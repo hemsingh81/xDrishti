@@ -183,6 +183,10 @@ services:
       # Bearer token for the tool server (xd-mcp checks it; the API sends it from P9-03). Same file as xd-mcp's.
       - source: mcp_token
         target: Assistant__Mcp__Token
+      # The tool server's READ-ONLY service token (BK-12b, ADR 0267): the API accepts it only on GET /api/reports/baskets/{id}/profile and /ranking (scheme xd-service-read, policy AssistantBasketRead); every other route needs the owner's session.
+      # Another file than mcp_token (which is the API's key towards the tool server): one secret both ways could not be revoked alone. Same file as xd-mcp's.
+      - source: mcp_api_token
+        target: Api__ServiceTokens__Mcp
     # egress: outbound only, to Dhan's consent endpoints (auth.dhan.co; ADR 0008, 0009), the read of the account's holdings (GET api.dhan.co/v2/holdings
     # with the stored access token; ADR 0012) and the two public instrument-master files (images.dhan.co, nsearchives.nseindia.com; ADR 0010).
     # The API's HTTP clients refuse every other endpoint (allow-lists); nothing is published on this network.
@@ -377,7 +381,7 @@ services:
       retries: 12 # 150 s + 12 x 10 s = 270 s, inside the 330 s that scripts/xd-ai.sh waits
     <<: *hardening
 
-  # ---- The assistant eval (P9-09, ADR 0143). Profile `eval` = never part of `xd-up.sh`; the owner starts it with scripts/xd-eval.sh. Four services, none with a published port, all on the internal `back` network (no route out). ----
+  # ---- The assistant eval (P9-09, ADR 0143). Profile `eval` = never part of `xd-up.sh`; the owner starts it with scripts/xd-eval.sh. Five services (BK-12b added xd-api-eval), none with a published port, all on the internal `back` network (no route out). ----
   # The fixture database `xdrishti_eval` is migrated by the same image and seeded from eval/fixture/fixture.json. The eval's tool server reads ONLY that database, as the same two read-only roles of P9-02; its own token is held by the
   # runner alone (never by xd-api, which keeps no eval token and no path to this server). Rules: deploy/CLAUDE.md, checked by EvalComposeRulesTests (part of scripts/check.sh).
 
@@ -419,6 +423,8 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Database__ReadConnectionString: Host=xd-db;Port=5432;Database=xdrishti_eval;Username=xd_mcp_read
       Database__SqlConnectionString: Host=xd-db;Port=5432;Database=xdrishti_eval;Username=xd_mcp_sql
+      # The basket reports of the eval come from the eval's own API over the FIXTURE (xd-api-eval, BK-12b), never from the production API: production figures must not reach a fixture golden.
+      Mcp__Api__BaseUrl: http://xd-api-eval:8080
       Serilog__WriteTo__1__Name: Seq
       Serilog__WriteTo__1__Args__serverUrl: http://xd-seq:5341
     secrets:
@@ -430,6 +436,8 @@ services:
         target: Mcp__Tokens__Eval
       - source: mcp_token_hermes
         target: Mcp__Tokens__Hermes
+      - source: mcp_api_token_eval
+        target: Mcp__Api__Token
     networks: [back, ai-edge]
     mem_limit: 512m
     depends_on:
@@ -438,6 +446,36 @@ services:
       test: [CMD, dotnet, XDrishti.Mcp.dll, --healthcheck]
       interval: 15s
       timeout: 10s
+      start_period: 20s
+      retries: 3
+    <<: *hardening
+
+  # The API over the FIXTURE database, for the two basket report routes only (BK-12b, ADR 0267): the API image with Api:ReportsOnly (no hosted or scheduled service, only the report endpoints mapped, no broker key), reading `xdrishti_eval` as the runtime role.
+  # Its one credential besides the database password is the eval's own service token (mcp_api_token_eval), held with xd-mcp-eval. No egress network, no published port, no Dhan or broker secret; ~300 to 500 MB while the eval runs.
+  xd-api-eval:
+    profiles: [eval]
+    image: localhost/xdrishti/api:${XD_VERSION:-0.1.0}
+    restart: unless-stopped
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Production
+      # Shortcut: the runtime role xd_app (it can write the fixture database, which holds synthetic rows only), no separate read-only login; the host serves GET report routes only and refuses Api:ReportsOnly over any database but xdrishti_eval.
+      Database__ConnectionString: Host=xd-db;Port=5432;Database=xdrishti_eval;Username=xd_app
+      Api__ReportsOnly: "true"
+    secrets:
+      - source: db_app_password
+        target: Database__Password
+      - source: mcp_api_token_eval
+        target: Api__ServiceTokens__Mcp
+    networks: [back]
+    mem_limit: 512m
+    pull_policy: never
+    depends_on:
+      xd-db: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, dotnet, XDrishti.Api.dll, --healthcheck]
+      interval: 15s
+      timeout: 5s
       start_period: 20s
       retries: 3
     <<: *hardening
@@ -512,6 +550,8 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Database__ReadConnectionString: Host=xd-db;Port=5432;Database=xdrishti;Username=xd_mcp_read
       Database__SqlConnectionString: Host=xd-db;Port=5432;Database=xdrishti;Username=xd_mcp_sql
+      # The basket profile and ranking come from the API's two read-only routes (BK-12b, ADR 0267), with the service token below: the tool server's database roles gain nothing.
+      Mcp__Api__BaseUrl: http://xd-api:8080
       Serilog__WriteTo__1__Name: Seq
       Serilog__WriteTo__1__Args__serverUrl: http://xd-seq:5341
     secrets:
@@ -523,6 +563,8 @@ services:
         target: Mcp__Tokens__Api
       - source: mcp_token_hermes
         target: Mcp__Tokens__Hermes
+      - source: mcp_api_token
+        target: Mcp__Api__Token
     networks: [back, ai-edge]
     mem_limit: 512m
     depends_on:
@@ -610,6 +652,10 @@ secrets:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/eval_mcp_token
   mcp_token_hermes:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/mcp_token_hermes
+  mcp_api_token:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/mcp_api_token
+  mcp_api_token_eval:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/mcp_api_token_eval
   db_exec_password:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/db_exec_password
   exec_handover_key:

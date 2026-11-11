@@ -30,7 +30,7 @@ public static class FixtureSeeder
     /// <summary>The tables that must be empty before the first seeding (one row anywhere is real data).</summary>
     private static readonly string[] MustBeEmpty =
     [
-        "research.sim_runs", "research.cell_stats", "research.lessons", "research.hypotheses", "market.instruments", "market.baskets", "portfolio.holdings", "trading.plans", "accounts.broker_accounts", "accounts.portfolio_buckets", "ai.settings",
+        "research.sim_runs", "research.cell_stats", "research.lessons", "research.hypotheses", "market.instruments", "market.bars_agg", "market.baskets", "portfolio.holdings", "trading.plans", "accounts.broker_accounts", "accounts.portfolio_buckets", "ai.settings",
     ];
 
     public static async Task<SeedOutcome> SeedAsync(string ownerConnectionString, EvalFixture fixture, string fixtureText, string requiredDatabase, CancellationToken cancellationToken)
@@ -85,14 +85,18 @@ public static class FixtureSeeder
         for (var i = 0; i < f.Instruments.Count; i++)
         {
             var instrument = f.Instruments[i];
+            var isIndex = instrument.Type == "index";
             await Exec(
                 c, t,
                 """
                 INSERT INTO market.instruments (id, canonical_symbol, exchange, exchange_segment, type, name, display_name, isin, series, lot_size, underlying_symbol, sector, fno_eligible, first_seen_at, last_seen_at)
-                VALUES (@id, @symbol, 'NSE', 'NSE_EQ', 'share', @name, @symbol, @isin, 'EQ', 1, @symbol, 'Eval', false, @stamp, @stamp)
+                VALUES (@id, @symbol, 'NSE', @segment, @type, @name, @symbol, @isin, @series, 1, @symbol, 'Eval', false, @stamp, @stamp)
                 """,
-                ct, ("id", NpgsqlDbType.Uuid, instruments[instrument.Symbol]), ("symbol", NpgsqlDbType.Varchar, instrument.Symbol), ("name", NpgsqlDbType.Varchar, instrument.Name), ("isin", NpgsqlDbType.Varchar, $"XS{i + 1:D10}"), ("stamp", NpgsqlDbType.TimestampTz, stamp));
+                ct, ("id", NpgsqlDbType.Uuid, instruments[instrument.Symbol]), ("symbol", NpgsqlDbType.Varchar, instrument.Symbol), ("name", NpgsqlDbType.Varchar, instrument.Name), ("segment", NpgsqlDbType.Varchar, isIndex ? "IDX_I" : "NSE_EQ"), ("type", NpgsqlDbType.Varchar, instrument.Type),
+                ("isin", NpgsqlDbType.Varchar, isIndex ? DBNull.Value : $"XS{i + 1:D10}"), ("series", NpgsqlDbType.Varchar, isIndex ? DBNull.Value : "EQ"), ("stamp", NpgsqlDbType.TimestampTz, stamp));
         }
+
+        await SeedBarsAsync(c, t, f, instruments, ct);
 
         for (var i = 0; i < f.Baskets.Count; i++)
         {
@@ -124,6 +128,28 @@ public static class FixtureSeeder
         await SeedPortfolioAsync(c, t, f, instruments, stamp, ct);
         await SeedCellAsync(c, t, f, stamp, ct);
         await SeedLearningAsync(c, t, f, orbRunKey!, stamp, ct);
+    }
+
+    /// <summary>The stored daily bars of the fixture (BK-12b): a straight line of closes per series on weekday sessions, written as 1D rows at the India midnight like the real daily bars.</summary>
+    private static async Task SeedBarsAsync(NpgsqlConnection c, NpgsqlTransaction t, EvalFixture f, Dictionary<string, Guid> instruments, CancellationToken ct)
+    {
+        if (f.Bars is not { } bars)
+        {
+            return;
+        }
+
+        var dates = bars.Dates();
+        foreach (var series in bars.Series)
+        {
+            for (var k = 0; k < dates.Count; k++)
+            {
+                var close = Math.Round(series.From + ((series.To - series.From) * k / (dates.Count - 1)), 6);
+                await Exec(
+                    c, t,
+                    "INSERT INTO market.bars_agg (instrument_id, timeframe, ts, open, high, low, close, volume, bars, complete) VALUES (@id, '1D', @ts, @c, @c, @c, @c, 1000, 375, true)",
+                    ct, ("id", NpgsqlDbType.Uuid, instruments[series.Symbol]), ("ts", NpgsqlDbType.TimestampTz, new DateTimeOffset(dates[k].ToDateTime(TimeOnly.MinValue), TimeSpan.FromMinutes(330)).ToUniversalTime()), ("c", NpgsqlDbType.Double, close));
+            }
+        }
     }
 
     private static async Task SeedRunAsync(NpgsqlConnection c, NpgsqlTransaction t, FixtureRun run, string runKey, Dictionary<string, Guid> instruments, Dictionary<string, Guid> baskets, EvalFixture f, DateTime stamp, CancellationToken ct)

@@ -35,6 +35,9 @@ internal static class ApiSetup
 {
     public const string OpenApiRoute = "/api/openapi/{documentName}.json";
 
+    /// <summary>Deployment switch <c>Api:ReportsOnly</c>: serve the report routes only, with no hosted service (the eval's API over the fixture database, BK-12b).</summary>
+    public const string ReportsOnlyKey = "Api:ReportsOnly";
+
     /// <summary>Failed and successful logins together: more than this per minute from one address are refused with 429.</summary>
     public const int LoginAttemptsPerMinute = 10;
 
@@ -48,6 +51,19 @@ internal static class ApiSetup
     public const int ConfirmActsPerMinute = 60;
 
     private static readonly string[] TrustedProxyNetworks = ["127.0.0.0/8", "::1/128", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"];
+
+    /// <summary>The only database a reports-only instance may read: the eval fixture. Refuses (the host does not start) when <c>Database:ConnectionString</c> names another.</summary>
+    public const string EvalDatabase = "xdrishti_eval";
+
+    public static void RequireEvalDatabase(IConfiguration configuration)
+    {
+        var text = configuration["Database:ConnectionString"] ?? string.Empty;
+        var name = text.Split(';', StringSplitOptions.TrimEntries).Select(part => part.Split('=', 2)).Where(kv => kv.Length == 2 && kv[0].Equals("Database", StringComparison.OrdinalIgnoreCase)).Select(kv => kv[1]).FirstOrDefault();
+        if (!string.Equals(name, EvalDatabase, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"{ReportsOnlyKey} is allowed only over the database '{EvalDatabase}'.");
+        }
+    }
 
     public static IServiceCollection AddApi(this IServiceCollection services)
     {
@@ -340,23 +356,29 @@ internal static class ApiSetup
         app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
         app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = r => r.Tags.Contains("ready") }).AllowAnonymous();
 
-        // The contract and the docs UI need a session like everything else (stated explicitly; the fallback policy would also cover them).
-        app.MapOpenApi(OpenApiRoute).RequireAuthorization();
-        // Local-only docs UI: Scalar's cloud features (AI agent, MCP, telemetry, client button) are disabled.
-        app.MapScalarApiReference("/api/docs", o => o
-            .WithTitle("xDrishti API")
-            .WithOpenApiRoutePattern(OpenApiRoute)
-            .DisableAgent()
-            .DisableMcp()
-            .DisableTelemetry()
-            .HideClientButton())
-            .RequireAuthorization();
+        var reportsOnly = app.Configuration.GetValue<bool>(ReportsOnlyKey);
 
-        // The hub: owner session (the fallback policy, stated again by [Authorize] on the hub), WebSockets only.
-        app.MapHub<EventsHub>(LiveHubContract.Route, o => o.Transports = HttpTransportType.WebSockets).RequireAuthorization();
+        // A reports-only instance (BK-12b) maps no contract, docs UI or hub: only the health probes and the GET report routes below.
+        if (!reportsOnly)
+        {
+            // The contract and the docs UI need a session like everything else (stated explicitly; the fallback policy would also cover them).
+            app.MapOpenApi(OpenApiRoute).RequireAuthorization();
+            // Local-only docs UI: Scalar's cloud features (AI agent, MCP, telemetry, client button) are disabled.
+            app.MapScalarApiReference("/api/docs", o => o
+                .WithTitle("xDrishti API")
+                .WithOpenApiRoutePattern(OpenApiRoute)
+                .DisableAgent()
+                .DisableMcp()
+                .DisableTelemetry()
+                .HideClientButton())
+                .RequireAuthorization();
+
+            // The hub: owner session (the fallback policy, stated again by [Authorize] on the hub), WebSockets only.
+            app.MapHub<EventsHub>(LiveHubContract.Route, o => o.Transports = HttpTransportType.WebSockets).RequireAuthorization();
+        }
 
         var api = app.MapGroup("/api");
-        foreach (var module in app.Services.GetServices<IEndpointModule>())
+        foreach (var module in app.Services.GetServices<IEndpointModule>().Where(m => !reportsOnly || m is ReportsEndpoints))
         {
             module.Map(api);
         }
@@ -367,10 +389,21 @@ internal static class ApiSetup
     private static void AddAuth(this IServiceCollection services)
     {
         services.AddAuthentication(SessionAuthentication.Scheme)
-            .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthentication.Scheme, _ => { });
+            .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthentication.Scheme, _ => { })
+            .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, ServiceReadAuthenticationHandler>(ServiceReadAuthentication.Scheme, _ => { });
 
-        // Closed by default: any endpoint without its own policy needs a signed-in session.
-        services.AddAuthorization(o => o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+        // The tool server's read-only token (BK-12b, ADR 0267): unset means the scheme accepts nothing; a value equal to another secret stops the host at start.
+        services.AddOptions<ServiceTokenOptions>().BindConfiguration(ServiceTokenOptions.SectionName).ValidateOnStart();
+        services.AddSingleton<IValidateOptions<ServiceTokenOptions>, ServiceTokenOptionsValidator>();
+
+        services.AddAuthorization(o =>
+        {
+            // Closed by default: any endpoint without its own policy needs a signed-in session (the default scheme only, so the service token opens nothing here).
+            o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+
+            // The two basket report routes alone: an owner session or the tool server's token (the session scheme first: it writes the 401).
+            o.AddPolicy(ServiceReadAuthentication.AssistantBasketReadPolicy, new AuthorizationPolicyBuilder(SessionAuthentication.Scheme, ServiceReadAuthentication.Scheme).RequireAuthenticatedUser().Build());
+        });
 
         // The proxy (Caddy, container network) is trusted to tell the real client address and scheme.
         services.Configure<ForwardedHeadersOptions>(o =>

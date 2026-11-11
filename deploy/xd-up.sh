@@ -177,6 +177,10 @@ write_secret mcp_token "xdrishti/mcp/token"
 write_secret eval_mcp_token "xdrishti/mcp/eval-token"
 # The Hermes PoC's own tool token (P9-10, ADR 0144): Mcp:Tokens:Hermes of xd-mcp / xd-mcp-eval, held by xd-hermes (profile hermes, never started here). Revoke it alone by rotating the Keychain item and restarting xd-mcp.
 write_secret mcp_token_hermes "xdrishti/mcp/hermes-token"
+# The tool server's read-only API token (BK-12b, ADR 0267): xd-api accepts it ONLY on GET /api/reports/baskets/{id}/profile and /ranking; xd-mcp presents it. Not the same value as mcp_token (the API's key towards the tool server). Created once, never replaced. To rotate: change the
+# Keychain item, run this script and restart xd-api and xd-mcp. The eval's own token is held by the eval's API over the fixture and the eval tool server only (profile eval, started by scripts/xd-eval.sh), so production figures never reach a fixture golden.
+write_secret mcp_api_token "xdrishti/mcp/api-token"
+write_secret mcp_api_token_eval "xdrishti/mcp/api-eval-token"
 
 # The execution role's password (P12-01b): the Keychain item is created ONLY by `--exec` (an owner act). Without it the compose file still needs the file to exist: an empty one is made once and never overwritten,
 # which sets the role xd_exec NOLOGIN (xd-migrate gives the login only from a non-empty file). Mounted into xd-migrate and xd-exec only.

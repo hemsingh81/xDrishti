@@ -41,10 +41,10 @@ health() { podman inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else
 container_health() { podman inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$1" 2>/dev/null || echo none; }
 mcp_running() { [[ "$(podman inspect -f '{{.State.Running}}' "$MCP_CONTAINER" 2>/dev/null || true)" == "true" ]]; }
 
-# Starts the tool server alone. It needs the stack's database (xd-db healthy and migrated, which gave the two read-only roles their login) and three secret files written by deploy/xd-up.sh. --no-deps: compose must not start the one-shot xd-migrate again.
+# Starts the tool server alone. It needs the stack's database (xd-db healthy and migrated, which gave the two read-only roles their login) and four secret files written by deploy/xd-up.sh. --no-deps: compose must not start the one-shot xd-migrate again.
 start_tools() {
   local f
-  for f in db_mcp_read_password db_mcp_sql_password mcp_token; do
+  for f in db_mcp_read_password db_mcp_sql_password mcp_token mcp_api_token; do
     [[ -s "$XD_SECRETS_DIR/$f" ]] || { echo "The secret file $f is missing or empty: run deploy/xd-up.sh once (it creates the Keychain items and sets the database logins)." >&2; return 1; }
   done
   podman info >/dev/null 2>&1 || { echo "The Podman machine is not running: start it (podman machine start) or run deploy/xd-up.sh." >&2; return 1; }

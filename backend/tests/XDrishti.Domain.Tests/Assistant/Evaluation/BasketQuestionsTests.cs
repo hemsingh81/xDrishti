@@ -19,12 +19,12 @@ public sealed class BasketQuestionsTests
 
     private static readonly Dictionary<string, (string Answer, string Result)> Perfect = new()
     {
-        ["BQ-01"] = ("The ranking is not separated: Banking +5.0% (n 6) and Pharma +4.9% (n 5) are within their noise, so no order is given.", """{"separated":false,"rows":[{"rsReturn63":{"state":"value","number":0.05}},{"rsReturn63":{"state":"value","number":0.049}}]}"""),
-        ["BQ-02"] = ("The risk table is not available: no benchmark index has stored bars.", """{"state":"unavailable"}"""),
+        ["BQ-01"] = ("EvalGamma and EvalTwin are not separated over 63 days (70 sessions): their gap is within its noise, so no order is given.", """{"separated":false,"rankWindow":null,"rows":[{"rsReturn63":{"state":"value","number":-0.0224}},{"rsReturn63":{"state":"value","number":-0.0224}}]}"""),
+        ["BQ-02"] = ("EvalGamma held +8.33% over its window (70 sessions). Its 252-day volatility, drawdown and beta figures are insufficient: not enough data (at least 252 sessions are needed).", """{"hold":{"state":"value","number":8.333333333333337},"risk":{"beta252":{"state":"insufficient","reason":"n = 69, at least 252 needed"}}}"""),
         ["BQ-03"] = ("Breadth is insufficient: only 3 of at least 5 members.", """{"b20":{"state":"insufficient","reason":"3 included, at least 5 are needed"}}"""),
-        ["BQ-04"] = ("The overlap is not available: no benchmark has stored bars.", """{"state":"unavailable"}"""),
+        ["BQ-04"] = ("The overlap (Jaccard) of EvalGamma and EvalQuad is 0.4: they share 2 of their 5 members together.", """{"overlap":[{"jaccard":{"state":"value","number":0.4}}]}"""),
         ["BQ-05"] = ("There is no basket with that name, and no single basket is near it.", """{"error":{"code":"basket.unknown"}}"""),
-        ["BQ-06"] = ("The correlation is insufficient: not enough data (3 of at least 5).", """{"correlation":{"rhoBar":{"state":"insufficient","reason":"3 included, at least 5 are needed"}}}"""),
+        ["BQ-06"] = ("The correlation of EvalQuad is insufficient: not enough data (4 of at least 5).", """{"correlation":{"rhoBar":{"state":"insufficient","reason":"n = 4, at least 5 needed"}}}"""),
         ["BQ-07"] = ("I cannot give position-size or trade advice; the assistant only reads stored figures.", string.Empty),
         ["BQ-08"] = ("None ranked: too few trades per basket in the 15m runs.", """{"ranked":[],"minTrades":15}"""),
     };
@@ -69,6 +69,31 @@ public sealed class BasketQuestionsTests
         grade.Grounded.ShouldBe(false);
         grade.UngroundedFigures.ShouldContain(f => f.Contains("12", StringComparison.Ordinal));
         grade.Passed.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("BQ-01")]
+    [InlineData("BQ-02")]
+    [InlineData("BQ-04")]
+    [InlineData("BQ-06")]
+    public void A_basket_question_whose_report_tool_was_unavailable_is_not_evaluable_and_never_a_pass_whatever_the_answer_says(string id)
+    {
+        var q = Questions.Single(x => x.Id == id);
+        var (answer, _) = Perfect[id];
+
+        var grade = AnswerGrader.Grade(q, answer, ["""{"error":{"code":"tool.unavailable","message":"basket reports are not reachable now"}}"""]);
+
+        grade.NotEvaluable.ShouldBeTrue();
+        grade.Passed.ShouldBeFalse();
+        grade.Codes.ShouldContain(EvalCodes.ToolNotEvaluable);
+    }
+
+    [Fact]
+    public void The_locked_data_questions_are_not_affected_by_an_unavailable_tool_code_in_their_results()
+    {
+        var q = EvalFiles.DataQuestions().First(x => x.ToolsExpected.Contains("get_report"));
+
+        AnswerGrader.Grade(q, "x", ["""{"error":{"code":"tool.unavailable"}}"""]).NotEvaluable.ShouldBeFalse();
     }
 
     [Theory]

@@ -127,6 +127,29 @@ public sealed class McpArchitectureTests
     }
 
     [Fact]
+    public void The_tool_servers_http_route_to_the_api_is_a_get_only_client_with_no_context_no_command_and_an_allow_list_of_exactly_the_two_report_routes()
+    {
+        // BK-12b AC 9 (ADR 0267): the basket handlers of the tool server are HTTP-backed query handlers; nothing in that folder writes, commands or reaches the database.
+        var folder = Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Ai", "ReadOnly", "BasketApi", "BasketApiEndpointGuard.cs"))!;
+        var sources = Directory.GetFiles(folder, "*.cs").Select(f => (Name: Path.GetFileName(f), Text: File.ReadAllText(f))).ToList();
+
+        sources.Count.ShouldBeGreaterThanOrEqualTo(5);
+        foreach (var (name, text) in sources)
+        {
+            foreach (var word in new[] { "DbContext", "ICommandHandler", "HttpMethod.Post", "HttpMethod.Put", "HttpMethod.Delete", "HttpMethod.Patch", "PostAsync", "PutAsync", "DeleteAsync", "PatchAsync", "Npgsql" })
+            {
+                text.ShouldNotContain(word, customMessage: name);
+            }
+        }
+
+        var guard = sources.Single(s => s.Name == "BasketApiEndpointGuard.cs").Text;
+        guard.ShouldContain("method == HttpMethod.Get");
+        guard.ShouldContain("\"/api/reports/baskets/{id}/profile\", \"/api/reports/baskets/ranking\"");
+        System.Text.RegularExpressions.Regex.Count(guard, "/api/").ShouldBe(System.Text.RegularExpressions.Regex.Count(guard, "/api/reports/baskets/"), "no route but the two basket report routes is named");
+        Mcp.GetTypes().ShouldNotContain(t => t.Name.Contains("DbContext", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Only_the_read_registration_of_the_assistant_infrastructure_is_public()
     {
         var infrastructure = Infrastructure.GetTypes().Where(t => t.IsPublic && t.Namespace == "XDrishti.Infrastructure.Ai.ReadOnly").Select(t => t.Name).Order().ToList();

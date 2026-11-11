@@ -21,6 +21,7 @@ internal static class McpHost
             .ValidateOnStart();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddAiReadOnly(builder.Configuration);
+        builder.Services.AddAiBasketApi(builder.Configuration); // basket_profile and basket_ranking over the API's two read-only routes (BK-12b); the reader resolves the handlers from a scope
         builder.Services.AddSingleton<ToolRunner>();
         builder.Services.AddSingleton<ListTablesTool>();
         builder.Services.AddSingleton<DescribeTableTool>();
