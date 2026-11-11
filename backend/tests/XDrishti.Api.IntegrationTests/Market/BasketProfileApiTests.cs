@@ -168,6 +168,20 @@ public sealed class BasketProfileApiTests(ApiFactory factory) : BasketsTestBase(
     }
 
     [Fact]
+    public async Task When_two_indices_are_called_nifty_500_the_canonical_symbol_wins()
+    {
+        await ImportAsync();
+        var basket = await SeededBasketAsync();
+        await InsertIndexAsync("NSE:AAA_NIFTY_500_COPY", "Nifty 500"); // sorts first by symbol, so only the canonical-symbol rule can pick the other one
+        var canonical = await InsertIndexAsync("NSE:NIFTY_500", "Nifty 500");
+        await StoreDailyAsync(canonical, i => 1000 + (i * 200.0 / 24));
+
+        var body = await ProfileAsync(basket);
+
+        body.GetProperty("index").GetProperty("id").GetGuid().ShouldBe(canonical);
+    }
+
+    [Fact]
     public async Task Nifty_500_without_daily_bars_says_so_and_the_window_is_the_calendar()
     {
         await ImportAsync();

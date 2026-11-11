@@ -17,9 +17,14 @@ internal sealed class BasketBenchmarkStore(XDrishtiDbContext db, IPortfolioBench
         if (stored is not null)
         {
             var chosen = Guid.TryParse(stored, out var id) ? await master.FindAsync(id, cancellationToken) : null;
-            return chosen is { Retired: false } && chosen.Type == InstrumentTypeCodes.Index
-                ? new BasketBenchmark(chosen, false, chosen.Name, null)
-                : new BasketBenchmark(null, false, "The chosen index", "The chosen index is not in the instrument master");
+            if (chosen is { Retired: false } && chosen.Type == InstrumentTypeCodes.Index)
+            {
+                return new BasketBenchmark(chosen, false, chosen.Name, null);
+            }
+
+            var name = chosen?.Name ?? "The chosen index";
+            var why = chosen is null ? "is not in the instrument master" : chosen.Retired ? "is retired" : "is not an index";
+            return new BasketBenchmark(null, false, name, $"{name} {why}");
         }
 
         var preferred = BasketBenchmarkDefault.CanonicalSymbol;
