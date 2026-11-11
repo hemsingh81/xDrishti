@@ -147,6 +147,19 @@ public sealed class LabRunnerTests
         query.Request.Fills.ShouldBe(new FillRulesInput(FillRules.Default.EntryLimitPercent, FillRules.Default.Slippage.Ticks, FillRules.Default.Slippage.BarRangeFrac, FillRules.Default.Slippage.StopExitExtraTicks));
     }
 
+    [Fact]
+    public async Task BK_11b_a_dated_run_asks_for_the_basket_and_the_basis_not_for_the_list()
+    {
+        var basket = Guid.NewGuid();
+        var run = Run() with { Universe = Run().Universe with { BasketId = basket, MembersBasis = "dated" } };
+
+        await Runner().ExecuteAsync(run, Ct);
+
+        var query = (RunSimulationQuery)_simulation.ReceivedCalls().Single().GetArguments()[0]!;
+        query.Request.InstrumentIds.ShouldBeNull();
+        (query.Request.BasketId, query.Request.MembersBasis).ShouldBe((basket, "dated"));
+    }
+
     private static LabRun FullRun() => Run() with { Method = "full", From = new DateOnly(2026, 2, 1) };
 
     [Fact]

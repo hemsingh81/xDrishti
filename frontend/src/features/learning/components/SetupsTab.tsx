@@ -8,6 +8,7 @@ import { ChangelogTimeline } from './ChangelogTimeline';
 import { Heatmap } from './Heatmap';
 import { LifecycleFunnel } from './LifecycleFunnel';
 import { NoSnapshot } from './NoSnapshot';
+import { UniverseLinksPanel } from './UniverseLinksPanel';
 import { Panel } from './Panel';
 
 /** Setups: the cell heatmap with a window selector, the lifecycle funnel, the changelog and the open cell. All view state is in the URL. */
@@ -70,6 +71,7 @@ export function SetupsTab() {
           <ChangelogTimeline label="Changelog, newest first" />
         </Panel>
       </Box>
+      <UniverseLinksPanel />
       {openCell !== null && (
         <CellDrawer
           cellKey={openCell}

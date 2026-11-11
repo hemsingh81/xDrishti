@@ -74,7 +74,7 @@ internal sealed class HoldOutPass(
         var r = new List<double>();
         foreach (var timeframe in timeframes)
         {
-            var request = new SimulationRequest(run.StrategyId, new Dictionary<string, double>(), timeframe.ToCode(), block.Start, block.HistoryLast, [.. run.Universe.Instruments.Select(i => i.Id)], null, CostChoice.Sheet(sheet.Value.Id), false, null, fills, null, null, run.StrategyHash) with { Exits = exits };
+            var request = new SimulationRequest(run.StrategyId, new Dictionary<string, double>(), timeframe.ToCode(), block.Start, block.HistoryLast, run.Universe.IsDated ? null : [.. run.Universe.Instruments.Select(i => i.Id)], run.Universe.IsDated ? run.Universe.BasketId : null, CostChoice.Sheet(sheet.Value.Id), false, null, fills, null, null, run.StrategyHash, MembersBasis: run.Universe.IsDated ? run.Universe.MembersBasis : null) with { Exits = exits };
             var compared = await comparisons.HandleAsync(new RunComparisonQuery(request), cancellationToken);
             if (compared.IsFailure)
             {

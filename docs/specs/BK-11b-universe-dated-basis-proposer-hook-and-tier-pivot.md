@@ -80,7 +80,8 @@ None blocking (approved). Left for the owner:
 - The derived-basket `params_hash` is the newest stored version with `effective_from` on or before the window start (`IDerivedVersionStore.ListVersionsAsync`).
 - The web propose endpoint is `POST /api/cells/universe-links/{key}/propose` (key URL-encoded), an owner act behind `learning_moves_ui`; the window defaults to `all`.
 - The auto proposer proposes an observation only once per (cell, tier): a closed (rejected, expired) hypothesis of the same pair is not proposed again by the auto option; the owner can still propose it by hand.
-**Not built (reported)**
-- The Lab: `membersBasis` is accepted by the simulate command (`xd simulate --basket --members dated|single_snapshot`) and the run record carries the structured fields; the Lab start request, its stored universe and the Lab run view do not offer it (the Lab samples a stored instrument list and builds many requests from it). The trial count (`GET /api/lab/strategies/{id}/universe-trials`) counts (basket, basis) pairs and reads `membersBasis` of a stored Lab universe when one exists.
-- The frontend Lab picker and the Setups "Propose as hypothesis" row: the Setups universe-links screen does not exist yet in the frontend (BK-11 built the endpoints only). The pivot builder offers the liquidity tier.
-- The random-entry and placebo walks (CF-07) and the trade-card recomputation (`BuildTradeCards`) do not take the member filter: the card of a trade a dated run took is rebuilt from the same bars; only the entries a dated run refused are not shown.
+**Follow-up 2026-11-11 (same ADR): the earlier not-built items are built**
+- The Lab: `universe.membersBasis` on `POST /api/lab/runs` (dated for a full or robust test; `simulation.members_not_dated` 422 as the simulate path), stored on the Lab universe, used by every request of the run including the hold-out pass; the (basket, basis) trial count reads it.
+- The random-entry and placebo walks and the trade-card recomputation carry the member filter (the random-entry draw is on a real trade's date, a member day by construction; tested).
+- Frontend: the Lab "Members" picker (single snapshot default, dated; disabled with the reason for the quick test), a Setups list of the tier links, and the owner-act form `/owner-acts/universe/<key>` (fresh password; 409 and 422 sentences shown as sent).
+- `single_snapshot` with a named basis: `members_as_of` is the run date as AC 4 and 5 say, so its key changes daily; kept, and said in the ADR.

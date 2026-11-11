@@ -87,6 +87,12 @@ export const overviewQuery = queryOptions({
   queryFn: async ({ signal }) => unwrap(await api.GET('/api/learning/overview', { signal })),
 });
 
+/** Each liquidity-tier cell read against its all-shares parent (BK-11); an observation only, nothing is applied. */
+export const universeLinksQuery = queryOptions({
+  queryKey: ['learning', 'universe-links'] as const,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/cells/universe-links', { signal })),
+});
+
 export const cellsQuery = (window: CellWindow) =>
   queryOptions({
     queryKey: learningKeys.cells(window),

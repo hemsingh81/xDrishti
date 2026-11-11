@@ -263,7 +263,7 @@ internal sealed class RunSimulationHandler(
         var days = readsContext ? await contextDays.ListAsync(cancellationToken) : null;
         if (basisSink is not null)
         {
-            basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough, days, events, resultsDays, entryTiers, request.Fills?.ConservativeSlippage == true);
+            basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough, days, events, resultsDays, entryTiers, request.Fills?.ConservativeSlippage == true, targets.Dated);
         }
 
         // BK-09: a strategy that names mom_rank, rs_vs_index or sector_rs gets the stored rows of the previous closed sessions, read once per instrument; the step being off means there are none and every instrument is skipped with a reason.

@@ -47022,6 +47022,16 @@
               "integer"
             ],
             "format": "int64"
+          },
+          "membersBasis": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isDated": {
+            "type": "boolean",
+            "description": "True for a basket run that replays each day with that day's members (BK-11b): its requests name the basket and the basis, not the list."
           }
         },
         "description": "The universe of a Lab run as it was resolved when the run was posted (spec P5-02, D2): the basket changes later, the run keeps the list. Requested is the number of members before the quick-test sample;\nSampled says the list was cut to the limit by the seeded shuffle of Seed."
@@ -68317,6 +68327,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "membersBasis": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "description": "The universe of a posted run: exactly one of a basket and a list of symbols."

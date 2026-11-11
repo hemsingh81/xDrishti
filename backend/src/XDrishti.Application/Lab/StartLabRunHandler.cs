@@ -74,6 +74,13 @@ internal sealed class StartLabRunHandler(
         }
 
         var (from, to, firstSession, lastSession) = window.Value;
+        var dated = await ApplyMembersBasisAsync(command, universe.Value, full, from, to, cancellationToken);
+        if (dated.IsFailure)
+        {
+            return Result.Failure<StartedLabRun>(dated.Error);
+        }
+
+        universe = dated;
         string? holdOutNote = null;
         if (holdOut is not null && await holdOut.EnsureAsync(firstSession, lastSession, cancellationToken) is { } block)
         {
@@ -298,6 +305,50 @@ internal sealed class StartLabRunHandler(
         var byId = members.ToDictionary(m => m.Id);
         var chosen = choice.Ids.Select(id => byId[id]).ToList();
         return Result.Success(new LabUniverse(kind, command.BasketId, kind == "basket" ? "basket members at the time of the post" : "symbols as listed", members.Count, chosen, choice.Sampled, choice.Seed));
+    }
+
+    /// <summary>
+    /// BK-11b: the members basis of a basket run. Without one nothing changes. <c>dated</c> needs a full or robust test (the quick test samples a list), a basket with dated membership for the window start (else 422 <c>simulation.members_not_dated</c>, as the simulate path) and
+    /// replaces the universe by the instruments that are a member on some day of the window, under the dated label, so the plan hash and the key differ from the snapshot test. <c>single_snapshot</c> is recorded and keeps the list and the label.
+    /// </summary>
+    private async ValueTask<Result<LabUniverse>> ApplyMembersBasisAsync(StartLabRunCommand command, LabUniverse universe, bool full, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        if (command.MembersBasis is not { } basis)
+        {
+            return Result.Success(universe);
+        }
+
+        if (command.BasketId is not { } basketId || basis is not (UniverseBasisRecord.Dated or UniverseBasisRecord.SingleSnapshot))
+        {
+            return Result.Failure<LabUniverse>(LabErrors.InvalidInput("`universe.membersBasis` is dated or single_snapshot and goes with `universe.basketId`."));
+        }
+
+        if (basis == UniverseBasisRecord.SingleSnapshot)
+        {
+            return Result.Success(universe with { MembersBasis = basis });
+        }
+
+        if (!full)
+        {
+            return Result.Failure<LabUniverse>(LabErrors.InvalidInput("The dated basis needs a full or robust test: the quick test samples the members of one day."));
+        }
+
+        var stays = await baskets.StaysAsync(basketId, cancellationToken);
+        if (stays is null || stays.ArchivedAt is not null)
+        {
+            return Result.Failure<LabUniverse>(LabErrors.BasketNotFound(basketId));
+        }
+
+        var members = new DatedMembers(stays.Items.Select(s => (s.InstrumentId, s.ValidFrom, s.ValidTo)));
+        if (!members.IsDatedFor(from, out var firstDay))
+        {
+            return Result.Failure<LabUniverse>(SimulationErrors.MembersNotDated(firstDay));
+        }
+
+        var chosen = stays.Items.Where(s => members.IsMemberDuring(s.InstrumentId, from, to)).DistinctBy(s => s.InstrumentId).OrderBy(s => s.Position).Select(s => new LabInstrument(s.InstrumentId, s.Symbol)).ToList();
+        return chosen.Count == 0
+            ? Result.Failure<LabUniverse>(LabErrors.InvalidInput("The universe has no instrument."))
+            : Result.Success(universe with { Label = UniverseLabels.Dated(basketId, null), Requested = chosen.Count, Instruments = chosen, Sampled = false, Seed = null, MembersBasis = basis });
     }
 
     private static string Show(string term) => term.Length <= 40 ? term : term[..40];

@@ -62,6 +62,20 @@ public sealed class RandomEntryWalkerTests
     }
 
     [Fact]
+    public void BK_11b_the_member_filter_is_applied_to_a_draw_and_a_constant_membership_changes_nothing()
+    {
+        var input = Input(Bars());
+        var spec = Spec();
+
+        var plain = RandomEntryWalker.RandomTrades(Orb, input, Plan(draws: 10, trades: spec), spec);
+        var member = RandomEntryWalker.RandomTrades(Orb, input with { MemberOn = _ => true }, Plan(draws: 10, trades: spec), spec);
+        var leaver = RandomEntryWalker.RandomTrades(Orb, input with { MemberOn = _ => false }, Plan(draws: 10, trades: spec), spec);
+
+        member.Trades.OfType<SimTrade>().Select(t => t.Key).ShouldBe(plain.Trades.OfType<SimTrade>().Select(t => t.Key));
+        leaver.Trades.OfType<SimTrade>().ShouldBeEmpty("a draw on a day the instrument was not a member is no trade");
+    }
+
+    [Fact]
     public void The_draws_of_a_trade_do_not_depend_on_the_other_trades_of_the_plan()
     {
         var input = Input(Bars());

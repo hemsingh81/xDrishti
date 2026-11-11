@@ -86,6 +86,20 @@ public sealed class RunSimulationDatedMembersTests
     }
 
     [Fact]
+    public async Task BK_11b_the_basis_for_the_trade_cards_carries_the_membership_of_a_dated_run_and_none_for_another()
+    {
+        var (fixture, basket, _, b, _) = HandCase();
+        var dated = new ExplainBasisSink();
+        var plain = new ExplainBasisSink();
+
+        (await fixture.Handler.HandleAsync(new RunSimulationQuery(Dated(basket), null, dated), Ct)).IsSuccess.ShouldBeTrue();
+        (await fixture.Handler.HandleAsync(new RunSimulationQuery(RunFixture.Basket(basket), null, plain), Ct)).IsSuccess.ShouldBeTrue();
+
+        dated.Basis!.Members.ShouldNotBeNull().IsMember(b, RunFixture.D2).ShouldBeFalse();
+        plain.Basis!.Members.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task A_snapshot_basis_stores_the_run_date_keeps_the_label_and_differs_from_a_run_that_did_not_say()
     {
         var (fixture, basket, _, _, _) = HandCase();

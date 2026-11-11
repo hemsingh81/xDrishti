@@ -15132,6 +15132,9 @@ export interface components {
       sampled: boolean;
       /** Format: int64 */
       seed: null | number;
+      membersBasis?: null | string;
+      /** @description True for a basket run that replays each day with that day's members (BK-11b): its requests name the basket and the basis, not the list. */
+      isDated?: boolean;
     };
     /** @description The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off. `Trials` (CF-06) is the count of looks with its parts as of the judgement; null in a result stored before it. `Nulls` (CF-07) is the random-entry null beside the outcome; null in a result stored before it, in a run that is not robust or when its mode is Off. `Benchmark` (CF-11 row 13, ADR 0227) is the daily Sharpe of the strategy against its universe's buy-and-hold; null in a result stored before it. */
     LabVerdictView: {
@@ -23177,6 +23180,7 @@ export interface components {
       /** Format: uuid */
       basketId?: null | string;
       symbols?: null | string[];
+      membersBasis?: null | string;
     };
     /** @description The window of a posted run, India dates, inclusive; both or neither. */
     StartLabRunWindow: {
