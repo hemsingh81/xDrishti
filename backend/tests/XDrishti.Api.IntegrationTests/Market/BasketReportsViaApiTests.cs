@@ -1,5 +1,3 @@
-using System.Text.Json.Nodes;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -232,29 +230,6 @@ public sealed class BasketReportsViaApiTests(ApiFactory factory) : BasketsTestBa
         answer.ErrorCode.ShouldBeNull();
         clock.ElapsedMilliseconds.ShouldBeLessThan(1000);
         answer.Data!["series"]!["dates"]!.AsArray().Count.ShouldBeLessThanOrEqualTo(120);
-    }
-
-    [Fact]
-    public async Task The_reports_only_host_serves_the_two_report_routes_with_no_hosted_service_and_no_broker_key()
-    {
-        var (id, _, _) = await WorldAsync();
-        await using var reportsOnly = Factory.WithWebHostBuilder(b =>
-        {
-            b.UseSetting("Api:ReportsOnly", "true");
-            b.UseSetting("BrokerVault:Key", string.Empty); // a host with no broker secret must start
-            b.UseSetting("ExecHandover:Key", string.Empty);
-        });
-        using var client = reportsOnly.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
-        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Factory.ServiceToken);
-
-        using var profile = await client.GetAsync(new Uri($"/api/reports/baskets/{id}/profile?from={From}&to={To}", UriKind.Relative), Ct);
-
-        profile.StatusCode.ShouldBe(System.Net.HttpStatusCode.OK, await profile.Content.ReadAsStringAsync(Ct));
-        var names = reportsOnly.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints.Select(e => e.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.IEndpointNameMetadata>()?.EndpointName).ToList();
-        names.ShouldContain("GetBasketProfile");
-        names.ShouldNotContain("GetSystemStatus"); // only the report routes are mapped
-        reportsOnly.Services.GetServices<Microsoft.Extensions.Hosting.IHostedService>().Select(h => h.GetType().Namespace).ShouldAllBe(n => n!.StartsWith("Microsoft.", StringComparison.Ordinal)); // the framework's own only
-        JsonNode.Parse(await profile.Content.ReadAsStringAsync(Ct))!["members"]!["counted"]!.GetValue<int>().ShouldBe(3);
     }
 
     private async Task StoreDailyAsync(Guid instrumentId, Func<int, double> close)

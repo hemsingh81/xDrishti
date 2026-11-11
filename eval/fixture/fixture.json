@@ -34,6 +34,31 @@
   {
    "symbol": "EVH2",
    "name": "Eval Holding Two"
+  },
+  {
+   "symbol": "NSE:NIFTY_500",
+   "name": "Nifty 500",
+   "type": "index"
+  },
+  {
+   "symbol": "EVG1",
+   "name": "Eval Gamma One"
+  },
+  {
+   "symbol": "EVG2",
+   "name": "Eval Gamma Two"
+  },
+  {
+   "symbol": "EVG3",
+   "name": "Eval Gamma Three"
+  },
+  {
+   "symbol": "EVQ3",
+   "name": "Eval Quad Three"
+  },
+  {
+   "symbol": "EVQ4",
+   "name": "Eval Quad Four"
   }
  ],
  "baskets": [
@@ -58,6 +83,31 @@
    "symbols": [
     "EVH1",
     "EVH2"
+   ]
+  },
+  {
+   "name": "EvalGamma",
+   "symbols": [
+    "EVG1",
+    "EVG2",
+    "EVG3"
+   ]
+  },
+  {
+   "name": "EvalQuad",
+   "symbols": [
+    "EVG1",
+    "EVG2",
+    "EVQ3",
+    "EVQ4"
+   ]
+  },
+  {
+   "name": "EvalTwin",
+   "symbols": [
+    "EVG1",
+    "EVG2",
+    "EVG3"
    ]
   }
  ],
@@ -440,6 +490,42 @@
    {
     "key": "EVAL-H3",
     "status": "rejected"
+   }
+  ]
+ },
+ "bars": {
+  "start": "2025-11-24",
+  "sessions": 70,
+  "series": [
+   {
+    "symbol": "NSE:NIFTY_500",
+    "from": 1000,
+    "to": 1100
+   },
+   {
+    "symbol": "EVG1",
+    "from": 100,
+    "to": 110
+   },
+   {
+    "symbol": "EVG2",
+    "from": 50,
+    "to": 45
+   },
+   {
+    "symbol": "EVG3",
+    "from": 200,
+    "to": 250
+   },
+   {
+    "symbol": "EVQ3",
+    "from": 200,
+    "to": 250
+   },
+   {
+    "symbol": "EVQ4",
+    "from": 100,
+    "to": 100
    }
   ]
  }

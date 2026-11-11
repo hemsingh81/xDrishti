@@ -48,7 +48,7 @@ public sealed class FixtureOracleTests
     public void The_fixture_has_the_records_of_the_spec()
     {
         Fixture.FixtureDate.ShouldBe(new DateOnly(2026, 3, 3));
-        Fixture.Instruments.Select(i => i.Symbol).ShouldBe(["EVA", "EVB", "EVC", "EVD", "EVE", "EVF", "EVH1", "EVH2"]);
+        Fixture.Instruments.Select(i => i.Symbol).ShouldBe(["EVA", "EVB", "EVC", "EVD", "EVE", "EVF", "EVH1", "EVH2", "NSE:NIFTY_500", "EVG1", "EVG2", "EVG3", "EVQ3", "EVQ4"]); // the last six are the basket reports' world (BK-12b): no trade, no plan line, no holding
         Fixture.Runs.Select(r => (r.Key, r.Trades.Count)).ShouldBe([("EVAL-ORB-15m", 24), ("EVAL-VWAP-15m", 16)]);
         Fixture.Runs[0].Trades.Max(t => t.R).ShouldBe(3.0);
         Fixture.Runs[0].Trades.Single(t => t.R == 3.0).Symbol.ShouldBe("EVC");

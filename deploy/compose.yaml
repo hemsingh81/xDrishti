@@ -459,6 +459,7 @@ services:
     environment:
       DOTNET_ENVIRONMENT: Production
       ASPNETCORE_ENVIRONMENT: Production
+      # Shortcut: the runtime role xd_app (it can write the fixture database, which holds synthetic rows only), no separate read-only login; the host serves GET report routes only and refuses Api:ReportsOnly over any database but xdrishti_eval.
       Database__ConnectionString: Host=xd-db;Port=5432;Database=xdrishti_eval;Username=xd_app
       Api__ReportsOnly: "true"
     secrets:

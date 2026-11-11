@@ -49,6 +49,7 @@ public sealed class EvalComposeRulesTests
         { "mcp-eval-reads-the-eval-api", "xd-mcp-eval", "Mcp__Api__BaseUrl: http://xd-api-eval:8080", "Mcp__Api__BaseUrl: http://xd-api:8080" },
         { "api-eval-isolated", "xd-api-eval", "networks: [back]", "networks: [back, egress]" },
         { "api-eval-token-only-where-designed", "xd-eval-seed", "    secrets:\n      - source: db_owner_password\n        target: Database__Password", "    secrets:\n      - source: db_owner_password\n        target: Database__Password\n      - source: mcp_api_token_eval\n        target: Api__ServiceTokens__Mcp" },
+        { "production-api-not-reports-only", "xd-api", "Brokers__PublicBaseUrl: http://localhost:${XD_HTTP_PORT:-8080}", "Brokers__PublicBaseUrl: http://localhost:${XD_HTTP_PORT:-8080}\n      Api__ReportsOnly: \"true\"" },
         { "api-has-no-eval-token", "xd-api", "      - source: mcp_token\n        target: Assistant__Mcp__Token", "      - source: mcp_token\n        target: Assistant__Mcp__Token\n      - source: eval_mcp_token\n        target: Eval__Mcp__Token" },
     };
 

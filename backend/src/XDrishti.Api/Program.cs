@@ -60,6 +60,7 @@ builder.Services
 // The reports-only instance (BK-12b, ADR 0267; xd-api-eval over the eval fixture): no hosted or scheduled service, no vault key and no hand-over key (it holds no broker secret), and only the report routes are mapped.
 if (builder.Configuration.GetValue<bool>(ApiSetup.ReportsOnlyKey))
 {
+    ApiSetup.RequireEvalDatabase(builder.Configuration); // never over the real database, whatever a compose file says
     builder.Services.RemoveAll<IHostedService>();
 }
 else if (!OpenApiGeneration.IsRunning)

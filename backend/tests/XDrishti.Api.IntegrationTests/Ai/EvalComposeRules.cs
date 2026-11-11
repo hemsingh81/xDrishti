@@ -12,7 +12,7 @@ internal static partial class EvalComposeRules
 
     public static readonly string[] All =
     [
-        "profile-eval-only", "no-ports", "network-back-only", "hardening", "mcp-eval-database", "mcp-eval-secrets", "mcp-eval-image", "database-of-the-one-shots", "runner-runtime-role", "runner-reads-eval-files-read-only", "eval-token-only-where-designed", "api-has-no-eval-token", "mcp-eval-reads-the-eval-api", "api-eval-isolated", "api-eval-token-only-where-designed",
+        "profile-eval-only", "no-ports", "network-back-only", "hardening", "mcp-eval-database", "mcp-eval-secrets", "mcp-eval-image", "database-of-the-one-shots", "runner-runtime-role", "runner-reads-eval-files-read-only", "eval-token-only-where-designed", "api-has-no-eval-token", "mcp-eval-reads-the-eval-api", "api-eval-isolated", "api-eval-token-only-where-designed", "production-api-not-reports-only",
     ];
 
     private static readonly string[] Services = ["xd-migrate-eval", "xd-mcp-eval", "xd-api-eval", "xd-eval-seed", "xd-eval"];
@@ -74,6 +74,7 @@ internal static partial class EvalComposeRules
             && Env("xd-api-eval", "Database__ConnectionString") == "Host=xd-db;Port=5432;Database=xdrishti_eval;Username=xd_app" && Env("xd-api-eval", "Api__ReportsOnly") == "true"
             && !AiComposeRules.Map(apiEval, "environment").Keys.Any(k => k.Contains("Dhan", StringComparison.OrdinalIgnoreCase) || k.StartsWith("Brokers__", StringComparison.Ordinal) || k.StartsWith("BrokerVault", StringComparison.Ordinal)) && !AiComposeRules.EnvironmentLooksSecret(apiEval));
         Check("api-eval-token-only-where-designed", services.Keys.Where(s => McpComposeRules.Secrets(AiComposeRules.Map(services, s)).Contains("mcp_api_token_eval")).Order(StringComparer.Ordinal).SequenceEqual(["xd-api-eval", "xd-mcp-eval"]));
+        Check("production-api-not-reports-only", !AiComposeRules.Map(api, "environment").ContainsKey("Api__ReportsOnly")); // the reports-only switch belongs to xd-api-eval alone (the host also refuses it over any database but xdrishti_eval)
         return found;
     }
 }
