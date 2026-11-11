@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.LiveTrading;
 using XDrishti.Application.Abstractions.Market;
@@ -39,7 +40,9 @@ internal sealed class StoredPlanContextSource(
     ILiveReadyFactsSource liveFacts,
     IBasketSettingsStore? basketSettings = null,
     IBasketContextStore? basketContext = null,
-    IBasketQueries? basketQueries = null) : IPlanContextSource
+    IBasketQueries? basketQueries = null,
+    SmartRulesOptions? smartOptions = null,
+    ILogger<StoredPlanContextSource>? logger = null) : IPlanContextSource
 {
     /// <summary>Calendar days of daily bars read before the close of the session (about 60 sessions plus slack).</summary>
     public const int ReturnLookbackDays = 120;
@@ -146,8 +149,13 @@ internal sealed class StoredPlanContextSource(
     {
         var row = await basketContext!.LatestBeforeAsync(basketId, forDate, cancellationToken);
         var name = basketQueries is null ? null : (await basketQueries.GetAsync(basketId, cancellationToken))?.Name;
-        var breadth = GateBreadthSource.FromBasket(name ?? basketId.ToString("D"), row?.AsOf, row?.B20, row?.State, forDate, new SmartRulesOptions().GateMaxAgeDays);
-        var asOf = figures?.AsOf ?? row?.AsOf;
+        var breadth = GateBreadthSource.FromBasket(name ?? basketId.ToString("D"), row?.AsOf, row?.B20, row?.State, forDate, (smartOptions ?? new SmartRulesOptions()).GateMaxAgeDays);
+        if (logger is not null)
+        {
+            GateSourceLog.Used(logger, basketId, forDate, row?.State ?? "none", breadth.Breadth is not null, breadth.Reason);
+        }
+        // The input is stamped with the older of the two days: the gate's age check then covers the basket row as well as the VIX day.
+        var asOf = figures is null ? row?.AsOf : row is null ? figures.AsOf : (figures.AsOf < row.AsOf ? figures.AsOf : row.AsOf);
         return asOf is { } day ? (new MarketGateInput(day, figures?.Vix, breadth.Breadth, null), breadth.Note) : (null, breadth.Note);
     }
 

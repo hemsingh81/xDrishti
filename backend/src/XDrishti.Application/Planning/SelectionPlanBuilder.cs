@@ -237,9 +237,9 @@ internal sealed class SelectionPlanBuilder(
 
         var cluster = clusters.Of(decision.Candidate.Symbol);
         var check = decision.Checks.FirstOrDefault(c => c.Code == FillCodes.ClusterCap);
-        if (cluster is null || cluster.CorrelationUnknown || check?.Value is not { } risk)
+        if (cluster is null || cluster.CorrelationUnknown || check?.Outcome == FilterOutcome.Unavailable || check?.Value is not { } risk)
         {
-            return [string.Create(CultureInfo.InvariantCulture, $"cluster of {decision.Candidate.Symbol}: unknown correlation, cap {limit:0.###}%")];
+            return [string.Create(CultureInfo.InvariantCulture, $"cluster of {decision.Candidate.Symbol}: unknown correlation (its own or an open position's), cap {limit:0.###}%")];
         }
 
         return [string.Create(CultureInfo.InvariantCulture, $"cluster {cluster.MembersText}: open risk {risk:0.###}% of cap {limit:0.###}%")];

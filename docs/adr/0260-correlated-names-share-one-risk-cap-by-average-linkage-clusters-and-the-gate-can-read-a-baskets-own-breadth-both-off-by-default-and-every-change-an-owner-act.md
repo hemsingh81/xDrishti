@@ -25,6 +25,6 @@ The fill counted five banking longs as five independent bets (it has a pair rule
 
 ## Known limits
 - The banner "gate source changed until dismissed" (criterion 11) is moved to BK-10b with the sizing banner; the settings read shows the newest loosening.
-- The basket context uses raw closes (no corporate-action adjustment) and no ex-date exclusion; the tracked-set breadth does exclude a share with an ex-date in its window. A split inside a window can make one member vote wrongly. Shortcut: upgrade when the adjusted close series is wired in.
+- Shortcut: the basket context uses raw closes (no corporate-action adjustment) and **no ex-date exclusion** (the tracked-set breadth excludes a share with an ex-date in its window), so a split inside a window can make one member vote wrongly. Upgrade when the adjusted close series and the ex-dates are wired into the basket step.
 - Only the latest five closed sessions are caught up; an older backfill is a separate run.
-- The gate source note is not logged by the infrastructure source (the log helpers are internal to the Application); the note itself carries it.
+- The gate source is logged by the Infrastructure source (event 7395: basket, row state, available, reason code); the plan note carries it too. The age check uses the configured `GateMaxAgeDays`, and the gate input is stamped with the older of the VIX day and the row day.

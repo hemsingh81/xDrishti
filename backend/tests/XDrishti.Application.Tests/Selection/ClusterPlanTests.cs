@@ -19,13 +19,13 @@ public sealed class ClusterPlanTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private static async Task<NewPlan> BuildAsync(FakeBasketSettingsStore? settings)
+    private static async Task<NewPlan> BuildAsync(FakeBasketSettingsStore? settings, PlanContext? planContext = null)
     {
         var found = WiredPlanFixture.Candidates();
         var source = Substitute.For<ITicketSource>();
         source.ReadAsync(WiredPlanFixture.Session, WiredPlanFixture.ForDate, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(new TicketSourceResult(found, 1, 2, ["history not ready at the close"]))));
         var context = Substitute.For<IPlanContextSource>();
-        context.ReadAsync(Arg.Any<PlanContextRequest>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(WiredPlanFixture.Context())));
+        context.ReadAsync(Arg.Any<PlanContextRequest>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(planContext ?? WiredPlanFixture.Context())));
         var builder = new SelectionPlanBuilder(source, context, NullLogger<SelectionPlanBuilder>.Instance, WiredPlanFixture.Loose, basketSettings: settings);
         return (await builder.BuildAsync(WiredPlanFixture.Request, Ct)).Value;
     }
@@ -98,5 +98,18 @@ public sealed class ClusterPlanTests
         var on = await BuildAsync(On(5.0));
 
         on.Items.Where(i => i.Group == TicketGroup.Primary).Select(i => i.Symbol).ShouldBe(off.Items.Where(i => i.Group == TicketGroup.Primary).Select(i => i.Symbol));
+    }
+
+    [Fact]
+    public async Task One_open_position_with_an_unknown_cluster_makes_the_cap_unavailable_and_the_candidates_are_rejected_with_the_reason_text()
+    {
+        var book = new BookPosition("ZZZ", "BUY", "swing", 0.1, "Energy", ["Nifty"]); // no correlation with anything: its cluster is unknown
+        var plan = await BuildAsync(On(0.8), WiredPlanFixture.Context() with { Book = [book] });
+
+        plan.Items.Where(i => i.Group == TicketGroup.Primary).ShouldBeEmpty();
+        var aaa = Item(plan, "AAA");
+        aaa.Group.ShouldBe(TicketGroup.Rejected);
+        aaa.Reasons.ShouldContain("cluster_cap:unavailable");
+        aaa.Reasons.ShouldContain(r => r.Contains("unknown correlation", StringComparison.Ordinal));
     }
 }

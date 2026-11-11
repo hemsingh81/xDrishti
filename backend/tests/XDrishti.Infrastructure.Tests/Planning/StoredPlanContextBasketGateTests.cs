@@ -47,7 +47,7 @@ public sealed class StoredPlanContextBasketGateTests
 
     private static BasketContextRow Row(DateOnly day, double? b20, string state = "value") => new(Basket, day, 50, 48, b20, null, null, null, null, null, null, state, "single_snapshot");
 
-    private static (StoredPlanContextSource Source, IBasketContextStore Store) Source(BasketSettings settings, BasketContextRow? row, ContextRead read)
+    private static (StoredPlanContextSource Source, IBasketContextStore Store) Source(BasketSettings settings, BasketContextRow? row, ContextRead read, SmartRulesOptions? options = null)
     {
         var accounts = Substitute.For<IAccountStore>();
         accounts.ListActiveAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<BrokerAccount>>([]));
@@ -61,7 +61,7 @@ public sealed class StoredPlanContextBasketGateTests
         store.LatestBeforeAsync(Basket, Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(call => ValueTask.FromResult(row is not null && row.AsOf < call.ArgAt<DateOnly>(1) ? row : null));
         var queries = Substitute.For<IBasketQueries>();
         queries.GetAsync(Basket, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketView?>(new BasketView(Basket, "Nifty 50", "#fff", "trading", null, 0, 50, DateTimeOffset.UnixEpoch, null, "index", true, null, null)));
-        var source = new StoredPlanContextSource(accounts, profiles, holdings, Substitute.For<IHoldingClassifications>(), Substitute.For<IBarQueries>(), new Settings(), Substitute.For<IPaperBookReader>(), figures, Substitute.For<XDrishti.Application.Abstractions.LiveTrading.IRampStore>(), Substitute.For<XDrishti.Application.Abstractions.LiveTrading.ILiveRampSettings>(), Substitute.For<XDrishti.Application.Abstractions.LiveTrading.ILiveReadyFactsSource>(), new FixedSettings(settings), store, queries);
+        var source = new StoredPlanContextSource(accounts, profiles, holdings, Substitute.For<IHoldingClassifications>(), Substitute.For<IBarQueries>(), new Settings(), Substitute.For<IPaperBookReader>(), figures, Substitute.For<XDrishti.Application.Abstractions.LiveTrading.IRampStore>(), Substitute.For<XDrishti.Application.Abstractions.LiveTrading.ILiveRampSettings>(), Substitute.For<XDrishti.Application.Abstractions.LiveTrading.ILiveReadyFactsSource>(), new FixedSettings(settings), store, queries, options);
         return (source, store);
     }
 
@@ -143,5 +143,28 @@ public sealed class StoredPlanContextBasketGateTests
 
         ctx.Gate.ShouldBeNull();
         ctx.MarketNote!.ShouldContain("unavailable");
+    }
+
+    [Fact]
+    public async Task A_row_older_than_the_configured_maximum_age_is_unavailable_even_when_the_default_would_accept_it()
+    {
+        var (source, _) = Source(Gate, Row(Session, 0.62), Tracked(), new SmartRulesOptions(GateMaxAgeDays: 2)); // the row is 3 days before the planned day
+
+        var ctx = (await source.ReadAsync(Request, Ct)).Value;
+
+        ctx.Gate!.Breadth.ShouldBeNull();
+        ctx.MarketNote!.ShouldContain("stale");
+    }
+
+    [Fact]
+    public async Task The_input_is_stamped_with_the_older_of_the_vix_day_and_the_row_day()
+    {
+        var older = Session.AddDays(-1);
+        var (source, _) = Source(Gate, Row(Session, 0.62), ContextRead.Of(new ContextFigures(older, "index_only", null, null, null, 19.4, null, null, null, null, null, 27.5, 214)));
+
+        var ctx = (await source.ReadAsync(Request, Ct)).Value;
+
+        ctx.Gate!.AsOf.ShouldBe(older);
+        ctx.Gate.Breadth.ShouldBe(0.62);
     }
 }
