@@ -1089,6 +1089,11 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetPlanGradeQuery, Result<PlanGradeView>>, GetPlanGradeHandler>();
         services.AddScoped<IQueryHandler<GetDecisionsReportQuery, Result<GradeReportData>>, GetDecisionsReportHandler>();
         services.AddScoped<TicketReplayer>(); // the one replay path of grading and paper capture (P10-01, ADR 0116)
+        // The system replay (SR-01 part A, ADR 0272): research only, in memory, no order. One scope serves one run (the facts remember what they read).
+        services.TryAddSingleton(new XDrishti.Application.Replay.SystemReplayOptions()); // the host replaces it with its configuration (section Replay)
+        services.AddScoped<XDrishti.Application.Replay.IReplayFacts, XDrishti.Application.Replay.ReplayFacts>();
+        services.AddScoped<XDrishti.Application.Replay.ReplaySessionRunner>();
+        services.AddScoped<XDrishti.Application.Replay.ReplayDriver>();
         services.AddScoped<IEpochGate, FingerprintEpochGate>(); // the configuration fingerprint decides the epoch (P10-05, ADR 0119): detects, labels and records; applies and blocks nothing
         services.AddScoped<IConfigSnapshotSource, ConfigSnapshotSource>();
         services.AddScoped<IQueryHandler<GetEpochsQuery, Result<EpochList>>, GetEpochsHandler>();

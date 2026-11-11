@@ -3,9 +3,11 @@ using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Selection;
+using XDrishti.Application.Market.Bars;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Actions;
+using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Research;
 using XDrishti.Domain.Selection.SizeScaling;
 using XDrishti.Domain.Selection.SmartRules;
@@ -29,8 +31,35 @@ internal sealed class SizingInputSource(ISizingStore store, IBarQueries bars, IT
         var budgets = await store.BudgetsAsync(cancellationToken);
 
         // The one capacity share of the app (ADR 0223) is the ceiling: the owner's value can only be lower.
-        state = state with { Settings = state.Settings with { CapacityPct = Math.Min(state.Settings.CapacityPct, (double)costStress.CapacityDailyShare) } };
-        if (!state.Settings.VolTargetEnabled && !state.Settings.CapacityEnabled && budgets.Count == 0)
+        state = ClampCapacity(state, costStress);
+        if (IsOff(state, budgets))
+        {
+            // Everything OFF and no budget: nothing would be used, so no bar and no calendar is read and the plan is what it was.
+            return new SizingInputs(state.Settings, state.Version, new Dictionary<string, SymbolSizingInputs>(StringComparer.Ordinal));
+        }
+
+        return await ComputeAsync(state, budgets, session, forDate, instruments, bars.ReadDailyBarsAsync, await calendars.GetAsync(cancellationToken), classifications, cancellationToken);
+    }
+
+    private static bool IsOff(SizingState state, IReadOnlyDictionary<Guid, double> budgets) => !state.Settings.VolTargetEnabled && !state.Settings.CapacityEnabled && budgets.Count == 0;
+
+    /// <summary>The settings with the capacity share held at the app's ceiling.</summary>
+    internal static SizingState ClampCapacity(SizingState state, CostStressOptions costStress) =>
+        state with { Settings = state.Settings with { CapacityPct = Math.Min(state.Settings.CapacityPct, (double)costStress.CapacityDailyShare) } };
+
+    /// <summary>The inputs from given settings and budgets and a day-bar reader; the live read and the system replay (SR-01) both use it, so they cannot disagree. Nothing after <paramref name="session"/> is asked of the reader.</summary>
+    internal static async ValueTask<SizingInputs> ComputeAsync(
+        SizingState state,
+        IReadOnlyDictionary<Guid, double> budgets,
+        DateOnly session,
+        DateOnly forDate,
+        IReadOnlyList<ContextInstrument> instruments,
+        Func<Guid, DateOnly, DateOnly, CancellationToken, ValueTask<IReadOnlyList<BarRow>>> readDaily,
+        TradingCalendar calendar,
+        IHoldingClassifications classifications,
+        CancellationToken cancellationToken)
+    {
+        if (IsOff(state, budgets))
         {
             // Everything OFF and no budget: nothing would be used, so no bar is read and the plan is what it was.
             return new SizingInputs(state.Settings, state.Version, new Dictionary<string, SymbolSizingInputs>(StringComparer.Ordinal));
@@ -40,7 +69,6 @@ internal sealed class SizingInputSource(ISizingStore store, IBarQueries bars, IT
         var baskets = budgets.Count == 0 || ids.Count == 0
             ? new Dictionary<Guid, IReadOnlyList<BasketRef>>()
             : (await classifications.BasketsAsync(ids, cancellationToken)).ToDictionary(p => p.Key, p => p.Value);
-        var calendar = await calendars.GetAsync(cancellationToken);
         var options = state.Settings.Options;
         var symbols = new Dictionary<string, SymbolSizingInputs>(StringComparer.Ordinal);
         foreach (var instrument in instruments)
@@ -53,7 +81,7 @@ internal sealed class SizingInputSource(ISizingStore store, IBarQueries bars, IT
             double? adv = null;
             if (instrument.Id is { } id)
             {
-                var rows = await bars.ReadDailyBarsAsync(id, session.AddDays(-LookBackDays), session.AddDays(1), cancellationToken);
+                var rows = await readDaily(id, session.AddDays(-LookBackDays), session.AddDays(1), cancellationToken);
                 var complete = rows.Where(b => b.Complete).ToList();
                 var returns = ReturnSeries.FromCloses(complete.Select(b => (IndiaTime.Today(b.Ts), b.Close)), session);
                 reading = VolTarget.Read([.. returns.Select(r => r.Value)], options);

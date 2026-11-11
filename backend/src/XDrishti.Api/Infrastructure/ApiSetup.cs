@@ -294,6 +294,8 @@ internal static class ApiSetup
     private static void AddSimAllJob(this IServiceCollection services)
     {
         services.AddOptions<SimAllSettings>().BindConfiguration(SimAllSettings.Section).ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<XDrishti.Application.Replay.SystemReplayOptions>().BindConfiguration(XDrishti.Application.Replay.SystemReplayOptions.Section).ValidateDataAnnotations().ValidateOnStart(); // the system replay's bounds (SR-01, Internal)
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<XDrishti.Application.Replay.SystemReplayOptions>>().Value));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<SimAllSettings>>().Value));
         services.AddOptions<SimTrainingSettings>().BindConfiguration(SimTrainingSettings.Section).ValidateDataAnnotations().ValidateOnStart();
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<SimTrainingSettings>>().Value));

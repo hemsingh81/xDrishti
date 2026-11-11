@@ -202,9 +202,9 @@ All eight answered by the owner on 2026-11-11 as recommended ("Approve all"); th
    - Revisit in SR-02 once the settings history covers the replay range.
 3. **Learning cadence.** In `learning` mode, recompute cell stats every session, or on the scheduled job's cadence?
    - *Recommended:* the scheduled job's cadence, so the replay learns the way the live system does.
-   - UNVERIFIED: the builder confirms the cadence from the schedule and that the P6-01 calculator can run in memory without its store.
+   - **Verified at build (part A, ADR 0272):** no scheduled cell-statistics job exists in code (only `xd learn cells`); the design's weekly learning service (Saturday) is the cadence, so the replay uses weekly. The P6-01 calculator is pure and runs in memory without its store (reading the source runs of the frozen snapshot).
 4. **Cell lifecycle in `learning` mode.** Run the lifecycle rules in memory, or keep the stored changelog as of S?
-   - *Recommended:* the rules in memory, if they are pure (UNVERIFIED); otherwise the stored changelog, labelled "lifecycle as recorded".
+   - *Recommended:* the rules in memory, if they are pure; otherwise the stored changelog, labelled "lifecycle as recorded". **Verified at build (part A, ADR 0272):** the lifecycle is a table of legal moves that need owner approval and out-of-sample facts, so it is not pure in the needed sense; the changelog as of S is used, labelled.
    - Before Oct 2026 the changelog is empty, so "as recorded" means the initial state.
 5. **Compounding.** Size from replay equity (compounding) or from the fixed starting capital?
    - *Recommended:* replay equity, as the live system sizes from the paper book.
@@ -215,6 +215,11 @@ All eight answered by the owner on 2026-11-11 as recommended ("Approve all"); th
    - Filling in the sheet is the owner's act, and the most useful single step before trusting any profit figure.
 8. **Scope default.** Default the scope to the auto scope as of D?
    - *Recommended:* yes. This needs `AutoScopeResolver` to accept an as-of date, which is the same change as REVIEW-2026-11-10 question 3, so build it once in part A.
+
+## Decisions taken at build (part A review, ADR 0272)
+- Two per-run parameters, both off by default: `filtersWithoutHistory` (event, F&O-ban and surveillance filters not required; label `filters_without_history`) and `includeResearchCells` (research-state cells may be candidates; label `research_cells`). Part C adds them to the start request.
+- A start with no frozen cell statistics as of D answers 422 `replay.invalid`.
+- The rolling-window bar load is part B. The latest auto-scope definition is accepted under `settings_now`; part B stores the scope hash.
 
 ## Done when
 - [ ] All acceptance criteria have evidence
