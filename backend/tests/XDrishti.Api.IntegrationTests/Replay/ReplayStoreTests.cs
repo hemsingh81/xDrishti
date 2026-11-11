@@ -180,12 +180,13 @@ public sealed class ReplayStoreTests(ApiFactory factory) : IAsyncLifetime
         var tooSoon = await WithAsync((s, _) => s.InsertAsync(null, [New()], Ct).AsTask());
         tooSoon.Started.ShouldBeFalse("a start that may still be writing its rows holds the slot");
 
-        var old = New() with { CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-6) };
-        await StoreKit.ExecuteAsync(Db.ConnectionString, $"UPDATE research.replay_runs SET created_at = now() - interval '6 minutes' WHERE id = '{recent.Id}'", Ct);
-        var later = await WithAsync((s, _) => s.InsertAsync(null, [old], Ct).AsTask());
+        await WithAsync((s, _) => s.CancelAsync(recent.Id, T0, Ct).AsTask());
+        var stale = New() with { CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-6) };
+        await WithAsync((s, _) => s.InsertAsync(null, [stale], Ct).AsTask()); // a start that died six minutes ago
+        var later = await WithAsync((s, _) => s.InsertAsync(null, [New()], Ct).AsTask());
 
         later.Started.ShouldBeTrue("the stale unrecorded run was cancelled under the lock");
-        (await WithAsync((s, _) => s.StateAsync(recent.Id, Ct).AsTask())).ShouldBe("cancelled");
+        (await WithAsync((s, _) => s.StateAsync(stale.Id, Ct).AsTask())).ShouldBe("cancelled");
     }
 
     [Fact]
