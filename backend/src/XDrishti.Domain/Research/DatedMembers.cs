@@ -37,6 +37,7 @@ public sealed class DatedMembers
     /// <summary>The India days on which membership changed (an addition or a removal), ascending.</summary>
     public IReadOnlyList<DateOnly> ChangeDays => [.. _all.SelectMany(s => s.To is { } to ? new[] { IndiaTime.Today(s.From), IndiaTime.Today(to) } : [IndiaTime.Today(s.From)]).Distinct().Order()];
 
+    // shortcut: membership rows are day-granular (the EOD fetch dates an addition or removal by its India day), so "a member at the end of the day" is used for the whole day; the time of day of an addition is not modelled.
     /// <summary>Whether the instrument is a member at the end of <paramref name="day"/>.</summary>
     public bool IsMember(Guid instrumentId, DateOnly day)
     {

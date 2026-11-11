@@ -70,6 +70,7 @@ internal sealed class UniverseLinkProposer(ICommandHandler<ProposeHypothesisComm
             return Result.Failure<HypothesisMoveOutcome>(LearningErrors.Invalid([new FieldError("tierCellKey", "The stored link names a cell that is not a valid key.")]));
         }
 
+        // shortcut: the newest 1000 hypotheses are scanned for the open duplicate; an open one older than the newest 1000 is not seen (the open limit is 3 and the log is small, so this is a stated bound, not a guess)
         var open = (await log.ListAsync(null, ScanLimit, cancellationToken))
             .FirstOrDefault(h => HypothesisStateText.TryParse(h.Row.State) is { } s && HypothesisLifecycle.IsOpen(s)
                 && string.Equals(h.Row.Source, "universe", StringComparison.Ordinal) && string.Equals(h.Row.CellKey, link.ParentKey, StringComparison.Ordinal) && string.Equals(h.Row.CandidateValue, link.Universe, StringComparison.Ordinal));

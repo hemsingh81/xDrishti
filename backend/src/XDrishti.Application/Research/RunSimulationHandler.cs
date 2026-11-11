@@ -531,6 +531,7 @@ internal sealed class RunSimulationHandler(
             return null;
         }
 
+        // shortcut: the newest 200 versions are read; a derived basket has one version a day at most, so a window start older than 200 versions is not found and the hash is null (stated, not guessed)
         var versions = await derivedVersions.ListVersionsAsync(basketId, 0, 200, cancellationToken);
         return versions?.Items.Where(v => v.EffectiveFrom <= from).OrderByDescending(v => v.EffectiveFrom).Select(v => v.ParamsHash).FirstOrDefault();
     }

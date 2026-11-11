@@ -51,7 +51,7 @@ export function RunStarter({ target, onStarted }: RunStarterProps) {
         basketId: basketId || null,
         symbols,
         // the default is not sent: a post without a basis is the members at the time of the post, as before
-        ...(!usingSymbols && membersBasis === 'dated' ? { membersBasis: 'dated' as const } : {}),
+        ...(!usingSymbols && method !== 'quick' && membersBasis === 'dated' ? { membersBasis: 'dated' as const } : {}),
         ...(conservative ? { slippage: 'conservative' as const } : {}),
         // stress is already on for robust and refused for quick; only a full test takes it when asked
         ...(full && stress ? { stress: true } : {}),
@@ -115,6 +115,7 @@ export function RunStarter({ target, onStarted }: RunStarterProps) {
           </MenuItem>
         ))}
       </TextField>
+      {/* shortcut: whether the basket has dated rows is not asked here; the server refuses with the first dated day (simulation.members_not_dated) and the message is shown */}
       {!usingSymbols && (
         <TextField
           select

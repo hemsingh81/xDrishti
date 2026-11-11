@@ -273,7 +273,6 @@ internal sealed class ReportLoader(IReportTradeSource source, ITrainingReportSou
         }
     }
 
-    /// <summary>The sector of the instrument master as of today (the master keeps one current sector, so this is not the sector at the time of the trade), one read for all instruments of the trades; an instrument with none stays not recorded.</summary>
     /// <summary>
     /// BK-11b: gives each trade the liquidity tier of its instrument on its decision date, computed by <see cref="UniverseTagger"/> from sessions strictly before that date (the same date and function the cell statistics use, so a trade's report tier equals its cell tier). Only when at least one
     /// trade has a real tier is any tier attached: with no tier source, or fewer eligible shares than the minimum on every date, no trade carries one and the dimension is refused with the reason. Unknown and unavailable are kept as their own buckets.
@@ -297,6 +296,7 @@ internal sealed class ReportLoader(IReportTradeSource source, ITrainingReportSou
         }
     }
 
+    /// <summary>The sector of the instrument master as of today (the master keeps one current sector, so this is not the sector at the time of the trade), one read for all instruments of the trades; an instrument with none stays not recorded.</summary>
     private async ValueTask AttachSectorsAsync(List<ReportTrade> trades, CancellationToken cancellationToken)
     {
         var sectors = await classifications.SectorsAsync([.. trades.Select(t => t.InstrumentId).Distinct()], cancellationToken);
