@@ -25,6 +25,7 @@ namespace XDrishti.Domain.Reporting;
 /// <param name="ExitReason">Why the trade closed (the stored reason); null when not recorded.</param>
 /// <param name="Ordinal">The trade's position in its run (the key, with the run key, of the replay); 0 when not read.</param>
 /// <param name="Sector">The sector of the instrument as of the read (not as of the trade); null when the master has none.</param>
+/// <param name="Tier">The liquidity tier of the instrument on the trade decision date (BK-11b): <c>liq_high</c>, <c>liq_mid</c>, <c>liq_low</c>, <c>unknown</c> or <c>unavailable</c>, from sessions before that date only; attached at read time and only when the universe lens is asked, never stored (null when not attached).</param>
 public sealed record ReportTrade(
     string RunKey,
     string TradeKey,
@@ -44,4 +45,5 @@ public sealed record ReportTrade(
     int? EntryMinuteIst = null,
     string? ExitReason = null,
     string? Sector = null,
-    int Ordinal = 0);
+    int Ordinal = 0,
+    string? Tier = null);

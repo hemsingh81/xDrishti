@@ -112,4 +112,5 @@ public enum AccountEventType
     BasketSettingsChanged,
     LooseningDismissed,
     LooseningSettingsChanged,
+    HypothesisProposed,
 }

@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.SimAll;
+using XDrishti.Application.Learning;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Reporting;
@@ -15,7 +16,7 @@ namespace XDrishti.Application.Reporting;
 /// A net basis is allowed only by the owner's stored confirmation of the charge sheet (<see cref="IChargeSheetConfirmationSource"/>), read here and nowhere else; nothing in the query can supply it. The load is bounded: the closed trades of the runs, from their stored
 /// headers, may not exceed <see cref="MaxClosedTrades"/> (refused before one trade is read), and one report at a time holds a population in memory (<see cref="ReportGate"/>).
 /// </summary>
-internal sealed class ReportLoader(IReportTradeSource source, ITrainingReportSource trainingSource, ITrainingJobProgress simJobs, IChargeSheetConfirmationSource confirmations, IHoldingClassifications classifications, ReportTrainingOptions trainingSettings, ReportGate gate, TimeProvider time, ILogger<ReportLoader> logger, IUniverseSettingsStore? universeSettings = null, IBasketQueries? baskets = null)
+internal sealed class ReportLoader(IReportTradeSource source, ITrainingReportSource trainingSource, ITrainingJobProgress simJobs, IChargeSheetConfirmationSource confirmations, IHoldingClassifications classifications, ReportTrainingOptions trainingSettings, ReportGate gate, TimeProvider time, ILogger<ReportLoader> logger, IUniverseSettingsStore? universeSettings = null, IBasketQueries? baskets = null, IUniverseSeriesSource? universeSource = null)
 {
     /// <summary>
     /// The most closed trades (by the run headers, before any filter) one request reads. Chosen from the measured peak of one request (ADR 0100): the population of 500,000 trades takes about the figure the ADR states above the idle process, which, with one report in memory at a
@@ -83,6 +84,12 @@ internal sealed class ReportLoader(IReportTradeSource source, ITrainingReportSou
     {
         if (query.Sim is { } sim)
         {
+            if (query.Lens.Contains(ReportDimension.Universe))
+            {
+                // BK-11b (ADR 0243, ADR 0250): only research runs are tagged by liquidity tier; a training simulation never is
+                return Result.Failure<LoadedReport>(ReportErrors.UniverseNotForTraining());
+            }
+
             return await BuildTrainingAsync(query, sim, started, kind, cancellationToken);
         }
 
@@ -160,6 +167,11 @@ internal sealed class ReportLoader(IReportTradeSource source, ITrainingReportSou
             if (trades.Count > 0 && query.Lens.Contains(ReportDimension.Sector))
             {
                 await AttachSectorsAsync(trades, cancellationToken);
+            }
+
+            if (trades.Count > 0 && query.Lens.Contains(ReportDimension.Universe))
+            {
+                await AttachTiersAsync(trades, cancellationToken);
             }
 
             var population = ReportPopulation.Create([.. used.Select(r => r.ToReportRun())], trades, options);
@@ -258,6 +270,29 @@ internal sealed class ReportLoader(IReportTradeSource source, ITrainingReportSou
         {
             lease.Dispose();
             throw;
+        }
+    }
+
+    /// <summary>
+    /// BK-11b: gives each trade the liquidity tier of its instrument on its decision date, computed by <see cref="UniverseTagger"/> from sessions strictly before that date (the same date and function the cell statistics use, so a trade's report tier equals its cell tier). Only when at least one
+    /// trade has a real tier is any tier attached: with no tier source, or fewer eligible shares than the minimum on every date, no trade carries one and the dimension is refused with the reason. Unknown and unavailable are kept as their own buckets.
+    /// </summary>
+    private async ValueTask AttachTiersAsync(List<ReportTrade> trades, CancellationToken cancellationToken)
+    {
+        if (universeSource is null)
+        {
+            return;
+        }
+
+        var tagged = await UniverseTagger.TagAsync(universeSource, [.. trades.Select(t => (t.EntryDate, t.InstrumentId))], new UniverseTierOptions(), cancellationToken);
+        if (!tagged.Any(t => t.CellPart() is not null))
+        {
+            return;
+        }
+
+        for (var i = 0; i < trades.Count; i++)
+        {
+            trades[i] = trades[i] with { Tier = tagged[i].CellPart() ?? (tagged[i] == UniverseTier.Unavailable ? "unavailable" : "unknown") };
         }
     }
 

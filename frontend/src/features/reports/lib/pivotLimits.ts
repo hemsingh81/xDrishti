@@ -3,7 +3,7 @@ export const MAX_BASKETS = 6;
 /** Rows past which the pivot grid scrolls inside its card (it never truncates). */
 export const TALL_GRID_ROWS = 40;
 
-/** The dimensions the built lens whitelist offers (sector and hour join when P8-10 adds them). */
+/** The dimensions the built lens whitelist offers (sector and hour join when P8-10 adds them; the liquidity tier, BK-11b, is offered). */
 export const pivotDimensions = [
   { id: 'basket', label: 'Basket' },
   { id: 'instrument', label: 'Instrument' },
@@ -14,6 +14,8 @@ export const pivotDimensions = [
   { id: 'exit', label: 'Exit' },
   { id: 'month', label: 'Month' },
   { id: 'weekday', label: 'Weekday' },
+  // BK-11b: the liquidity tier of the share on the decision date; the server refuses it, with the reason, when no tier could be made for the trades
+  { id: 'universe', label: 'Liquidity tier' },
 ] as const;
 export type PivotDimension = (typeof pivotDimensions)[number]['id'];
 export const dimensionLabel = (id: string): string => pivotDimensions.find((d) => d.id === id)?.label ?? id;

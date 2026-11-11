@@ -22,6 +22,12 @@ public sealed record BasketView(
 public sealed record BasketMemberView(
     Guid Id, InstrumentSummary Instrument, int Position, DateTimeOffset ValidFrom, DateTimeOffset? ValidTo, string? Note, string AddedBy, long? Quantity, string? AccountName);
 
+/// <summary>One stay of an instrument in a basket, with the instrument as the simulator reads it (BK-11b).</summary>
+public sealed record BasketStay(Guid InstrumentId, string Symbol, string Name, decimal? TickSize, int Position, DateTimeOffset ValidFrom, DateTimeOffset? ValidTo);
+
+/// <summary>Every stay of a basket (BK-11b), in the order of the basket (position, then symbol).</summary>
+public sealed record BasketStays(Guid BasketId, string Name, DateTimeOffset? ArchivedAt, IReadOnlyList<BasketStay> Items);
+
 /// <summary>
 /// The members of a basket, in their order. <c>asOf</c> is null for the current members, otherwise the India date they are as of (members at the end of that
 /// day; removed ones show their <c>validTo</c>). <c>total</c> counts the items. <c>membersKnownSince</c> is set for a stored system basket: before that date the first known members are shown.

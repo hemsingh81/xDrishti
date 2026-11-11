@@ -81,6 +81,18 @@ internal static class SimulationRequestChecks
             return;
         }
 
+        if (request.MembersBasis is { } basis)
+        {
+            if (!hasBasket)
+            {
+                errors.Add("membersBasis", "A members basis applies to a basket, not to a list of instruments.");
+            }
+            else if (basis is not (UniverseBasisRecord.Dated or UniverseBasisRecord.SingleSnapshot))
+            {
+                errors.Add("membersBasis", "Use dated or single_snapshot.");
+            }
+        }
+
         if (request.InstrumentIds is { } ids)
         {
             if (ids.Count is < 1 or > MaxInstruments)

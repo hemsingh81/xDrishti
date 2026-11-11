@@ -51,13 +51,14 @@ internal static class SimulatePipeline
         bool acknowledgeCsvAdjusted,
         ExitChoice? exits = null,
         int? strategyVersion = null,
-        string? strategyHash = null)
+        string? strategyHash = null,
+        string? membersBasis = null)
     {
         var frame = timeframe
             ?? engine.BuiltIns.FirstOrDefault(b => string.Equals(b.Id, strategyId, StringComparison.Ordinal))?.DefaultTimeframe.ToCode()
             ?? Timeframe.M15.ToCode();
         var fills = new FillRulesInput(rules.EntryLimitPercent, rules.Slippage.Ticks, rules.Slippage.BarRangeFrac, rules.Slippage.StopExitExtraTicks);
-        return new SimulationRequest(strategyId, parameters, frame, from, to, universe.InstrumentIds, universe.BasketId, costs, acknowledgeCsvAdjusted, null, fills, exits, strategyVersion, strategyHash);
+        return new SimulationRequest(strategyId, parameters, frame, from, to, universe.InstrumentIds, universe.BasketId, costs, acknowledgeCsvAdjusted, null, fills, exits, strategyVersion, strategyHash, MembersBasis: membersBasis);
     }
 
     /// <summary>The line that names the stored version a run used (spec P3-02d, question 5): <c>strategy ORB version 1, hash ...</c>; none for a strategy that is not stored.</summary>

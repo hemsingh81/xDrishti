@@ -242,6 +242,13 @@ public static class TradeWalker
 
         var risk = Math.Abs(entry - stop);
         decimal? target = multiple is { } k ? (isBuy ? entry + (k * risk) : entry - (k * risk)) : null;
+        // shortcut: member days are whole days (membership rows are day-granular from the EOD fetch); an intraday addition time is not modelled
+        if (rules.MemberOn is { } memberOn && !memberOn(entryDate))
+        {
+            // BK-11b: a dated run takes an entry only on a day the instrument was a member; an open position is never closed by leaving
+            return WalkResults.NoTrade(NoTradeReason.NotMember, 1, zeroMinutes);
+        }
+
         if (rules.Fills.MinTurnoverCrore is { } minCrore
             && !LiquidityTiers.PassesTurnover(rules.TurnoverOn is { } turnoverOn ? turnoverOn(entryDate) : null, minCrore * LiquidityTiers.Crore))
         {

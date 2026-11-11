@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import type { Schemas } from '@/shared/api';
 import { createCapabilitiesFake } from '@/test/capabilitiesFake';
 import {
   buildAutonomy,
@@ -78,5 +79,42 @@ describe('Learning keeps no write control: it links to the owner-act forms (P8-1
     renderLearning('?tab=autonomy');
 
     expect(await screen.findByRole('link', { name: 'Change these switches' })).toHaveAttribute('href', '/owner-acts');
+  });
+});
+
+const link = (over: Partial<Schemas['UniverseLinkView']> = {}): Schemas['UniverseLinkView'] => ({
+  childKey: 'ORB|15m|BUY|intraday|FIXED_RR|*|liq_high',
+  parentKey: 'ORB|15m|BUY|intraday|FIXED_RR|*',
+  universe: 'liq_high',
+  window: 'all',
+  asOf: '2026-03-10',
+  reason: 'child_better',
+  readKey: 'ORB|15m|BUY|intraday|FIXED_RR|*|liq_high',
+  childN: 120,
+  parentN: 200,
+  childLower: 0.53,
+  parentLower: 0.44,
+  observation: true,
+  holdOut: 'stable',
+  holdOutFirstN: 60,
+  holdOutSecondN: 60,
+  text: 'ORB, 15m, BUY, intraday, liq_high: stronger than all shares; an observation, nothing is applied',
+  ...over,
+});
+
+describe('Setups lists the tier links and links an observation to the proposal form (BK-11b)', () => {
+  it('an observation links to the owner act while the switch is on; a thin tier has no link', async () => {
+    capabilities(['learning_moves_ui']);
+    mountLearning({
+      universeLinks: [link(), link({ childKey: 'ORB|15m|BUY|intraday|FIXED_RR|*|liq_low', observation: false })],
+    });
+    renderLearning('?tab=setups');
+
+    expect(await screen.findByRole('link', { name: 'Propose as hypothesis' })).toHaveAttribute(
+      'href',
+      '/owner-acts/universe/ORB%7C15m%7CBUY%7Cintraday%7CFIXED_RR%7C*%7Cliq_high',
+    );
+    expect(screen.getAllByRole('link', { name: 'Propose as hypothesis' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /propose/i })).toBeNull();
   });
 });

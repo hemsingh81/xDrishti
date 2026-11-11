@@ -10394,6 +10394,87 @@
         }
       }
     },
+    "/api/cells/universe-links/{key}/propose": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Propose ONE hypothesis (source universe, knob scan_scope from all shares to the tier, state proposed) from a stored liquidity-tier observation: the link must be an observation (the tier read in place of the parent, at least the link minimum of trades, a stable hold-out). Nothing is applied, no scan scope changes and no experiment starts; a scope hypothesis cannot be started. Needs a session, the CSRF token, the capability learning_moves_ui and the password in the body, checked on EVERY request; one HypothesisProposed account event. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid or learning.not_an_observation (with the reason), 404 learning.cell_not_found or learning.run_not_found, 409 learning.hypothesis_exists or hypotheses.open_limit, 429 auth.rate_limited",
+        "operationId": "ProposeFromUniverseLink",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeFromUniverseLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisMoveOutcome"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/learning/overview": {
       "get": {
         "tags": [
@@ -19770,7 +19851,7 @@
         "tags": [
           "Learning"
         ],
-        "summary": "The owner changes the universe settings (minTradesChild 1 to 1000, linkMinTrades 10 to 10000, registeredBaskets: comma separated names, 1 to 20); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row. expectedVersion (the version of the read) is required. 400 learning.invalid, 403 learning.owner_only, 409 learning.stale",
+        "summary": "The owner changes the universe settings (minTradesChild 1 to 1000, linkMinTrades 10 to 10000, registeredBaskets: comma separated names, 1 to 20; autoPropose: true or false, default false, when true the cells command proposes each tier observation as a hypothesis by the actor auto and applies nothing); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row. expectedVersion (the version of the read) is required. 400 learning.invalid, 403 learning.owner_only, 409 learning.stale",
         "operationId": "ChangeUniverseSettings",
         "requestBody": {
           "content": {
@@ -47126,6 +47207,16 @@
               "integer"
             ],
             "format": "int64"
+          },
+          "membersBasis": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isDated": {
+            "type": "boolean",
+            "description": "True for a basket run that replays each day with that day's members (BK-11b): its requests name the basket and the basis, not the list."
           }
         },
         "description": "The universe of a Lab run as it was resolved when the run was posted (spec P5-02, D2): the basket changes later, the run keeps the list. Requested is the number of members before the quick-test sample;\nSampled says the list was cut to the limit by the seeded shuffle of Seed."
@@ -59467,6 +59558,46 @@
         },
         "description": "One proposal as the API shows it (spec P9-08 Contract). The text fields are text: a screen renders them as text."
       },
+      "ProposeFromUniverseLinkRequest": {
+        "required": [
+          "baselineRunKey",
+          "reason",
+          "window",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "baselineRunKey": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The stored run the hypothesis is attached to (64 lower-case hex)."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 200 characters."
+          },
+          "window": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The window of the link: `all` (the default), `250d` or `60d`."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, typed again for THIS act and checked on every request."
+          }
+        },
+        "description": "The body of the owner act that proposes a hypothesis from a stable liquidity-tier observation (BK-11b): the stored baseline run, the owner's reason, the window of the link (default all) and the password. The actor is the session's owner; nothing here names it."
+      },
       "QualityBucketRow": {
         "required": [
           "timeframe",
@@ -68569,6 +68700,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "membersBasis": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "description": "The universe of a posted run: exactly one of a basket and a list of symbols."
@@ -72143,6 +72280,12 @@
               "integer"
             ],
             "format": "int64"
+          },
+          "autoPropose": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         },
         "description": "The body of a change of the universe settings; a value left out stays."
@@ -72190,6 +72333,11 @@
           "notice": {
             "type": "string",
             "description": "What the settings do and do not do."
+          },
+          "autoPropose": {
+            "type": "boolean",
+            "description": "`learning.universe_link.auto_propose` (BK-11b): off by default; when on, observations are proposed as hypotheses by the actor auto. Proposes only.",
+            "default": false
           }
         },
         "description": "The universe settings in force with their history (BK-11)."

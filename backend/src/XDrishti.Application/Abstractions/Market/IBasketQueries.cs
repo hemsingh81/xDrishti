@@ -16,6 +16,11 @@ public interface IBasketQueries
     /// </summary>
     ValueTask<BasketMembers?> MembersAsync(Guid basketId, DateTimeOffset? cutoff, DateOnly? asOf, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Every stay of every instrument in a basket (archived or not), read once, with what the simulator needs of the instrument (BK-11b): the dated replay keeps no per-day query. Null when there is no such basket.
+    /// </summary>
+    ValueTask<BasketStays?> StaysAsync(Guid basketId, CancellationToken cancellationToken);
+
     /// <summary>The newest <paramref name="take"/> additions and removals of a basket; null when there is no such basket.</summary>
     ValueTask<BasketHistory?> HistoryAsync(Guid basketId, int take, CancellationToken cancellationToken);
 

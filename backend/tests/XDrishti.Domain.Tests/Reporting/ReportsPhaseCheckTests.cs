@@ -265,6 +265,7 @@ public sealed class ReportsPhaseCheckTests
             "POST /api/lessons/{id:long}/link", "POST /api/lessons/{id:long}/close", "POST /api/lessons/{id:long}/dismiss", "POST /api/hypotheses/{id:long}/move", "POST /api/changelog/{id:long}/revert",
             "POST /api/exports/{kind}",
             "POST /api/learning/rollback/{id:long}/apply", "PUT /api/learning/ml-settings", "POST /api/learning/models/{id:long}/promote",
+            "POST /api/cells/universe-links/{key}/propose",   // BK-11b (ADR 0266): the one more owner act, intended: it writes one proposed hypothesis and applies nothing
             "POST /api/learning/cells/{key}/re-enable",
         ]);
     }

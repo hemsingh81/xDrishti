@@ -3016,6 +3016,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/cells/universe-links/{key}/propose': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Propose ONE hypothesis (source universe, knob scan_scope from all shares to the tier, state proposed) from a stored liquidity-tier observation: the link must be an observation (the tier read in place of the parent, at least the link minimum of trades, a stable hold-out). Nothing is applied, no scan scope changes and no experiment starts; a scope hypothesis cannot be started. Needs a session, the CSRF token, the capability learning_moves_ui and the password in the body, checked on EVERY request; one HypothesisProposed account event. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid or learning.not_an_observation (with the reason), 404 learning.cell_not_found or learning.run_not_found, 409 learning.hypothesis_exists or hypotheses.open_limit, 429 auth.rate_limited */
+    post: operations['ProposeFromUniverseLink'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/learning/overview': {
     parameters: {
       query?: never;
@@ -5757,7 +5774,7 @@ export interface paths {
     };
     /** The universe settings in force (the fewest trades of a tier cell to be read in place of its parent, 30; the fewest trades of a tier to be an observation, 100; the registered basket names a strategy x basket comparison may use) and the latest 50 changes. Read only */
     get: operations['GetUniverseSettings'];
-    /** The owner changes the universe settings (minTradesChild 1 to 1000, linkMinTrades 10 to 10000, registeredBaskets: comma separated names, 1 to 20); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row. expectedVersion (the version of the read) is required. 400 learning.invalid, 403 learning.owner_only, 409 learning.stale */
+    /** The owner changes the universe settings (minTradesChild 1 to 1000, linkMinTrades 10 to 10000, registeredBaskets: comma separated names, 1 to 20; autoPropose: true or false, default false, when true the cells command proposes each tier observation as a hypothesis by the actor auto and applies nothing); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row. expectedVersion (the version of the read) is required. 400 learning.invalid, 403 learning.owner_only, 409 learning.stale */
     put: operations['ChangeUniverseSettings'];
     post?: never;
     delete?: never;
@@ -15167,6 +15184,9 @@ export interface components {
       sampled: boolean;
       /** Format: int64 */
       seed: null | number;
+      membersBasis?: null | string;
+      /** @description True for a basket run that replays each day with that day's members (BK-11b): its requests name the basket and the basis, not the list. */
+      isDated?: boolean;
     };
     /** @description The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off. `Trials` (CF-06) is the count of looks with its parts as of the judgement; null in a result stored before it. `Nulls` (CF-07) is the random-entry null beside the outcome; null in a result stored before it, in a run that is not robust or when its mode is Off. `Benchmark` (CF-11 row 13, ADR 0227) is the daily Sharpe of the strategy against its universe's buy-and-hold; null in a result stored before it. */
     LabVerdictView: {
@@ -19902,6 +19922,17 @@ export interface components {
       modelId: null | string;
       decision: null | components['schemas']['ProposalDecisionView'];
     };
+    /** @description The body of the owner act that proposes a hypothesis from a stable liquidity-tier observation (BK-11b): the stored baseline run, the owner's reason, the window of the link (default all) and the password. The actor is the session's owner; nothing here names it. */
+    ProposeFromUniverseLinkRequest: {
+      /** @description The stored run the hypothesis is attached to (64 lower-case hex). */
+      baselineRunKey: null | string;
+      /** @description Why, 1 to 200 characters. */
+      reason: null | string;
+      /** @description The window of the link: `all` (the default), `250d` or `60d`. */
+      window: null | string;
+      /** @description The owner's password, typed again for THIS act and checked on every request. */
+      password: null | string;
+    };
     /** @description A bucket stored and recomputed side by side; `fields` name what differs (open, high, low, close, volume, bars) or `missing` / `unexpected`; `stored` or `recomputed` is null when there is none. */
     QualityBucketRow: {
       timeframe: string;
@@ -23276,6 +23307,7 @@ export interface components {
       /** Format: uuid */
       basketId?: null | string;
       symbols?: null | string[];
+      membersBasis?: null | string;
     };
     /** @description The window of a posted run, India dates, inclusive; both or neither. */
     StartLabRunWindow: {
@@ -24650,6 +24682,7 @@ export interface components {
       password: null | string;
       /** Format: int64 */
       expectedVersion?: null | number;
+      autoPropose?: null | boolean;
     };
     /** @description The universe settings in force with their history (BK-11). */
     UniverseSettingsView: {
@@ -24674,6 +24707,11 @@ export interface components {
       version: number;
       /** @description What the settings do and do not do. */
       notice: string;
+      /**
+       * @description `learning.universe_link.auto_propose` (BK-11b): off by default; when on, observations are proposed as hypotheses by the actor auto. Proposes only.
+       * @default false
+       */
+      autoPropose: boolean;
     };
     /** @description The baskets a strategy was tested on and how many variants they add (information only, BK-11). */
     UniverseTrialsView: {
@@ -32500,6 +32538,68 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ChangelogOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ProposeFromUniverseLink: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ProposeFromUniverseLinkRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HypothesisMoveOutcome'];
         };
       };
       /** @description Bad Request */

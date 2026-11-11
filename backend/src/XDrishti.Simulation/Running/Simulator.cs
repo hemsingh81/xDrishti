@@ -178,13 +178,14 @@ public sealed class Simulator
     /// <param name="resultsDays">What the features <c>days_to_results</c> and <c>days_since_results</c> read (P15-05); required, with a <paramref name="calendar"/>, when a side names either (<see cref="ReadsResultsDays"/>), ignored otherwise.</param>
     /// <param name="turnoverOn">The 20-day median traded value in rupees on an entry date (CF-05, ADR 0230); read when a side names <c>min_turnover</c>; null or a null answer blocks the entry.</param>
     /// <param name="relativeStrength">The stored relative-strength rows of the instrument that <c>mom_rank</c>, <c>rs_vs_index</c> and <c>sector_rs</c> read (BK-09); required when a side names one.</param>
+    /// <param name="memberOn">Whether the instrument is a member of the basket on an entry date (BK-11b, dated members); null for every other run. A date that is not a member date takes no new entry.</param>
     /// <param name="tierOn">The liquidity tier of the instrument on an entry date (CF-05, D2); read only when the fill rules ask for conservative slippage, and null then excludes every trade.</param>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null, RelativeStrengthInputs? relativeStrength = null) =>
-        RunUntilCancelled(instrument, bars, tick, calendar, quantity, context, events, resultsDays, tierOn, turnoverOn, CancellationToken.None, relativeStrength);
+    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null, RelativeStrengthInputs? relativeStrength = null, Func<DateOnly, bool>? memberOn = null) =>
+        RunUntilCancelled(instrument, bars, tick, calendar, quantity, context, events, resultsDays, tierOn, turnoverOn, CancellationToken.None, relativeStrength, memberOn);
 
     /// <summary>As <c>Run</c>, looking at <paramref name="cancellationToken"/> every few thousand minutes of the scan; a stop raises <see cref="OperationCanceledException"/> (AU-12). A separate overload so that existing callers are unchanged.</summary>
-    public Result<SimulationResult> RunUntilCancelled(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, ScanContext? context, EventCalendarSnapshot? events, ResultsDayInputs? resultsDays, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn, CancellationToken cancellationToken, RelativeStrengthInputs? relativeStrength = null)
+    public Result<SimulationResult> RunUntilCancelled(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, ScanContext? context, EventCalendarSnapshot? events, ResultsDayInputs? resultsDays, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn, CancellationToken cancellationToken, RelativeStrengthInputs? relativeStrength = null, Func<DateOnly, bool>? memberOn = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
@@ -240,7 +241,7 @@ public sealed class Simulator
             scans.Add(scanner.Counters);
 
             // D11: a swing side keeps one open position at a time, so its candidates go through the gate; an intraday trade leaves on its entry date and is not gated.
-            var walked = WalkSide(side, scanner, bars, tick, calendar, quantity, HoldsOvernight, events, series, tierOn, turnoverOn);
+            var walked = WalkSide(side, scanner, bars, tick, calendar, quantity, HoldsOvernight, events, series, tierOn, turnoverOn, memberOn);
             if (walked.IsFailure)
             {
                 return Result.Failure<SimulationResult>(walked.Error);
@@ -284,7 +285,7 @@ public sealed class Simulator
     /// Walks every candidate of a scanned side under this simulator's one exit (P4-05: the scanner may belong to another simulator of a comparison, whose tape holds the features of every candidate; the column of this exit is found by name).
     /// With <paramref name="gated"/> the candidates go through the <see cref="PositionGate"/>, else every candidate is walked.
     /// </summary>
-    internal Result<IReadOnlyList<CandidateOutcome>> WalkSide(SideRun side, EntryScanner scanner, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, bool gated, EventCalendarSnapshot? events = null, ResultsDaysScan? series = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null)
+    internal Result<IReadOnlyList<CandidateOutcome>> WalkSide(SideRun side, EntryScanner scanner, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, bool gated, EventCalendarSnapshot? events = null, ResultsDaysScan? series = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null, Func<DateOnly, bool>? memberOn = null)
     {
         if (side.Compiled.NeedsTurnover && _fills.MinTurnoverCrore is null)
         {
@@ -292,7 +293,7 @@ public sealed class Simulator
             return Result.Failure<IReadOnlyList<CandidateOutcome>>(Error.Validation(SimulatorCodes.FilterNotAvailable, "the filter min_turnover has no threshold in the fill rules (CF-05, ADR 0230)"));
         }
 
-        var rules = RulesOf(side, _fills, tick, calendar, series, tierOn, turnoverOn);
+        var rules = RulesOf(side, _fills, tick, calendar, series, tierOn, turnoverOn, memberOn);
         if (rules.IsFailure)
         {
             return Result.Failure<IReadOnlyList<CandidateOutcome>>(rules.Error);
@@ -334,11 +335,11 @@ public sealed class Simulator
     internal IReadOnlyList<SideRun> SideRuns => _sides;
 
     /// <summary>The one place the rules of a walk are built: the exit rules of the side, the fill rules, the tick of the instrument and, for a swing side, the hold counted with the calendar.</summary>
-    private static Result<WalkRules> RulesOf(SideRun side, FillRules fills, TickSpec tick, TradingCalendar? calendar, ResultsDaysScan? series, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn)
+    private static Result<WalkRules> RulesOf(SideRun side, FillRules fills, TickSpec tick, TradingCalendar? calendar, ResultsDaysScan? series, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn, Func<DateOnly, bool>? memberOn)
     {
         if (side.MaxHoldSessions is not { } sessions)
         {
-            return Result.Success(new WalkRules(side.RewardRisk, side.SquareOffMinute, fills, tick, TierOn: tierOn, TurnoverOn: turnoverOn));
+            return Result.Success(new WalkRules(side.RewardRisk, side.SquareOffMinute, fills, tick, TierOn: tierOn, TurnoverOn: turnoverOn, MemberOn: memberOn));
         }
 
         var hold = SwingHold.Create(sessions, calendar);
@@ -350,7 +351,7 @@ public sealed class Simulator
         // P15-09: the event_exit overlay reads days_to_results of the instrument's series at the close of each session; a side that lists it is never run without the series (Run refuses that first).
         var overlay = side.Compiled.Overlays.FirstOrDefault(o => o.Kind == OverlayKind.EventExit);
         var plan = overlay is not null && series is not null ? new EventExitPlan((int)overlay.Values["days_before_results"][0], series.DaysToResultsAt) : null;
-        return Result.Success(new WalkRules(side.RewardRisk, WalkRules.NoSquareOff, fills, tick, plan is null ? hold.Value : hold.Value with { EventExit = plan }, tierOn, turnoverOn));
+        return Result.Success(new WalkRules(side.RewardRisk, WalkRules.NoSquareOff, fills, tick, plan is null ? hold.Value : hold.Value with { EventExit = plan }, tierOn, turnoverOn, memberOn));
     }
 
     private static Result<IReadOnlyList<CandidateOutcome>> WalkAll(IReadOnlyList<EntryCandidate> candidates, Func<EntryCandidate, Result<WalkOutcome>> walk)

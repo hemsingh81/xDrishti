@@ -25,6 +25,11 @@ internal sealed class StartHypothesisHandler(IRunStore runs, IHypothesisLog log,
         }
 
         var row = latest.Row;
+        if (string.Equals(row.KnobKind, nameof(ExperimentKnobKind.Scope), StringComparison.Ordinal))
+        {
+            return Refuse(LearningErrors.KnobNotRunnable());   // BK-11b: a scope hypothesis is never started: a scope experiment is not built
+        }
+
         var from = HypothesisStateText.TryParse(row.State) ?? HypothesisState.Expired;
         var refusals = HypothesisLifecycle.Refusals(from, HypothesisState.Running, new HypothesisFacts(HypothesisRows.IsOwner(command.Actor), AutonomyLevel.Supervised));
         if (refusals.Count > 0)

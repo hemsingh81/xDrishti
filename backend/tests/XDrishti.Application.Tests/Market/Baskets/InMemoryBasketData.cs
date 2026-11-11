@@ -87,6 +87,12 @@ internal sealed class InMemoryBasketData : IBasketStore, IBasketQueries, IMarket
         return ValueTask.FromResult<BasketMembers?>(basket is null ? null : new BasketMembers(basketId, basket.Name, basket.ArchivedAt, asOf, 0, []));
     }
 
+    public ValueTask<BasketStays?> StaysAsync(Guid basketId, CancellationToken cancellationToken)
+    {
+        var basket = Baskets.FirstOrDefault(b => b.Id == basketId);
+        return ValueTask.FromResult<BasketStays?>(basket is null ? null : new BasketStays(basketId, basket.Name, basket.ArchivedAt, []));
+    }
+
     public ValueTask<BasketHistory?> HistoryAsync(Guid basketId, int take, CancellationToken cancellationToken)
     {
         LastHistoryCall = (basketId, take);
