@@ -878,6 +878,9 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetSmartRulesEvidenceQuery, Result<SmartRulesView>>, GetSmartRulesEvidenceHandler>(); // smart-rule evidence from stored plan rows (P8-13, ADR 0111)
         services.AddScoped<IQueryHandler<ListCellsQuery, Result<IReadOnlyList<CellStatsView>>>, ListCellsHandler>();
         services.AddScoped<IQueryHandler<GetCellQuery, Result<IReadOnlyList<CellStatsView>>>, GetCellHandler>();
+        services.AddScoped<IQueryHandler<GetUniverseTrialsQuery, UniverseTrialsView>, GetUniverseTrialsHandler>(); // the baskets a strategy was tested on, from the stored tests (BK-11)
+        services.AddScoped<IQueryHandler<GetUniverseSettingsQuery, UniverseSettingsView>, GetUniverseSettingsHandler>(); // the owner's universe settings (BK-11)
+        services.AddScoped<ICommandHandler<ChangeUniverseSettingsCommand, UniverseSettingsView>, ChangeUniverseSettingsHandler>(); // owner only, password every change; applies no restriction (BK-11)
         services.AddScoped<IQueryHandler<ListUniverseCellsQuery, Result<IReadOnlyList<CellStatsView>>>, ListUniverseCellsHandler>(); // the liquidity-tier cells of the newest snapshot that has them (BK-11, ADR 0261)
         services.AddScoped<IQueryHandler<GetUniverseLinksQuery, Result<IReadOnlyList<UniverseLinkView>>>, GetUniverseLinksHandler>(); // each tier cell read against its all-shares parent; observations only, nothing is applied (BK-11)
         services.AddScoped<IQueryHandler<ListRegimeCellsQuery, Result<IReadOnlyList<CellStatsView>>>, ListRegimeCellsHandler>(); // the regime cells of the newest snapshot that has them (P6-02, ADR 0146)

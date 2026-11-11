@@ -22,7 +22,6 @@ using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
-using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.Jobs;
 using XDrishti.Application.Learning.SimTraining;
 using XDrishti.Application.Live.Push;
@@ -153,6 +152,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, OptionReportEndpoints>(); // the read-only P14 reports (P14-16): GETs only, counts, shares, dates and verdict words
         services.AddSingleton<IEndpointModule, FilingEndpoints>(); // the stored filings as metadata and counts, optionally as of an instant (P15-02): GETs only, no file content
         services.AddSingleton<IEndpointModule, ExtensionEvaluationEndpoints>(); // the stored verdicts of protocols F, X, P and L (P15-10): GETs only; a KEEP is a record
+        services.AddSingleton<IEndpointModule, UniverseSettingsEndpoints>(); // BK-11: the owner's universe settings, password every change; applies no restriction, places no order
         services.AddSingleton<IEndpointModule, SizingEndpoints>(); // BK-10: the down-only size scaling's owner settings, basket risk budgets and the read-only study; password every change; places no order
         services.AddSingleton<IEndpointModule, EventFilterEndpoints>(); // the owner's event-risk switch (P15-06): password every time, recorded as owner; the auto option is inert until a protocol-F verdict exists; places no order
         services.AddSingleton<IEndpointModule, CalendarEndpoints>(); // the results meetings known at an instant and the instruments without an entry (P15-04): one GET, no file content, no estimate
@@ -274,8 +274,6 @@ internal static class ApiSetup
     {
         services.AddOptions<SimAllSettings>().BindConfiguration(SimAllSettings.Section).ValidateDataAnnotations().ValidateOnStart();
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<SimAllSettings>>().Value));
-        services.AddOptions<UniverseSettings>().BindConfiguration(UniverseSettings.Section).ValidateDataAnnotations().ValidateOnStart();
-        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<UniverseSettings>>().Value));
         services.AddOptions<SimTrainingSettings>().BindConfiguration(SimTrainingSettings.Section).ValidateDataAnnotations().ValidateOnStart();
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<SimTrainingSettings>>().Value));
         services.AddSimAllRunner();

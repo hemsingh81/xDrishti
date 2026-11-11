@@ -55,7 +55,8 @@ public sealed class RunSimulationUniverseTests
 
         var run = result.Value;
         run.Universe.Kind.ShouldBe(UniverseKind.Basket);
-        run.Universe.Label.ShouldBe("members as of today");
+        run.Universe.Label.ShouldStartWith(UniverseLabels.BasketBasis);   // BK-11: one snapshot, survivorship applies, never point in time
+        UniverseLabels.IsExploratory(run.Universe.Label).ShouldBeFalse();
         (run.Universe.BasketId, run.Universe.BasketName).ShouldBe((basket, "Nifty watch"));
         run.Universe.Members.Select(m => m.Id).ShouldBe([abb, retired, empty], "the basket's order is the position, not the order the query returned");
         run.Instruments.Select(i => i.Skipped).ShouldBe([null, null, SkipReason.NoBars]);
@@ -118,7 +119,7 @@ public sealed class RunSimulationUniverseTests
         result.IsSuccess.ShouldBeTrue();
         result.Value.Instruments.ShouldBeEmpty();
         result.Value.Trades.ShouldBeEmpty();
-        result.Value.Universe.Label.ShouldBe("members as of today");
+        result.Value.Universe.Label.ShouldStartWith(UniverseLabels.BasketBasis);
     }
 
     [Fact]

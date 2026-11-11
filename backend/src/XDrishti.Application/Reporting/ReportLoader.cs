@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Reporting;
+using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Reporting;
 
@@ -68,7 +69,8 @@ internal sealed class ReportLoader(IReportTradeSource source, ITrainingReportSou
             }
         }
 
-        var used = chosen.Where(query.Filters.KeepsRun).ToList();
+        // BK-11 (criterion 10): a run on a basket outside the registered list is exploratory and is left out of the What-works ranking (every other report still shows it, labelled)
+        var used = chosen.Where(query.Filters.KeepsRun).Where(r => kind != "what-works" || !UniverseLabels.IsExploratory(r.UniverseLabel)).ToList();
         var options = new ReportOptions { Basis = query.Basis };
         if (query.Basis == ReportBasis.Net)
         {

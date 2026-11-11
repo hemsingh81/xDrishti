@@ -114,7 +114,7 @@ public sealed class UniverseCellsDatabaseTests(ApiFactory factory) : DataTestBas
         all.GetProperty("childN").GetInt32().ShouldBe(30);
         all.GetProperty("parentN").GetInt32().ShouldBe(200);
         all.GetProperty("observation").GetBoolean().ShouldBeFalse("30 trades are under the link minimum of 100");
-        all.GetProperty("holdOut").GetString().ShouldBe("not_evaluated");
+        all.GetProperty("holdOut").GetString().ShouldBe("insufficient", "the tier trades all exit on one day: no two halves");
     }
 
     [Fact]

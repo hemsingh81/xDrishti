@@ -30,7 +30,7 @@ internal sealed class CellsEndpoints : IEndpointModule
 
         cells.MapGet("/universe-links", ListUniverseLinksAsync)
             .WithName("ListUniverseLinks")
-            .WithSummary("Each liquidity-tier cell read against its all-shares parent (BK-11): which cell a reader takes (child_better, no_better_than_parent, child_thin), both lower bounds, and whether the tier is an observation (at least the link minimum of trades). An observation only: nothing is applied, no scan scope changes, and the hold-out check is not evaluated. Filter by strategy; empty before a computation with --by-universe")
+            .WithSummary("Each liquidity-tier cell read against its all-shares parent (BK-11): which cell a reader takes (child_better, no_better_than_parent, child_thin), both lower bounds, and whether the tier is an observation (at least the link minimum of trades). An observation only: it needs the tier read in place of the parent, at least the link minimum of trades and a stable hold-out (both halves of its trades beat the rest of the parent); nothing is applied and no scan scope changes. Filter by strategy; empty before a computation with --by-universe")
             .Produces<IReadOnlyList<UniverseLinkView>>();
 
         cells.MapGet("/{key}", GetAsync)

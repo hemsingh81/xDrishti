@@ -46,8 +46,15 @@ public static class LabErrors
     /// <summary>The stored history is too short to keep a hold-out, or the plan cannot be run on it (CF-06): 409.</summary>
     public const string HoldOutUnavailableCode = "lab.holdout_unavailable";
 
+    /// <summary>A full test on a basket that is not in the owner's registered list (BK-11).</summary>
+    public const string UniverseNotRegisteredCode = "lab.universe_not_registered";
+
+    /// <summary>The basket is outside the registered list; the message names the list. An unregistered basket can still be simulated alone (the run is labelled exploratory).</summary>
+    public static Error UniverseNotRegistered(string basketName, IReadOnlyList<string> registered) =>
+        Error.Validation(UniverseNotRegisteredCode, $"The basket `{basketName}` is not a registered basket, so a full test of a strategy on it is refused. " + XDrishti.Domain.Learning.UniverseSettingsRules.RegisteredMessage(registered) + " The owner changes the list (PUT /api/universe/settings); a simulation of the basket alone is still possible and is labelled exploratory.");
+
     /// <summary>True for the codes the API answers with 422.</summary>
-    public static bool IsUnprocessable(string code) => code is InvalidInputCode or NotRegisteredCode or HoldOutTouchedCode;
+    public static bool IsUnprocessable(string code) => code is InvalidInputCode or NotRegisteredCode or HoldOutTouchedCode or UniverseNotRegisteredCode;
 
     /// <summary>The name of the payload entry that carries the problems.</summary>
     public const string ProblemsKey = "problems";

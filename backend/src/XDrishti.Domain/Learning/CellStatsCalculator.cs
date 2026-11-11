@@ -99,7 +99,9 @@ public static class CellStatsCalculator
                     }
 
                     var inWindow = InWindow(input.Trades, asOf, window);
-                    rows.Add(Row(input, window, inWindow, asOf, star.WinRatePosterior, options, confidence));
+                    var parentTrades = InWindow(cells.First(c => c.Cell == parent).Trades, asOf, window);
+                    var row = Row(input, window, inWindow, asOf, star.WinRatePosterior, options, confidence);
+                    rows.Add(row with { UniverseHoldOut = UniverseHoldOuts.Evaluate(inWindow, Remainder(parentTrades, inWindow), star.WinRatePosterior, options) });
                     traded.Add(inWindow);
                 }
             }
@@ -125,6 +127,31 @@ public static class CellStatsCalculator
         }
 
         return result.AsReadOnly();
+    }
+
+    // the parent's trades that are not the tier's, by value: equal trades are interchangeable, so a multiset subtraction is exact
+    private static List<CellTrade> Remainder(List<CellTrade> parent, List<CellTrade> tier)
+    {
+        var counts = new Dictionary<CellTrade, int>();
+        foreach (var t in tier)
+        {
+            counts[t] = counts.GetValueOrDefault(t) + 1;
+        }
+
+        var rest = new List<CellTrade>(parent.Count);
+        foreach (var t in parent)
+        {
+            if (counts.TryGetValue(t, out var left) && left > 0)
+            {
+                counts[t] = left - 1;
+            }
+            else
+            {
+                rest.Add(t);
+            }
+        }
+
+        return rest;
     }
 
     // Trades are ordered by exit date only (stable sort): the order within one day is the order of the input, i.e. by source run then by that run's trade ordinal.

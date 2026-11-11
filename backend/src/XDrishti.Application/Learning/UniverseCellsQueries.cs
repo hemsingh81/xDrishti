@@ -37,22 +37,25 @@ internal sealed class ListUniverseCellsHandler(ICellStatsStore store) : IQueryHa
 /// <param name="ChildLower">The tier cell's lower credible bound of the win rate.</param>
 /// <param name="ParentLower">The parent's bound without the child's trades; null when the child is thin.</param>
 /// <param name="Observation">True when the tier is read in place of the parent and has at least the link minimum of trades: an observation to show, never applied.</param>
-/// <param name="HoldOut">Always <c>not_evaluated</c> in this slice: the halves of the trades are not stored with a cell, so the hold-out condition of criterion 11 is not checked and no hypothesis is proposed from this list.</param>
+/// <param name="HoldOut"><c>stable</c> (the tier's lower bound beats the rest of the parent's in both halves of its trades), <c>unstable</c>, <c>insufficient</c> (a half has fewer than 30 trades) or <c>not_evaluated</c> (a row stored before it); computed when the cells were computed.</param>
+/// <param name="HoldOutFirstN">Tier trades in the first half; null when not evaluated.</param>
+/// <param name="HoldOutSecondN">Tier trades in the second half; null when not evaluated.</param>
 /// <param name="Text">The sentence the Setups view shows.</param>
-public sealed record UniverseLinkView(string ChildKey, string ParentKey, string Universe, string Window, DateOnly AsOf, string Reason, string ReadKey, int ChildN, int ParentN, double ChildLower, double? ParentLower, bool Observation, string HoldOut, string Text);
+public sealed record UniverseLinkView(string ChildKey, string ParentKey, string Universe, string Window, DateOnly AsOf, string Reason, string ReadKey, int ChildN, int ParentN, double ChildLower, double? ParentLower, bool Observation, string HoldOut, int? HoldOutFirstN, int? HoldOutSecondN, string Text);
 
 /// <summary>For each tier cell of the newest snapshot, which cell a reader takes and why (BK-11). Reads only; nothing here applies a restriction.</summary>
 public sealed record GetUniverseLinksQuery(string? Strategy) : IQuery<Result<IReadOnlyList<UniverseLinkView>>>;
 
-internal sealed class GetUniverseLinksHandler(ICellStatsStore store, UniverseSettings? settings = null) : IQueryHandler<GetUniverseLinksQuery, Result<IReadOnlyList<UniverseLinkView>>>
+internal sealed class GetUniverseLinksHandler(ICellStatsStore store, IUniverseSettingsStore settingsStore) : IQueryHandler<GetUniverseLinksQuery, Result<IReadOnlyList<UniverseLinkView>>>
 {
     public async ValueTask<Result<IReadOnlyList<UniverseLinkView>>> HandleAsync(GetUniverseLinksQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
         var rows = await store.ListUniverseLatestAsync(string.IsNullOrWhiteSpace(query.Strategy) ? null : query.Strategy, null, cancellationToken);
         var byKey = rows.ToDictionary(r => (r.Row.Cell, r.Row.Window));
-        var minChild = (settings ?? new UniverseSettings()).MinTradesChild;
-        var minLink = (settings ?? new UniverseSettings()).LinkMinTrades;
+        var settings = (await settingsStore.CurrentAsync(cancellationToken)).Settings;
+        var minChild = settings.MinTradesChild;
+        var minLink = settings.LinkMinTrades;
         var views = new List<UniverseLinkView>();
         foreach (var child in rows.Where(r => r.Row.Cell.Universe != CellId.AllUniverses))
         {
@@ -62,9 +65,10 @@ internal sealed class GetUniverseLinksHandler(ICellStatsStore store, UniverseSet
             }
 
             var choice = CellChoice.Resolve(child.Row, parent.Row, minChild, child.Options);
-            var observation = choice.IsChild && child.Row.N >= minLink;
+            var hold = child.Row.UniverseHoldOut;
+            var observation = choice.IsChild && child.Row.N >= minLink && hold is { IsStable: true };
             views.Add(new UniverseLinkView(
-                child.Row.Cell.Key, parentId.Key, child.Row.Cell.Universe, child.Row.Window.Code(), child.Row.AsOf, choice.Reason, choice.Cell.Cell.Key, child.Row.N, parent.Row.N, choice.ChildLower, choice.ParentLower, observation, "not_evaluated", Text(child.Row, parent.Row, choice)));
+                child.Row.Cell.Key, parentId.Key, child.Row.Cell.Universe, child.Row.Window.Code(), child.Row.AsOf, choice.Reason, choice.Cell.Cell.Key, child.Row.N, parent.Row.N, choice.ChildLower, choice.ParentLower, observation, hold?.Verdict ?? "not_evaluated", hold?.FirstN, hold?.SecondN, Text(child.Row, parent.Row, choice)));
         }
 
         return Result.Success<IReadOnlyList<UniverseLinkView>>([.. views.OrderBy(v => v.ChildKey, StringComparer.Ordinal).ThenBy(v => v.Window, StringComparer.Ordinal)]);
@@ -75,7 +79,7 @@ internal sealed class GetUniverseLinksHandler(ICellStatsStore store, UniverseSet
         var who = $"{child.Cell.Strategy}, {child.Cell.Timeframe}, {child.Cell.Side}, {child.Cell.Style}, {child.Cell.Universe}";
         return choice.Reason switch
         {
-            CellChoice.ChildBetter => string.Create(CultureInfo.InvariantCulture, $"{who}: stronger than all shares (lower bound {choice.ChildLower:0.00} vs {choice.ParentLower:0.00}, n {child.N}/{parent.N}); an observation, nothing is applied"),
+            CellChoice.ChildBetter => string.Create(CultureInfo.InvariantCulture, $"{who}: stronger than all shares (lower bound {choice.ChildLower:0.00} vs {choice.ParentLower:0.00}, n {child.N}/{parent.N}); an observation, nothing is applied (hold-out {child.UniverseHoldOut?.Verdict ?? "not_evaluated"})"),
             CellChoice.NoBetterThanParent => string.Create(CultureInfo.InvariantCulture, $"{who}: no better than all shares (lower bound {choice.ChildLower:0.00} vs {choice.ParentLower:0.00}, n {child.N}/{parent.N})"),
             _ => string.Create(CultureInfo.InvariantCulture, $"{who}: not enough evidence (n {child.N})"),
         };

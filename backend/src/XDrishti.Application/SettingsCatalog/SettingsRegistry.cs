@@ -56,6 +56,9 @@ public static class SettingsRegistry
         Stored("sizing.capacity.enabled", "Cap suggestions at a share of the 20-day traded value (owner only, password every change)", SettingTier.Advanced, "false"),
         Stored("sizing.capacity.pct", "Capacity share of the 20-day traded value, at most the configured capacity share 0.005: tighten only (owner only, password every change)", SettingTier.Advanced, "0.005"),
         Stored("sizing.basket_budgets", "Basket risk budgets, a share of the total open risk limit (owner only, password every change)", SettingTier.Advanced, null),
+        Stored("learning.universe_min_trades_child", "Fewest trades a liquidity-tier cell needs before it can be read in place of the all-shares cell (owner only, password every change)", SettingTier.Advanced, "30"),
+        Stored("learning.universe_link_min_trades", "Fewest trades a liquidity tier needs before its edge is listed as an observation (owner only, password every change)", SettingTier.Advanced, "100"),
+        Stored("learning.universe_registered_baskets", "Baskets a strategy x basket comparison may use, by name (owner only, password every change)", SettingTier.Advanced, "Nifty 50,Nifty 100,Nifty Midcap 150,F&O stocks,Most liquid,Low volatility,Momentum,Nifty 500"),
         Stored("options.backfill_stocks", "Frozen share order of the options backfill", SettingTier.Internal, null),
     ];
 
@@ -71,8 +74,6 @@ public static class SettingsRegistry
         Config("StrategyLab:Gates:MinPositiveFoldsPct", "Minimum share of positive folds (%)", SettingTier.Advanced, QualificationDefaults.MinPositiveFoldsPct, 0, 100, SettingSafer.Higher),
         Config("StrategyLab:Gates:MaxDrawdownR", "Maximum drawdown (R)", SettingTier.Advanced, QualificationDefaults.MaxDrawdownR, 0, null, SettingSafer.Lower),
         Config("StrategyLab:Gates:MaxCalibrationErrorPp", "Maximum calibration error (pp)", SettingTier.Advanced, QualificationDefaults.MaxCalibrationErrorPp, 0, null, SettingSafer.Lower),
-        Config("Learning:Universe:MinTradesChild", "Fewest trades a liquidity-tier cell needs before it can be read in place of the all-shares cell; the read side only", SettingTier.Advanced, "30", 1, 1000),
-        Config("Learning:Universe:LinkMinTrades", "Fewest trades a liquidity tier needs before its edge is listed as an observation; nothing is applied", SettingTier.Advanced, "100", 10, 10000),
         Config("Live:Writes:Enabled", "Live writes deployment gate", SettingTier.Advanced, "false"),
         Config("Learned:WeeklyCap", "Most automatic learned changes per week", SettingTier.Internal, "3", 0, 10),
         Config("Learned:MaxTotalPercent", "Largest total learned drift from the configured value (%)", SettingTier.Internal, "30", 1, 100),
@@ -101,7 +102,7 @@ public static class SettingsRegistry
             "Live", "Live:Buckets", "Live:Estimates", "Live:Capacity", "Live:Report", "Live:Ramp", "Live:Capture", "Live:Match", "Live:Protect",
             "Ticks", "Depth", "Options", "Options:Liquidity", "Options:Costs", "Options:PhaseCheck", "Options:Remark", "Options:Quality",
             "Pairs", "Models", "Filings", "StrategyLab", "Experiments", "Recovery", "Shadow", "Heartbeat", "Exports", "Mcp", "Eval",
-            "Learned", "Learning:Universe", "Simulate", "Training", "Planning:TicketAlerts", "Reports:PlanVsActual", "Reports:Benchmark", "Reports:BasketProfile", "Reports:Training", "Market:RelativeStrength",
+            "Learned", "Simulate", "Training", "Planning:TicketAlerts", "Reports:PlanVsActual", "Reports:Benchmark", "Reports:BasketProfile", "Reports:Training", "Market:RelativeStrength",
             "Portfolio:Heal", "Portfolio:BrokerHistory", "Portfolio:AutoRefresh", "Instruments:AutoRefresh", "Data", "Data:History", "Baskets:System:Fetch", "Baskets:System:Lists", "Baskets:System:Derived",
             "Assistant:Mcp", "Assistant:Llm", "Assistant:Briefing", "Assistant:Turn", "Assistant:Proposals", "Assistant:Drafts", "AiRoles",
             "Brokers", "BrokerVault", "ExecHandover", "ExecRole", "Execution", "Execution:Sandbox", "Database", "Auth:Owner",

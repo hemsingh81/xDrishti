@@ -64,6 +64,11 @@ internal sealed class LabRunsEndpoints : IEndpointModule
             .WithSummary("The test ledger of a strategy family: every Lab run created for it, the number of distinct variants (hashes) and the factor the qualification gates are tightened by now")
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        api.MapGet("/lab/strategies/{id}/universe-trials", GetUniverseTrialsAsync)
+            .WithTags("Lab")
+            .WithName("GetUniverseTrials")
+            .WithSummary("The baskets a strategy family was tested on, counted from the stored Lab tests (BK-11): the distinct baskets k, the distinct tests, the k - 1 variants they add and the multiple-testing factor of k variants (k = 8 is three doublings). A repeated test of the same version, basket and window counts once");
+
         runs.MapPost("/{id:guid}/cancel", CancelAsync)
             .WithName("CancelLabRun")
             .WithSummary("Stop a run: a queued run at once, a running run at its next safe point between instruments (202); nothing is stored for it. 409 lab.not_cancellable once it has finished")
@@ -89,6 +94,9 @@ internal sealed class LabRunsEndpoints : IEndpointModule
         var started = result.Value;
         return started.Created ? TypedResults.Accepted($"/api/lab/runs/{started.Run.Id}", started.Run) : TypedResults.Ok(started.Run);
     }
+
+    private static async Task<Ok<UniverseTrialsView>> GetUniverseTrialsAsync(string id, IQueryHandler<GetUniverseTrialsQuery, UniverseTrialsView> handler, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await handler.HandleAsync(new GetUniverseTrialsQuery(id), cancellationToken));
 
     private static async Task<Results<Ok<IReadOnlyList<LabRunView>>, ProblemHttpResult>> ListAsync(
         string? strategyId,
