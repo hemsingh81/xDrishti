@@ -178,3 +178,8 @@ export const snoozeAlert = async (noticeId: string, minutes: 15 | 30 | 60): Prom
 export const dismissAlert = async (noticeId: string): Promise<void> => {
   ensureOk(await api.POST('/api/plans/alerts/{noticeId}/dismiss', { params: { path: { noticeId } } }));
 };
+
+/** Hides one loosened limit on every plan from now on (insert-only, no password; the owner is the session). */
+export const dismissLoosening = async (noticeId: string): Promise<void> => {
+  ensureOk(await api.POST('/api/plans/loosenings/{noticeId}/dismiss', { params: { path: { noticeId } } }));
+};

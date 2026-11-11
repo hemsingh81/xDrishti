@@ -59,6 +59,7 @@ public static class SettingsRegistry
         Stored("gate.breadth_source", "Where the market gate reads breadth: tracked, or basket:<id>; any change loosens (owner only, password every change)", SettingTier.Advanced, "tracked"),
         Stored("selection.max_cluster_risk_pct", "Cap on open risk per correlation cluster, percent of capital; off when unset (owner only, password every change)", SettingTier.Advanced, null),
         Stored("selection.cluster_rho", "Correlation at which clusters are cut; raising it loosens (owner only, password every change)", SettingTier.Advanced, "0.7"),
+        Stored("plans.loosening_banner.auto_dismiss", "Hide a loosened limit from the plan banner automatically once a plan has shown it (owner only, password every change)", SettingTier.Advanced, "false"),
         Stored("learning.universe_min_trades_child", "Fewest trades a liquidity-tier cell needs before it can be read in place of the all-shares cell (owner only, password every change)", SettingTier.Advanced, "30"),
         Stored("learning.universe_link_min_trades", "Fewest trades a liquidity tier needs before its edge is listed as an observation (owner only, password every change)", SettingTier.Advanced, "100"),
         Stored("learning.universe_registered_baskets", "Baskets a strategy x basket comparison may use, by name (owner only, password every change)", SettingTier.Advanced, "Nifty 50,Nifty 100,Nifty Midcap 150,F&O stocks,Most liquid,Low volatility,Momentum,Nifty 500"),

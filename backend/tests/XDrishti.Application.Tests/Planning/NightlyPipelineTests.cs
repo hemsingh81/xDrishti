@@ -95,6 +95,22 @@ public sealed class NightlyPipelineTests
         (row.Outcome, row.FailedGate, row.PlanId, row.Manual).ShouldBe(("published", null, 101L, false));
     }
 
+    [Fact]
+    public async Task With_the_loosening_setting_ON_the_publish_runs_the_automatic_dismissal_once_and_with_it_OFF_dismisses_nothing()
+    {
+        var looseningStore = Substitute.For<ILooseningStore>();
+        looseningStore.CurrentSettingAsync(Ct).Returns(new LooseningSwitch(4, true, "h4"));
+        looseningStore.PreviousPlanCreatedAtAsync(101, Ct).Returns(Evening);
+        looseningStore.ListUndismissedAsync(Ct).Returns([new LooseningNotice(LooseningNoticeId.Sizing, 7, "sizing.vol_target.floor", null, "0.5", "0.7", "owner:me@x", Evening.AddDays(-1))]);
+        looseningStore.AddDismissalAsync(Arg.Any<NewLooseningDismissal>(), Ct).Returns(true);
+        var auto = new LooseningAutoDismissal(looseningStore, Substitute.For<XDrishti.Application.Abstractions.Accounts.IAccountEventLog>(), Substitute.For<XDrishti.Application.Abstractions.Accounts.IAccountUnitOfWork>(), _time, NullLogger<LooseningAutoDismissal>.Instance);
+
+        await new RunNightlyPlanHandler(_calendar, Gates(), new NullPlanBuilder(), _store, _time, NullLogger<RunNightlyPlanHandler>.Instance, auto).HandleAsync(Run(), Ct);
+        await new RunNightlyPlanHandler(_calendar, Gates(), new NullPlanBuilder(), _store, _time, NullLogger<RunNightlyPlanHandler>.Instance, auto).HandleAsync(Run(), Ct); // a repeat: no second plan, no second dismissal
+
+        await looseningStore.Received(1).AddDismissalAsync(new NewLooseningDismissal("sizing", 7, "auto", 4, "h4"), Ct);
+    }
+
     [Theory]
     [InlineData(0, GateStatus.Fail)]
     [InlineData(1, GateStatus.Fail)]

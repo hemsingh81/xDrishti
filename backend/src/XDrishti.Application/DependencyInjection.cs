@@ -975,6 +975,12 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetCellStateQuery, Result<CellStateView>>, GetCellStateHandler>();
         services.AddScoped<IQueryHandler<ListPlansQuery, Result<IReadOnlyList<PlanView>>>, ListPlansHandler>(); // the plan record (P7-03, ADR 0083)
         services.AddScoped<IQueryHandler<GetPlanQuery, Result<PlanView>>, GetPlanHandler>();
+        // BK-10b: the loosening banner of the plan screen (read on request, never stored in a plan), its insert-only dismissal and the automatic dismissal setting (OFF by default). Nothing here changes a limit or places an order.
+        services.AddScoped<XDrishti.Application.Planning.LooseningReader>();
+        services.AddScoped<XDrishti.Application.Planning.LooseningAutoDismissal>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Planning.DismissLooseningCommand>, XDrishti.Application.Planning.DismissLooseningHandler>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.Planning.GetLooseningSettingsQuery, XDrishti.Application.Planning.LooseningSettingsView>, XDrishti.Application.Planning.GetLooseningSettingsHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Planning.ChangeLooseningSettingsCommand, XDrishti.Application.Planning.LooseningSettingsView>, XDrishti.Application.Planning.ChangeLooseningSettingsHandler>();
         // BK-10: the down-only size scaling (owner settings and basket budgets, the inputs of the plan, the study). All OFF until the owner turns a setting on; nothing here places an order.
         services.AddScoped<XDrishti.Application.Abstractions.Planning.ISizingInputs, XDrishti.Application.Sizing.SizingInputSource>();
         services.AddScoped<IQueryHandler<XDrishti.Application.Sizing.GetSizingSettingsQuery, XDrishti.Application.Sizing.SizingSettingsView>, XDrishti.Application.Sizing.GetSizingSettingsHandler>();

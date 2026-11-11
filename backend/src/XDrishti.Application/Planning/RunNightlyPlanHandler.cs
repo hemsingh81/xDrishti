@@ -18,7 +18,8 @@ internal sealed class RunNightlyPlanHandler(
     IPlanBuilder builder,
     IPlanStore store,
     TimeProvider clock,
-    ILogger<RunNightlyPlanHandler> logger) : ICommandHandler<RunNightlyPlanCommand, NightlyRunView>
+    ILogger<RunNightlyPlanHandler> logger,
+    LooseningAutoDismissal? looseningAutoDismissal = null) : ICommandHandler<RunNightlyPlanCommand, NightlyRunView>
 {
     private const int HistoryRead = 200;
 
@@ -117,6 +118,12 @@ internal sealed class RunNightlyPlanHandler(
             var winner = FirstPublished(await store.ListRunsAsync(forDate, HistoryRead, cancellationToken));
             NightlyLog.Repeat(logger, forDate, published.Id);
             return Result.Success(new NightlyRunView(session, forDate, NightlyOutcomes.Published, true, false, winner?.Attempt ?? 0, null, $"Already published by another run (plan {published.Id}); nothing was done.", published.Id, views));
+        }
+
+        // BK-10b: with the setting ON, the loosenings an earlier plan already showed are dismissed as `auto` after the plan is stored (a separate write that never fails the run; with the setting OFF nothing happens).
+        if (looseningAutoDismissal is not null && published.Created)
+        {
+            await looseningAutoDismissal.RunAsync(published.Id, cancellationToken);
         }
 
         NightlyLog.Published(logger, forDate, published.Id, attempt);
