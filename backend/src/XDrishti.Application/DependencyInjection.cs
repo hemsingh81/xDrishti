@@ -315,6 +315,17 @@ public static class DependencyInjection
     }
 
     /// <summary>
+    /// The opening-minute recorder (BK-03b) - only for the <c>xd-feed</c> host: its own supervisor (three gates, window, run record) and its own session (a second Quote-mode socket to the allowed live-feed host). The host provides
+    /// <c>OpeningBarsSettings</c> and, through <c>AddOpeningBarsRecording</c>, the ports. Registered paused and off.
+    /// </summary>
+    public static IServiceCollection AddOpeningBarsRecorder(this IServiceCollection services)
+    {
+        services.AddSingleton<XDrishti.Application.OpeningBars.OpeningBarsRecorder>();
+        services.AddSingleton<XDrishti.Application.Abstractions.OpeningBars.IOpeningBarsSupervisor, XDrishti.Application.OpeningBars.OpeningBarsSupervisor>();
+        return services;
+    }
+
+    /// <summary>
     /// The trade-tick recorder (P7-16b) - only for the <c>xd-feed</c> host: its own supervisor (three gates, window, run record, heartbeat <c>xd-ticks</c>) and its own session (a second Quote-mode socket to the allowed live-feed host). The host provides
     /// <see cref="TickSettings"/> and <see cref="DepthSettings"/> (the set inputs and the shared free floor) and, through <c>AddTickRecording</c>, the ports. Registered paused and off.
     /// </summary>
@@ -380,6 +391,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, PreOpenService>(); // arms the approved tickets at 09:10 (P7-11); starts paused, no order, no promotion
         services.AddSingleton<IScheduledService, XDrishti.Application.Market.Baskets.SystemBasketsService>(); // BK-01: the index lists' membership at 07:30; starts paused, Baskets:System:Fetch:Enabled OFF, zero requests while off
         services.AddSingleton<IScheduledService, DerivedBasketsService>(); // BK-03: the derived baskets' versions after the end-of-day run; starts paused, Baskets:System:Derived:Enabled OFF, reads and writes nothing while off
+        services.AddSingleton<IScheduledService, XDrishti.Application.OpeningBars.OpeningBarsService>(); // BK-03b: the opening-minute recorder, shown and edited here, run by xd-feed; starts paused, "Run now" refused
         services.AddSingleton<IScheduledService, PlanExpiryService>(); // expires the day's armed tickets after the close (P7-11); starts paused
         services.AddSingleton<IScheduledService, PaperCaptureService>(); // paper fills of armed tickets after the end-of-day run (P10-01); starts paused, no order
         services.AddSingleton<IScheduledService, ShadowWriteService>(); // the shadow record of every nightly candidate, written before the open (CF-08); starts paused, setting paper.shadow.enabled OFF, no order
@@ -1008,6 +1020,10 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<XDrishti.Application.Market.Baskets.GetSystemBasketSettingsQuery, XDrishti.Application.Market.Baskets.SystemBasketSettingsView>, XDrishti.Application.Market.Baskets.GetSystemBasketSettingsHandler>(); // BK-04: which owner-act switches are on
         services.AddScoped<IQueryHandler<XDrishti.Application.Market.Baskets.GetBasketSourceQuery, Result<XDrishti.Application.Market.Baskets.BasketSourceView>>, XDrishti.Application.Market.Baskets.GetBasketSourceHandler>();
         services.AddScoped<ICommandHandler<RefreshDerivedBasketsCommand, DerivedRun>, RefreshDerivedBasketsHandler>(); // BK-03: form the due derived versions from our own bars
+        services.AddScoped<ICommandHandler<XDrishti.Application.OpeningBars.FreezeOpeningBasketsCommand, XDrishti.Application.OpeningBars.OpeningFreezeRun>, XDrishti.Application.OpeningBars.FreezeOpeningBasketsHandler>(); // BK-03b: forms baskets 4 and 12 once from the opening-minute bars, or names why not; called by the feed host's recorder loop
+        services.AddScoped<IQueryHandler<XDrishti.Application.OpeningBars.GetOpeningBarsRecorderQuery, XDrishti.Application.OpeningBars.OpeningBarsRecorderView>, XDrishti.Application.OpeningBars.GetOpeningBarsRecorderHandler>(); // BK-03b: the owner's opening-bars switch: read
+        services.AddScoped<ICommandHandler<XDrishti.Application.OpeningBars.ChangeOpeningBarsCommand, XDrishti.Application.OpeningBars.OpeningBarsSwitched>, XDrishti.Application.OpeningBars.ChangeOpeningBarsHandler>(); // BK-03b: change, insert-only, behind a fresh password in the endpoint
+        services.TryAddSingleton(XDrishti.Application.Abstractions.OpeningBars.OpeningBarsSettings.Off); // the feed host replaces it with the checked OpeningBars:* options; every other host sees everything off
         services.AddScoped<ICommandHandler<BackfillDerivedBasketCommand, DerivedRun>, BackfillDerivedBasketHandler>(); // BK-03: owner-triggered recomputed versions of a past range
         services.AddScoped<ICommandHandler<SetDerivedParamsCommand, DerivedDefinitionView>, SetDerivedParamsHandler>(); // BK-03: a new immutable parameter set and the switch
         services.AddScoped<IQueryHandler<GetBasketVersionsQuery, Result<BasketVersionPage>>, GetBasketVersionsHandler>();

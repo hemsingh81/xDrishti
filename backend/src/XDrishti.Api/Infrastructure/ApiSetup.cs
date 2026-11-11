@@ -176,6 +176,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, SizingEndpoints>(); // BK-10: the down-only size scaling's owner settings, basket risk budgets and the read-only study; password every change; places no order
         services.AddSingleton<IEndpointModule, EventFilterEndpoints>(); // the owner's event-risk switch (P15-06): password every time, recorded as owner; the auto option is inert until a protocol-F verdict exists; places no order
         services.AddSingleton<IEndpointModule, CalendarEndpoints>(); // the results meetings known at an instant and the instruments without an entry (P15-04): one GET, no file content, no estimate
+        services.AddSingleton<IEndpointModule, OpeningBarsEndpoints>(); // the owner's opening-minute recorder switch (BK-03b): fresh password per change, insert-only; no bar is readable
         services.AddSingleton<IEndpointModule, TickEndpoints>(); // the owner's trade-tick recorder switch (P7-16b): fresh password per change, insert-only; no tick data is readable
         services.AddSingleton<IEndpointModule, LiveTradingEndpoints>(); // the compliance record of the small live phase (P11-05): fresh password, gate Live:Writes:Enabled (OFF), insert-only; no broker call
         services.AddSingleton<IEndpointModule, ChargeSheetEndpoints>(); // the owner's confirmation of the charge sheet (P8-23, ADR 0127)

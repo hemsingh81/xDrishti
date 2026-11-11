@@ -58,6 +58,9 @@ public interface IDerivedVersionStore
     /// <summary>The effective date of the first and the as_of of the newest published version of the basket (both null when there is none).</summary>
     ValueTask<(DateOnly? FirstEffectiveFrom, DateOnly? NewestAsOf)> PublishedRangeAsync(Guid basketId, CancellationToken cancellationToken);
 
+    /// <summary>Whether a published frozen (intraday, <c>formed_at</c> set) version of the basket exists for the as_of: formed or not formed, the day is settled and nothing more is written (BK-03b).</summary>
+    ValueTask<bool> FrozenExistsAsync(Guid basketId, DateOnly asOf, CancellationToken cancellationToken);
+
     ValueTask<bool> ExistsAsync(Guid basketId, DateOnly asOf, string paramsHash, CancellationToken cancellationToken);
 
     /// <summary>Writes the version, its scores and the dated member changes in one transaction (nothing is left behind on a failure).</summary>

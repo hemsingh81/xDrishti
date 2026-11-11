@@ -10,10 +10,10 @@ namespace XDrishti.Application.Market.Baskets;
 
 /// <summary>What the processor decided for one NSE list file: a rejection (nothing applied), a membership change (the ban list) or the lot rows to store (the lot file); the fetch row carries the counts and warnings.</summary>
 internal sealed record ListPlan(
-    FetchRecord Fetch, string? Reject, MembershipChange? Change = null, IReadOnlyList<Guid>? Order = null, DateTimeOffset Effective = default, ListOrigin? Origin = null, DateOnly? TradeDate = null);
+    FetchRecord Fetch, string? Reject, MembershipChange? Change = null, IReadOnlyList<Guid>? Order = null, DateTimeOffset Effective = default, ListOrigin? Origin = null, DateOnly? TradeDate = null, IReadOnlyList<NseLot>? Lots = null);
 
 /// <summary>
-/// Reads the two NSE F&amp;O files (BK-05) into a plan without writing anything: <c>fo_secban.csv</c> into the ban list's membership dated by the trade date in its first line, <c>fo_mktlots.csv</c> into a summary and the cross-checks against the master (nothing is stored but the fetch record; a lot table is deferred to the owner's question 5 of the spec review)
+/// Reads the two NSE F&amp;O files (BK-05) into a plan without writing anything: <c>fo_secban.csv</c> into the ban list's membership dated by the trade date in its first line, <c>fo_mktlots.csv</c> into a summary and the cross-checks against the master (nothing is stored but the fetch record; the lots to store as <c>nse_mktlots</c> rows, BK-05b, travel in the plan)
 /// (a mismatch and a universe difference are warnings; the master stays primary). The caller applies the plan through the same fail-closed steps as the index lists.
 /// </summary>
 internal sealed class ListFileProcessor(IBasketSourceStore sources, IBasketStore baskets, IListMasterReader master)
@@ -101,6 +101,23 @@ internal sealed class ListFileProcessor(IBasketSourceStore sources, IBasketStore
         }
 
         var warnings = new List<string> { $"index_rows_skipped:{file.Rows.Count - shareRows.Count}" };
+        var lots = shareRows.Select(r => new NseLot(shares[r.Symbol].Flags.Id, r.LotSize)).ToList();
+        var disagreeing = new HashSet<Guid>();
+        var indexRows = file.Rows.Where(r => !shares.ContainsKey(r.Symbol) && NseIndexSymbols.IsIndex(r.Symbol)).ToList();
+        var indexIds = indexRows.Count == 0 ? new Dictionary<string, Guid>() : await master.ReadIndexIdsAsync([.. indexRows.Select(r => NseIndexSymbols.Canonical(r.Symbol)).OfType<string>()], cancellationToken);
+        var indexUnmatched = 0;
+        foreach (var row in indexRows)
+        {
+            if (NseIndexSymbols.Canonical(row.Symbol) is { } canonical && indexIds.TryGetValue(canonical, out var id))
+            {
+                lots.Add(new NseLot(id, row.LotSize));
+            }
+            else
+            {
+                indexUnmatched++;
+            }
+        }
+
         var nse = shareRows.ToDictionary(r => r.Symbol, r => r.LotSize, StringComparer.OrdinalIgnoreCase);
         var masterLots = shares.Where(s => s.Value.MasterLot is not null).ToDictionary(s => s.Key, s => s.Value.MasterLot!.Value, StringComparer.OrdinalIgnoreCase);
         warnings.AddRange(LotChecks.Mismatches(nse, masterLots).Select(m => $"lot_size_mismatch:{m.Symbol}:master={m.Master}:nse={m.Nse}"));
@@ -112,10 +129,32 @@ internal sealed class ListFileProcessor(IBasketSourceStore sources, IBasketStore
             warnings.AddRange(diff.OnlyNse.Select(s => $"only_nse:{s}"));
         }
 
+        // Two rows naming one instrument with different lots (a share symbol that is also listed twice under another name): neither is believed, none is stored.
+        foreach (var group in lots.GroupBy(l => l.UnderlyingId).Where(g => g.Select(l => l.LotSize).Distinct().Count() > 1))
+        {
+            disagreeing.Add(group.Key);
+            warnings.Add($"lot_rows_disagree:{group.Key}");
+        }
+
+        lots = [.. lots.Where(l => !disagreeing.Contains(l.UnderlyingId)).GroupBy(l => l.UnderlyingId).Select(g => g.First())];
         var mismatches = LotChecks.Mismatches(nse, masterLots).Count;
-        warnings.Insert(0, $"lots_summary:shares={shareRows.Count},nearest={shareRows.FirstOrDefault()?.ExpiryLabel},mismatches={mismatches},withoutLot={file.RowsWithoutLot}");
+        warnings.Insert(0, $"lots_summary:shares={shareRows.Count},nearest={shareRows.FirstOrDefault()?.ExpiryLabel},mismatches={mismatches},withoutLot={file.RowsWithoutLot},indexUnmatched={indexUnmatched}");
         fetch = fetch with { WarningsJson = Json(warnings) };
-        return new ListPlan(fetch, null);
+        return new ListPlan(fetch, null, Lots: lots);
+    }
+
+    /// <summary>The fetch record once the number of lot rows written is known: the summary carries <c>lotsWritten</c>, and the outcome is applied when any row was written, unchanged otherwise.</summary>
+    public static FetchRecord WithLotsWritten(FetchRecord fetch, int written)
+    {
+        ArgumentNullException.ThrowIfNull(fetch);
+        var warnings = JsonSerializer.Deserialize<List<string>>(fetch.WarningsJson) ?? [];
+        var at = warnings.FindIndex(w => w.StartsWith("lots_summary:", StringComparison.Ordinal));
+        if (at >= 0)
+        {
+            warnings[at] += $",lotsWritten={written}";
+        }
+
+        return fetch with { Outcome = written > 0 ? FetchOutcomes.Applied : FetchOutcomes.Unchanged, WarningsJson = JsonSerializer.Serialize(warnings) };
     }
 
     private static string Json(List<string> warnings) =>

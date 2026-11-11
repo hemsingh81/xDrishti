@@ -5,6 +5,9 @@ internal sealed record Session(DateOnly Date, IntradayBar[] Bars)
 {
     /// <summary>Bars whose minute since the 09:15 open is in [from, to).</summary>
     public IEnumerable<IntradayBar> Between(int from, int to) => Bars.Where(b => IntradaySessions.Minute(b) >= from && IntradaySessions.Minute(b) < to);
+
+    /// <summary>Whether every minute in [from, to) has a bar: a window with a missing minute is not read (a missing minute is never filled forward, BK-03b).</summary>
+    public bool IsComplete(int from, int to) => Between(from, to).Select(IntradaySessions.Minute).Distinct().Count() == to - from;
 }
 
 /// <summary>Groups intraday bars into sessions using only what was knowable: daily-dated bars up to as_of, plus today's bars strictly before the formation time.</summary>

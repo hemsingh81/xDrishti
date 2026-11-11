@@ -28,11 +28,6 @@ internal sealed class SetDerivedParamsHandler(IDerivedVersionStore store, IDeriv
             return Result.Failure<DerivedDefinitionView>(BasketErrors.NotFound);
         }
 
-        if (command.Enabled == true && DerivedSchedule.WhyNotRunnable(DerivedCatalogue.Get(definition.DefinitionNo)) is { } why)
-        {
-            return Result.Failure<DerivedDefinitionView>(BasketErrors.Invalid("enabled", $"This basket cannot be switched on yet ({why})."));
-        }
-
         var before = DerivedComputation.ParamsOf(definition);
         var after = command.Overrides is null ? before : DerivedParams.Create(1, command.Overrides);
         if (after.IsFailure)

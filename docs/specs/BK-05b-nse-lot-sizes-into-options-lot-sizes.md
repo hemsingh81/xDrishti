@@ -1,6 +1,6 @@
 # BK-05b — NSE lot sizes into options.lot_sizes
 
-- **Status:** Approved (owner, 2026-11-11, in chat: "Yes, write + build")
+- **Status:** Built on `feature/bk-05b` 2026-11-11 (approved by the owner 2026-11-11 in chat: "Yes, write + build"); full gate and reviewer pending
 - **Phase / roadmap row:** BK follow-up — BK-05b (closes [BK-05](BK-05-broker-flag-and-fo-baskets.md) AC 7 and 8 as a dated table; REVIEW-2026-11-10 question 5 answered yes; ADR 0256 "Owner decision 2026-11-11")
 - **Design refs:** ADR 0175 (P14-01 `options.lot_sizes`) · ADR 0256 (list baskets, NSE F&O files OFF) · ADR 0254 (fetch guard, owner acts) · docs/design/06 §2.3
 - **Needs (VERIFIED in code at a793b745 unless marked):**
@@ -53,6 +53,16 @@ About 200 share rows plus a few indices per day: one set-based insert, under 100
 - Index symbols in `fo_mktlots.csv` beyond `NIFTY`/`BANKNIFTY` and their master canonical symbols.
 - Whether any P14 reader filters `source` values explicitly (a filter would ignore the new rows; a grep at build time settles it).
 
+## Build note 2026-11-11 (feature/bk-05b, ADR 0256 build note; no new ADR)
+- **UNVERIFIED resolved by reading the code.** (a) No P14 reader filters `source`: `OptionReference.LotSizesAsync` selects every row of an underlying, `LotSizeLookup` orders them; the new rows are read like the others (grep of `src`). (b) Index tickers: `NIFTY`, `BANKNIFTY`, `FINNIFTY`, `MIDCPNIFTY` map to `NSE:{TICKER}` (the names `OptionUnderlyings.DefaultIndices`, `ExpiryRules` and the live index set already use); `NIFTYNXT50` has no canonical symbol anywhere in the code, so it is mapped to nothing and counted `indexUnmatched` (never guessed). Whether `fo_mktlots.csv` lists further indices stays UNVERIFIED (a ticker outside the map is treated as a skipped non-share row, as before).
+- **Open question 1:** nearest expiry column only, as recommended.
+- **Where:** `INseLotApplier` (Application port) and `NseLotApplier` (Infrastructure, beside `OptionContractStore`) run the insert and the fetch row in one EF transaction; `ListFileProcessor` plans the lots (shares by master id, indices through `IListMasterReader.ReadIndexIdsAsync`, exactly one live index per canonical symbol); `RunBasketFetchHandler` calls the applier. The lot SQL lives in a new file, so the architecture test's list of option-table SQL files gains `NseLotApplier.cs` (a deliberate addition, as in P14-04 and P14-08), and a new architecture test forbids UPDATE/DELETE/TRUNCATE of `options.lot_sizes` in any source file.
+- **Deviation from the contract text:** the port is `INseLotApplier.ApplyAsync(NseLotApplication)` (lots, India date, file URL, source state, a function from the written count to the fetch record), not `IOptionLotWriter.InsertChangedAsync`, because the fetch record's `lotsWritten` and its outcome depend on the count and must commit with the rows. AC 3 uses "newest `nse_mktlots` row of the underlying by (effective_from, id)".
+- **Evidence.** AC1 `AllowNseLotSource` + `OptionMigrationTests` (up, check, Down refuses and deletes nothing, Down clean, up again) and `OptionGrantsTests` (confirmed true refused 23514). AC2/3 `ListBasketsApiTests` (rows with date, URL, never confirmed; same lot no row; 475 a new row; `lotsWritten`) and `ListFileFetchTests`. AC3 no update path: `OptionArchiveArchitectureTests` + `OptionGrantsTests` (UPDATE/DELETE 42501). AC4 same bytes: unit and integration. AC5 `NseIndexSymbolsTests`, `ListFileFetchTests`, integration with a `NSE:NIFTY` index. AC6 integration (instrument lot 250 stays, mismatch warning stays). AC7 `LotSizeLookupTests`. AC8 rejected file unit and integration. AC9 unit (unmatched share has no row). AC10 unit and integration (setting off: 409, zero requests, no row). AC11 `FakeLotApplier` failure gives `failed`/`lot_write_failed` (unit) and a duplicate fetch id after the insert rolls both back (integration).
+- `scripts/check.sh` was not run for this slice (the builder ran the targeted suites only); the reviewer and the full gate stay with the caller.
+
+- **Owner decision 2026-11-11 (follow-up):** AC 3 compares with the lot in force on the fetch date across all sources (what `LotSizeLookup` returns), not only the newest `nse_mktlots` row, so a matching confirmed lot is never hidden; test: confirmed circular 65 and an NSE 65 write nothing, NSE 75 writes a row. `source_url` is the address that answered (`SourceResponse.Url`). Disagreeing lots of one instrument in a file are skipped with `lot_rows_disagree`. The failure catch is `DbUpdateException`, `NpgsqlException` or `RetryLimitExceededException`, and the exception type is logged.
+
 ## Done when
 - [ ] Every criterion has evidence; `scripts/check.sh` green; reviewer: no blockers/majors (told to look for any update path and any precedence change)
-- [ ] Migration with `Down`; ADR 0256 build note; BK-05 build note updated; roadmap row updated
+- [x] Migration with `Down`; ADR 0256 build note; BK-05 build note updated; roadmap row updated

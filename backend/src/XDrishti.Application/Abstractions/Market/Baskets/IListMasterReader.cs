@@ -9,4 +9,7 @@ public sealed record MasterShare(FlagRow Flags, string Symbol, int? MasterLot);
 public interface IListMasterReader
 {
     ValueTask<IReadOnlyList<MasterShare>> ReadSharesAsync(DateOnly today, CancellationToken cancellationToken);
+
+    /// <summary>The id of each given canonical symbol (<c>NSE:NIFTY</c>) that names exactly one live index instrument of the master; a symbol with none, or more than one, is absent (BK-05b).</summary>
+    ValueTask<IReadOnlyDictionary<string, Guid>> ReadIndexIdsAsync(IReadOnlyCollection<string> canonicalSymbols, CancellationToken cancellationToken);
 }

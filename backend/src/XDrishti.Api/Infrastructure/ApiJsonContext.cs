@@ -46,6 +46,7 @@ using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Strength;
 using XDrishti.Application.Market.Tracking;
+using XDrishti.Application.OpeningBars;
 using XDrishti.Application.OptionBackfill;
 using XDrishti.Application.OptionChain;
 using XDrishti.Application.OptionQuality;
@@ -134,6 +135,9 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(TickRecorderView))]
 [JsonSerializable(typeof(TickRecorderSwitched))]
 [JsonSerializable(typeof(TickSwitchRequest))]
+[JsonSerializable(typeof(OpeningBarsRecorderView))]
+[JsonSerializable(typeof(OpeningBarsSwitched))]
+[JsonSerializable(typeof(OpeningBarsSwitchRequest))]
 [JsonSerializable(typeof(OptionChainRecorderView))]
 [JsonSerializable(typeof(OptionChainRecorderSwitched))]
 [JsonSerializable(typeof(OptionChainSwitchRequest))]

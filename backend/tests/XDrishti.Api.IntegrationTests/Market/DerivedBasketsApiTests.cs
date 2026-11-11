@@ -315,7 +315,7 @@ public sealed class DerivedBasketsApiTests(ApiFactory factory) : BasketsTestBase
     }
 
     [Fact]
-    public async Task A_basket_this_build_cannot_form_cannot_be_switched_on()
+    public async Task A_frozen_intraday_basket_can_be_switched_on_because_the_opening_minute_freeze_forms_it()
     {
         var gappers = Guid.CreateVersion7();
         await Factory.WithDbAsync(async db =>
@@ -327,7 +327,7 @@ public sealed class DerivedBasketsApiTests(ApiFactory factory) : BasketsTestBase
 
         using var response = await Client.PutJsonAsync($"/api/baskets/system/derived/{gappers}/params", new { enabled = true }, Ct);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        (await Factory.WithDbAsync(db => db.DerivedDefinitions.AsNoTracking().Where(d => d.BasketId == gappers).Select(d => d.Enabled).SingleAsync(Ct))).ShouldBeFalse();
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await Factory.WithDbAsync(db => db.DerivedDefinitions.AsNoTracking().Where(d => d.BasketId == gappers).Select(d => d.Enabled).SingleAsync(Ct))).ShouldBeTrue();
     }
 }
