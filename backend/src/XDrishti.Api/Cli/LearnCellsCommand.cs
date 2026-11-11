@@ -51,8 +51,13 @@ internal static class LearnCellsCommand
             if (options.ByUniverse)
             {
                 // BK-11b: the auto option of the tier proposer; OFF unless the owner switched it on, and it proposes a hypothesis, nothing more
-                var auto = await scope.ServiceProvider.GetRequiredService<ICommandHandler<AutoProposeUniverseLinksCommand, AutoProposeOutcome>>().HandleAsync(new AutoProposeUniverseLinksCommand(options.Sources), cancellationToken);
-                if (auto.IsSuccess && auto.Value.Enabled)
+                var autoHandler = scope.ServiceProvider.GetService<ICommandHandler<AutoProposeUniverseLinksCommand, AutoProposeOutcome>>();   // registered in every host; a host without it simply has no auto option
+                var auto = autoHandler is null ? null : await autoHandler.HandleAsync(new AutoProposeUniverseLinksCommand(options.Sources), cancellationToken);
+                if (auto is null)
+                {
+                    // nothing to propose with
+                }
+                else if (auto.IsSuccess && auto.Value.Enabled)
                 {
                     await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"universe proposals (auto): {auto.Value.Proposed} proposed as actor auto, {auto.Value.AlreadyProposed} already proposed, {auto.Value.NoBaseline} without a baseline run among --run{(auto.Value.LimitReached ? ", stopped at the open limit" : string.Empty)}"));
                 }
