@@ -338,6 +338,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(RunsView))]
 [JsonSerializable(typeof(ReportBenchmarksView))]
 [JsonSerializable(typeof(BasketProfileView))]
+[JsonSerializable(typeof(ProfileIndexView))]
+[JsonSerializable(typeof(SetBasketBenchmarkInput))]
 [JsonSerializable(typeof(BasketRankingView))]
 [JsonSerializable(typeof(RelativeStrengthView))]
 [JsonSerializable(typeof(SimReportJobsView))]

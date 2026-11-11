@@ -30,10 +30,10 @@ internal static class BasketProfileMapper
             [.. points.Select(p => beta.TryGetValue(p.Date, out var v) ? (double?)v : null)]);
     }
 
-    /// <summary>Why an index-relative figure is unavailable and where the owner can track the index; null when the index has bars.</summary>
-    public static string? NoBenchmark(string? symbol, bool hasBars) => symbol is null
-        ? "no benchmark index is in the master list; the owner can track one in Portfolio (this read tracks nothing)"
-        : hasBars ? null : $"{symbol} has no daily bars; the owner can track it in Portfolio (this read tracks nothing)";
+    /// <summary>Why an index-relative figure is unavailable; null when the index has bars. The index is never replaced by another one (BK-06c).</summary>
+    public static string? NoBenchmark(ResolvedWindow window, bool hasBars) => window.Index is null
+        ? window.IndexMissing ?? "no benchmark index is in the instrument master"
+        : hasBars ? null : $"{window.IndexName} has no stored daily bars in this window";
 
     /// <summary>Without index bars every figure against the index is unavailable, with the reason, instead of the engine's too-few-days state.</summary>
     public static MetricView Against(Metric metric, string? noBenchmark) => noBenchmark is null ? M(metric) : M(Metric.Unavailable(noBenchmark));

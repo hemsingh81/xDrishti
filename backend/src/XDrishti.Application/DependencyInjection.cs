@@ -724,6 +724,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetReportWhatWorksQuery, Result<WhatWorksView>>, GetReportWhatWorksHandler>();
         services.AddScoped<IQueryHandler<PageReportTradesQuery, Result<TradesView>>, PageReportTradesHandler>();
         services.AddScoped<IQueryHandler<GetReportBenchmarksQuery, Result<ReportBenchmarksView>>, GetReportBenchmarksHandler>();
+        services.AddScoped<ICommandHandler<SetBasketBenchmarkCommand, ProfileIndexView>, SetBasketBenchmarkHandler>(); // the owner's basket benchmark (BK-06c, ADR 0262)
         services.AddScoped<ProfileWindowResolver>(); // the window and the index of a basket profile (BK-07, ADR 0262)
         services.AddScoped<BasketMembershipLoader>();
         services.AddSingleton<IProfileCache, ProfileCache>(); // in process, bounded, keyed by everything the answer depends on

@@ -20,7 +20,7 @@ internal sealed partial class NseBasketSourceFetcher(IHttpClientFactory clients,
     {
         ArgumentNullException.ThrowIfNull(source);
         var first = await GetOnceAsync(source.SourceUrl, source, cancellationToken);
-        return first.Status is 0 or 404 or >= 500 && source.HostAlt is { Length: > 0 } alt ? await GetOnceAsync(alt, source, cancellationToken) : first;
+        return first.Status is 0 or 404 or >= 500 && source.HostAlt is { Length: > 0 } alt ? (await GetOnceAsync(alt, source, cancellationToken)) with { Url = alt } : first with { Url = source.SourceUrl };
     }
 
     private async ValueTask<SourceResponse> GetOnceAsync(string url, BasketSourceInfo source, CancellationToken cancellationToken)

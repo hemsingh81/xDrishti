@@ -16358,7 +16358,7 @@
         "tags": [
           "Reports"
         ],
-        "summary": "The performance profile of one basket (manual, portfolio or system) from its own stored daily bars against an index: the equal-weight, daily-rebalanced, price-return index rebased to 100 beside the index, volatility, drawdown, beta, alpha (the regression intercept, never a trading result), tracking error, capture, rolling beta, relative strength, breadth, dispersion and correlation inside the basket, contribution, the index by market regime, turnover, ADV20 and capacity, and the median split of the basket's strategy trades. Every figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) with a number only for a value, and the membership basis (dated, or a single snapshot with survivorship) and every instrument left out are named. Takes from and to (default the last 252 sessions ending at the newest stored daily bar of the index; window.source says which), index (instrument id; default the owner's benchmark) and membersAsOf (default the window end). A window under 20 sessions or a basket above the instrument cap is 422 reports.invalid; an unknown or archived basket 404 reports.not_found. Read only; the answer is cached by basket, membership, window, index and newest bar.",
+        "summary": "The performance profile of one basket (manual, portfolio or system) from its own stored daily bars against an index: the equal-weight, daily-rebalanced, price-return index rebased to 100 beside the index, volatility, drawdown, beta, alpha (the regression intercept, never a trading result), tracking error, capture, rolling beta, relative strength, breadth, dispersion and correlation inside the basket, contribution, the index by market regime, turnover, ADV20 and capacity, and the median split of the basket's strategy trades. Every figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) with a number only for a value, and the membership basis (dated, or a single snapshot with survivorship) and every instrument left out are named. Takes from and to (default the last 252 sessions ending at the newest stored daily bar of the index; window.source says which), index (instrument id; default Nifty 500, or the index the owner chose with PUT /api/reports/basket-benchmark, never the portfolio benchmark; when it is missing from the master or has no bars every figure against it is unavailable with the reason) and membersAsOf (default the window end). A window under 20 sessions or a basket above the instrument cap is 422 reports.invalid; an unknown or archived basket 404 reports.not_found. Read only; the answer is cached by basket, membership, window, index and newest bar.",
         "operationId": "GetBasketProfile",
         "parameters": [
           {
@@ -16789,6 +16789,47 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/basket-benchmark": {
+      "put": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Choose the index the basket profile and ranking compare with (default Nifty 500): body {instrumentId} of a listed index of the instrument master. Session and CSRF token, no password (it loosens nothing). Answers the index {id, symbol, isDefault, name}. 422 reports.invalid for no id, an unknown id, a non-index or a retired index. Audited; the portfolio benchmark is not changed.",
+        "operationId": "SetBasketBenchmark",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetBasketBenchmarkInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileIndexView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -59063,6 +59104,12 @@
           },
           "isDefault": {
             "type": "boolean"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "description": "The index in force: null symbol when there is none."
@@ -66811,6 +66858,22 @@
           }
         },
         "description": "The body of `PUT /api/auto/scope`: ids of baskets and of individual instruments; at least one in all."
+      },
+      "SetBasketBenchmarkInput": {
+        "required": [
+          "instrumentId"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "description": "The body of the choice of the basket benchmark (BK-06c): the id of a listed index of the instrument master."
       },
       "SetOutcome": {
         "required": [

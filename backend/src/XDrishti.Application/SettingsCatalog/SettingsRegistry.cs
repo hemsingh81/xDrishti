@@ -64,6 +64,7 @@ public static class SettingsRegistry
         Stored("learning.universe_link_min_trades", "Fewest trades a liquidity tier needs before its edge is listed as an observation (owner only, password every change)", SettingTier.Advanced, "100"),
         Stored("learning.universe_registered_baskets", "Baskets a strategy x basket comparison may use, by name (owner only, password every change)", SettingTier.Advanced, "Nifty 50,Nifty 100,Nifty Midcap 150,F&O stocks,Most liquid,Low volatility,Momentum,Nifty 500"),
         Stored("learning.universe_link.auto_propose", "Propose each stable liquidity-tier observation as a hypothesis automatically, as the actor auto; off means nothing is proposed automatically (owner only, password every change)", SettingTier.Advanced, "false"),
+        Stored("reports.basket_benchmark_instrument", "Index the basket profile and ranking compare with, an instrument id (unset: Nifty 500) (owner may change, no password: it loosens nothing)", SettingTier.Advanced, "Nifty 500"),
         Stored("options.backfill_stocks", "Frozen share order of the options backfill", SettingTier.Internal, null),
     ];
 

@@ -93,9 +93,7 @@ describe('the header', () => {
     const h = await header();
 
     expect(
-      h.getByText(
-        /Window 14 Sept? 2026 to 25 Sept? 2026 \(the dates you chose\)\. Index: NIFTY \(the benchmark you track\)\./,
-      ),
+      h.getByText(/Window 14 Sept? 2026 to 25 Sept? 2026 \(the dates you chose\)\. Index: Nifty 500 \(default\)\./),
     ).toBeInTheDocument();
     expect(h.getByRole('link', { name: 'Compare baskets' })).toHaveStyle({ minHeight: '44px' });
   });
@@ -196,14 +194,11 @@ describe('every figure keeps to its state', () => {
     expect(screen.queryByRole('grid', { name: 'Correlation matrix' })).not.toBeInTheDocument();
   });
 
-  it('says the index has no bars and where it can be tracked, with no chart line for it', async () => {
-    const noIndex = nonValue(
-      'unavailable',
-      'NIFTY has no daily bars; the owner can track it in Portfolio (this read tracks nothing)',
-    );
+  it('says Nifty 500 is not in the instrument master, with no chart line for it', async () => {
+    const noIndex = nonValue('unavailable', 'Nifty 500 is not in the instrument master');
     show(
       buildProfile({
-        index: { id: null, symbol: null, isDefault: true },
+        index: { id: null, symbol: null, isDefault: true, name: null },
         series: {
           ...buildProfile().series,
           index: buildProfile().series.index.map(() => null),
@@ -213,7 +208,7 @@ describe('every figure keeps to its state', () => {
       }),
     );
 
-    expect(await screen.findAllByText(/track it in Portfolio/)).not.toHaveLength(0);
+    expect(await screen.findAllByText(/Nifty 500 is not in the instrument master/)).not.toHaveLength(0);
     expect(screen.queryByLabelText('Basket minus index, in index points')).not.toBeInTheDocument();
   });
 

@@ -83,9 +83,20 @@ public sealed class OptionArchiveArchitectureTests
             .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN)\\s+options\\.(contracts|lot_sizes|market_epochs)", System.Text.RegularExpressions.RegexOptions.None, ScanRegex.Timeout))
             .Select(Path.GetFileName).Order().ToList();
 
-        // P14-04 (ADR 0178) added exactly one reader of these reference tables, the quality checks' OptionReference (strike step, lot history, rule epochs); P14-08 (ADR 0197) added exactly one more, the re-mark's ContractExpiryReader (the expiry dates of one underlying in a date range). A further file here is a failure.
-        named.ShouldBe(["ContractExpiryReader.cs", "OptionContractStore.cs", "OptionReference.cs"]);
+        // P14-04 (ADR 0178) added exactly one reader of these reference tables, the quality checks' OptionReference (strike step, lot history, rule epochs); P14-08 (ADR 0197) added exactly one more, the re-mark's ContractExpiryReader (the expiry dates of one underlying in a date range); BK-05b (ADR 0256) added the NseLotApplier (an insert of NSE lot rows that reads the newest row of its own source). A further file here is a failure.
+        named.ShouldBe(["ContractExpiryReader.cs", "NseLotApplier.cs", "OptionContractStore.cs", "OptionReference.cs"]);
         Directory.GetFiles(Path.Combine(Root, "src", "XDrishti.Api"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && File.ReadAllText(f).Contains("XDrishti.Application.Abstractions.Options", StringComparison.Ordinal)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void No_code_updates_or_deletes_a_row_of_the_lot_table()
+    {
+        var offenders = Directory.GetFiles(Path.Combine(Root, "src"), "*.cs", SearchOption.AllDirectories)
+            .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "(UPDATE|DELETE\\s+FROM|TRUNCATE(\\s+TABLE)?)\\s+options\\.lot_sizes", System.Text.RegularExpressions.RegexOptions.IgnoreCase, ScanRegex.Timeout))
+            .Select(Path.GetFileName).ToList();
+
+        offenders.ShouldBeEmpty("options.lot_sizes is insert-only (BK-05b): a lot row is never updated or deleted");
     }
 }

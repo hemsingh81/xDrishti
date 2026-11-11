@@ -26,6 +26,7 @@ internal sealed class RunBasketFetchHandler(
     IBasketRunLock runLock,
     IListSettings listSettings,
     ListFileProcessor lists,
+    INseLotApplier lotApplier,
     TimeProvider clock,
     ILogger<RunBasketFetchHandler> logger) : ICommandHandler<RunBasketFetchCommand, BasketFetchRun>
 {
@@ -175,7 +176,22 @@ internal sealed class RunBasketFetchHandler(
         var update = Updated(source, source.Enabled, now, ok: true, response.Etag, response.LastModified, sha, null, 0) with { KnownThrough = plan.TradeDate };
         if (plan.Change is null)
         {
-            // The lot file: its summary and warnings are the fetch record; nothing else is stored (the master's lot is primary).
+            // The lot file (BK-05b): its lots go to options.lot_sizes (dated, unconfirmed, only when changed) in the transaction of the fetch row; the master's lot is never touched.
+            if (plan.Lots is { Count: > 0 })
+            {
+                var url = response.Url ?? (settings.PreferredHost == "B" && source.HostAlt is { Length: > 0 } alt ? alt : source.SourceUrl);
+                var written = await lotApplier.ApplyAsync(new NseLotApplication(plan.Lots, IndiaTime.Today(now), url, update, n => ListFileProcessor.WithLotsWritten(plan.Fetch, n)), cancellationToken);
+                if (written is { } count)
+                {
+                    BasketLog.LotsWritten(logger, source.BasketId, count);
+                    return ListFileProcessor.WithLotsWritten(plan.Fetch, count);
+                }
+
+                var failed = plan.Fetch with { Outcome = FetchOutcomes.Failed, Error = "lot_write_failed" };
+                await sources.RecordAsync(Updated(source, source.Enabled, now, ok: false, null, null, null, null, TriesToday(source, now) + 1), failed, cancellationToken);
+                return failed;
+            }
+
             var summary = plan.Fetch with { Outcome = FetchOutcomes.Unchanged };
             await sources.RecordAsync(update, summary, cancellationToken);
             return summary;

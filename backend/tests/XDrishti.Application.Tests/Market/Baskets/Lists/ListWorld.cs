@@ -30,6 +30,10 @@ internal sealed class ListWorld
 
     public FakeApplier Applier { get; } = new();
 
+    public FakeLotApplier LotApplier => _lotApplier ??= new(Store);
+
+    private FakeLotApplier? _lotApplier;
+
     public FakeRunLock RunLock { get; } = new();
 
     public InMemoryBasketData Baskets { get; } = new(new InMemoryTrackingData());
@@ -44,7 +48,7 @@ internal sealed class ListWorld
 
     public static Guid LotsId => ListBaskets.LotSizes.Id;
 
-    public RunBasketFetchHandler Fetch => new(Settings, Store, Fetcher, Baskets, Applier, RunLock, ListSettings, new ListFileProcessor(Store, Baskets, Master), Clock, NullLogger<RunBasketFetchHandler>.Instance);
+    public RunBasketFetchHandler Fetch => new(Settings, Store, Fetcher, Baskets, Applier, RunLock, ListSettings, new ListFileProcessor(Store, Baskets, Master), LotApplier, Clock, NullLogger<RunBasketFetchHandler>.Instance);
 
     public RefreshFlagListsHandler Refresh => new(Store, Master, Baskets, Applier, Clock, NullLogger<RefreshFlagListsHandler>.Instance);
 
