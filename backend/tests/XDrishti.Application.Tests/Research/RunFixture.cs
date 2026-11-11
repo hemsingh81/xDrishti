@@ -71,6 +71,9 @@ internal sealed class RunFixture
     /// <summary>The sectors of the instruments (none).</summary>
     public XDrishti.Application.Abstractions.Portfolio.IHoldingClassifications Classifications { get; } = Substitute.For<XDrishti.Application.Abstractions.Portfolio.IHoldingClassifications>();
 
+    /// <summary>The derived-basket versions (none): the parameter hash of a dated or snapshot run reads them (BK-11b).</summary>
+    public XDrishti.Application.Abstractions.Market.Baskets.IDerivedVersionStore Derived { get; } = Substitute.For<XDrishti.Application.Abstractions.Market.Baskets.IDerivedVersionStore>();
+
     public FakeTimeProvider Time { get; } = new();
 
     public StructuredLogger<RunSimulationHandler> Log { get; } = new();
@@ -89,7 +92,7 @@ internal sealed class RunFixture
         Classifications.SectorsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns((IReadOnlyDictionary<Guid, string>)new Dictionary<Guid, string>());
     }
 
-    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, ContextDays, EventSnapshots, FilingTimes, SurpriseReader, Time, Log, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IRandomEntryEngine>(), NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IPlaceboEngine>(), EntryTiers, CostStress is null ? null : new Settings(CostStress), new XDrishti.Application.Market.Strength.RelativeStrengthRunReader(Strength, Baskets, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Market.Baskets.IDerivedVersionStore>(), Classifications));
+    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, ContextDays, EventSnapshots, FilingTimes, SurpriseReader, Time, Log, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IRandomEntryEngine>(), NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IPlaceboEngine>(), EntryTiers, CostStress is null ? null : new Settings(CostStress), new XDrishti.Application.Market.Strength.RelativeStrengthRunReader(Strength, Baskets, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Market.Baskets.IDerivedVersionStore>(), Classifications), Derived);
 
     /// <summary>Registers an instrument with a row (the tick is in paise, as the master has it) and its stored bars.</summary>
     public Guid Add(string symbol, IEnumerable<Bar>? bars = null, decimal? tickPaise = 5m, Guid? id = null)
@@ -120,6 +123,10 @@ internal sealed class RunFixture
             Guid.CreateVersion7(), Summary(m.Id, m.Symbol, m.TickPaise, m.Retired), m.Position, DateTimeOffset.UnixEpoch, null, null, "owner", null, null)).ToList();
         Baskets.MembersAsync(basketId, null, null, Arg.Any<CancellationToken>()).Returns(new BasketMembers(basketId, name, archivedAt, null, items.Count, items));
     }
+
+    /// <summary>The stays of a basket with dated membership (BK-11b): the instrument, its place, when it was added and when it was removed.</summary>
+    public void SetStays(Guid basketId, string name, DateTimeOffset? archivedAt, params (Guid Id, string Symbol, int Position, DateTimeOffset From, DateTimeOffset? To)[] stays) =>
+        Baskets.StaysAsync(basketId, Arg.Any<CancellationToken>()).Returns(new BasketStays(basketId, name, archivedAt, [.. stays.Select(s => new BasketStay(s.Id, s.Symbol, s.Symbol + " Ltd", 5m, s.Position, s.From, s.To))]));
 
     public static InstrumentSummary Summary(Guid id, string symbol, decimal? tickPaise, bool retired) =>
         new(id, symbol, symbol + " Ltd", symbol, "share", null, "EQ", null, 1, tickPaise, null, false, false, retired, TrackedInfo.Never);

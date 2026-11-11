@@ -21,6 +21,7 @@ namespace XDrishti.Application.Research;
 /// <param name="StrategyVersion">The version of the stored strategy <paramref name="StrategyId"/>; null is the latest (spec P3-02d, D7).</param>
 /// <param name="StrategyHash">A stored version by its content hash instead of by id and version; <paramref name="StrategyId"/> may then be empty, and if given must be that version's family.</param>
 /// <param name="Purpose">Why the run exists (AU-11, ADR 0243): <c>Research</c> unless the simulate-everything job asks for <c>Training</c>. The one place the header's purpose comes from.</param>
+/// <param name="MembersBasis">For a basket run, how its members are chosen (BK-11b): <c>dated</c> (each replayed day uses that day's members), <c>single_snapshot</c> (the members on the run date) or null (the members now, as every run before; no structured fields, the key and record unchanged). Refused for a list of instruments.</param>
 public sealed record SimulationRequest(
     string StrategyId,
     IReadOnlyDictionary<string, double>? Parameters,
@@ -36,4 +37,5 @@ public sealed record SimulationRequest(
     ExitChoice? Exits = null,
     int? StrategyVersion = null,
     string? StrategyHash = null,
-    RunPurpose Purpose = RunPurpose.Research);
+    RunPurpose Purpose = RunPurpose.Research,
+    string? MembersBasis = null);

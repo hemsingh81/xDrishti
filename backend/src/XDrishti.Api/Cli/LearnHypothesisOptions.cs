@@ -22,7 +22,9 @@ internal sealed record LearnHypothesisOptions(
     IReadOnlyList<CellSource> Sources,
     DateOnly Since,
     int MinNewTrades,
-    int MonitorMonths)
+    int MonitorMonths,
+    string? UniverseLink = null,
+    string? Window = null)
 {
     public const string Usage = """
         usage:
@@ -30,6 +32,8 @@ internal sealed record LearnHypothesisOptions(
             lists the grid values around a parameter of a stored run (deterministic, bounded); nothing is written
           xd learn hypothesis propose --baseline RUNKEY --knob NAME --kind parameter|exit|slippage --from V --to V --reason TEXT [--source owner|grid] [--cell KEY]
             writes one hypothesis down (one knob; at most 3 open); a parameter knob must be a parameter of the baseline run at its stored value; a grid source must use a grid value
+          xd learn hypothesis propose --from-universe-link TIERCELLKEY --baseline RUNKEY --reason TEXT [--window all|250d|60d]
+            writes ONE hypothesis (source universe, knob scan_scope, all shares to the tier) from a stored liquidity-tier observation (BK-11b); refused unless the link is an observation; it applies nothing and cannot be started
           xd learn hypothesis approve|reject|expire|accept --id N --reason TEXT
             moves it by the state table (the owner approves; accepting needs a Better experiment and only records the verdict, it applies nothing)
           xd learn hypothesis start --id N --candidate RUNKEY
@@ -47,7 +51,7 @@ internal sealed record LearnHypothesisOptions(
     private static readonly string[] Known =
     [
         "--baseline", "--candidate", "--parameter", "--cell", "--knob", "--kind", "--from", "--to", "--reason", "--source", "--id", "--grid-step-pct", "--grid-steps", "--hold-out-months", "--min-fold-trades", "--live-gap-r", "--trials",
-        "--run", "--since", "--min-new-trades", "--monitor-months",
+        "--run", "--since", "--min-new-trades", "--monitor-months", "--from-universe-link", "--window",
     ];
 
     /// <summary>Parses the arguments after <c>learn hypothesis</c>; the errors are listed when the options are null.</summary>
@@ -92,7 +96,7 @@ internal sealed record LearnHypothesisOptions(
             }
         }
 
-        foreach (var required in Required(action))
+        foreach (var required in Required(action, values.ContainsKey("--from-universe-link")))
         {
             if (!values.ContainsKey(required))
             {
@@ -111,8 +115,13 @@ internal sealed record LearnHypothesisOptions(
             errors.Add("--source is owner or grid");
         }
 
+        if (source == HypothesisSource.Universe)
+        {
+            errors.Add("--source universe is only made by --from-universe-link");
+        }
+
         var kind = ExperimentKnobKind.Parameter;
-        if (values.TryGetValue("--kind", out var kindText) && !Enum.TryParse(kindText, true, out kind))
+        if (values.TryGetValue("--kind", out var kindText) && (!Enum.TryParse(kindText, true, out kind) || kind == ExperimentKnobKind.Scope))
         {
             errors.Add("--kind is parameter, exit or slippage");
         }
@@ -141,14 +150,15 @@ internal sealed record LearnHypothesisOptions(
             return (null, errors);
         }
 
-        var knob = action == "propose" ? new ExperimentKnob(values["--knob"], kind, values["--from"], values["--to"]) : null;
+        var knob = action == "propose" && !values.ContainsKey("--from-universe-link") ? new ExperimentKnob(values["--knob"], kind, values["--from"], values["--to"]) : null;
         string? Get(string key) => values.GetValueOrDefault(key);
-        return (new LearnHypothesisOptions(action, source, Get("--baseline"), Get("--candidate"), Get("--parameter"), Get("--cell"), knob, Get("--reason") ?? string.Empty, id, grid, experiment, hold, sources, since, minNew, monitor), errors);
+        return (new LearnHypothesisOptions(action, source, Get("--baseline"), Get("--candidate"), Get("--parameter"), Get("--cell"), knob, Get("--reason") ?? string.Empty, id, grid, experiment, hold, sources, since, minNew, monitor, Get("--from-universe-link"), Get("--window")), errors);
     }
 
-    private static string[] Required(string action) => action switch
+    private static string[] Required(string action, bool fromUniverseLink) => action switch
     {
         "grid" => ["--baseline", "--parameter"],
+        "propose" when fromUniverseLink => ["--baseline", "--reason"],
         "propose" => ["--baseline", "--knob", "--kind", "--from", "--to", "--reason"],
         "approve" or "reject" or "expire" or "accept" => ["--id", "--reason"],
         "start" => ["--id", "--candidate"],

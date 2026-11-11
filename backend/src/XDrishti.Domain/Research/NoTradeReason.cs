@@ -47,4 +47,9 @@ public enum NoTradeReason
     /// The filter <c>min_turnover</c> blocked the entry (CF-05, ADR 0230): the 20-day median traded value before the entry date is under the threshold, or it cannot be known (missing bars, under 20 sessions, missing volume). Never a pass. Produced by the walker.
     /// </summary>
     TurnoverBlocked,
+
+    /// <summary>
+    /// The run replays a basket with dated membership (BK-11b) and the instrument was not a member on the entry date: no new entry for a leaver or a not yet member. Produced by the walker before the fill is priced; an open position is not affected.
+    /// </summary>
+    NotMember,
 }

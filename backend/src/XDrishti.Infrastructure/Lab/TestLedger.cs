@@ -69,7 +69,7 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger, IUn
     public async ValueTask<IReadOnlyList<UniverseTrial>> ListBasketTestsAsync(string strategyId, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand("""
-            SELECT DISTINCT l.strategy_hash, (r.universe->>'basketId')::uuid, l.window_from, l.window_to
+            SELECT DISTINCT l.strategy_hash, (r.universe->>'basketId')::uuid, l.window_from, l.window_to, COALESCE(r.universe->>'membersBasis', 'single_snapshot')
             FROM lab.test_ledger l JOIN lab.lab_runs r ON r.id = l.lab_run_id AND l.trial_kind = 'run'
             WHERE l.strategy_id = @id AND r.universe->>'basketId' IS NOT NULL
             """);
@@ -78,7 +78,7 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger, IUn
         var rows = new List<UniverseTrial>();
         while (await reader.ReadAsync(cancellationToken))
         {
-            rows.Add(new UniverseTrial(reader.GetString(0).Trim(), reader.GetGuid(1), reader.GetFieldValue<DateOnly>(2), reader.GetFieldValue<DateOnly>(3)));
+            rows.Add(new UniverseTrial(reader.GetString(0).Trim(), reader.GetGuid(1), reader.GetFieldValue<DateOnly>(2), reader.GetFieldValue<DateOnly>(3), reader.GetString(4)));
         }
 
         return rows;

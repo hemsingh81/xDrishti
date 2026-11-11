@@ -12,6 +12,12 @@ public static class UniverseLabels
     /// <summary>The label of a basket run (BK-11, criterion 8): the basket id, the basis and the parameter hash (none for a manual or index basket; the hash of a derived basket is not read here). It depends only on the run, never on the owner's mutable registered list, so the run key is reproducible; whether a basket is registered is read when a report is built.</summary>
     public static string Basket(Guid basketId) => BasketBasis + "; basket " + basketId.ToString("D") + "; params -";
 
+    /// <summary>The first words of the label of a dated basket run (BK-11b): each replayed day uses the members of that day.</summary>
+    public const string DatedBasis = "members as of each day (dated)";
+
+    /// <summary>The label of a dated basket run (BK-11b, criterion 4): the basket id and the parameter hash (none for a manual or index basket).</summary>
+    public static string Dated(Guid basketId, string? paramsHash) => DatedBasis + "; basket " + basketId.ToString("D") + "; params " + (paramsHash ?? "-");
+
     /// <summary>An explicit list of instruments.</summary>
     public const string InstrumentsAsListed = "instruments as listed";
 }

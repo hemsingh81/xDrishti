@@ -83,6 +83,7 @@ public static class RunLabels
             .. TargetLine(run),
             .. SurpriseLine(run),
             .. RelativeStrengthLine(run),
+            .. UniverseBasisLine(run),
             .. ReferenceLine(run),
             "universe: " + run.Universe.Label + SurvivorshipNote,
             DataLine(run),
@@ -161,6 +162,9 @@ public static class RunLabels
     }
 
     /// <summary>The line of a run that read the relative-strength rows (BK-09): the baskets, their ids, "members as of", basis and parameter hash. No line for any other run.</summary>
+    /// <summary>The line that says what the members are for a run that named a basis (BK-11b): "point in time" only for <c>dated</c>. No line for a run that did not name one.</summary>
+    private static string[] UniverseBasisLine(SimulationRun run) => run.UniverseBasis is { } b ? [b.Statement()] : [];
+
     private static string[] RelativeStrengthLine(SimulationRun run) => run.RelativeStrength is { } r ? [r.Label()] : [];
 
     /// <summary>

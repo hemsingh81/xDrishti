@@ -8,7 +8,8 @@ namespace XDrishti.Domain.Learning;
 /// <param name="MinTradesChild">Fewest trades a tier cell needs before it can be read in place of its all-shares parent.</param>
 /// <param name="LinkMinTrades">Fewest trades a tier needs before its edge is listed as an observation.</param>
 /// <param name="RegisteredBaskets">The pre-registered basket names a strategy x basket comparison may use (case-insensitive, the system prefixes ignored).</param>
-public sealed record UniverseSettings(int MinTradesChild, int LinkMinTrades, IReadOnlyList<string> RegisteredBaskets)
+/// <param name="AutoPropose">BK-11b: when on, <c>xd learn cells --by-universe</c> proposes each new observation as a hypothesis, as the actor <c>auto</c>. Off by default; it never applies a restriction or runs an experiment.</param>
+public sealed record UniverseSettings(int MinTradesChild, int LinkMinTrades, IReadOnlyList<string> RegisteredBaskets, bool AutoPropose = false)
 {
     /// <summary>The settings in force when the owner has not changed any.</summary>
     public static UniverseSettings Defaults { get; } = new(UniverseSettingsRules.DefaultMinTradesChild, UniverseSettingsRules.DefaultLinkMinTrades, UniverseSettingsRules.DefaultRegisteredBaskets);
@@ -28,6 +29,9 @@ public static class UniverseSettingsRules
 
     /// <summary>The pre-registered basket names, comma separated.</summary>
     public const string RegisteredBasketsKey = "learning.universe_registered_baskets";
+
+    /// <summary>The auto option of the proposer (BK-11b): <c>true</c> or <c>false</c>; no row is off.</summary>
+    public const string AutoProposeKey = "learning.universe_link.auto_propose";
 
     /// <summary>Default of <see cref="MinTradesChildKey"/>.</summary>
     public const int DefaultMinTradesChild = 30;

@@ -110,6 +110,22 @@ internal sealed class BasketQueries(XDrishtiDbContext db) : IBasketQueries
         return new BasketMembers(basketId, basket.Name, basket.ArchivedAt, asOf, items.Count, items, knownSince);
     }
 
+    public async ValueTask<BasketStays?> StaysAsync(Guid basketId, CancellationToken cancellationToken)
+    {
+        var basket = await db.Baskets.AsNoTracking().Where(b => b.Id == basketId).Select(b => new { b.Name, b.ArchivedAt }).FirstOrDefaultAsync(cancellationToken);
+        if (basket is null)
+        {
+            return null;
+        }
+
+        var rows = await (
+            from m in db.BasketMembers.AsNoTracking().Where(m => m.BasketId == basketId)
+            join i in db.Instruments.AsNoTracking() on m.InstrumentId equals i.Id
+            orderby m.Position, i.CanonicalSymbol, m.Id
+            select new BasketStay(i.Id, i.CanonicalSymbol, i.Name, i.TickSize, m.Position, m.ValidFrom, m.ValidTo)).ToListAsync(cancellationToken);
+        return new BasketStays(basketId, basket.Name, basket.ArchivedAt, rows);
+    }
+
     public async ValueTask<BasketHistory?> HistoryAsync(Guid basketId, int take, CancellationToken cancellationToken)
     {
         var name = await db.Baskets.AsNoTracking().Where(b => b.Id == basketId).Select(b => b.Name).FirstOrDefaultAsync(cancellationToken);

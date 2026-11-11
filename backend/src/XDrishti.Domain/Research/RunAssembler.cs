@@ -63,7 +63,8 @@ public static class RunAssembler
             header.Events,
             header.ResultsDays,
             header.Purpose == RunPurpose.Training,
-            header.RelativeStrength);
+            header.RelativeStrength,
+            header.UniverseBasis);
     }
 
     /// <summary>
@@ -132,6 +133,11 @@ public static class RunAssembler
         if (header.RelativeStrength is { } strength)
         {
             Line(text, "rstrength", strength.Sha256 + "|" + strength.Version + "|" + Date(strength.MembersAsOf));   // only a run that names mom_rank, rs_vs_index or sector_rs has this line, so every other key is unchanged (BK-09)
+        }
+
+        if (header.UniverseBasis is { } basis)
+        {
+            Line(text, "umembers", basis.KeyValue());   // only a basket run that named a members basis has this line, so every other key is unchanged (BK-11b)
         }
 
         if (header.Purpose == RunPurpose.Training)

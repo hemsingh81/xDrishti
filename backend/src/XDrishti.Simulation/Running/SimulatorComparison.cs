@@ -77,7 +77,7 @@ public sealed class SimulatorComparison
         RunUntilCancelled(instrument, bars, tick, calendar, quantity, context, events, resultsDays, tierOn, turnoverOn, CancellationToken.None);
 
     /// <summary>As <c>Run</c>, looking at <paramref name="cancellationToken"/> every few thousand minutes of the scan; a stop raises <see cref="OperationCanceledException"/> (AU-12). A separate overload so that existing callers are unchanged.</summary>
-    public Result<ComparisonResult> RunUntilCancelled(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, ScanContext? context, EventCalendarSnapshot? events, ResultsDayInputs? resultsDays, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn, CancellationToken cancellationToken)
+    public Result<ComparisonResult> RunUntilCancelled(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, ScanContext? context, EventCalendarSnapshot? events, ResultsDayInputs? resultsDays, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn, CancellationToken cancellationToken, Func<DateOnly, bool>? memberOn = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
@@ -129,7 +129,7 @@ public sealed class SimulatorComparison
             scans.Add(scanner.Counters);
             for (var k = 0; k < _members.Length; k++)
             {
-                var walked = _members[k].WalkSide(_members[k].SideRuns[s], scanner, bars, tick, calendar, quantity, gated: false, events, series, tierOn, turnoverOn);
+                var walked = _members[k].WalkSide(_members[k].SideRuns[s], scanner, bars, tick, calendar, quantity, gated: false, events, series, tierOn, turnoverOn, memberOn);
                 if (walked.IsFailure)
                 {
                     return Result.Failure<ComparisonResult>(walked.Error);

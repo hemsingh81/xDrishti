@@ -84,6 +84,19 @@ public sealed class UniverseRulesTests
     }
 
     [Fact]
+    public void BK_11b_a_dated_run_on_a_basket_is_one_more_variant_and_a_repeat_counts_once()
+    {
+        var basket = Guid.NewGuid();
+        var snapshot = new UniverseTrial("h", basket, new DateOnly(2025, 1, 1), new DateOnly(2025, 12, 31));
+        var dated = snapshot with { Basis = "dated" };
+
+        var count = UniverseTrials.Count([snapshot, dated, dated, snapshot]);
+
+        (count.Baskets, count.Tests, count.ExtraVariants).ShouldBe((1, 2, 1));
+        UniverseTrials.Count([snapshot, snapshot]).ExtraVariants.ShouldBe(0);
+    }
+
+    [Fact]
     public void A_basket_run_label_says_single_snapshot_and_survivorship_and_depends_only_on_the_basket()
     {
         var id = Guid.NewGuid();

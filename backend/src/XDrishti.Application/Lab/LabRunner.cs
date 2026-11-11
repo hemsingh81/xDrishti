@@ -458,7 +458,7 @@ internal sealed class LabRunner(
         var costs = sheet.IsSuccess && sheet.Value.Schedules[0].EffectiveFrom <= run.From ? CostChoice.Sheet(sheet.Value.Id) : CostChoice.Gross;
         var fills = LabFills.For(run, stressOptions);
         var timeframe = DefaultTimeframe(run.StrategyId, description);
-        var request = new SimulationRequest(run.StrategyId, new Dictionary<string, double>(), timeframe.ToCode(), run.From, run.To, [.. run.Universe.Instruments.Select(i => i.Id)], null, costs, false, null, fills, null, null, run.StrategyHash);
+        var request = new SimulationRequest(run.StrategyId, new Dictionary<string, double>(), timeframe.ToCode(), run.From, run.To, run.Universe.IsDated ? null : [.. run.Universe.Instruments.Select(i => i.Id)], run.Universe.IsDated ? run.Universe.BasketId : null, costs, false, null, fills, null, null, run.StrategyHash, MembersBasis: run.Universe.IsDated ? run.Universe.MembersBasis : null);
         return (request, costs is CostChoice.SheetChoice && sheet.IsSuccess ? sheet.Value : null);
     }
 

@@ -201,6 +201,65 @@ public sealed class StartLabRunHandlerTests
         registered.Error.Code.ShouldBe(LabErrors.InvalidInputCode, "past the registered check (the empty basket is refused later)");
     }
 
+    private static DateTimeOffset At(int y, int m, int d) => new(new DateTime(y, m, d), TimeSpan.FromHours(5.5));
+
+    private Guid DatedBasket(bool dated)
+    {
+        var id = Guid.NewGuid();
+        Guid A = new(1, 0, 0, [0, 0, 0, 0, 0, 0, 0, 1]), B = new(2, 0, 0, [0, 0, 0, 0, 0, 0, 0, 1]), C = new(3, 0, 0, [0, 0, 0, 0, 0, 0, 0, 1]);
+        BasketStay[] stays = dated
+            ? [new(A, "A", "A", 5m, 0, At(2025, 1, 1), null), new(B, "B", "B", 5m, 1, At(2025, 1, 1), At(2026, 3, 1)), new(C, "C", "C", 5m, 2, At(2026, 3, 1), null)]
+            : [new(A, "A", "A", 5m, 0, At(2025, 1, 1), null)];
+        _baskets.StaysAsync(id, Arg.Any<CancellationToken>()).Returns(new BasketStays(id, "Nifty 50", null, stays));
+        _baskets.MembersAsync(id, null, null, Arg.Any<CancellationToken>()).Returns(new BasketMembers(id, "Nifty 50", null, null, 1, [new BasketMemberView(Guid.NewGuid(), XDrishti.Application.Tests.Research.RunFixture.Summary(A, "A", 5m, false), 0, At(2025, 1, 1), null, null, "o", null, null)]));
+        return id;
+    }
+
+    [Fact]
+    public async Task BK_11b_a_dated_full_test_replays_the_members_of_each_day_under_the_dated_label_and_has_its_own_key()
+    {
+        _sheets.FindAsync(LabSettings.Default.CostSheetId, Arg.Any<CancellationToken>()).Returns(Result.Success(FixtureSheet.Sheet));
+        var id = DatedBasket(dated: true);
+        var window = (new DateOnly(2026, 2, 1), new DateOnly(2026, 4, 30));
+
+        var snapshot = (await Handler().HandleAsync(new StartLabRunCommand("LAB_TEST", null, id, null, "full", window.Item1, window.Item2), Ct)).Value.Run;
+        var dated = (await Handler().HandleAsync(new StartLabRunCommand("LAB_TEST", null, id, null, "full", window.Item1, window.Item2, MembersBasis: "dated"), Ct)).Value.Run;
+
+        dated.Universe.MembersBasis.ShouldBe("dated");
+        dated.Universe.IsDated.ShouldBeTrue();
+        dated.Universe.Label.ShouldBe(UniverseLabels.Dated(id, null));
+        dated.Universe.Instruments.Count.ShouldBe(3, "every instrument that is a member on some day of the window");
+        dated.Key.ShouldNotBe(snapshot.Key, "a different basis is a different plan");
+        snapshot.Universe.MembersBasis.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task BK_11b_a_dated_test_on_a_basket_without_dated_rows_is_refused_with_the_first_dated_day_and_the_quick_test_refuses_the_basis()
+    {
+        var id = DatedBasket(dated: false);
+        _resolver.HandleAsync(Arg.Any<ResolveInstrumentsQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Matched(2)));
+        var dated = await Handler().HandleAsync(new StartLabRunCommand("LAB_TEST", null, id, null, "full", new DateOnly(2026, 2, 1), new DateOnly(2026, 4, 30), MembersBasis: "dated"), Ct);
+        var quick = await Handler().HandleAsync(new StartLabRunCommand("LAB_TEST", null, id, null, "quick", null, null, MembersBasis: "dated"), Ct);
+        var list = await Handler().HandleAsync(new StartLabRunCommand("LAB_TEST", null, null, ["S1"], "quick", null, null, MembersBasis: "dated"), Ct);
+
+        dated.Error.Code.ShouldBe(SimulationErrors.MembersNotDatedCode);
+        quick.Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+        list.Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+        await _runs.DidNotReceiveWithAnyArgs().InsertOrGetAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task BK_11b_a_snapshot_basis_is_recorded_and_the_trials_count_sees_dated_and_snapshot_as_two_variants()
+    {
+        var id = DatedBasket(dated: true);
+        var run = (await Handler().HandleAsync(new StartLabRunCommand("LAB_TEST", null, id, null, "quick", null, null, MembersBasis: "single_snapshot"), Ct)).Value.Run;
+
+        run.Universe.MembersBasis.ShouldBe("single_snapshot");
+        run.Universe.IsDated.ShouldBeFalse();
+        var trials = UniverseTrials.Count([new UniverseTrial(Hash, id, new DateOnly(2026, 2, 1), new DateOnly(2026, 4, 30), "single_snapshot"), new UniverseTrial(Hash, id, new DateOnly(2026, 2, 1), new DateOnly(2026, 4, 30), "dated")]);
+        trials.ExtraVariants.ShouldBe(1);
+    }
+
     [Fact]
     public async Task No_stored_bar_is_a_conflict_with_lab_no_data()
     {

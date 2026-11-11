@@ -54,7 +54,7 @@ internal static class OwnerActFlow
 
     /// <summary>A refused input of the learning moves is 422, as in the Lab; every other failure is the shared mapping.</summary>
     private static ProblemHttpResult Problem(Error error, HttpContext http) =>
-        error.Code == LearningErrors.InvalidCode
+        error.Code is LearningErrors.InvalidCode or LearningErrors.NotAnObservationCode or LearningErrors.KnobNotRunnableCode
             ? TypedResults.Problem(ProblemResults.Create(StatusCodes.Status422UnprocessableEntity, error.Message, error.Code))
             : ProblemResults.From(error, http);
 }

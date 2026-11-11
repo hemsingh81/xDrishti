@@ -140,7 +140,7 @@ public static class RandomEntryWalker
             return Refused("the session has no minute inside the entry window");
         }
 
-        var rules = new WalkRules(spec.RewardRisk, squareOff, strategy.Fills, input.Tick, TierOn: input.TierOn, TurnoverOn: input.TurnoverOn);
+        var rules = new WalkRules(spec.RewardRisk, squareOff, strategy.Fills, input.Tick, TierOn: input.TierOn, TurnoverOn: input.TurnoverOn, MemberOn: input.MemberOn);   // BK-11b: a draw is made on the date of a real trade, which was a member day, so the filter never blocks it; stated so the control matches a dated run
         var results = new SimTrade?[plan.Draws];
         var redraws = 0;
         var tradeSeed = new SeededRandom(plan.Seed ^ ((ulong)(spec.Id + 1) * TradeMix)).NextBits();

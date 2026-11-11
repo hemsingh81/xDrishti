@@ -28,12 +28,30 @@ public static class LearningErrors
     /// <summary>No stored counterfactual matches (spec P8-12).</summary>
     public const string CounterfactualNotFoundCode = "learning.counterfactual_not_found";
 
+    /// <summary>The tier link is not an observation (BK-11b): nothing is proposed from it.</summary>
+    public const string NotAnObservationCode = "learning.not_an_observation";
+
+    /// <summary>An open hypothesis already proposes this tier for this cell (BK-11b).</summary>
+    public const string HypothesisExistsCode = "learning.hypothesis_exists";
+
+    /// <summary>The knob of the hypothesis has no experiment that runs it (BK-11b: a scope experiment is not built).</summary>
+    public const string KnobNotRunnableCode = "learning.knob_not_runnable";
+
     /// <summary>The problems found before anything was read.</summary>
     public static Error Invalid(IReadOnlyList<FieldError> fields)
     {
         ArgumentNullException.ThrowIfNull(fields);
         return new Error(InvalidCode, "The request cannot be used: " + string.Join("; ", fields.Select(f => f.Field + ": " + f.Message)), ErrorKind.Validation, Fields: fields);
     }
+
+    /// <summary>The tier is read in place of all shares only as an observation; this one is not, and the reason says why.</summary>
+    public static Error NotAnObservation(string reason) => Error.Validation(NotAnObservationCode, "Nothing is proposed: the link is not an observation (" + reason + ").");
+
+    /// <summary>One open proposal of the same tier for the same cell is enough.</summary>
+    public static Error HypothesisExists(long id) => Error.Conflict(HypothesisExistsCode, $"Hypothesis {id} already proposes this tier for this cell and is still open.");
+
+    /// <summary>A scope hypothesis can be recorded and judged by the owner, but no experiment runs it.</summary>
+    public static Error KnobNotRunnable() => Error.Validation(KnobNotRunnableCode, "A scope experiment is not built: this hypothesis is a note about a tier and cannot be started or run. Accepting it records a verdict only.");
 
     /// <summary>A named run is not in the result store.</summary>
     public static Error IvArchiveEmpty() => Error.Validation(IvArchiveEmptyCode, "The option archive holds no bars for these trades or no NIFTY series: an iv-1 extraction would freeze all-unknown rows. Run the backfill first; nothing was stored.");

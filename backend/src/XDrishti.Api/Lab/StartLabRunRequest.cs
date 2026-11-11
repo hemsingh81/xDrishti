@@ -1,7 +1,8 @@
 namespace XDrishti.Api.Lab;
 
 /// <summary>The universe of a posted run: exactly one of a basket and a list of symbols.</summary>
-internal sealed record StartLabRunUniverse(Guid? BasketId = null, IReadOnlyList<string>? Symbols = null);
+/// <remarks><c>MembersBasis</c> (BK-11b): with a basket, <c>dated</c> replays each day with that day's members (a full or robust test only; refused 422 <c>simulation.members_not_dated</c> when the basket has no dated membership for the window start) or <c>single_snapshot</c>; omitted is the members at the time of the post, as before.</remarks>
+internal sealed record StartLabRunUniverse(Guid? BasketId = null, IReadOnlyList<string>? Symbols = null, string? MembersBasis = null);
 
 /// <summary>The window of a posted run, India dates, inclusive; both or neither.</summary>
 internal sealed record StartLabRunWindow(DateOnly From, DateOnly To);
