@@ -107,6 +107,21 @@ public sealed class StartLabRunHandlerTests
     }
 
     [Fact]
+    public async Task CF_04_C_depth_and_survivorship_labels_only_for_a_stored_history_of_three_years_and_the_key_does_not_move()
+    {
+        _resolver.HandleAsync(Arg.Any<ResolveInstrumentsQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Matched(2)));
+        var shallow = (await Handler().HandleAsync(BySymbols("S1"), Ct)).Value.Run;
+        _bars.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new BarTotals(214, 40_000_000, new DateTimeOffset(2021, 5, 3, 9, 15, 0, TimeSpan.FromHours(5.5)), LastBar, 0, 0));
+
+        var deep = (await Handler().HandleAsync(BySymbols("S1"), Ct)).Value.Run;
+
+        shallow.Labels.ShouldNotContain(l => l.StartsWith("depth:", StringComparison.Ordinal) || l.StartsWith("survivorship:", StringComparison.Ordinal));
+        deep.Labels.ShouldContain(l => l.StartsWith("depth: stored history from 2021-05-03", StringComparison.Ordinal));
+        deep.Labels.ShouldContain(l => l.StartsWith("survivorship: members as of today", StringComparison.Ordinal));
+        deep.Key.ShouldBe(shallow.Key, "labels are not part of the Lab run key");
+    }
+
+    [Fact]
     public async Task A_full_test_takes_the_whole_universe_has_its_own_key_and_says_what_it_is()
     {
         _sheets.FindAsync(LabSettings.Default.CostSheetId, Arg.Any<CancellationToken>()).Returns(Result.Success(FixtureSheet.Sheet));

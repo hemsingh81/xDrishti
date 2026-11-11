@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace XDrishti.Domain.Research;
 
@@ -11,7 +12,8 @@ public static class HistoryDepth
     /// <summary>The depth from which a run counts as resting on backfilled history: the stored history before the backfill is about 2.1 years.</summary>
     public const double BackfilledYears = 3.0;
 
-    private const double DaysPerYear = 365.25;
+    /// <summary>Days per year of every depth figure (days / 365.25).</summary>
+    public const double DaysPerYear = 365.25;
 
     /// <summary>The survivorship text for a run with the single-snapshot (or no) basis.</summary>
     public const string SurvivorshipSnapshot = "survivorship: members as of today; instruments delisted in the window are absent (Dhan serves active instruments only; ISS-22)";
@@ -48,6 +50,42 @@ public static class HistoryDepth
         [
             string.Create(CultureInfo.InvariantCulture, $"depth: history from {first:yyyy-MM-dd}; instruments by years of stored bars: under 2 {u2}, 2 to 3 {f2}, 3 to 5 {f3}, 5 or more {f5} (per instrument: firstBar in the record)"),
             run.UniverseBasis?.IsDatedBasis() == true ? SurvivorshipDated : SurvivorshipSnapshot,
+        ];
+    }
+
+    private static readonly Regex StoredSpan = new(@"Stored data runs from (\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+
+    /// <summary>The years the stored data of a Lab run span, up to the window end only: (min(last, to) - first) / 365.25.</summary>
+    public static double StoredYears(DateOnly first, DateOnly last, DateOnly to) => (Math.Min(last.DayNumber, to.DayNumber) - first.DayNumber) / DaysPerYear;
+
+    /// <summary>The stored-data span a Lab run recorded in its labels ("Stored data runs from A to B"); null for a run that has no such label.</summary>
+    public static (DateOnly First, DateOnly Last)? StoredSpanOf(IEnumerable<string> labels)
+    {
+        ArgumentNullException.ThrowIfNull(labels);
+        foreach (var label in labels)
+        {
+            var m = StoredSpan.Match(label);
+            if (m.Success && DateOnly.TryParseExact(m.Groups[1].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var a) && DateOnly.TryParseExact(m.Groups[2].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var b))
+            {
+                return (a, b);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The depth and survivorship lines of a Lab run, from the stored-data span it reads (no per-instrument records exist at post time); none when the span is under <see cref="BackfilledYears"/> years, so every current Lab run keeps its labels.</summary>
+    public static string[] LabLines(DateOnly first, DateOnly last, DateOnly to, bool datedMembers)
+    {
+        if (StoredYears(first, last, to) < BackfilledYears)
+        {
+            return [];
+        }
+
+        return
+        [
+            string.Create(CultureInfo.InvariantCulture, $"depth: stored history from {first:yyyy-MM-dd} to {last:yyyy-MM-dd}, about {StoredYears(first, last, to):0.0} years (the first bar of each instrument is in its simulation record)"),
+            datedMembers ? SurvivorshipDated : SurvivorshipSnapshot,
         ];
     }
 
