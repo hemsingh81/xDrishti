@@ -235,8 +235,8 @@ public sealed class ReadOnlyRolesTests(ReadOnlyDatabase db)
         {
             foreach (var schema in new[] { "accounts", "auth", "platform", "portfolio", "research", "lab", "market", "trading", "workflow", "paper" })
             {
-                // The read role names the four report-source tables of research and lab (column-level grants, migration AddAiToolAccess); the SQL role names nothing.
-                var expected = role == "xd_mcp_read" && schema is "research" or "lab";
+                // The read role names the four report-source tables of research and lab (column-level grants, migration AddAiToolAccess) and names market for the basket context table (AddBasketToolAccess, BK-12); the SQL role names nothing.
+                var expected = role == "xd_mcp_read" && schema is "research" or "lab" or "market";
                 (await HasAsync("has_schema_privilege", role, schema, "USAGE")).ShouldBe(expected, $"{role} USAGE on {schema}");
             }
 
@@ -244,6 +244,21 @@ public sealed class ReadOnlyRolesTests(ReadOnlyDatabase db)
             (await HasAsync("has_schema_privilege", role, "aiv", "CREATE")).ShouldBeFalse();
             (await HasAsync("has_schema_privilege", role, "public", "CREATE")).ShouldBeFalse();
         }
+    }
+
+    [Fact]
+    public async Task The_read_roles_can_execute_no_function_of_schema_market_and_the_runtime_role_can()
+    {
+        const string Count = "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'market' AND p.prokind = 'f' AND has_function_privilege('{0}', p.oid, 'EXECUTE')";
+        var all = (long)(await ReadOnlyDatabase.ScalarAsync(db.Owner, "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'market' AND p.prokind = 'f'"))!;
+
+        all.ShouldBeGreaterThan(0);
+        foreach (var role in Roles)
+        {
+            (await ReadOnlyDatabase.ScalarAsync(db.Owner, string.Format(System.Globalization.CultureInfo.InvariantCulture, Count, role))).ShouldBe(0L, role);
+        }
+
+        (await ReadOnlyDatabase.ScalarAsync(db.Owner, string.Format(System.Globalization.CultureInfo.InvariantCulture, Count, "xd_app"))).ShouldBe(all);
     }
 
     [Fact]

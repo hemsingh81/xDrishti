@@ -25,6 +25,7 @@ public static class AssistantToolsRegistration
         services.AddScoped<IQueryHandler<GetReportDistributionQuery, Result<DistributionView>>, GetReportDistributionHandler>();
         services.AddScoped<IQueryHandler<GetReportInsightsQuery, Result<InsightsView>>, GetReportInsightsHandler>();
         services.AddScoped<IQueryHandler<GetReportWhatWorksQuery, Result<WhatWorksView>>, GetReportWhatWorksHandler>();
+        services.AddSingleton<BasketReportReader>(); // BK-12: the basket reports of get_report; the BK-07 handlers are resolved when called, so a host without them answers tool.unavailable
         services.AddSingleton<IAiReportReader, ReportToolReader>();
         return services;
     }

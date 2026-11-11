@@ -25,6 +25,7 @@ internal static class AskYourDataSeed
         DELETE FROM trading.plans;
         DELETE FROM portfolio.holding_lots;
         DELETE FROM portfolio.holdings;
+        DELETE FROM market.basket_context_daily;
         DELETE FROM market.basket_members;
         DELETE FROM market.baskets;
         DELETE FROM market.bars_agg;

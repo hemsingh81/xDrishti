@@ -197,7 +197,7 @@
   },
   {
     "Name": "get_report",
-    "Description": "Report engine figures from stored simulation runs, gross R only: n, win rate, expectancy per group, each with a state (value, insufficient, unavailable). Prefer it to run_sql for expectancy. query: runs, lens, filters, from, to, metric.",
+    "Description": "Report engine figures, gross R only: n, win rate, expectancy per group, each with a state. Prefer it to run_sql for expectancy. basket_profile, basket_ranking, basket_context read baskets (query basket, baskets, date). Other query: runs, lens, filters, from, to, metric.",
     "Schema": {
       "type": "object",
       "properties": {
@@ -205,7 +205,7 @@
           "description": "Kind of report.",
           "type": "string",
           "maxLength": 20,
-          "pattern": "^(summary|groups|pivot|what_works|equity|distribution|insights)$"
+          "pattern": "^(summary|groups|pivot|what_works|equity|distribution|insights|basket_profile|basket_ranking|basket_context)$"
         },
         "query": {
           "description": "Report query pairs.",
