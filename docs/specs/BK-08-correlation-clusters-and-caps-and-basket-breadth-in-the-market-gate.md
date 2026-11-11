@@ -96,5 +96,5 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 
 ## Build notes 2026-11-11
 - AC 3 and AC 4 amended above (clusters only with the cap ON; book-alone is Rejected, picks-alone is Reserve; owner may still decide otherwise).
-- AC 11 banner is carried by roadmap row BK-10b.
+- AC 11 banner is carried by roadmap row BK-10b (met by BK-10b, ADR 0265).
 - The gate's age check uses the configured `SmartRulesOptions.GateMaxAgeDays` and the gate input is stamped with the older of the VIX day and the basket row day.

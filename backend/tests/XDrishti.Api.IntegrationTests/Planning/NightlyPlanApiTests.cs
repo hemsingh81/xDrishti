@@ -37,7 +37,8 @@ public sealed class NightlyPlanApiTests(ApiFactory factory) : DataTestBase(facto
             new NullPlanBuilder(),
             p.GetRequiredService<IPlanStore>(),
             new FakeTimeProvider(Evening),
-            NullLogger<RunNightlyPlanHandler>.Instance);
+            NullLogger<RunNightlyPlanHandler>.Instance,
+            p.GetRequiredService<XDrishti.Application.Planning.LooseningAutoDismissal>()); // resolved from the API host: the dependency is wired
         var result = await handler.HandleAsync(command, Ct);
         return result.Value;
     }

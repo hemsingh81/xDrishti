@@ -153,6 +153,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, OptionReportEndpoints>(); // the read-only P14 reports (P14-16): GETs only, counts, shares, dates and verdict words
         services.AddSingleton<IEndpointModule, FilingEndpoints>(); // the stored filings as metadata and counts, optionally as of an instant (P15-02): GETs only, no file content
         services.AddSingleton<IEndpointModule, ExtensionEvaluationEndpoints>(); // the stored verdicts of protocols F, X, P and L (P15-10): GETs only; a KEEP is a record
+        services.AddSingleton<IEndpointModule, LooseningEndpoints>(); // BK-10b: the loosening banner dismissal and its automatic setting (OFF by default, password every change); changes no limit and places no order
         services.AddSingleton<IEndpointModule, BasketSettingsEndpoints>(); // BK-08: the cluster cap, cluster cut and the gate's breadth source (owner settings, password every change, all OFF by default) and the read-only basket context; places no order
         services.AddSingleton<IEndpointModule, UniverseSettingsEndpoints>(); // BK-11: the owner's universe settings, password every change; applies no restriction, places no order
         services.AddSingleton<IEndpointModule, SizingEndpoints>(); // BK-10: the down-only size scaling's owner settings, basket risk budgets and the read-only study; password every change; places no order

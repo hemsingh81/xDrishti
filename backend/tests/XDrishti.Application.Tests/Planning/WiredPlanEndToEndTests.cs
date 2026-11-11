@@ -279,7 +279,7 @@ public sealed class WiredPlanEndToEndTests
         calendar.GetAsync(Ct).Returns(new XDrishti.Domain.Market.Calendar.TradingCalendar());
         var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 23, 13, 0, 0, TimeSpan.Zero));
         var builder = WiredPlanFixture.Builder(WiredPlanFixture.Candidates(), WiredPlanFixture.Context(), out _);
-        var handler = new RunNightlyPlanHandler(calendar, [], builder, store, time, Microsoft.Extensions.Logging.Abstractions.NullLogger<RunNightlyPlanHandler>.Instance);
+        var handler = new RunNightlyPlanHandler(calendar, [], builder, store, time, Microsoft.Extensions.Logging.Abstractions.NullLogger<RunNightlyPlanHandler>.Instance, LooseningFakes.Auto(time));
 
         var result = await handler.HandleAsync(new RunNightlyPlanCommand(null, true, false, "test"), Ct);
 

@@ -234,6 +234,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(SizingStudyView))]
 [JsonSerializable(typeof(BasketSettingsView))]
 [JsonSerializable(typeof(BasketSettingsChangeBody))]
+[JsonSerializable(typeof(LooseningSettingsView))]
+[JsonSerializable(typeof(LooseningSettingsChangeBody))]
 [JsonSerializable(typeof(BasketContextView))]
 [JsonSerializable(typeof(EventFilterView))]
 [JsonSerializable(typeof(EventFilterChangeBody))]

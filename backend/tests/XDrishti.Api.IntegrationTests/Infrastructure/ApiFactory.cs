@@ -480,9 +480,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 TRUNCATE filings.event_filter_decisions RESTART IDENTITY;
                 TRUNCATE selection.sizing_settings_changes, selection.basket_risk_budgets RESTART IDENTITY;
                 TRUNCATE selection.basket_settings_changes, market.basket_context_daily RESTART IDENTITY;
+                TRUNCATE trading.loosening_dismissals, trading.loosening_settings RESTART IDENTITY;
                 TRUNCATE research.extension_evaluations;
                 DELETE FROM lab.test_ledger WHERE strategy_id LIKE '%:%' OR strategy_id = 'pead';
-                DELETE FROM accounts.account_events WHERE event IN ('EventFilterSwitched', 'BasketSettingsChanged');
+                DELETE FROM accounts.account_events WHERE event IN ('EventFilterSwitched', 'BasketSettingsChanged', 'LooseningDismissed', 'LooseningSettingsChanged');
                 DELETE FROM options.lot_sizes;
                 DELETE FROM options.contracts;
                 DELETE FROM market.instruments;
