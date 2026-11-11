@@ -22,7 +22,7 @@ public static class EvalFixtureReader
             var learning = root.GetProperty("learning");
             var fixture = new EvalFixture(
                 Date(root, "fixtureDate"),
-                [.. root.GetProperty("instruments").EnumerateArray().Select(i => new FixtureInstrument(Str(i, "symbol"), Str(i, "name")))],
+                [.. root.GetProperty("instruments").EnumerateArray().Select(i => new FixtureInstrument(Str(i, "symbol"), Str(i, "name"), i.TryGetProperty("type", out var type) ? type.GetString() ?? "share" : "share"))],
                 [.. root.GetProperty("baskets").EnumerateArray().Select(b => new FixtureBasket(Str(b, "name"), Strings(b, "symbols")))],
                 [.. root.GetProperty("runs").EnumerateArray().Select(Run)],
                 new FixturePlan(
@@ -37,7 +37,10 @@ public static class EvalFixtureReader
                 new FixtureCellStats(Str(cell, "cell"), [.. cell.GetProperty("windows").EnumerateArray().Select(w => new FixtureCellWindow(Str(w, "window"), w.GetProperty("n").GetInt32()))]),
                 new FixtureLearning(
                     [.. learning.GetProperty("lessons").EnumerateArray().Select(l => new FixtureStatusItem(Str(l, "key"), Str(l, "status")))],
-                    [.. learning.GetProperty("hypotheses").EnumerateArray().Select(l => new FixtureStatusItem(Str(l, "key"), Str(l, "status")))]));
+                    [.. learning.GetProperty("hypotheses").EnumerateArray().Select(l => new FixtureStatusItem(Str(l, "key"), Str(l, "status")))]),
+                root.TryGetProperty("bars", out var bars)
+                    ? new FixtureBars(Date(bars, "start"), bars.GetProperty("sessions").GetInt32(), [.. bars.GetProperty("series").EnumerateArray().Select(x => new FixtureSeries(Str(x, "symbol"), x.GetProperty("from").GetDouble(), x.GetProperty("to").GetDouble()))])
+                    : null);
             var problem = Check(fixture);
             return problem is null ? Result.Success(fixture) : Result.Failure<EvalFixture>(new Error(InvalidCode, problem, ErrorKind.Validation));
         }
@@ -58,6 +61,16 @@ public static class EvalFixtureReader
         if (f.Baskets.Any(b => b.Symbols.Any(s => !symbols.Contains(s))) || f.Runs.Any(r => r.Trades.Any(t => !symbols.Contains(t.Symbol))))
         {
             return "a basket or a trade names a symbol that is not an instrument";
+        }
+
+        if (f.Instruments.Any(i => i.Type is not ("share" or "index")))
+        {
+            return "an instrument type is not share or index";
+        }
+
+        if (f.Bars is { } bars && (bars.Sessions is < 2 or > 400 || bars.Series.Any(x => !symbols.Contains(x.Symbol) || x.From <= 0 || x.To <= 0) || bars.Series.Select(x => x.Symbol).Distinct().Count() != bars.Series.Count))
+        {
+            return "the bars are not valid (sessions 2 to 400, a listed symbol once, positive prices)";
         }
 
         var signals = f.Runs.SelectMany(r => r.Trades.Select(t => (r.Strategy, t.Symbol, t.Side, t.Entry))).ToList();

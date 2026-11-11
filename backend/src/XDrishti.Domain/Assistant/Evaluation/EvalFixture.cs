@@ -14,7 +14,8 @@ public sealed record EvalFixture(
     FixturePlan Plan,
     FixturePortfolio Portfolio,
     FixtureCellStats CellStats,
-    FixtureLearning Learning)
+    FixtureLearning Learning,
+    FixtureBars? Bars = null)
 {
     /// <summary>The fixture hash: lower-case hex SHA-256 of the file's bytes.</summary>
     public static string HashOf(ReadOnlySpan<byte> bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
@@ -27,7 +28,29 @@ public sealed record EvalFixture(
     }
 }
 
-public sealed record FixtureInstrument(string Symbol, string Name);
+/// <summary><c>Type</c> is <c>share</c> or <c>index</c> (the Nifty 500 of the basket reports, BK-12b).</summary>
+public sealed record FixtureInstrument(string Symbol, string Name, string Type = "share");
+
+/// <summary>Stored daily bars (BK-12b): <c>Sessions</c> weekdays from <c>Start</c>, each series a straight line of closes from <c>From</c> to <c>To</c>, so that a basket's hold is hand-worked (a basket of A 100 to 110, B 50 to 45, C 200 to 250 held +8.3333 %).</summary>
+public sealed record FixtureBars(DateOnly Start, int Sessions, IReadOnlyList<FixtureSeries> Series)
+{
+    /// <summary>The session dates: weekdays from <see cref="Start"/> (a Saturday or Sunday start moves to Monday).</summary>
+    public IReadOnlyList<DateOnly> Dates()
+    {
+        var dates = new List<DateOnly>(Sessions);
+        for (var d = Start; dates.Count < Sessions; d = d.AddDays(1))
+        {
+            if (d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
+            {
+                dates.Add(d);
+            }
+        }
+
+        return dates;
+    }
+}
+
+public sealed record FixtureSeries(string Symbol, double From, double To);
 
 public sealed record FixtureBasket(string Name, IReadOnlyList<string> Symbols);
 

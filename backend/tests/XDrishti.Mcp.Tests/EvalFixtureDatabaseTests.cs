@@ -34,7 +34,7 @@ public sealed class EvalFixtureDatabaseTests(ReadOnlyDatabase db) : IAsyncLifeti
         DELETE FROM research.lessons; DELETE FROM research.hypotheses; DELETE FROM research.sim_trades; DELETE FROM research.sim_runs; DELETE FROM research.cell_stats;
         DELETE FROM trading.plan_item_allocations; DELETE FROM trading.plan_items; DELETE FROM trading.plans;
         DELETE FROM portfolio.holding_lots; DELETE FROM portfolio.holdings; DELETE FROM accounts.portfolio_buckets; DELETE FROM accounts.broker_accounts;
-        DELETE FROM market.basket_members; DELETE FROM market.baskets; DELETE FROM market.instruments;
+        DELETE FROM market.bars_agg; DELETE FROM market.basket_members; DELETE FROM market.baskets; DELETE FROM market.instruments;
         DELETE FROM lab.strategy_versions WHERE strategy_id IN ('ORB', 'VWAP_PULLBACK'); DELETE FROM lab.strategies WHERE id IN ('ORB', 'VWAP_PULLBACK');
         """);
 
@@ -86,9 +86,10 @@ public sealed class EvalFixtureDatabaseTests(ReadOnlyDatabase db) : IAsyncLifeti
     {
         (await SeedAsync()).ShouldBe(SeedOutcome.Seeded);
 
-        (await CountAsync("market.instruments")).ShouldBe(8);
-        (await CountAsync("market.baskets")).ShouldBe(3);
-        (await CountAsync("market.basket_members")).ShouldBe(8);
+        (await CountAsync("market.instruments")).ShouldBe(14);
+        (await CountAsync("market.baskets")).ShouldBe(6);
+        (await CountAsync("market.basket_members")).ShouldBe(18);
+        (await CountAsync("market.bars_agg")).ShouldBe(6 * 70); // BK-12b: the index and five shares, 70 sessions each
         (await CountAsync("research.sim_runs")).ShouldBe(2);
         (await CountAsync("research.sim_trades")).ShouldBe(40);
         (await CountAsync("trading.plans")).ShouldBe(1);

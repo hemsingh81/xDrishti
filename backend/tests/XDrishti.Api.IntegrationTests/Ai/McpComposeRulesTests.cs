@@ -42,7 +42,8 @@ public sealed class McpComposeRulesTests
         { "mem-limit", "mem_limit: 512m", "mem_limit: 4g" },
         { "healthcheck", "    healthcheck:\n      test: [CMD, dotnet, XDrishti.Mcp.dll", "    xhealthcheck:\n      test: [CMD, dotnet, XDrishti.Mcp.dll" },
         { "read-only-root", "<<: *hardening", "cap_drop: [ALL]\n    security_opt: [no-new-privileges:true]" },
-        { "exactly-four-secrets", "      - source: mcp_token\n        target: Mcp__Tokens__Api", "      - source: mcp_token\n        target: Mcp__Tokens__Api\n      - source: db_app_password\n        target: Database__Password" },
+        { "exactly-five-secrets", "      - source: mcp_token\n        target: Mcp__Tokens__Api", "      - source: mcp_token\n        target: Mcp__Tokens__Api\n      - source: db_app_password\n        target: Database__Password" },
+        { "api-address", "Mcp__Api__BaseUrl: http://xd-api:8080", "Mcp__Api__BaseUrl: http://xd-api-eval:8080" },
         { "no-secret-in-environment", "ASPNETCORE_ENVIRONMENT: Production", "ASPNETCORE_ENVIRONMENT: Production\n      Mcp__Tokens__Api: abcdefghijklmnopqrstuvwxyz0123456789" },
         { "no-application-role", "Username=xd_mcp_sql\n", "Username=xd_app\n" },
         { "no-volumes", "    networks: [back, ai-edge]\n    mem_limit: 512m", "    volumes: [\"../data:/data\"]\n    networks: [back, ai-edge]\n    mem_limit: 512m" },
@@ -68,6 +69,8 @@ public sealed class McpComposeRulesTests
         string[] Users(string secret) => [.. services.Split("\n  xd-", StringSplitOptions.None).Where(block => block.Contains($"source: {secret}\n", StringComparison.Ordinal)).Select(b => b.Split('\n')[0].TrimEnd(':'))];
 
         Users("mcp_token").ShouldBe(["api", "mcp"], ignoreOrder: true, customMessage: "the token is read by the tool server and sent by the API");
+        Users("mcp_api_token").ShouldBe(["api", "mcp"], ignoreOrder: true, customMessage: "BK-12b: the API accepts the read-only token, the tool server presents it; no other service, and never the eval services");
+        Users("mcp_api_token_eval").ShouldBe(["api-eval", "mcp-eval"], ignoreOrder: true, customMessage: "BK-12b: the eval's own token, held by its API over the fixture and its tool server only");
         Users("mcp_token_hermes").ShouldBe(["mcp", "mcp-eval"], ignoreOrder: true, customMessage: "Mcp:Tokens:Hermes is accepted by both tool servers; xd-hermes holds it as a plain short-syntax secret (P9-10)");
         Users("db_mcp_read_password").ShouldBe(["migrate", "mcp", "migrate-eval", "mcp-eval"], ignoreOrder: true, customMessage: "migrate sets the login, the tool server uses it, and so do the migration and the tool server of the eval (P9-09)");
         Users("db_mcp_sql_password").ShouldBe(["migrate", "mcp", "migrate-eval", "mcp-eval"], ignoreOrder: true);
