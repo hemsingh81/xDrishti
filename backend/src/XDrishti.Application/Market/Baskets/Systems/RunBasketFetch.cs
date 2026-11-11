@@ -179,7 +179,7 @@ internal sealed class RunBasketFetchHandler(
             // The lot file (BK-05b): its lots go to options.lot_sizes (dated, unconfirmed, only when changed) in the transaction of the fetch row; the master's lot is never touched.
             if (plan.Lots is { Count: > 0 })
             {
-                var url = settings.PreferredHost == "B" && source.HostAlt is { Length: > 0 } alt ? alt : source.SourceUrl;
+                var url = response.Url ?? (settings.PreferredHost == "B" && source.HostAlt is { Length: > 0 } alt ? alt : source.SourceUrl);
                 var written = await lotApplier.ApplyAsync(new NseLotApplication(plan.Lots, IndiaTime.Today(now), url, update, n => ListFileProcessor.WithLotsWritten(plan.Fetch, n)), cancellationToken);
                 if (written is { } count)
                 {

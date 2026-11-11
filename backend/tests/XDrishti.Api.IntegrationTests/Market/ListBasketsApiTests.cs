@@ -347,6 +347,23 @@ public sealed class ListBasketsApiTests(ApiFactory factory) : BasketsTestBase(fa
     }
 
     [Fact]
+    public async Task An_nse_lot_equal_to_the_lot_in_force_from_any_source_is_not_written_and_a_different_one_is_and_the_confirmed_lot_still_wins_the_lookup()
+    {
+        await RefreshListsAsync();
+        Factory.BasketSources.FetchEnabled = true;
+        var l001 = _shares["L001"];
+        await SqlAsync($"INSERT INTO options.lot_sizes (underlying_id, effective_from, lot_size, source, source_url, confirmed) VALUES ({l001}, date '2026-09-26', 65, 'circular', 'https://nseindia.test/circular', true)");
+
+        await FetchLotsOnAsync(26, Row("L001", 65, 65), Row("L002", 100, 100)); // L001 equals the confirmed circular lot: no row; L002 has none: a row
+        (await LotRowsAsync()).ShouldBe([("L002", 100, "2026-10-26")]);
+        var rows = await Factory.WithDbAsync(db => db.Database.SqlQuery<string>($"SELECT lot_size || '|' || confirmed || '|' || source AS \"Value\" FROM options.lot_sizes WHERE underlying_id = {l001} ORDER BY id").ToListAsync(Ct));
+        rows.ShouldBe(["65|true|circular"]);
+
+        await FetchLotsOnAsync(27, Row("L001", 75, 75), Row("L002", 100, 100)); // a different lot: a row, the circular one stays
+        (await LotRowsAsync()).ShouldBe([("L001", 75, "2026-10-27"), ("L002", 100, "2026-10-26")]);
+    }
+
+    [Fact]
     public async Task The_same_bytes_twice_are_unchanged_and_write_no_lot_row()
     {
         await RefreshListsAsync();

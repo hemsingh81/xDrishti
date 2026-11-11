@@ -403,6 +403,20 @@ public sealed class ListFileFetchTests
     }
 
     [Fact]
+    public async Task The_provenance_url_is_the_address_that_answered_not_the_catalogue_one()
+    {
+        _w.Share("A", fno: true, lot: 10);
+        _w.Share("B", fno: true, lot: 10);
+        _w.LotSource();
+        _w.Serve(ListWorld.Lot(("A", "A", "10"), ("B", "B", "10")));
+        _w.Fetcher.Response = _w.Fetcher.Response with { Url = "https://alt.example/fo_mktlots.csv" };
+
+        await _w.RunOneAsync();
+
+        _w.LotApplier.Applied.Single().SourceUrl.ShouldBe("https://alt.example/fo_mktlots.csv");
+    }
+
+    [Fact]
     public async Task An_index_row_is_stored_only_when_its_canonical_symbol_names_one_index_of_the_master_otherwise_it_is_counted_unmatched()
     {
         _w.Share("A", fno: true, lot: 10);

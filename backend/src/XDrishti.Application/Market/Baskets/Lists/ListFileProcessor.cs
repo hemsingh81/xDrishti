@@ -102,6 +102,7 @@ internal sealed class ListFileProcessor(IBasketSourceStore sources, IBasketStore
 
         var warnings = new List<string> { $"index_rows_skipped:{file.Rows.Count - shareRows.Count}" };
         var lots = shareRows.Select(r => new NseLot(shares[r.Symbol].Flags.Id, r.LotSize)).ToList();
+        var disagreeing = new HashSet<Guid>();
         var indexRows = file.Rows.Where(r => !shares.ContainsKey(r.Symbol) && NseIndexSymbols.IsIndex(r.Symbol)).ToList();
         var indexIds = indexRows.Count == 0 ? new Dictionary<string, Guid>() : await master.ReadIndexIdsAsync([.. indexRows.Select(r => NseIndexSymbols.Canonical(r.Symbol)).OfType<string>()], cancellationToken);
         var indexUnmatched = 0;
@@ -128,6 +129,14 @@ internal sealed class ListFileProcessor(IBasketSourceStore sources, IBasketStore
             warnings.AddRange(diff.OnlyNse.Select(s => $"only_nse:{s}"));
         }
 
+        // Two rows naming one instrument with different lots (a share symbol that is also listed twice under another name): neither is believed, none is stored.
+        foreach (var group in lots.GroupBy(l => l.UnderlyingId).Where(g => g.Select(l => l.LotSize).Distinct().Count() > 1))
+        {
+            disagreeing.Add(group.Key);
+            warnings.Add($"lot_rows_disagree:{group.Key}");
+        }
+
+        lots = [.. lots.Where(l => !disagreeing.Contains(l.UnderlyingId)).GroupBy(l => l.UnderlyingId).Select(g => g.First())];
         var mismatches = LotChecks.Mismatches(nse, masterLots).Count;
         warnings.Insert(0, $"lots_summary:shares={shareRows.Count},nearest={shareRows.FirstOrDefault()?.ExpiryLabel},mismatches={mismatches},withoutLot={file.RowsWithoutLot},indexUnmatched={indexUnmatched}");
         fetch = fetch with { WarningsJson = Json(warnings) };
