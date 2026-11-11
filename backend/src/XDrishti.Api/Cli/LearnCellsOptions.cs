@@ -13,7 +13,7 @@ internal sealed record LearnCellsOptions(DateOnly AsOf, IReadOnlyList<CellSource
           xd learn cells --as-of YYYY-MM-DD --run RUNKEY:STYLE:EXIT [--run ...] [--half-life-days N] [--prior-strength N] [--min-trades N] [--by-regime] [--by-universe]
             RUNKEY is the 64-hex key of a stored run, STYLE is intraday or swing, EXIT labels the exit policy the run used (no '|')
             --by-regime also splits every cell by the regime of its trades' entry day (read before the day; trades with no regime are counted, not guessed)
-            --by-universe also splits every cell by the liquidity tier (high, mid, low third) of its trades' instrument on the decision date, from daily bars before that date (trades with no tier are counted, not guessed)
+            --by-universe also splits every cell by the liquidity tier (high, mid, low third) of its trades' instrument on the decision date, from daily bars before that date (trades with no tier are counted, not guessed); with the owner's setting learning.universe_link.auto_propose ON (off by default) each new stable observation is also proposed as a hypothesis by the actor auto, nothing is applied
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
         """;

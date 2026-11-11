@@ -27,6 +27,7 @@ internal static class ProblemResults
             ErrorKind.Forbidden => StatusCodes.Status403Forbidden,
             ErrorKind.Locked => StatusCodes.Status423Locked,
             ErrorKind.Validation when error.Code == "accounts.live_not_ready" => StatusCodes.Status422UnprocessableEntity, // the live-ready gate names every failing item (spec P11-04)
+            ErrorKind.Validation when error.Code is "simulation.members_not_dated" or "learning.not_an_observation" or "learning.knob_not_runnable" => StatusCodes.Status422UnprocessableEntity, // BK-11b: a refusal with its reason, not a malformed request
             ErrorKind.Validation => StatusCodes.Status400BadRequest,
             ErrorKind.NotFound => StatusCodes.Status404NotFound,
             ErrorKind.Conflict => StatusCodes.Status409Conflict,

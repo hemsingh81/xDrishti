@@ -29,7 +29,8 @@ internal sealed record SimulateOptions(
     ExitChoice? Exits = null,
     SelectionOptions? Selection = null,
     int? StrategyVersion = null,
-    string? StrategyHash = null)
+    string? StrategyHash = null,
+    string? Members = null)
 {
     /// <summary>The default of <c>--cards</c>: the roadmap's cap (spec P3-04c, C1).</summary>
     public const int DefaultCards = 200;
@@ -38,6 +39,7 @@ internal sealed record SimulateOptions(
     public const string Usage =
         "usage:\n"
         + "  simulate (--strategy <id> [--strategy-version <n>] | --strategy-hash <64 hex>) (--symbols <a,b,...> | --basket <name|id>) --from <yyyy-MM-dd> --to <yyyy-MM-dd>\n"
+        + "           [--members dated|single_snapshot]   (with --basket: the members of each replayed day, or of the run date; none = the members now, BK-11b)\n"
         + "           [--timeframe <5m|10m|15m|30m|1h|1D>] [--param <name>=<number>]... [--fills modelled|no-slippage] [--acknowledge-csv-adjusted] [--force]\n"
         + "           [--cards <0..500>]   (trade cards with their conditions at the decision bar, and index.html; default 200, 0 writes none)\n"
         + "           [--store]   (keep the run in the database as well as in the export folder; default off, P3-10)\n"
@@ -51,7 +53,7 @@ internal sealed record SimulateOptions(
 
     private const int MaxText = 60;
 
-    private static readonly string[] ValueFlags = ["--strategy", "--strategy-version", "--strategy-hash", "--symbols", "--basket", "--from", "--to", "--timeframe", "--param", "--exit", "--time-stop", "--fills", "--cards", "--costs", "--capital", "--profile", "--max-cost-r", "--min-train-months", "--test-months", "--embargo-sessions", "--lambda", "--min-trades"];
+    private static readonly string[] ValueFlags = ["--strategy", "--strategy-version", "--strategy-hash", "--symbols", "--basket", "--members", "--from", "--to", "--timeframe", "--param", "--exit", "--time-stop", "--fills", "--cards", "--costs", "--capital", "--profile", "--max-cost-r", "--min-train-months", "--test-months", "--embargo-sessions", "--lambda", "--min-trades"];
 
     private static readonly string[] SwitchFlags = ["--acknowledge-csv-adjusted", "--force", "--list-strategies", "--gross", "--store", "--select-exit", "--no-plateau"];
 
@@ -161,6 +163,7 @@ internal sealed record SimulateOptions(
             errors.Add(values.ContainsKey("--symbols") ? "give --symbols or --basket, not both" : "give --symbols or --basket");
         }
 
+        var members = ReadMembers(values, errors);
         var from = Date(values, "--from", errors);
         var to = Date(values, "--to", errors);
         var timeframe = ReadTimeframe(values, errors);
@@ -176,7 +179,30 @@ internal sealed record SimulateOptions(
         }
 
         return new SimulateParse(
-            new SimulateOptions(false, strategy ?? string.Empty, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), costs, cards, switches.Contains("--store"), exitChoice, selection, version, hash), []);
+            new SimulateOptions(false, strategy ?? string.Empty, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), costs, cards, switches.Contains("--store"), exitChoice, selection, version, hash, members), []);
+    }
+
+    /// <summary>The <c>--members</c> flag (BK-11b): dated or single_snapshot, and only with a basket.</summary>
+    internal static string? ReadMembers(Dictionary<string, string> values, List<string> errors)
+    {
+        if (!values.TryGetValue("--members", out var members))
+        {
+            return null;
+        }
+
+        if (members is not (UniverseBasisRecord.Dated or UniverseBasisRecord.SingleSnapshot))
+        {
+            errors.Add("'--members' is dated or single_snapshot");
+            return null;
+        }
+
+        if (!values.ContainsKey("--basket"))
+        {
+            errors.Add("'--members' applies to --basket");
+            return null;
+        }
+
+        return members;
     }
 
     private static SimulateParse Invalid(List<string> errors) => new(null, errors.AsReadOnly());

@@ -52,6 +52,25 @@ public sealed class TierExcludedExportTests
     }
 
     [Fact]
+    public void BK_11b_the_universe_basis_and_the_not_member_counter_are_absent_for_a_run_that_did_not_name_a_basis_and_written_when_it_did()
+    {
+        var run = FabricatedRun.Standard();
+        string Record(SimulationRun r) => Sinks.Render(sink => SimExportJson.WriteRecord(sink, r));
+
+        Record(run).ShouldNotContain("universe_basis");
+        Record(run).ShouldNotContain("not_member");
+        Json(run).ShouldNotContain("universe_basis");
+
+        var dated = run with
+        {
+            UniverseBasis = new UniverseBasisRecord(Guid.Parse("11111111-1111-1111-1111-111111111111"), null, null, UniverseBasisRecord.Dated, new string('c', 64)),
+            Totals = run.Totals with { Fates = run.Totals.Fates with { NotMember = 2 }, Walk = run.Totals.Walk with { NotMember = 2 } },
+        };
+        Record(dated).ShouldContain("\"universe_basis\":{\"universe_basket_id\":\"11111111-1111-1111-1111-111111111111\",\"universe_params_hash\":null,\"members_as_of\":null,\"universe_basis\":\"dated\",\"member_days_hash\":\"" + new string('c', 64) + "\"}");
+        Record(dated).ShouldContain("\"not_member\":2");
+    }
+
+    [Fact]
     public void The_turnover_blocked_counter_is_left_out_while_it_is_zero_and_written_when_set_ADR_0230()
     {
         var run = FabricatedRun.Standard();

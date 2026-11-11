@@ -9,8 +9,9 @@ namespace XDrishti.Simulation.Walking;
 /// <param name="Tick">The instrument's tick size in rupees; built with <see cref="TickSpec.FromMasterPaise"/> or <see cref="TickSpec.FromRupees"/>. A null value is refused by the walker.</param>
 /// <param name="TurnoverOn">The 20-day median traded value in rupees of the instrument on an entry date, read only when <see cref="FillRules.MinTurnoverCrore"/> is set (CF-05, ADR 0230); null, or a null answer, blocks the entry.</param>
 /// <param name="TierOn">The liquidity tier of the instrument on an entry date, read only when <see cref="FillRules.ConservativeSlippage"/> is set (CF-05, D2); null then means every trade is excluded.</param>
+/// <param name="MemberOn">Whether the instrument is a member of the basket on an entry date (BK-11b, dated basis); null for every other run. An entry on a date that is not a member date is no trade (<see cref="NoTradeReason.NotMember"/>).</param>
 /// <param name="Hold">The longest hold in sessions and the calendar that counts them; null for the intraday walk of ADR 0038, which ends at the square-off. A walk with a hold is a swing walk (X7 to X9) and its square-off must be <see cref="WalkRules.NoSquareOff"/>.</param>
-public readonly record struct WalkRules(double? RewardRisk, int SquareOffMinute, FillRules Fills, TickSpec Tick, SwingHold? Hold = null, Func<DateOnly, LiquidityTier>? TierOn = null, Func<DateOnly, decimal?>? TurnoverOn = null)
+public readonly record struct WalkRules(double? RewardRisk, int SquareOffMinute, FillRules Fills, TickSpec Tick, SwingHold? Hold = null, Func<DateOnly, LiquidityTier>? TierOn = null, Func<DateOnly, decimal?>? TurnoverOn = null, Func<DateOnly, bool>? MemberOn = null)
 {
     /// <summary>The square-off minute of a swing walk: there is none (X7).</summary>
     public const int NoSquareOff = 0;

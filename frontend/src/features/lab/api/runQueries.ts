@@ -85,6 +85,8 @@ export interface StartRunInput {
   stress?: boolean;
   nulls?: false;
   draws?: number;
+  /** BK-11b: with a basket, how its members are chosen; omitted is the members at the time of the post. */
+  membersBasis?: 'single_snapshot' | 'dated';
 }
 
 /** A run posted with options that differ from the default is a what-if and cannot be evidence. */
@@ -97,7 +99,9 @@ export async function startRun(input: StartRunInput) {
         strategyId: input.strategyId,
         version: input.version,
         method: input.method,
-        universe: input.basketId ? { basketId: input.basketId } : { symbols: input.symbols },
+        universe: input.basketId
+          ? { basketId: input.basketId, ...(input.membersBasis ? { membersBasis: input.membersBasis } : {}) }
+          : { symbols: input.symbols },
         ...(input.slippage ? { slippage: input.slippage } : {}),
         ...(input.stress !== undefined ? { stress: input.stress } : {}),
         ...(input.nulls === false ? { nulls: false } : {}),

@@ -11,6 +11,9 @@ internal static partial class SimulationLog
     [LoggerMessage(EventId = 4402, Level = LogLevel.Information, Message = "Simulation run started: strategy {StrategyId}, universe '{Universe}' of {Instruments} instruments, {From:yyyy-MM-dd} to {To:yyyy-MM-dd}, {Warnings} compile warnings, costs {Costs}")]
     public static partial void RunStarted(ILogger logger, string strategyId, string universe, int instruments, DateOnly from, DateOnly to, int warnings, string costs);
 
+    [LoggerMessage(EventId = 4496, Level = LogLevel.Information, Message = "Simulation run on dated members: basket {BasketId}, {ChangeDays} days of change, {Members} instruments with a stay in the window")]
+    public static partial void DatedMembers(ILogger logger, Guid basketId, int changeDays, int members);
+
     [LoggerMessage(EventId = 4403, Level = LogLevel.Information, Message = "Simulation run: instrument {Symbol} ({InstrumentId}) skipped, {Reason}")]
     public static partial void InstrumentSkipped(ILogger logger, string symbol, Guid instrumentId, string reason);
 

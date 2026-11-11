@@ -48,6 +48,25 @@ internal static class LearnCellsCommand
                 await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"universe split: {universe.TierCells} tier cells; {universe.Tiered} trades in a tier, {universe.Unknown} with no tier (too few bars or no dated set), {universe.Unavailable} dated when too few shares could be ranked"));
             }
 
+            if (options.ByUniverse)
+            {
+                // BK-11b: the auto option of the tier proposer; OFF unless the owner switched it on, and it proposes a hypothesis, nothing more
+                var autoHandler = scope.ServiceProvider.GetService<ICommandHandler<AutoProposeUniverseLinksCommand, AutoProposeOutcome>>();   // registered in every host; a host without it simply has no auto option
+                var auto = autoHandler is null ? null : await autoHandler.HandleAsync(new AutoProposeUniverseLinksCommand(options.Sources), cancellationToken);
+                if (auto is null)
+                {
+                    // nothing to propose with
+                }
+                else if (auto.IsSuccess && auto.Value.Enabled)
+                {
+                    await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"universe proposals (auto): {auto.Value.Proposed} proposed as actor auto, {auto.Value.AlreadyProposed} already proposed, {auto.Value.NoBaseline} without a baseline run among --run{(auto.Value.LimitReached ? ", stopped at the open limit" : string.Empty)}"));
+                }
+                else if (auto.IsFailure)
+                {
+                    await console.Error.WriteLineAsync(SimulateOptions.Show(auto.Error.Code + ": " + auto.Error.Message));
+                }
+            }
+
             if (o.TauFloorShare is { } share)
             {
                 await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"shrinkage: {o.ShrunkRows} rows shrunk, {o.TauFloorRows} ({share:P0}) with the between-cell variance at its floor"));

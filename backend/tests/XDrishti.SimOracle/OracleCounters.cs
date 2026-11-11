@@ -100,6 +100,9 @@ public sealed record OracleCounters
 
     public int TurnoverBlocked { get; init; }
 
+    /// <summary>BK-11b: candidates refused because the instrument was not a member on the entry date. Always 0 here.</summary>
+    public int NotMember { get; init; }
+
     /// <summary>The sum of two counter sets, property by property.</summary>
     public OracleCounters Plus(OracleCounters other) => new()
     {
@@ -149,5 +152,6 @@ public sealed record OracleCounters
         EventExitUnavailableTrades = EventExitUnavailableTrades + other.EventExitUnavailableTrades,
         TierExcluded = TierExcluded + other.TierExcluded,
         TurnoverBlocked = TurnoverBlocked + other.TurnoverBlocked,
+        NotMember = NotMember + other.NotMember,
     };
 }

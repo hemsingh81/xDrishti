@@ -35,7 +35,8 @@ internal sealed class UniverseSettingsStore(NpgsqlDataSource dataSource) : IUniv
         var settings = new UniverseSettings(
             Int(current, UniverseSettingsRules.MinTradesChildKey, defaults.MinTradesChild),
             Int(current, UniverseSettingsRules.LinkMinTradesKey, defaults.LinkMinTrades),
-            current.TryGetValue(UniverseSettingsRules.RegisteredBasketsKey, out var list) ? UniverseSettingsRules.ParseList(list) : defaults.RegisteredBaskets);
+            current.TryGetValue(UniverseSettingsRules.RegisteredBasketsKey, out var list) ? UniverseSettingsRules.ParseList(list) : defaults.RegisteredBaskets,
+            current.TryGetValue(UniverseSettingsRules.AutoProposeKey, out var auto) && string.Equals(auto, "true", StringComparison.Ordinal));
         return new UniverseSettingsState(settings, history, history.Count == 0 ? 0 : history[0].Id);
     }
 

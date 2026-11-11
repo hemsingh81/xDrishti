@@ -18,6 +18,9 @@ public static class SimulationErrors
     /// <summary>The basket of a run does not exist, is a portfolio basket or is archived (P3-04a D2).</summary>
     public const string BasketNotFoundCode = "simulation.basket_not_found";
 
+    /// <summary>A run asked for the dated members of a basket that has no dated membership for the window start (BK-11b): never labelled dated with today's members.</summary>
+    public const string MembersNotDatedCode = "simulation.members_not_dated";
+
     /// <summary>The charge sheet a request names is not stored, or its id is a <c>test-</c> one (P3-03f F2).</summary>
     public const string CostSheetNotFoundCode = "simulation.cost_sheet_not_found";
 
@@ -140,6 +143,14 @@ public static class SimulationErrors
         {
             Fields = [new FieldError("costs.sheet_id", $"has no rates before {firstEffective:yyyy-MM-dd}.", null, CostSheetNotEffectiveCode)],
         };
+
+    /// <summary>The refusal of <c>membersBasis</c> dated on a basket without dated membership for the window start (BK-11b); names the first dated day when there is one, and says the owner can rerun with <c>single_snapshot</c>.</summary>
+    public static Error MembersNotDated(DateOnly? firstDay) => Error.Validation(
+        MembersNotDatedCode,
+        (firstDay is { } day
+            ? "The basket has dated membership only from " + day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + " (or on fewer than two days), not for the start of the window."
+            : "The basket has no dated membership.")
+        + " Run with the members as of the run date (single_snapshot) instead; a run is never called dated with today's members.");
 
     public static readonly Error BasketNotFound = Error.NotFound(BasketNotFoundCode, "The basket does not exist, is a portfolio basket or is archived; a simulation runs over a manual basket that is not archived.");
 }

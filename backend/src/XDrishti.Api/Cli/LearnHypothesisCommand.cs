@@ -98,6 +98,8 @@ internal static class LearnHypothesisCommand
     {
         Result<HypothesisMoveOutcome> result = o.Action switch
         {
+            "propose" when o.UniverseLink is not null => await p.GetRequiredService<ICommandHandler<ProposeFromUniverseLinkCommand, HypothesisMoveOutcome>>()
+                .HandleAsync(new ProposeFromUniverseLinkCommand(o.UniverseLink, o.Baseline!, o.Reason, Actor, o.Window), cancellationToken),
             "propose" => await p.GetRequiredService<ICommandHandler<ProposeHypothesisCommand, HypothesisMoveOutcome>>()
                 .HandleAsync(new ProposeHypothesisCommand(o.Source, o.Cell, o.Knob!, o.Reason, o.Baseline!, o.Grid, Actor), cancellationToken),
             "start" => await p.GetRequiredService<ICommandHandler<StartHypothesisCommand, HypothesisMoveOutcome>>()

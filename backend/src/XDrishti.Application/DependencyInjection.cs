@@ -970,6 +970,9 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RevertChangelogCommand, ChangelogOutcome>, RevertChangelogHandler>(); // a revert is a new row (P6-08)
         services.AddScoped<IQueryHandler<ListChangelogQuery, Result<IReadOnlyList<ChangelogEntryView>>>, ListChangelogHandler>();
         services.AddScoped<IQueryHandler<GetChangelogEntryQuery, Result<ChangelogEntryView>>, GetChangelogEntryHandler>();
+        services.AddScoped<UniverseLinkProposer>(); // the one place a tier observation becomes a hypothesis: the owner's act and the auto option write the same row (BK-11b)
+        services.AddScoped<ICommandHandler<ProposeFromUniverseLinkCommand, HypothesisMoveOutcome>, ProposeFromUniverseLinkHandler>(); // proposes one hypothesis from a stable tier observation; applies nothing (BK-11b)
+        services.AddScoped<ICommandHandler<AutoProposeUniverseLinksCommand, AutoProposeOutcome>, AutoProposeUniverseLinksHandler>(); // the auto option, OFF by default, actor auto (BK-11b)
         services.AddScoped<ICommandHandler<ProposeHypothesisCommand, HypothesisMoveOutcome>, ProposeHypothesisHandler>(); // a hypothesis written down: one knob, owner or grid (P6-10, ADR 0076)
         services.AddScoped<ICommandHandler<MoveHypothesisCommand, HypothesisMoveOutcome>, MoveHypothesisHandler>(); // approve, reject, expire, accept by the state table
         services.AddScoped<ICommandHandler<StartHypothesisCommand, HypothesisMoveOutcome>, StartHypothesisHandler>(); // attach the candidate run after the one-variable check
