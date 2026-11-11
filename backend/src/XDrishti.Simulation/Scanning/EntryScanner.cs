@@ -39,6 +39,12 @@ public sealed class EntryScanner
     private readonly long[] _false;
     private readonly long[] _unknown;
     private readonly long[] _notReady;
+
+    private readonly bool[] _readsStored;
+
+    private long _featureUnknown;
+
+    private bool _stepCounted;
     private readonly int _setupCount;
     private readonly int _invalidateFrom;
     private readonly int[] _readyHandles;
@@ -101,6 +107,7 @@ public sealed class EntryScanner
         _false = new long[items.Count];
         _unknown = new long[items.Count];
         _notReady = new long[items.Count];
+        _readsStored = [.. items.Select(i => i.Condition.Features.Any(f => f.Name is "mom_rank" or "rs_vs_index" or "sector_rs"))];
         _setupCount = side.Setup?.Items.Count ?? 0;
         _invalidateFrom = _setupCount + side.Trigger.Items.Count;
         _readyHandles = [.. Enumerable.Range(0, _invalidateFrom).SelectMany(i => _itemHandles[i]).Distinct()];
@@ -152,7 +159,8 @@ public sealed class EntryScanner
                 _invalidatedDays,
                 _stopNotReady,
                 _unknownInvalidation,
-                Array.AsReadOnly(conditions));
+                Array.AsReadOnly(conditions),
+                _featureUnknown);
         }
     }
 
@@ -162,7 +170,7 @@ public sealed class EntryScanner
     /// evaluation on a week or a month, are refused by name. A side that reads the market context needs <paramref name="context"/> (P3-lift): the frame is refused without it. A side that names <c>days_to_results</c> or <c>days_since_results</c> needs <paramref name="resultsDays"/> (P15-05): the frame is refused on <c>options.resultsDays</c> without it. A 1D evaluation is accepted (ADR 0043): its decision is taken at the step of the 15:29 minute.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="side"/> is null.</exception>
-    public static Result<EntryScanner> Create(CompiledSide side, InstrumentRef instrument, TradingCalendar? calendar = null, ScanContext? context = null, ResultsDaysScan? resultsDays = null)
+    public static Result<EntryScanner> Create(CompiledSide side, InstrumentRef instrument, TradingCalendar? calendar = null, ScanContext? context = null, ResultsDaysScan? resultsDays = null, RelativeStrengthScan? relativeStrength = null)
     {
         ArgumentNullException.ThrowIfNull(side);
         if (side.EvaluationTimeframe >= Timeframe.W1)
@@ -175,7 +183,7 @@ public sealed class EntryScanner
             return Result.Failure<EntryScanner>(Error.Validation(ScannerCodes.StopUnsupported, problem));
         }
 
-        var created = FeatureFrame.Create(side.Features, new FrameOptions(calendar, Math.Max(side.HistoryDepth, 1), side.NeedsContext ? context?.Context : null, ResultsDays: ResultsDaysScan.Reads(side) ? resultsDays?.Days : null));
+        var created = FeatureFrame.Create(side.Features, new FrameOptions(calendar, Math.Max(side.HistoryDepth, 1), side.NeedsContext ? context?.Context : null, ResultsDays: ResultsDaysScan.Reads(side) ? resultsDays?.Days : null, RelativeStrength: RelativeStrengthScan.Reads(side) ? relativeStrength?.Days : null));
         if (created.IsFailure)
         {
             return Result.Failure<EntryScanner>(created.Error);
@@ -215,6 +223,7 @@ public sealed class EntryScanner
         }
 
         _decisionSteps++;
+        _stepCounted = false;
         var closedNow = _frame.ClosedBarsAt(_timeframe);
         if (closedNow > 1)
         {
@@ -353,6 +362,13 @@ public sealed class EntryScanner
                     _false[i]++;
                     break;
                 default:
+                    if (_readsStored[i] && !_stepCounted)
+                    {
+                        // once per decision step, whatever the number of conditions that name a stored feature (BK-09, feature_unknown)
+                        _featureUnknown++;
+                        _stepCounted = true;
+                    }
+
                     if (AnyEmpty(_itemHandles[i]))
                     {
                         _notReady[i]++;

@@ -47,7 +47,8 @@ internal sealed class RunSimulationHandler(
     IRandomEntryEngine randomEntries,
     IPlaceboEngine placeboEngine,
     IEntryTierSource? entryTiers = null,
-    ICostStressSettings? costStress = null) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>
+    ICostStressSettings? costStress = null,
+    IRelativeStrengthRunSource? relativeStrength = null) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>
 {
     private readonly InstrumentInputReader _reader = new(bars, barQueries, adjustments);
 
@@ -263,7 +264,9 @@ internal sealed class RunSimulationHandler(
             basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough, days, events, resultsDays, entryTiers, request.Fills?.ConservativeSlippage == true);
         }
 
-        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext, days, events, resultsDays, prepared.Value.ReadsTurnover);
+        // BK-09: a strategy that names mom_rank, rs_vs_index or sector_rs gets the stored rows of the previous closed sessions, read once per instrument; the step being off means there are none and every instrument is skipped with a reason.
+        var strength = prepared.Value.ReadsRelativeStrength && relativeStrength is not null ? await relativeStrength.BeginAsync(targets.Ids, request.To, cancellationToken) : null;
+        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext, days, events, resultsDays, prepared.Value.ReadsTurnover, strength);
         var readTime = time.GetElapsedTime(started);
         var replayTime = TimeSpan.Zero;
         var candidates = prepared.Value.Candidates;
@@ -337,7 +340,8 @@ internal sealed class RunSimulationHandler(
                 days is null ? null : ContextFingerprint.Of(days, request.To),
                 events is null ? null : new EventFilterRecord(events.Sha256, events.RowCount, events.LagMinutes, EventCalendarSnapshot.RuleVersion),
                 resultsDays is null ? null : new ResultsDaysRecord(resultsDays.Calendar?.Sha256 ?? "-", resultsDays.Calendar?.RowCount ?? 0, resultsDays.FilingsSha256, resultsDays.FilingCount, resultsDays.LagMinutes, ResultsDaySeries.Version, resultsDays.Surprises?.Sha256, resultsDays.Surprises?.Rows ?? 0, resultsDays.Surprises is null ? null : SurpriseInputs.Version, resultsDays.Surprises?.UnverifiedRows ?? 0, resultsDays.Surprises?.Seasons ?? 0, resultsDays.Surprises?.ThinSeasons ?? 0, missed.Missed, missed.Total),
-                Purpose: request.Purpose);
+                Purpose: request.Purpose,
+                RelativeStrength: context.RelativeStrength?.Record(replays[k].Sum(r => r.Record.Scans.Sum(s => s.FeatureUnknown))));
             firstHeader ??= header;
             runs.Add(RunAssembler.Assemble(header, replays[k]));
         }
@@ -497,9 +501,10 @@ internal sealed class RunSimulationHandler(
 
         var request = context.Request;
         var (raw, factors) = await _reader.ReadAsync(id, request.To, cancellationToken);
-        return InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.ContextDays, context.ContextDays is { Count: > 0 } ? null : (context.ContextDays is null ? null : "no_context"), context.Events, context.ResultsDays,
+        var built = InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.ContextDays, context.ContextDays is { Count: > 0 } ? null : (context.ContextDays is null ? null : "no_context"), context.Events, context.ResultsDays,
             request.Fills?.ConservativeSlippage == true && entryTiers is not null ? await entryTiers.ForAsync(id, request.From, request.To, cancellationToken) : null,
             context.ReadsTurnover && entryTiers is not null ? await entryTiers.TurnoverForAsync(id, request.From, request.To, cancellationToken) : null);
+        return context.RelativeStrength is { } strength ? built with { RelativeStrength = await strength.ReadAsync(id, request.From, cancellationToken) } : built;
     }
 
     private sealed record Universe(UniverseKind Kind, Guid? BasketId, string? BasketName, string Label, IReadOnlyList<Guid> Ids, IReadOnlyDictionary<Guid, BarsInstrument>? Known);
@@ -514,5 +519,6 @@ internal sealed class RunSimulationHandler(
         IReadOnlyList<ContextDayRecord>? ContextDays,
         EventCalendarSnapshot? Events,
         ResultsDayInputs? ResultsDays = null,
-        bool ReadsTurnover = false);
+        bool ReadsTurnover = false,
+        IRelativeStrengthRun? RelativeStrength = null);
 }

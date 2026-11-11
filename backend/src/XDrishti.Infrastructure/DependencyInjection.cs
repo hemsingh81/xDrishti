@@ -23,6 +23,7 @@ using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Market.Quality;
+using XDrishti.Application.Abstractions.Market.Strength;
 using XDrishti.Application.Abstractions.OptionBackfill;
 using XDrishti.Application.Abstractions.OptionChain;
 using XDrishti.Application.Abstractions.Paper;
@@ -36,6 +37,7 @@ using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Application.Abstractions.Ticks;
 using XDrishti.Application.Execution;
 using XDrishti.Application.Market.Bars.Dhan;
+using XDrishti.Application.Market.Strength;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Reporting;
@@ -61,6 +63,7 @@ using XDrishti.Infrastructure.Market.Calendar;
 using XDrishti.Infrastructure.Market.Context;
 using XDrishti.Infrastructure.Market.Live;
 using XDrishti.Infrastructure.Market.Quality;
+using XDrishti.Infrastructure.Market.Strength;
 using XDrishti.Infrastructure.OptionBackfill;
 using XDrishti.Infrastructure.OptionChain;
 using XDrishti.Infrastructure.OptionQuality;
@@ -665,6 +668,9 @@ public static class DependencyInjection
         services.AddScoped<IContextBarSource, ContextBarSource>();
         services.AddScoped<IContextDayStore, ContextDayStore>();
         services.AddScoped<IBreadthSource, BreadthSource>();
+        services.AddOptions<RelativeStrengthSettings>().Bind(configuration.GetSection(RelativeStrengthSettings.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the relative-strength step: OFF by default, the catch-up and the minimum samples (spec BK-09, ADR 0263)
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<RelativeStrengthSettings>>().Value);
+        services.AddScoped<IRelativeStrengthStore, RelativeStrengthStore>(); // the relative-strength tables, insert-once (BK-09)
         services.AddScoped<IContextFigures, ContextFiguresAdapter>();
         services.AddSingleton<ICsvFolder, CsvFolder>();
         services.AddSingleton<IDataJobChannel, DataJobChannel>();

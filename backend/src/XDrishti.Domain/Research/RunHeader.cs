@@ -20,4 +20,5 @@ public sealed record RunHeader(
     string? ContextSha256 = null,
     EventFilterRecord? Events = null,
     ResultsDaysRecord? ResultsDays = null,
-    RunPurpose Purpose = RunPurpose.Research);
+    RunPurpose Purpose = RunPurpose.Research,
+    RelativeStrengthRecord? RelativeStrength = null);

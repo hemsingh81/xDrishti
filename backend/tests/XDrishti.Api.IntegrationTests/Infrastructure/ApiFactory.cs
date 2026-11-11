@@ -463,6 +463,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.bar_coverage;
                 DELETE FROM market.derived_definitions;
                 DELETE FROM market.basket_param_sets;
+                DELETE FROM market.relative_strength_daily;
+                DELETE FROM market.sector_strength_daily;
                 DELETE FROM market.basket_member_scores;
                 DELETE FROM market.basket_versions;
                 DELETE FROM market.basket_fetches;

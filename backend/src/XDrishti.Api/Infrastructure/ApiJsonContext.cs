@@ -44,6 +44,7 @@ using XDrishti.Application.Market.Context;
 using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
+using XDrishti.Application.Market.Strength;
 using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.OptionBackfill;
 using XDrishti.Application.OptionChain;
@@ -326,6 +327,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ReportBenchmarksView))]
 [JsonSerializable(typeof(BasketProfileView))]
 [JsonSerializable(typeof(BasketRankingView))]
+[JsonSerializable(typeof(RelativeStrengthView))]
 [JsonSerializable(typeof(SimReportJobsView))]
 [JsonSerializable(typeof(TrainingCompletenessView))]
 [JsonSerializable(typeof(PlanVsActualView))]

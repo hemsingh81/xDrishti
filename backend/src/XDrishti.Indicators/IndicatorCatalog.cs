@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Market.Strength;
 
 namespace XDrishti.Indicators;
 
@@ -228,6 +229,30 @@ public static class IndicatorCatalog
                 _ => DateFeature.WarmUpDays(captured, defaults), _ => new DateFeature(captured),
                 dateFeature: kind, requiresContext: DateFeature.ReadsContext(kind), requiresExpiryDays: kind == DateFeatureKind.ExpiryDay, requiresResultsDays: kind is DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults or DateFeatureKind.ResultsSueQuintile or DateFeatureKind.ResultsCar3Quintile));
         }
+
+        AddRelativeStrength(list);
+    }
+
+    /// <summary>The three relative-strength features of BK-09: stored numbers of the previous closed session, with parameters that are a closed pre-registered set (no free parameter, so no grid search by accident).</summary>
+    private static void AddRelativeStrength(List<IndicatorInfo> list)
+    {
+        var lookbacks = new IndicatorParameter("lookback", ParameterKind.Whole, 126, 252, 126, [126, 252]);
+        var skip = new IndicatorParameter("skip", ParameterKind.Whole, 21, 21, 21, [21]);
+        var basket = new IndicatorParameter("basket", ParameterKind.Whole, 1, StrengthBaskets.Names.Count, 2, StrengthBaskets.Codes);
+        var days = new[] { new IndicatorParameter("n", ParameterKind.Whole, 20, 20, 20, [20]) };
+        var window = new[] { new IndicatorParameter("window", ParameterKind.Whole, 21, 126, 63, [21, 63, 126]) };
+        list.Add(new IndicatorInfo(
+            "mom_rank", "Percent rank (0 to 1) of the share's volatility-adjusted momentum inside a pre-registered basket (written by name, such as \"Nifty 100\"), lookback 126 or 252 sessions skipping the latest 21, as of the previous closed session; not ready when the rank is insufficient (BK-09).",
+            [basket, lookbacks, skip], SessionBehaviour.Continuous, false, PriceSource.Close, false,
+            _ => 1, _ => new DateFeature(DateFeatureKind.MomRank), dateFeature: DateFeatureKind.MomRank, requiresRelativeStrength: true));
+        list.Add(new IndicatorInfo(
+            "rs_vs_index", "The share's 20-session return minus the Nifty 50's, in percentage points, as of the previous closed session; not ready when either is missing (BK-09).",
+            days, SessionBehaviour.Continuous, false, PriceSource.Close, false,
+            _ => 1, _ => new DateFeature(DateFeatureKind.RsVsIndex), dateFeature: DateFeatureKind.RsVsIndex, requiresRelativeStrength: true));
+        list.Add(new IndicatorInfo(
+            "sector_rs", "Rank (1 is the strongest) of the share's sector among the sectors by equal-weight member return over 21, 63 or 126 sessions, as of the previous closed session; not ready for a sector with fewer than 5 members (BK-09).",
+            window, SessionBehaviour.Continuous, false, PriceSource.Close, false,
+            _ => 1, _ => new DateFeature(DateFeatureKind.SectorRs), dateFeature: DateFeatureKind.SectorRs, requiresRelativeStrength: true));
     }
 
     private static SpecProblem? FastBelowSlow(FeatureSpec spec) =>

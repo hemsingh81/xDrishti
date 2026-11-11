@@ -61,6 +61,7 @@ using XDrishti.Application.Market.Context;
 using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
+using XDrishti.Application.Market.Strength;
 using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.OptionBackfill;
 using XDrishti.Application.OptionChain;
@@ -546,6 +547,9 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ComputeBreadthCommand, BreadthComputed>, ComputeBreadthHandler>(); // the breadth of the owner's tracked shares, set once per context day (P3-01e)
         services.AddScoped<ICommandHandler<RebuildBreadthCommand, BreadthRebuilt>, RebuildBreadthHandler>();
         services.AddScoped<IContextUpkeep, ContextUpkeep>();
+        services.AddScoped<ICommandHandler<ComputeRelativeStrengthCommand, RelativeStrengthComputed>, ComputeRelativeStrengthHandler>(); // the relative strength of the missing sessions, insert-once, OFF by default (BK-09, ADR 0263)
+        services.AddScoped<IRelativeStrengthRunSource, RelativeStrengthRunReader>(); // what a Lab run reads of the stored rows (BK-09)
+        services.AddScoped<IQueryHandler<GetRelativeStrengthQuery, Result<RelativeStrengthView>>, GetRelativeStrengthHandler>();
         services.AddScoped<IQueryHandler<GetContextCoverageQuery, ContextCoverageView>, GetContextCoverageHandler>();
         services.AddScoped<IQueryHandler<GetRegimeLabelsQuery, Result<RegimeLabelsView>>, GetRegimeLabelsHandler>(); // the regime label of each session, read before the day (P6-02, ADR 0146)
         services.AddScoped<IQueryHandler<GetCalendarQuery, Result<CalendarView>>, GetCalendarHandler>();

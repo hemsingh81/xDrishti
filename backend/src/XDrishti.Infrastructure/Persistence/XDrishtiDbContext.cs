@@ -72,6 +72,10 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<XDrishti.Infrastructure.Market.DerivedBaskets.BasketMemberScoreRecord> BasketMemberScores => Set<XDrishti.Infrastructure.Market.DerivedBaskets.BasketMemberScoreRecord>();
 
+    internal DbSet<XDrishti.Infrastructure.Market.Strength.RelativeStrengthRecord> RelativeStrengths => Set<XDrishti.Infrastructure.Market.Strength.RelativeStrengthRecord>();
+
+    internal DbSet<XDrishti.Infrastructure.Market.Strength.SectorStrengthRecord> SectorStrengths => Set<XDrishti.Infrastructure.Market.Strength.SectorStrengthRecord>();
+
     internal DbSet<XDrishti.Infrastructure.Market.DerivedBaskets.DerivedDefinitionRecord> DerivedDefinitions => Set<XDrishti.Infrastructure.Market.DerivedBaskets.DerivedDefinitionRecord>();
 
     internal DbSet<XDrishti.Infrastructure.Market.DerivedBaskets.BasketParamSetRecord> BasketParamSets => Set<XDrishti.Infrastructure.Market.DerivedBaskets.BasketParamSetRecord>();

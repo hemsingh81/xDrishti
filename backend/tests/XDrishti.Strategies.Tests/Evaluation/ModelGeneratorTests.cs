@@ -196,7 +196,7 @@ public sealed class ModelGeneratorTests
     }
 
     [Fact]
-    public void All_61_catalog_names_are_read_by_the_generated_conditions()
+    public void All_61_catalog_names_but_the_three_stored_row_ones_are_read_by_the_generated_conditions()
     {
         var names = new HashSet<string>();
         foreach (var evaluation in Timeframes.All)
@@ -211,9 +211,9 @@ public sealed class ModelGeneratorTests
             }
         }
 
-        var missing = IndicatorCatalog.All.Select(i => i.Name).Where(n => !names.Contains(n)).ToList();
+        var missing = IndicatorCatalog.All.Where(i => !i.RequiresRelativeStrength).Select(i => i.Name).Where(n => !names.Contains(n)).ToList();
 
-        IndicatorCatalog.All.Count.ShouldBe(61);
+        IndicatorCatalog.All.Count.ShouldBe(64);
         missing.ShouldBeEmpty("never read: " + string.Join(", ", missing));
     }
 

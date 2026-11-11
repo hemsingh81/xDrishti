@@ -1,0 +1,24 @@
+strategy:
+  schema: 1
+  id: RS_ROTATION
+  style: swing
+  timeframes:
+    - 1D
+  sides:
+    - BUY
+  params:
+    rr: 2
+  trigger:
+    all:
+      - "mom_rank(\"Nifty 100\", 126, 21) >= 0.67"
+      - "sector_rs(63) <= 3"
+  entry:
+    type: at_close
+  stop:
+    type: swing_low
+    lookback: 5
+  exits:
+    - policy: FIXED_RR
+      rr: [rr]
+  time_rules:
+    max_hold_sessions: 5

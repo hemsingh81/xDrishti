@@ -137,6 +137,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, PaperPhaseCheckEndpoints>(); // the paper phase check (P10-06): one GET, computed on read
         services.AddSingleton<IEndpointModule, TicketAlertsEndpoints>(); // price-crossing alerts and prompts on the plan screen (P7-20); preferences only, no order
         services.AddSingleton<IEndpointModule, ReportsEndpoints>();
+        services.AddSingleton<IEndpointModule, MarketStrengthEndpoints>(); // the stored relative-strength rows (BK-09): one GET, read only
         services.AddSingleton<IEndpointModule, ReportsPhaseCheckEndpoints>(); // the P8 phase check (P8-17): one GET, computed on read
         services.AddSingleton<IEndpointCatalogue, EndpointCatalogue>(); // the route table for the phase check's read-only criterion
         services.AddSingleton<IEndpointModule, AutonomyEndpoints>();

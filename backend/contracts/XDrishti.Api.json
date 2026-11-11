@@ -16605,6 +16605,53 @@
         }
       }
     },
+    "/api/market/relative-strength": {
+      "get": {
+        "tags": [
+          "Market"
+        ],
+        "summary": "The stored relative-strength rows, newest session first, at most 500: per share and pre-registered basket the volatility-adjusted momentum score and its percent rank (0 to 1) for the lookbacks 126 and 252 skipping the latest 21 sessions, with the number ranked, the state (value, insufficient, not_evaluable, unavailable, short_history, corporate_action_unresolved) and the membership basis (dated, or single_snapshot with survivorship). A rank is a number only for a value. Takes basket (an id or one of the names Nifty 50, Nifty 100, F&O stocks, Most liquid) and asOf (yyyy-MM-dd, the last closed session the row is as of). Read only; the rows are written once by the daily step, which is off until Market:RelativeStrength:Enabled. 400 market.relative_strength.invalid.",
+        "operationId": "GetRelativeStrength",
+        "parameters": [
+          {
+            "name": "basket",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asOf",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelativeStrengthView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports/phase-check": {
       "get": {
         "tags": [
@@ -61445,6 +61492,88 @@
         },
         "description": "The relative strength return over a window of sessions (fraction)."
       },
+      "RelativeStrengthRowView": {
+        "required": [
+          "asOf",
+          "instrumentId",
+          "basketId",
+          "lookback",
+          "skip",
+          "score",
+          "pctRank",
+          "nRanked",
+          "state",
+          "membershipBasis"
+        ],
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date"
+          },
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "basketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lookback": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skip": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "score": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "pctRank": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "nRanked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "membershipBasis": {
+            "type": "string"
+          }
+        },
+        "description": "One stored row. `basketId` is the empty id for the index-relative row (lookback 20; `score` is percentage points)."
+      },
+      "RelativeStrengthView": {
+        "required": [
+          "items",
+          "cap"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelativeStrengthRowView"
+            }
+          },
+          "cap": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The rows and the cap they were cut at."
+      },
       "ReleaseHaltRequest": {
         "required": [
           "reason",
@@ -71861,6 +71990,9 @@
     },
     {
       "name": "Reports"
+    },
+    {
+      "name": "Market"
     },
     {
       "name": "Autonomy"

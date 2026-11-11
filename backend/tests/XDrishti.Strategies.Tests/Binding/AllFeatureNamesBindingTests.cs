@@ -19,8 +19,8 @@ public sealed class AllFeatureNamesBindingTests
     [Fact]
     public void The_table_of_forms_has_one_form_for_each_of_the_60_names_of_the_catalog()
     {
-        IndicatorCatalog.All.Count.ShouldBe(61);
-        AllFeatureForms.Forms.Count.ShouldBe(61);
+        IndicatorCatalog.All.Count.ShouldBe(64);
+        AllFeatureForms.Forms.Count.ShouldBe(64);
         AllFeatureForms.Forms.Keys.OrderBy(n => n, StringComparer.Ordinal).ShouldBe(IndicatorCatalog.All.Select(i => i.Name).OrderBy(n => n, StringComparer.Ordinal));
     }
 
@@ -55,7 +55,7 @@ public sealed class AllFeatureNamesBindingTests
             error.Message.ShouldContain("'" + name + "'", Case.Sensitive, "names the feature");
             error.Message.ShouldContain(timeframe.ToCode(), Case.Sensitive, "names the timeframe");
         }
-        else if (FeatureFrame.Create([expected], new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>(), ResultsDays: new Dictionary<DateOnly, ResultsDayValues>())).IsFailure)
+        else if (FeatureFrame.Create([expected], new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>(), ResultsDays: new Dictionary<DateOnly, ResultsDayValues>(), RelativeStrength: RelativeStrengthDays.Empty)).IsFailure)
         {
             // the default of a parameter can be refused on a longer timeframe (an opening range of 15 minutes is not a whole number of 30m or 1h bars)
             result.Errors.ShouldHaveSingleItem().Code.ShouldBe(LintCodes.BadArguments);

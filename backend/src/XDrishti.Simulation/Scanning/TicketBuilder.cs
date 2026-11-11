@@ -52,6 +52,7 @@ public static class TicketBuilder
             return Unavailable(symbol, strategy.SideText, side.StrategyId, strategy.Hash, session, "the session " + Date(session) + " is not complete in the bars (its last minute is missing)");
         }
 
+        // shortcut: the stored relative-strength rows (BK-09) are not given here, so a side that names mom_rank, rs_vs_index or sector_rs is refused by the frame (options.relativeStrength): the card and the ticket explanation fail closed for it
         var created = FeatureFrame.Create(side.Features, new FrameOptions(calendar, Math.Max(side.HistoryDepth, 1)));
         if (created.IsFailure)
         {

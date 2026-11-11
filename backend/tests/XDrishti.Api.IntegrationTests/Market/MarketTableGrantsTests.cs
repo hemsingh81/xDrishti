@@ -90,6 +90,18 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
             await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, $"DELETE FROM market.{table}"), PostgresErrorCodes.InsufficientPrivilege);
         }
 
+        // BK-09: the relative-strength tables are insert-only for the runtime role (insert and select, no update, no delete).
+        await ExecuteAsync(connection, "INSERT INTO market.relative_strength_daily (as_of, instrument_id, basket_id, lookback, skip, score, pct_rank, n_ranked, state, membership_basis) VALUES ('2026-01-02', '00000000-0000-7000-8000-00000000a001', '00000000-0000-0000-0000-000000000000', 20, 0, 1.5, NULL, 0, 'value', 'none')");
+        await ExecuteAsync(connection, "INSERT INTO market.sector_strength_daily (as_of, sector, window_sessions, ret, rank, n_members, state) VALUES ('2026-01-02', 'Probe', 63, 0.03, 1, 5, 'value')");
+        foreach (var table in new[] { "relative_strength_daily", "sector_strength_daily" })
+        {
+            await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, $"UPDATE market.{table} SET state = 'unavailable'"), PostgresErrorCodes.InsufficientPrivilege);
+            await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, $"DELETE FROM market.{table}"), PostgresErrorCodes.InsufficientPrivilege);
+        }
+
+        await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "INSERT INTO market.relative_strength_daily (as_of, instrument_id, basket_id, lookback, skip, score, pct_rank, n_ranked, state, membership_basis) VALUES ('2026-01-02', '00000000-0000-7000-8000-00000000a001', '00000000-0000-0000-0000-000000000000', 20, 0, 1.5, NULL, 0, 'value', 'none')"), PostgresErrorCodes.UniqueViolation);
+        await AsOwnerAsync(connection, "DELETE FROM market.relative_strength_daily; DELETE FROM market.sector_strength_daily");
+
         await CheckSystemBasketCatalogueAsync(connection);
         await AsOwnerAsync(connection, "DELETE FROM market.basket_members; DELETE FROM market.baskets WHERE name = 'Probe'; DELETE FROM market.tracked_instruments");
         (await ScalarAsync(connection, "SELECT count(*) FROM market.baskets")).ShouldBe(49L); // the three of the design, the 26 seeded index baskets, the 14 derived ones and the 6 list baskets

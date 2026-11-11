@@ -41,6 +41,8 @@ internal readonly record struct ValueRange(double Minimum, double Maximum, bool 
             table[name] = new ValueRange(1, 5);
         }
 
+        table["mom_rank"] = new ValueRange(0, 1);
+        table["sector_rs"] = new ValueRange(1, double.PositiveInfinity);
         table["gap_pct"] = new ValueRange(-100, double.PositiveInfinity, MinimumIncluded: false);
         return table.ToFrozenDictionary(StringComparer.Ordinal);
     }

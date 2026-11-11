@@ -54,4 +54,13 @@ public enum DateFeatureKind
 
     /// <summary>Quintile 1 to 5 of the <c>results_car3</c> of the newest results filing visible at the start of the India date of the step, by the breakpoints of the previous complete season, as of the <b>close</b> of that date (P15-09); NaN when unknown. Read from <see cref="FrameOptions.ResultsDays"/>.</summary>
     ResultsCar3Quintile,
+
+    /// <summary>Volatility-adjusted momentum percent rank (0 to 1) of the instrument inside a pre-registered basket, as of the previous closed session (BK-09); NaN when the stored state is not a value. Read from <see cref="FrameOptions.RelativeStrength"/>.</summary>
+    MomRank,
+
+    /// <summary>The instrument's 20-session return minus the Nifty 50's, in percentage points, as of the previous closed session (BK-09); NaN when unavailable. Read from <see cref="FrameOptions.RelativeStrength"/>.</summary>
+    RsVsIndex,
+
+    /// <summary>The rank (1 is the strongest) of the instrument's sector by its equal-weight member return over the window, as of the previous closed session (BK-09); NaN when the sector has no rank. Read from <see cref="FrameOptions.RelativeStrength"/>.</summary>
+    SectorRs,
 }

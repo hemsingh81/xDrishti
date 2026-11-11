@@ -62,7 +62,8 @@ public static class RunAssembler
             header.Costs,
             header.Events,
             header.ResultsDays,
-            header.Purpose == RunPurpose.Training);
+            header.Purpose == RunPurpose.Training,
+            header.RelativeStrength);
     }
 
     /// <summary>
@@ -126,6 +127,11 @@ public static class RunAssembler
         if (header.ResultsDays is { } days)
         {
             Line(text, "rdays", days.CalendarSha256 + "|" + days.FilingsSha256 + "|" + CanonicalText.Number(days.LagMinutes) + "|" + days.RdsVersion + (days.SurpriseSha256 is { } surprise ? "|" + surprise + "|" + days.SbpVersion : string.Empty));   // only a run that names a results-days feature has this line (P15-05); the surprise part only for a quintile feature (P15-09)
+        }
+
+        if (header.RelativeStrength is { } strength)
+        {
+            Line(text, "rstrength", strength.Sha256 + "|" + strength.Version + "|" + Date(strength.MembersAsOf));   // only a run that names mom_rank, rs_vs_index or sector_rs has this line, so every other key is unchanged (BK-09)
         }
 
         if (header.Purpose == RunPurpose.Training)
