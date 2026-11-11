@@ -17,3 +17,7 @@ A basket with one membership snapshot is constant in time and survivorship biase
 ## Owner decision 2026-11-11
 
 Given in chat. The default benchmark of the basket profile is **Nifty 500** (not the portfolio's Nifty 50). Built in [BK-06c](../specs/BK-06c-nifty-500-default-benchmark-for-the-basket-profile.md): a basket-only setting, the portfolio benchmark (ADR 0020 §2) unchanged, and an honest `unavailable` state when Nifty 500 has no stored bars (never a silent fall-back to Nifty 50).
+
+## Build note BK-06c (2026-11-11)
+
+The default index is the basket setting `reports.basket_benchmark_instrument` (an instrument id; unset means Nifty 500), read through `IBasketBenchmark`; the portfolio benchmark (`portfolio.benchmark_instrument`, Nifty 50) is not read by the profile or the ranking. The index is found by canonical symbol `NSE:NIFTY_500` (`CanonicalSymbol.ForIndex("NIFTY 500")`) or the display name "Nifty 500", case-insensitively. A missing index or one without bars in the window makes every figure against it `unavailable` with the reason; there is no fall-back to Nifty 50, and a stored choice that left the master is reported missing rather than replaced. The cache key already holds the index id, so a change of default is never served from an old answer. `PUT /api/reports/basket-benchmark` (session and CSRF token, no password) stores the choice and audits it as `EssentialSettingChanged`.

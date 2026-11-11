@@ -44,7 +44,7 @@ export function ProfileHeader({ profile, from, to, onWindow }: ProfileHeaderProp
           {basisLine}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          {`Window ${formatDate(range.from)} to ${formatDate(range.to)} (${source}). Index: ${index.symbol ?? 'none is set'}${index.symbol ? (index.isDefault ? ' (the benchmark you track)' : ' (chosen)') : ''}.`}
+          {`Window ${formatDate(range.from)} to ${formatDate(range.to)} (${source}). Index: ${index.name ?? index.symbol ?? 'none is set'}${index.symbol ? (index.isDefault ? ' (default)' : ' (chosen)') : ''}.`}
         </Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ gap: 1.5, alignItems: { sm: 'center' } }}>
           <TextField

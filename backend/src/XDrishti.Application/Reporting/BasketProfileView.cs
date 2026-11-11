@@ -57,7 +57,7 @@ public sealed record ProfileMembersView(int Total, int Counted, IReadOnlyList<Pr
 public sealed record ProfileExclusionView(string Symbol, string Reason);
 
 /// <summary>The index in force: null symbol when there is none.</summary>
-public sealed record ProfileIndexView(Guid? Id, string? Symbol, bool IsDefault);
+public sealed record ProfileIndexView(Guid? Id, string? Symbol, bool IsDefault, string? Name = null);
 
 /// <summary>The series of the charts, one entry per index date. The basket and the index are rebased to 100 on the first date; an entry without a value is null (the index has no bar that day), never zero.</summary>
 public sealed record ProfileSeriesView(

@@ -131,7 +131,7 @@ public sealed class GetBasketProfileHandlerTests
         {
             m.State.ShouldBe("unavailable");
             m.Number.ShouldBeNull();
-            m.Reason!.ShouldContain("Portfolio");
+            m.Reason!.ShouldBe("Nifty 500 is not in the instrument master");
         }
 
         view.RelativeStrength.ShouldAllBe(r => r.Return.State == "unavailable");

@@ -48,4 +48,10 @@ One extra small read per uncached profile; no measurable change.
 
 ## Done when
 - [ ] Every criterion has evidence; `scripts/check.sh` green; `scripts/gen-api.sh`; reviewer: no blockers/majors
-- [ ] ADR 0257/0262 build note; roadmap row updated
+- [x] ADR 0257/0262 build note; roadmap row updated (the full gate and the reviewer pass belong to the caller)
+
+## Build notes (2026-11-11)
+- **UNVERIFIED resolved by reading the code.** The master names an index by `CanonicalSymbol.ForIndex(symbol name)`: upper case, runs of whitespace as `_`. So Nifty 500 is `NSE:NIFTY_500` (not `NSE:NIFTY500`), display "Nifty 500" in the Dhan style ("Nifty Midcap 150" is `NSE:NIFTY_MIDCAP_150`). The lookup takes the canonical symbol first and then the display name case-insensitively, so either spelling of the live master matches. Whether the **live** master carries the Nifty 500 index and stores its daily bars is not visible in the code (the test sample `dhan-master-sample.csv` has no Nifty 500 row): the owner tracks it (Open question 1), and until then the profile says "Nifty 500 is not in the instrument master" or "Nifty 500 has no stored daily bars in this window".
+- **Setting write path.** The spec lists the setting as owner-changeable with an audit row (AC 7) but no route; built as `PUT /api/reports/basket-benchmark` body `{instrumentId}` (index, listed, session and CSRF token, no password), audited as `EssentialSettingChanged` with `key=symbol (was ...)`. The catalog descriptor is Advanced, default text "Nifty 500".
+- **View shape.** `index` gains an optional `name` (additive) so the label reads "Nifty 500 (default)"; the assistant `basket_profile` body carries it because the view is serialised as is.
+- **Reasons.** `BasketProfileMapper.NoBenchmark` now says "Nifty 500 is not in the instrument master" / "<name> has no stored daily bars in this window"; the older "track it in Portfolio" text is gone for the basket reads only (the P8-07 report benchmarks keep theirs).

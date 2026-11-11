@@ -34,7 +34,7 @@ export function buildProfile(over: Partial<Profile> = {}): Profile {
     membershipBasis: 'single_snapshot',
     membershipFrom: '2026-06-01',
     members: { total: 3, counted: 3, excluded: [] },
-    index: { id: '00000000-0000-4000-8000-0000000000f1', symbol: 'NIFTY', isDefault: true },
+    index: { id: '00000000-0000-4000-8000-0000000000f1', symbol: 'NSE:NIFTY_500', isDefault: true, name: 'Nifty 500' },
     hold: value(4),
     series: {
       dates,
@@ -196,7 +196,7 @@ export function buildRankingRow(over: Partial<Schemas['RankingRowView']> = {}): 
 export function buildRanking(over: Partial<Ranking> = {}): Ranking {
   return {
     window: { from: dates[0] ?? '', to: dates.at(-1) ?? '', source: 'query', fromSource: 'query', toSource: 'query' },
-    index: { id: '00000000-0000-4000-8000-0000000000f1', symbol: 'NIFTY', isDefault: true },
+    index: { id: '00000000-0000-4000-8000-0000000000f1', symbol: 'NSE:NIFTY_500', isDefault: true, name: 'Nifty 500' },
     rankWindow: 21,
     rows: [
       buildRankingRow(),

@@ -8,6 +8,7 @@ using XDrishti.Application.Abstractions.Market.Baskets;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Market.Search;
@@ -32,6 +33,8 @@ internal sealed class ProfileWorld
     public IBarQueries Bars { get; } = Substitute.For<IBarQueries>();
 
     public IPortfolioBenchmark Benchmark { get; } = Substitute.For<IPortfolioBenchmark>();
+
+    public IBasketBenchmark BasketBenchmark { get; } = Substitute.For<IBasketBenchmark>();
 
     public IPortfolioBasketSource Portfolio { get; } = Substitute.For<IPortfolioBasketSource>();
 
@@ -69,6 +72,7 @@ internal sealed class ProfileWorld
         Cache = new ProfileCache(Settings);
         Calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new ValueTask<XDrishti.Domain.Market.Calendar.TradingCalendar>(new XDrishti.Domain.Market.Calendar.TradingCalendar()));
         Benchmark.GetAsync(Arg.Any<CancellationToken>()).Returns(new ValueTask<ConfiguredBenchmark?>((ConfiguredBenchmark?)null));
+        BasketBenchmark.GetAsync(Arg.Any<CancellationToken>()).Returns(new ValueTask<BasketBenchmark>(new BasketBenchmark(null, true, "Nifty 500", "Nifty 500 is not in the instrument master")));
         Context.AsOfManyAsync(Arg.Any<IReadOnlyCollection<DateOnly>>(), Arg.Any<CancellationToken>()).Returns(call =>
             new ValueTask<IReadOnlyDictionary<DateOnly, ContextRead>>(call.ArgAt<IReadOnlyCollection<DateOnly>>(0).ToDictionary(d => d, _ => ContextRead.Not(ContextRead.NoContext))));
         Portfolio.ExistsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(new ValueTask<bool>(false));
@@ -141,8 +145,14 @@ internal sealed class ProfileWorld
 
     public static DateTimeOffset At(DateOnly day) => new(day.Year, day.Month, day.Day, 12, 0, 0, TimeSpan.FromMinutes(330));
 
-    public void IndexIsBenchmark(Guid index) =>
-        Benchmark.GetAsync(Arg.Any<CancellationToken>()).Returns(new ValueTask<ConfiguredBenchmark?>(new ConfiguredBenchmark(new BenchmarkInstrument(index, "NIFTY", "Nifty 50", "index", false, true, true), true)));
+    /// <summary>The index is the basket benchmark (the default Nifty 500 or, with isDefault false, the owner's choice); the portfolio benchmark is a different index so a read of the wrong one shows.</summary>
+    public void IndexIsBenchmark(Guid index, string symbol = "NIFTY", string name = "Nifty 500", bool isDefault = true)
+    {
+        var instrument = new BenchmarkInstrument(index, symbol, name, "index", false, true, true);
+        BasketBenchmark.GetAsync(Arg.Any<CancellationToken>()).Returns(new ValueTask<BasketBenchmark>(new BasketBenchmark(instrument, isDefault, name, null)));
+        Benchmark.FindAsync(index, Arg.Any<CancellationToken>()).Returns(new ValueTask<BenchmarkInstrument?>(instrument));
+        Benchmark.GetAsync(Arg.Any<CancellationToken>()).Returns(new ValueTask<ConfiguredBenchmark?>(new ConfiguredBenchmark(new BenchmarkInstrument(Guid.NewGuid(), "NSE:NIFTY", "Nifty 50", "index", false, true, true), true)));
+    }
 
     private BasketView? View(Guid id) => _baskets.TryGetValue(id, out var b)
         ? new BasketView(id, b.Name, "#fff", "trading", null, 0, _stays[id].Count(s => s.To is null), Now, b.Archived, "manual", false, null, null)
@@ -183,7 +193,7 @@ internal sealed class ProfileWorld
     private InstrumentSummary Summary(Guid id) =>
         new(id, Symbols[id], Symbols[id], Symbols[id], "share", null, null, "Banks", 1, null, null, false, false, false, TrackedInfo.Never);
 
-    public ProfileWindowResolver Resolver() => new(Bars, Benchmark, Calendar, Settings, Limits, Time);
+    public ProfileWindowResolver Resolver() => new(Bars, Benchmark, BasketBenchmark, Calendar, Settings, Limits, Time);
 
     public BasketMembershipLoader Memberships() => new(Baskets, Portfolio, Derived, Runs, Settings, Time);
 

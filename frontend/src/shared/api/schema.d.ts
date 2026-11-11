@@ -4810,7 +4810,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The performance profile of one basket (manual, portfolio or system) from its own stored daily bars against an index: the equal-weight, daily-rebalanced, price-return index rebased to 100 beside the index, volatility, drawdown, beta, alpha (the regression intercept, never a trading result), tracking error, capture, rolling beta, relative strength, breadth, dispersion and correlation inside the basket, contribution, the index by market regime, turnover, ADV20 and capacity, and the median split of the basket's strategy trades. Every figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) with a number only for a value, and the membership basis (dated, or a single snapshot with survivorship) and every instrument left out are named. Takes from and to (default the last 252 sessions ending at the newest stored daily bar of the index; window.source says which), index (instrument id; default the owner's benchmark) and membersAsOf (default the window end). A window under 20 sessions or a basket above the instrument cap is 422 reports.invalid; an unknown or archived basket 404 reports.not_found. Read only; the answer is cached by basket, membership, window, index and newest bar. */
+    /** The performance profile of one basket (manual, portfolio or system) from its own stored daily bars against an index: the equal-weight, daily-rebalanced, price-return index rebased to 100 beside the index, volatility, drawdown, beta, alpha (the regression intercept, never a trading result), tracking error, capture, rolling beta, relative strength, breadth, dispersion and correlation inside the basket, contribution, the index by market regime, turnover, ADV20 and capacity, and the median split of the basket's strategy trades. Every figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) with a number only for a value, and the membership basis (dated, or a single snapshot with survivorship) and every instrument left out are named. Takes from and to (default the last 252 sessions ending at the newest stored daily bar of the index; window.source says which), index (instrument id; default Nifty 500, or the index the owner chose with PUT /api/reports/basket-benchmark, never the portfolio benchmark; when it is missing from the master or has no bars every figure against it is unavailable with the reason) and membersAsOf (default the window end). A window under 20 sessions or a basket above the instrument cap is 422 reports.invalid; an unknown or archived basket 404 reports.not_found. Read only; the answer is cached by basket, membership, window, index and newest bar. */
     get: operations['GetBasketProfile'];
     put?: never;
     post?: never;
@@ -4881,6 +4881,23 @@ export interface paths {
     /** One stored simulated trade on its own bars (the replay of the drill-down): the trade facts in adjusted prices, its legs, the costing (figures only for a charge sheet the owner confirmed), the bars of its window at the chosen timeframe built on the server from the 1-minute bars and adjusted for the corporate actions applied now, a check that the stored entry still fits the bars (ok, entry_mismatch, no_bars), the decision-time features stored for the trade (a number only where one is stored) and the evidence block. Takes openAtEnd (default false), timeframe (1m, 5m, 15m, 1h, 1D; default 5m), before and after (sessions around the trade: 0 to 3, or 0 to 60 for 1D). A window above 5,000 bars is refused, never thinned. Read only. 422 reports.invalid or reports.window_too_large; 404 reports.not_found. */
     get: operations['GetTradeReplay'];
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/basket-benchmark': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Choose the index the basket profile and ranking compare with (default Nifty 500): body {instrumentId} of a listed index of the instrument master. Session and CSRF token, no password (it loosens nothing). Answers the index {id, symbol, isDefault, name}. 422 reports.invalid for no id, an unknown id, a non-index or a retired index. Audited; the portfolio benchmark is not changed. */
+    put: operations['SetBasketBenchmark'];
     post?: never;
     delete?: never;
     options?: never;
@@ -19736,6 +19753,7 @@ export interface components {
       id: null | string;
       symbol: null | string;
       isDefault: boolean;
+      name?: null | string;
     };
     /** @description Instruments in the basket in the window (`Total`), the ones the figures rest on (`Counted`) and every one left out with its reason (no_bars, starts_late, ends_early, discontinuity, bad_price, too_few_bars). */
     ProfileMembersView: {
@@ -22487,6 +22505,11 @@ export interface components {
     SetAutoScopeRequest: {
       basketIds: null | string[];
       instrumentIds: null | string[];
+    };
+    /** @description The body of the choice of the basket benchmark (BK-06c): the id of a listed index of the instrument master. */
+    SetBasketBenchmarkInput: {
+      /** Format: uuid */
+      instrumentId: null | string;
     };
     /** @description The outcome of one set: the state and, for a failure, the thresholds that did not hold, in words. */
     SetOutcome: {
@@ -36742,6 +36765,39 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SetBasketBenchmark: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetBasketBenchmarkInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProfileIndexView'];
         };
       };
       /** @description Unprocessable Entity */

@@ -25,7 +25,7 @@ export function RankingBoard({ ranking }: { ranking: BasketRanking }) {
   return (
     <Section
       title="Baskets side by side"
-      note={`Relative strength against ${ranking.index.symbol ?? 'no index'}, ${formatDate(ranking.window.from)} to ${formatDate(ranking.window.to)}. ${ranking.rankWindow ? `Ranked on ${String(ranking.rankWindow)} sessions.` : 'Fewer than two baskets have a relative strength return, so nothing is ranked.'}`}
+      note={`Relative strength against ${ranking.index.name ?? ranking.index.symbol ?? 'no index'}, ${formatDate(ranking.window.from)} to ${formatDate(ranking.window.to)}. ${ranking.rankWindow ? `Ranked on ${String(ranking.rankWindow)} sessions.` : 'Fewer than two baskets have a relative strength return, so nothing is ranked.'}`}
     >
       {!ranking.separated && (
         <Typography role="status" sx={{ fontWeight: 600 }}>

@@ -74,7 +74,7 @@ internal sealed class GetBasketRankingHandler(
             inputs.Add(new RankInput(basket.Id, series, RelativeStrength.Compute(series, benchmark, options.RelativeStrengthWindows).Returns));
         }
 
-        var noBenchmark = BasketProfileMapper.NoBenchmark(win.Index?.Symbol, benchmark.Count > 0);
+        var noBenchmark = BasketProfileMapper.NoBenchmark(win, benchmark.Count > 0);
         var board = BasketRankBoard.Compute(inputs);
         var rows = new List<RankingRowView>(loaded.Count);
         for (var i = 0; i < loaded.Count; i++)
@@ -110,7 +110,7 @@ internal sealed class GetBasketRankingHandler(
         ];
         return Result.Success(new BasketRankingView(
             win.View,
-            new ProfileIndexView(win.Index?.Id, win.Index?.Symbol, win.IndexIsDefault),
+            new ProfileIndexView(win.Index?.Id, win.Index?.Symbol, win.IndexIsDefault, win.Index is null ? null : win.IndexName),
             board.RankWindow,
             rows,
             overlap,

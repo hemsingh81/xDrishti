@@ -101,7 +101,7 @@ internal sealed class GetBasketProfileHandler(
         var series = asOf is { } last ? BasketBreadth.SeriesAbove20(current, last, Math.Max(1, profile.Index.Points.Count), options) : [];
         var hold = await HoldOutAsync(basket.Id, cancellationToken);
         var excluded = Exclusions(basket, members, profile, win);
-        var noBenchmark = BasketProfileMapper.NoBenchmark(win.Index?.Symbol, benchmark.Count > 0);
+        var noBenchmark = BasketProfileMapper.NoBenchmark(win, benchmark.Count > 0);
         var unavailable = new List<string>();
         if (noBenchmark is not null)
         {
@@ -120,7 +120,7 @@ internal sealed class GetBasketProfileHandler(
             basket.Basis,
             profile.FirstDatedMembership,
             new ProfileMembersView(basket.Instruments.Count, basket.Instruments.Count - excluded.Count, excluded),
-            new ProfileIndexView(win.Index?.Id, win.Index?.Symbol, win.IndexIsDefault),
+            new ProfileIndexView(win.Index?.Id, win.Index?.Symbol, win.IndexIsDefault, win.Index is null ? null : win.IndexName),
             ReportViews.Metric(profile.HoldReturnPct),
             BasketProfileMapper.Series(profile, benchmark),
             BasketProfileMapper.Risk(profile, options, noBenchmark),

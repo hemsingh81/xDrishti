@@ -2,6 +2,7 @@ using System.Globalization;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Bars;
@@ -16,13 +17,15 @@ namespace XDrishti.Application.Reporting;
 /// <param name="View">The window as the answer prints it.</param>
 /// <param name="Index">The index in force; null when the master list has none.</param>
 /// <param name="IndexIsDefault">The owner has not chosen the index.</param>
-internal sealed record ResolvedWindow(DateOnly From, DateOnly To, DateOnly Newest, BenchmarkWindowView View, BenchmarkInstrument? Index, bool IndexIsDefault);
+/// <param name="IndexName">The index as the owner reads it (the default's name even while it is missing).</param>
+/// <param name="IndexMissing">Why there is no index; null when there is one.</param>
+internal sealed record ResolvedWindow(DateOnly From, DateOnly To, DateOnly Newest, BenchmarkWindowView View, BenchmarkInstrument? Index, bool IndexIsDefault, string IndexName, string? IndexMissing);
 
 /// <summary>
 /// Turns the raw query of a profile or ranking call into a window and an index (BK-07 criterion 1): <c>from</c> and <c>to</c> default to the last sessions ending at the newest stored daily bar of the index, said in <c>window.source</c>. One small read of the index finds that
 /// bar; the bars of the window are read later, once, and not at all when the answer is cached.
 /// </summary>
-internal sealed class ProfileWindowResolver(IBarQueries bars, IPortfolioBenchmark benchmark, ITradingCalendar calendars, BasketProfileSettings settings, ReportBenchmarkOptions limits, TimeProvider time)
+internal sealed class ProfileWindowResolver(IBarQueries bars, IPortfolioBenchmark benchmark, IBasketBenchmark basketBenchmark, ITradingCalendar calendars, BasketProfileSettings settings, ReportBenchmarkOptions limits, TimeProvider time)
 {
     /// <summary>Sessions of the minimum window.</summary>
     public const int MinSessions = 20;
@@ -41,6 +44,8 @@ internal sealed class ProfileWindowResolver(IBarQueries bars, IPortfolioBenchmar
 
         BenchmarkInstrument? index;
         var isDefault = true;
+        string indexName;
+        string? indexMissing = null;
         if (!string.IsNullOrWhiteSpace(indexText))
         {
             if (!Guid.TryParse(indexText.Trim(), out var indexId))
@@ -55,12 +60,16 @@ internal sealed class ProfileWindowResolver(IBarQueries bars, IPortfolioBenchmar
             }
 
             isDefault = false;
+            indexName = index.Name;
         }
         else
         {
-            var configured = await benchmark.GetAsync(cancellationToken);
-            index = configured?.Instrument;
-            isDefault = configured?.IsDefault ?? true;
+            // the basket setting (Nifty 500 by default), never the portfolio benchmark; a missing index stays missing, with the reason
+            var configured = await basketBenchmark.GetAsync(cancellationToken);
+            index = configured.Index;
+            isDefault = configured.IsDefault;
+            indexName = configured.Name;
+            indexMissing = configured.Reason;
         }
 
         var today = IndiaTime.Today(time.GetUtcNow());
@@ -88,7 +97,7 @@ internal sealed class ProfileWindowResolver(IBarQueries bars, IPortfolioBenchmar
 
         var toSource = to.Value is not null ? "query" : "newest_bar";
         var source = from.Value is not null && to.Value is not null ? "query" : "default";
-        return Result.Success(new ResolvedWindow(start, end, newest, new BenchmarkWindowView(start, end, source, fromSource, toSource), index, isDefault));
+        return Result.Success(new ResolvedWindow(start, end, newest, new BenchmarkWindowView(start, end, source, fromSource, toSource), index, isDefault, indexName, indexMissing));
     }
 
     private Error? Check(DateOnly from, DateOnly to, XDrishti.Domain.Market.Calendar.TradingCalendar calendar)
