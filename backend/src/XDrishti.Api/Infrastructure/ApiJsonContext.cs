@@ -105,6 +105,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(IReadOnlyList<LabRunView>))]
 [JsonSerializable(typeof(CellStatsView))]
 [JsonSerializable(typeof(IReadOnlyList<CellStatsView>))]
+[JsonSerializable(typeof(UniverseLinkView))]
+[JsonSerializable(typeof(IReadOnlyList<UniverseLinkView>))]
 [JsonSerializable(typeof(LearningOverviewView))]
 [JsonSerializable(typeof(ModelView))]
 [JsonSerializable(typeof(IReadOnlyList<ModelView>))]

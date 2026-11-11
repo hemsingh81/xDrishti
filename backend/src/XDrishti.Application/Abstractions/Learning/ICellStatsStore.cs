@@ -19,6 +19,9 @@ public interface ICellStatsStore
     /// <summary>The regime rows (regime other than <c>*</c>) of the newest snapshot that has any, optionally of one strategy and one window; empty when no snapshot has them (P6-02). <see cref="ListLatestAsync"/> and the readers that follow it see the <c>*</c> cells only.</summary>
     ValueTask<IReadOnlyList<StoredCellStats>> ListRegimeLatestAsync(string? strategy, string? window, CancellationToken cancellationToken);
 
+    /// <summary>The tier rows (universe <c>liq_high</c>, <c>liq_mid</c> or <c>liq_low</c>) of the newest snapshot that has any, together with the six-part <c>*</c> cash rows of that same snapshot (their parents), optionally of one strategy and one window; empty when no snapshot has tier rows (BK-11, ADR 0261). <see cref="ListLatestAsync"/> and the decision readers see the all-shares cells only.</summary>
+    ValueTask<IReadOnlyList<StoredCellStats>> ListUniverseLatestAsync(string? strategy, string? window, CancellationToken cancellationToken);
+
     /// <summary>Like <see cref="ListLatestAsync"/> but of the newest snapshot whose as-of date is before <paramref name="before"/>: what was known then. The snapshot is chosen among snapshots that hold a cash cell (P14-06): a later snapshot of non-cash cells alone does not hide it; the rows of the chosen snapshot are all returned, so the caller can count the non-cash ones. Empty when there is none.</summary>
     ValueTask<IReadOnlyList<StoredCellStats>> ListLatestBeforeAsync(DateOnly before, string? strategy, string? window, CancellationToken cancellationToken);
 

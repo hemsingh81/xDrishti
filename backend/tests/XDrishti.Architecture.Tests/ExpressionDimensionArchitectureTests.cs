@@ -57,14 +57,14 @@ public sealed partial class ExpressionDimensionArchitectureTests
         // Display and statistics readers (they list every cell, with its expression) and the paths that take cash cells only.
         string[] display =
         [
-            "XDrishti.Application/Learning/GetCellHandler.cs", "XDrishti.Application/Learning/GetLearningOverviewHandler.cs", "XDrishti.Application/Learning/ListCellsHandler.cs", "XDrishti.Application/Learning/ListRegimeCellsQuery.cs",
+            "XDrishti.Application/Learning/GetCellHandler.cs", "XDrishti.Application/Learning/GetLearningOverviewHandler.cs", "XDrishti.Application/Learning/ListCellsHandler.cs", "XDrishti.Application/Learning/ListRegimeCellsQuery.cs", "XDrishti.Application/Learning/UniverseCellsQueries.cs",
             "XDrishti.Application/Ai/Proposals/ProposalFacts.cs", "XDrishti.Application/Paper/BacktestReferenceReader.cs", "XDrishti.Infrastructure/Learning/CellStatsStore.cs", "XDrishti.Application/Abstractions/Learning/ICellStatsStore.cs",
         ];
         string[] cashOnly =
         [
             "XDrishti.Application/Selection/ShowSelectionHandler.cs", "XDrishti.Infrastructure/Planning/StoredTicketSource.cs", "XDrishti.Application/Paper/ConfigSnapshotSource.cs",
         ];
-        var readers = Files(".").Where(f => Regex.IsMatch(File.ReadAllText(f), @"\.(ListLatestAsync|ListLatestCashAsync|ListLatestBeforeAsync|ListRegimeLatestAsync|FindLatestAsync)\(")).Select(Rel)
+        var readers = Files(".").Where(f => Regex.IsMatch(File.ReadAllText(f), @"\.(ListLatestAsync|ListLatestCashAsync|ListLatestBeforeAsync|ListRegimeLatestAsync|ListUniverseLatestAsync|FindLatestAsync)\(")).Select(Rel)
             .Where(r => !r.StartsWith("XDrishti.Infrastructure/Auth/", StringComparison.Ordinal) && !r.StartsWith("XDrishti.Application/Auth/", StringComparison.Ordinal))
             .Order(StringComparer.Ordinal).ToList();
 

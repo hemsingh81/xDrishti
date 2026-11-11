@@ -3220,6 +3220,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/cells/universe': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The liquidity-tier cells (BK-11): the cells of the newest snapshot computed with the universe split, per tier (liq_high, liq_mid, liq_low) and window, each shrunk toward its all-shares cell, with the enough-evidence flag. Filter by strategy and window; empty before a computation with --by-universe. 422 learning.invalid */
+    get: operations['ListUniverseCells'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cells/universe-links': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Each liquidity-tier cell read against its all-shares parent (BK-11): which cell a reader takes (child_better, no_better_than_parent, child_thin), both lower bounds, and whether the tier is an observation (at least the link minimum of trades). An observation only: nothing is applied, no scan scope changes, and the hold-out check is not evaluated. Filter by strategy; empty before a computation with --by-universe */
+    get: operations['ListUniverseLinks'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/cells/{key}': {
     parameters: {
       query?: never;
@@ -24262,6 +24296,52 @@ export interface components {
       end: number;
       text: string;
     };
+    /** @description One tier cell read against its all-shares parent (BK-11, criteria 5, 6 and 11). */
+    UniverseLinkView: {
+      /** @description The tier cell's key. */
+      childKey: string;
+      /** @description The all-shares cell's key. */
+      parentKey: string;
+      /** @description The tier. */
+      universe: string;
+      /** @description The window code. */
+      window: string;
+      /**
+       * Format: date
+       * @description The snapshot's as-of date.
+       */
+      asOf: string;
+      /** @description `child_better`, `no_better_than_parent` or `child_thin`. */
+      reason: string;
+      /** @description The key a reader takes: the child's when it is better, else the parent's. */
+      readKey: string;
+      /**
+       * Format: int32
+       * @description Trades of the tier cell.
+       */
+      childN: number;
+      /**
+       * Format: int32
+       * @description Trades of the parent.
+       */
+      parentN: number;
+      /**
+       * Format: double
+       * @description The tier cell's lower credible bound of the win rate.
+       */
+      childLower: number;
+      /**
+       * Format: double
+       * @description The parent's bound without the child's trades; null when the child is thin.
+       */
+      parentLower: null | number;
+      /** @description True when the tier is read in place of the parent and has at least the link minimum of trades: an observation to show, never applied. */
+      observation: boolean;
+      /** @description Always `not_evaluated` in this slice: the halves of the trades are not stored with a cell, so the hold-out condition of criterion 11 is not checked and no hypothesis is proposed from this list. */
+      holdOut: string;
+      /** @description The sentence the Setups view shows. */
+      text: string;
+    };
     /** @description An entry that named no instrument. `reason`: `not_found` · `ambiguous` (an ISIN of several instruments) · `invalid` (too long or with control characters). */
     UnmatchedEntry: {
       term: string;
@@ -32478,6 +32558,60 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListUniverseCells: {
+    parameters: {
+      query?: {
+        strategy?: string;
+        window?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CellStatsView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListUniverseLinks: {
+    parameters: {
+      query?: {
+        strategy?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UniverseLinkView'][];
         };
       };
     };

@@ -10891,6 +10891,89 @@
         }
       }
     },
+    "/api/cells/universe": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The liquidity-tier cells (BK-11): the cells of the newest snapshot computed with the universe split, per tier (liq_high, liq_mid, liq_low) and window, each shrunk toward its all-shares cell, with the enough-evidence flag. Filter by strategy and window; empty before a computation with --by-universe. 422 learning.invalid",
+        "operationId": "ListUniverseCells",
+        "parameters": [
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CellStatsView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cells/universe-links": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Each liquidity-tier cell read against its all-shares parent (BK-11): which cell a reader takes (child_better, no_better_than_parent, child_thin), both lower bounds, and whether the tier is an observation (at least the link minimum of trades). An observation only: nothing is applied, no scan scope changes, and the hold-out check is not evaluated. Filter by strategy; empty before a computation with --by-universe",
+        "operationId": "ListUniverseLinks",
+        "parameters": [
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UniverseLinkView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/cells/{key}": {
       "get": {
         "tags": [
@@ -70952,6 +71035,92 @@
           }
         },
         "description": "A figure of the answer that the tool results do not hold: its place in the text (UTF-16 code units, End exclusive) and the text itself."
+      },
+      "UniverseLinkView": {
+        "required": [
+          "childKey",
+          "parentKey",
+          "universe",
+          "window",
+          "asOf",
+          "reason",
+          "readKey",
+          "childN",
+          "parentN",
+          "childLower",
+          "parentLower",
+          "observation",
+          "holdOut",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "childKey": {
+            "type": "string",
+            "description": "The tier cell's key."
+          },
+          "parentKey": {
+            "type": "string",
+            "description": "The all-shares cell's key."
+          },
+          "universe": {
+            "type": "string",
+            "description": "The tier."
+          },
+          "window": {
+            "type": "string",
+            "description": "The window code."
+          },
+          "asOf": {
+            "type": "string",
+            "description": "The snapshot's as-of date.",
+            "format": "date"
+          },
+          "reason": {
+            "type": "string",
+            "description": "`child_better`, `no_better_than_parent` or `child_thin`."
+          },
+          "readKey": {
+            "type": "string",
+            "description": "The key a reader takes: the child's when it is better, else the parent's."
+          },
+          "childN": {
+            "type": "integer",
+            "description": "Trades of the tier cell.",
+            "format": "int32"
+          },
+          "parentN": {
+            "type": "integer",
+            "description": "Trades of the parent.",
+            "format": "int32"
+          },
+          "childLower": {
+            "type": "number",
+            "description": "The tier cell's lower credible bound of the win rate.",
+            "format": "double"
+          },
+          "parentLower": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The parent's bound without the child's trades; null when the child is thin.",
+            "format": "double"
+          },
+          "observation": {
+            "type": "boolean",
+            "description": "True when the tier is read in place of the parent and has at least the link minimum of trades: an observation to show, never applied."
+          },
+          "holdOut": {
+            "type": "string",
+            "description": "Always `not_evaluated` in this slice: the halves of the trades are not stored with a cell, so the hold-out condition of criterion 11 is not checked and no hypothesis is proposed from this list."
+          },
+          "text": {
+            "type": "string",
+            "description": "The sentence the Setups view shows."
+          }
+        },
+        "description": "One tier cell read against its all-shares parent (BK-11, criteria 5, 6 and 11)."
       },
       "UnmatchedEntry": {
         "required": [

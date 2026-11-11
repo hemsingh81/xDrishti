@@ -10,7 +10,7 @@ namespace XDrishti.Domain.Learning;
 /// <param name="Style">The style, <c>intraday</c> or <c>swing</c>.</param>
 /// <param name="Exit">The label of the exit policy.</param>
 /// <param name="Regime"><c>*</c> for all regimes, or the regime code.</param>
-/// <param name="Universe">The seventh part, reserved for BK-11: only <c>*</c> is allowed in this slice.</param>
+/// <param name="Universe">The seventh part (BK-11, ADR 0261): <c>*</c> for all shares or a liquidity tier, <c>liq_high</c>, <c>liq_mid</c> or <c>liq_low</c>.</param>
 /// <param name="Expression">The eighth part: how the signal is expressed; <see cref="Learning.Expression.Cash"/> for every cell that has no eighth part.</param>
 public sealed record CellId(string Strategy, string Timeframe, string Side, string Style, string Exit, string Regime = "*", string Universe = CellId.AllUniverses, Expression Expression = Expression.Cash)
 {
@@ -20,8 +20,11 @@ public sealed record CellId(string Strategy, string Timeframe, string Side, stri
     /// <summary>The universe of every cell until BK-11 widens the list.</summary>
     public const string AllUniverses = "*";
 
-    /// <summary>The universes a key may name. Only <c>*</c> now; BK-11 adds <c>liq_high</c>, <c>liq_mid</c> and <c>liq_low</c>.</summary>
-    private static readonly string[] KnownUniverses = [AllUniverses];
+    /// <summary>The liquidity tiers a cell may be split by (BK-11): the only universe values other than <c>*</c>. One dimension of three: a second universe-like part is not allowed (<see cref="CellExplosionGuard"/>).</summary>
+    public static readonly IReadOnlyList<string> Tiers = ["liq_high", "liq_mid", "liq_low"];
+
+    /// <summary>The universes a key may name: <c>*</c> and the tiers.</summary>
+    private static readonly string[] KnownUniverses = [AllUniverses, .. Tiers];
 
     /// <summary>True for a cash cell: the only kind that selection, planning, paper, live and execution may read (ADR 0193).</summary>
     public bool IsCash => Expression == Expression.Cash;
@@ -33,7 +36,7 @@ public sealed record CellId(string Strategy, string Timeframe, string Side, stri
         : string.Join('|', Strategy, Timeframe, Side, Style, Exit, Regime);
 
     /// <summary>
-    /// Reads a key back; null when it is not 6, 7 or 8 valid parts, or not canonical. A seventh part must be a known universe other than <c>*</c> (none yet), an eighth part a known expression other than <c>cash</c>: so two texts never name
+    /// Reads a key back; null when it is not 6, 7 or 8 valid parts, or not canonical. A seventh part must be a known universe other than <c>*</c>, an eighth part a known expression other than <c>cash</c>: so two texts never name
     /// one cell.
     /// </summary>
     public static CellId? TryParse(string? key)
@@ -69,6 +72,12 @@ public sealed record CellId(string Strategy, string Timeframe, string Side, stri
         return id.Problems().Count == 0 ? id : null;
     }
 
+    /// <summary>
+    /// The cell this one is shrunk toward, one step up the single chain from the narrowest cell to the all-shares cell (BK-11): a regime cell first loses its regime (as before: regime, then universe), then a tiered cell loses its universe; a cell with both
+    /// is <c>(regime, universe)</c>, then <c>(*, universe)</c>, then <c>(*, *)</c>. The expression part never changes (an option cell is not a child of a cash cell). Null for a cell with regime and universe <c>*</c>.
+    /// </summary>
+    public CellId? Parent() => Regime != "*" ? this with { Regime = "*" } : Universe != AllUniverses ? this with { Universe = AllUniverses } : null;
+
     /// <summary>The problems of the parts: each is required, short and free of the separator.</summary>
     public IReadOnlyList<string> Problems()
     {
@@ -81,7 +90,7 @@ public sealed record CellId(string Strategy, string Timeframe, string Side, stri
         Check(problems, "regime", Regime);
         if (Array.IndexOf(KnownUniverses, Universe) < 0)
         {
-            problems.Add("universe is not a known universe (only * is allowed)");
+            problems.Add("universe is not a known universe (* or a liquidity tier)");
         }
 
         if (!Enum.IsDefined(Expression))

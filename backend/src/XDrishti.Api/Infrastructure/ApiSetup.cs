@@ -22,6 +22,7 @@ using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.Jobs;
 using XDrishti.Application.Learning.SimTraining;
 using XDrishti.Application.Live.Push;
@@ -273,6 +274,8 @@ internal static class ApiSetup
     {
         services.AddOptions<SimAllSettings>().BindConfiguration(SimAllSettings.Section).ValidateDataAnnotations().ValidateOnStart();
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<SimAllSettings>>().Value));
+        services.AddOptions<UniverseSettings>().BindConfiguration(UniverseSettings.Section).ValidateDataAnnotations().ValidateOnStart();
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<UniverseSettings>>().Value));
         services.AddOptions<SimTrainingSettings>().BindConfiguration(SimTrainingSettings.Section).ValidateDataAnnotations().ValidateOnStart();
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<SimTrainingSettings>>().Value));
         services.AddSimAllRunner();

@@ -26,6 +26,9 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
 
     private const string NewestCash = $"(SELECT snapshot_key FROM research.cell_stats WHERE {CashKey} ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)";
 
+    // BK-11 (ADR 0261): the universe is the seventh key part; a tier cell has regime * and a key of six or more separators with a tier in part seven. The readers that follow the all-shares cells leave the tier cells out.
+    private const string AllShares = "(split_part(cell_key, '|', 7) IN ('', '*'))";
+
     private const string Newest = "(SELECT snapshot_key FROM research.cell_stats ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)";
 
     public async ValueTask<bool> StoreAsync(CellSnapshotToStore snapshot, CancellationToken cancellationToken)
@@ -135,7 +138,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     {
         await using var command = dataSource.CreateCommand($"""
             SELECT {Columns}, cell_key, {DependenceColumns}, {ShrinkageColumns} FROM research.cell_stats
-            WHERE snapshot_key = {Newest} AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
+            WHERE snapshot_key = {Newest} AND regime = '*' AND {AllShares} AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
             """);
         command.Parameters.AddWithValue("strategy", NpgsqlDbType.Text, (object?)strategy ?? DBNull.Value);
@@ -148,6 +151,20 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
         await using var command = dataSource.CreateCommand($"""
             SELECT {Columns}, cell_key, {DependenceColumns}, {ShrinkageColumns} FROM research.cell_stats
             WHERE snapshot_key = {NewestCash} AND {CashKey} AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
+            ORDER BY cell_key, window_code
+            """);
+        command.Parameters.AddWithValue("strategy", NpgsqlDbType.Text, (object?)strategy ?? DBNull.Value);
+        command.Parameters.AddWithValue("window", NpgsqlDbType.Text, (object?)window ?? DBNull.Value);
+        return await ReadAsync(command, cancellationToken);
+    }
+
+    public async ValueTask<IReadOnlyList<StoredCellStats>> ListUniverseLatestAsync(string? strategy, string? window, CancellationToken cancellationToken)
+    {
+        // BK-11 (ADR 0261): the newest snapshot that holds any tier row; the rows carry their own as-of date and snapshot key
+        await using var command = dataSource.CreateCommand($"""
+            SELECT {Columns}, cell_key, {DependenceColumns}, {ShrinkageColumns} FROM research.cell_stats
+            WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE split_part(cell_key, '|', 7) LIKE 'liq\_%' ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)
+              AND (split_part(cell_key, '|', 7) LIKE 'liq\_%' OR ({AllShares} AND regime = '*' AND {CashKey})) AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
             """);
         command.Parameters.AddWithValue("strategy", NpgsqlDbType.Text, (object?)strategy ?? DBNull.Value);

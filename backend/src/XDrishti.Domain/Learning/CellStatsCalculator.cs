@@ -20,8 +20,10 @@ public static class CellStatsCalculator
     /// shrunk toward the same strategy rate; the system and strategy rates are taken from <paramref name="cells"/> alone, so a trade is never counted twice and the rows of <paramref name="cells"/> are the same with and without them.
     /// With <paramref name="confidence"/> (CF-01, ADR 0203) each row also carries its <see cref="CellStatsRow.Dependence"/> (null or Off: no such member and every other field exactly as before); only in the <see cref="ConfidenceMode.Gate"/> mode does <see cref="CellStatsRow.Enough"/> change.
     /// With <paramref name="shrinkage"/> (CF-02, ADR 0204) each row also carries its <see cref="CellStatsRow.Shrinkage"/> (null or Off: no such member); no other field of any row changes.
+    /// With <paramref name="universeCells"/> (BK-11, ADR 0261) the tier cells follow the regime cells; each is shrunk toward the posterior of its own <c>*</c> cell (the parent link, <see cref="CellId.Parent"/>), and the <c>*</c> rows are the same with and without them.
+    /// A tier cell has no <see cref="CellStatsRow.Shrinkage"/> (CF-02 does not yet have it in its chain; owner question 2).
     /// </summary>
-    public static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, DateOnly asOf, CellStatsOptions options, IReadOnlyList<CellInput>? regimeCells = null, ConfidenceOptions? confidence = null, ShrinkageOptions? shrinkage = null)
+    public static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, DateOnly asOf, CellStatsOptions options, IReadOnlyList<CellInput>? regimeCells = null, ConfidenceOptions? confidence = null, ShrinkageOptions? shrinkage = null, IReadOnlyList<CellInput>? universeCells = null)
     {
         ArgumentNullException.ThrowIfNull(cells);
         ArgumentNullException.ThrowIfNull(options);
@@ -84,6 +86,25 @@ public static class CellStatsCalculator
             }
         }
 
+        if (universeCells is not null)
+        {
+            var stars = rows.Where(r => r.Cell.Regime == "*" && r.Cell.Universe == CellId.AllUniverses).ToDictionary(r => (r.Cell, r.Window));
+            foreach (var input in universeCells)
+            {
+                foreach (var window in Windows)
+                {
+                    if (input.Cell.Parent() is not { } parent || !stars.TryGetValue((parent, window), out var star))
+                    {
+                        throw new ArgumentException($"The tier cell {input.Cell.Key} has no all-shares cell among the cells.", nameof(universeCells));
+                    }
+
+                    var inWindow = InWindow(input.Trades, asOf, window);
+                    rows.Add(Row(input, window, inWindow, asOf, star.WinRatePosterior, options, confidence));
+                    traded.Add(inWindow);
+                }
+            }
+        }
+
         return shrinkage is { IsOn: true } ? WithShrinkage(rows, traded, asOf, options, confidence, shrinkage) : rows.AsReadOnly();
     }
 
@@ -94,7 +115,7 @@ public static class CellStatsCalculator
         var result = rows.ToArray();
         foreach (var window in Windows)
         {
-            var index = Enumerable.Range(0, rows.Count).Where(i => rows[i].Window == window).ToList();
+            var index = Enumerable.Range(0, rows.Count).Where(i => rows[i].Window == window && rows[i].Cell.Universe == CellId.AllUniverses).ToList();
             var subjects = index.Select(i => new ShrinkSubject(rows[i].Cell, traded[i], rows[i].Dependence?.NEff)).ToList();
             var assessed = CellShrinker.Assess(subjects, asOf, options, shrinkage, floor);
             for (var k = 0; k < index.Count; k++)
