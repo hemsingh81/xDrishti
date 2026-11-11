@@ -71,6 +71,35 @@ public sealed class ReplayPairComparisonTests
     }
 
     [Fact]
+    public void Sparse_non_zero_days_are_too_little_history_however_many_sessions_are_paired()
+    {
+        // 3 exits in 40 sessions: the other days are exactly 0 for both runs
+        var r = ReplayPairComparison.Compare(Curve(40, _ => 0m), Curve(40, i => i is 5 or 15 or 25 ? 0.01m : 0m), 1_000_000m);
+
+        r.Value.Answer.ShouldBe(PairAnswer.TooLittleHistory);
+        r.Value.Days.ShouldBe(40);
+        r.Value.InformativeDays.ShouldBe(3);
+        r.Value.ProbabilityLearningBetter.ShouldBeNull();
+    }
+
+    [Fact]
+    public void An_equity_at_or_below_zero_or_unordered_sessions_are_refused()
+    {
+        var a = Curve(25, Base);
+        var broke = a.Select((p, i) => i == 3 ? p with { Equity = 0m } : p).ToList();
+        ReplayPairComparison.Compare(a, broke, 1_000_000m).Error.Code.ShouldBe(ReplayPairComparison.MisalignedCode);
+        var unordered = a.Select((p, i) => i == 4 ? p with { Session = a[2].Session } : p).ToList();
+        ReplayPairComparison.Compare(unordered, unordered, 1_000_000m).Error.Code.ShouldBe(ReplayPairComparison.MisalignedCode);
+    }
+
+    [Fact]
+    public void Loop_options_out_of_range_are_a_validation_failure()
+    {
+        var a = Curve(25, Base);
+        ReplayPairComparison.Compare(a, a, 1_000_000m, new XDrishti.Domain.Confidence.LoopOptions(MinDays: 1)).Error.Code.ShouldBe(ReplayPairComparison.InvalidCode);
+    }
+
+    [Fact]
     public void The_same_inputs_give_the_same_answer()
     {
         var f = Curve(40, Base);

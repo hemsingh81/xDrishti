@@ -5,53 +5,18 @@ using XDrishti.Domain.Learning;
 
 namespace XDrishti.Domain.Replay.Comparison;
 
-/// <summary>The close-of-session equity of one replay on one session.</summary>
-public readonly record struct ReplayDayEquity(DateOnly Session, decimal Equity);
-
-/// <summary>The answer of the frozen-versus-learning comparison (SR-01 AC 9).</summary>
-public enum PairAnswer
-{
-    /// <summary>The learning run beat the frozen run with probability at or above the cut.</summary>
-    LearningBetter,
-
-    /// <summary>The frozen run beat the learning run with probability at or above the cut.</summary>
-    FrozenBetter,
-
-    /// <summary>Neither side reached the cut.</summary>
-    NoMeasurableDifference,
-
-    /// <summary>Fewer paired days than the bootstrap's minimum.</summary>
-    TooLittleHistory,
-}
-
-/// <summary>The comparison: always n, the mean daily difference (learning minus frozen, as a fraction of equity) and the cut; the probabilities are null when there is too little history.</summary>
-/// <param name="Answer">The answer.</param>
-/// <param name="Days">Paired days (n).</param>
-/// <param name="MeanDailyDifference">Mean of learning daily return minus frozen daily return.</param>
-/// <param name="ProbabilityLearningBetter">P(mean difference above 0) from the paired day bootstrap.</param>
-/// <param name="ProbabilityFrozenBetter">The same for the mirrored difference.</param>
-/// <param name="Cut">The probability a side needs (the loop's helps-at bar).</param>
-/// <param name="MinDays">The fewest days the bootstrap accepts.</param>
-public sealed record ReplayPairResult(PairAnswer Answer, int Days, double MeanDailyDifference, double? ProbabilityLearningBetter, double? ProbabilityFrozenBetter, double Cut, int MinDays)
-{
-    /// <summary>The wire word of the answer.</summary>
-    public string AnswerCode => Answer switch
-    {
-        PairAnswer.LearningBetter => "learning_better",
-        PairAnswer.FrozenBetter => "frozen_better",
-        PairAnswer.NoMeasurableDifference => "no_measurable_difference",
-        _ => "too_little_history",
-    };
-}
-
 /// <summary>
-/// SR-01 part D: pairs the daily returns of a frozen and a learning replay (same range, scope and settings) by session and asks the existing <see cref="PairedDayBootstrap"/> (CF-10c, ADR 0216) with the loop's settings (<see cref="LoopOptions"/>: draws, level, minimum days, helps-at cut).
-/// Same rule as <see cref="ThreeArmLoopTest"/>: learning better when P(better) is at or above the cut, frozen better when the mirrored P is, otherwise no measurable difference. Seeded from the range, so the same inputs repeat. Pure.
+/// SR-01 part D: pairs the daily returns of a frozen and a learning replay (same range, scope and settings) by session and hands them to the existing <see cref="ThreeArmLoopTest.Compare"/> (the paired day bootstrap of CF-10c, ADR 0216) with the loop's settings
+/// (<see cref="LoopOptions"/>: draws, level, minimum days, helps-at cut, hurts bar). Helps is <c>learning_better</c>, Hurts is <c>frozen_better</c>; that test computes both directions with one seed and the same rule as the loop report, so there is no second rule here. Seeded from the range, so the same inputs repeat. Pure.
+/// Equity is capital plus realised result, so a day on which neither run exited a trade has a difference of exactly 0: fewer than the minimum of days with a non-zero difference is <c>too_little_history</c>, however many sessions were paired.
 /// </summary>
 public static class ReplayPairComparison
 {
     /// <summary>The failure code for series that cannot be paired.</summary>
     public const string MisalignedCode = "replay.pair_misaligned";
+
+    /// <summary>The failure code for loop options out of range.</summary>
+    public const string InvalidCode = "replay.pair_invalid";
 
     /// <summary>Compares the runs. Both series are one entry per session, in order, from the same start capital.</summary>
     public static Result<ReplayPairResult> Compare(IReadOnlyList<ReplayDayEquity> frozen, IReadOnlyList<ReplayDayEquity> learning, decimal capital, LoopOptions? options = null)
@@ -59,54 +24,60 @@ public static class ReplayPairComparison
         ArgumentNullException.ThrowIfNull(frozen);
         ArgumentNullException.ThrowIfNull(learning);
         options ??= new LoopOptions();
+        if (options.Problems().Count > 0)
+        {
+            return Result.Failure<ReplayPairResult>(Error.Validation(InvalidCode, string.Join("; ", options.Problems())));
+        }
+
         if (capital <= 0 || frozen.Count == 0 || frozen.Count != learning.Count)
         {
             return Misaligned("both runs need the same non-zero number of sessions and a capital above 0");
         }
 
-        var gains = new double[frozen.Count];
+        var f = new double[frozen.Count];
+        var l = new double[frozen.Count];
         var days = new DateOnly[frozen.Count];
         decimal prevF = capital, prevL = capital;
-        for (var i = 0; i < gains.Length; i++)
+        for (var i = 0; i < f.Length; i++)
         {
             if (frozen[i].Session != learning[i].Session || (i > 0 && frozen[i].Session <= frozen[i - 1].Session))
             {
                 return Misaligned("the sessions of the two runs differ or are not in order");
             }
 
-            if (prevF <= 0 || prevL <= 0)
+            if (frozen[i].Equity <= 0 || learning[i].Equity <= 0)
             {
                 return Misaligned("a run's equity is not above 0");
             }
 
-            gains[i] = (double)((learning[i].Equity / prevL) - (frozen[i].Equity / prevF));
+            f[i] = (double)((frozen[i].Equity / prevF) - 1);
+            l[i] = (double)((learning[i].Equity / prevL) - 1);
             days[i] = frozen[i].Session;
             (prevF, prevL) = (frozen[i].Equity, learning[i].Equity);
         }
 
-        var mean = gains.Average();
-        if (gains.Length < options.MinDays)
+        var mean = Enumerable.Range(0, f.Length).Average(i => l[i] - f[i]);
+
+        // shortcut: realised-only equity; upgrade to mark-to-market once closes are stored
+        var informative = Enumerable.Range(0, f.Length).Count(i => l[i] != f[i]);
+        if (informative < options.MinDays)
         {
-            return Result.Success(new ReplayPairResult(PairAnswer.TooLittleHistory, gains.Length, mean, null, null, options.HelpsAt, options.MinDays));
+            return Result.Success(new ReplayPairResult(PairAnswer.TooLittleHistory, f.Length, informative, mean, null, null, null, null, options.HelpsAt, LoopOptions.HurtsBar, options.MinDays));
         }
 
         var key = string.Create(CultureInfo.InvariantCulture, $"sr01|{days[0]:yyyy-MM-dd}|{days[^1]:yyyy-MM-dd}|{days.Length}");
-        var better = PairedDayBootstrap.Assess(gains, days, options.Draws, options.Level, key, options.MinDays);
-        if (better.IsFailure)
+        var arm = ThreeArmLoopTest.Compare("learning_vs_frozen", l, f, days, options.MinDays, options.Draws, options.Level, options.HelpsAt, LoopOptions.HurtsBar, key);
+        PairAnswer? answer = arm.Verdict switch
         {
-            return Result.Failure<ReplayPairResult>(better.Error);
-        }
-
-        var worse = PairedDayBootstrap.Assess([.. gains.Select(g => -g)], days, options.Draws, options.Level, key, options.MinDays);
-        if (worse.IsFailure)
-        {
-            return Result.Failure<ReplayPairResult>(worse.Error);
-        }
-
-        var pB = better.Value.ProbabilityBetter;
-        var pW = worse.Value.ProbabilityBetter;
-        var answer = pB >= options.HelpsAt ? PairAnswer.LearningBetter : pW >= options.HelpsAt ? PairAnswer.FrozenBetter : PairAnswer.NoMeasurableDifference;
-        return Result.Success(new ReplayPairResult(answer, gains.Length, mean, pB, pW, options.HelpsAt, options.MinDays));
+            LoopVerdict.Helps => PairAnswer.LearningBetter,
+            LoopVerdict.Hurts => PairAnswer.FrozenBetter,
+            LoopVerdict.NoMeasurableDifference => PairAnswer.NoMeasurableDifference,
+            LoopVerdict.Inconclusive => PairAnswer.TooLittleHistory,
+            _ => null,
+        };
+        return answer is { } a
+            ? Result.Success(new ReplayPairResult(a, f.Length, informative, mean, arm.ProbabilityBetter, arm.ProbabilityWorse, arm.Low, arm.High, options.HelpsAt, LoopOptions.HurtsBar, options.MinDays))
+            : Result.Failure<ReplayPairResult>(Error.Validation(InvalidCode, arm.Text));
     }
 
     private static Result<ReplayPairResult> Misaligned(string message) => Result.Failure<ReplayPairResult>(Error.Validation(MisalignedCode, message));

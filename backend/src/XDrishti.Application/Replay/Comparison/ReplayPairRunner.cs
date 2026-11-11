@@ -5,9 +5,6 @@ using XDrishti.Domain.Replay.Comparison;
 
 namespace XDrishti.Application.Replay.Comparison;
 
-/// <summary>The two runs of a pair and their comparison.</summary>
-internal sealed record ReplayPairRun(ReplayRunResult Frozen, ReplayRunResult Learning, ReplayPairResult Comparison);
-
 /// <summary>SR-01 part D: runs the same parameters once frozen and once learning, in memory, and compares them. Part C stores the runs and calls this per pair.</summary>
 internal sealed class ReplayPairRunner(ReplayDriver driver)
 {
