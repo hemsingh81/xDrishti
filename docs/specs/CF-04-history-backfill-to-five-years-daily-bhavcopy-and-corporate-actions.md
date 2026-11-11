@@ -140,3 +140,6 @@ Factual corrections. The status is unchanged; owner questions are in REVIEW-2026
 - **Verbs:** Part A built `xd data eod-probe`, so the Contract's Part B `xd data probe-nse` is not the NSE probe. Part B's verbs are `xd data backfill` and `xd data history`, plus a name for the Dhan overlap probe of Decision 9, chosen at build.
 - **AU-06/07 removals (ADR 0245):** none of the 11 removed items is used here. `EodErrors.FetchFailed` is gone; the live code is `DataErrors.RepairFetchFailedCode`.
 - **Size:** the review fix of 2026-10-27 says 10.5 days in all (Part B 6), while the roadmap row still shows Part B 5.
+
+## Part C build notes (2026-11-11)
+AC 12 built as `HistoryDepth` (Domain) and two run labels, ADR 0271: depth per instrument is derived from the instrument records already in the run (`first_bar` is the historyFrom), from stored bars up to the run last date only. Lines `depth:` (earliest first bar; counts under 2 / 2-3 / 3-5 / 5 or more) and `survivorship:` appear only for a run with an instrument 3 years deep or more, so runs on the old history keep their labels, record, key and exports unchanged. "Point in time" is never printed by these lines. Not in Part C: the History card and `GET /api/data/history` (Part B).

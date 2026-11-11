@@ -87,6 +87,7 @@ public static class RunLabels
             .. ReferenceLine(run),
             "universe: " + run.Universe.Label + SurvivorshipNote,
             DataLine(run),
+            .. HistoryDepth.Lines(run),
             EngineLine(run.EngineVersion),
             TickLabel,
             OpeningBarLabel,
