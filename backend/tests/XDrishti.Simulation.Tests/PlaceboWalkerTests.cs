@@ -75,6 +75,20 @@ public sealed class PlaceboWalkerTests
     }
 
     [Fact]
+    public void BK_11b_a_mirror_on_a_session_where_the_instrument_is_not_a_member_is_no_trade_and_with_members_it_is_what_it_was()
+    {
+        var input = Input(Sessions(8, 3));
+        var signal = Signal();
+
+        var member = Of(Walk(input with { MemberOn = _ => true }, Plan(signal), Orb), "mirror");
+        var none = Of(Walk(input, Plan(signal), Orb), "mirror");
+        var leaver = Of(Walk(input with { MemberOn = _ => false }, Plan(signal), Orb), "mirror");
+
+        member.NetR.ShouldBe(none.NetR, "a constant membership changes nothing");
+        leaver.NetR.ShouldBeNull("a dated run takes no entry there, so its placebo takes none");
+    }
+
+    [Fact]
     public void A_strategy_that_names_min_turnover_has_its_mirror_blocked_without_the_lookup_and_unchanged_with_it()
     {
         var named = Rep.Prepare(OrbV1.Create(), fills: FillRules.Create(0.1, SlippageConfig.Default, 0, false, 3m, 8m, 20m).Value);

@@ -7,11 +7,13 @@ import { useCapability } from '../api/capabilitiesRead';
 import { HypothesisMove } from './HypothesisMove';
 import { LessonMove } from './LessonMove';
 import { RevertMove } from './RevertMove';
+import { UniverseProposeMove } from './UniverseProposeMove';
 
 const titles: Record<string, string> = {
   lesson: 'Move a lesson',
   hypothesis: 'Move a hypothesis',
   revert: 'Revert a cell move',
+  universe: 'Propose a tier as a hypothesis',
 };
 
 /** One learning move: /owner-acts/lesson/:id, /owner-acts/hypothesis/:id or /owner-acts/revert/:id. Off until the owner switches `learning_moves_ui` on. */
@@ -19,7 +21,7 @@ export function MovePage() {
   const { kind = '', id = '' } = useParams();
   const number = /^[1-9]\d{0,15}$/.test(id) ? Number(id) : null;
   const { enabled, loaded } = useCapability('learning_moves_ui');
-  const known = kind in titles && number !== null;
+  const known = kind in titles && (kind === 'universe' ? id !== '' : number !== null);
 
   return (
     <>
@@ -35,9 +37,10 @@ export function MovePage() {
           <RouterLink to="/owner-acts">the owner-act switches</RouterLink>.
         </Alert>
       )}
-      {known && enabled && kind === 'lesson' && <Lesson id={number} />}
-      {known && enabled && kind === 'hypothesis' && <Hypothesis id={number} />}
-      {known && enabled && kind === 'revert' && <Revert id={number} />}
+      {known && enabled && kind === 'universe' && <UniverseProposeMove cellKey={id} />}
+      {known && enabled && kind === 'lesson' && number !== null && <Lesson id={number} />}
+      {known && enabled && kind === 'hypothesis' && number !== null && <Hypothesis id={number} />}
+      {known && enabled && kind === 'revert' && number !== null && <Revert id={number} />}
     </>
   );
 }

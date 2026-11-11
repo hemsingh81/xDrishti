@@ -28,6 +28,11 @@ internal sealed class RunExperimentHandler(IRunStore runs, IExperimentLedger led
             return Refuse(LearningErrors.Invalid(problems));
         }
 
+        if (command.Knob.Kind == ExperimentKnobKind.Scope)
+        {
+            return Refuse(LearningErrors.KnobNotRunnable());   // BK-11b: a scope hypothesis is a note; no experiment runs it
+        }
+
         var started = time.GetTimestamp();
         var key = ExperimentCanonical.Key(command);
         if (await ledger.FindByKeyAsync(key, cancellationToken) is { } existing)

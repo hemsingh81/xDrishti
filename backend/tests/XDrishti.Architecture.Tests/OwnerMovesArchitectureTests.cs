@@ -58,7 +58,7 @@ public sealed partial class OwnerMovesArchitectureTests
     {
         EndpointFilesNaming(@"\b(" + string.Join('|', MoveCommands) + @")\b").ShouldBe(["OwnerMovesEndpoints.cs"]);
         EndpointFilesNaming(@"\bChangeAutonomySettingsCommand\b").ShouldBe(["AutonomyEndpoints.cs"]);
-        EndpointFilesNaming(@"\bIOwnerActRunner\b").ShouldBe(["AutonomyEndpoints.cs", "OwnerActFlow.cs", "OwnerMovesEndpoints.cs"]);
+        EndpointFilesNaming(@"\bIOwnerActRunner\b").ShouldBe(["AutonomyEndpoints.cs", "OwnerActFlow.cs", "OwnerMovesEndpoints.cs", "UniverseProposeEndpoints.cs"]);   // BK-11b (ADR 0266): the one more owner act, the tier proposal, in a file of its own so the five moves above stay pinned as they were
         Regex.IsMatch("x LinkLessonCommand y", @"\b(" + string.Join('|', MoveCommands) + @")\b", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeTrue("the scan sees a use");
     }
 

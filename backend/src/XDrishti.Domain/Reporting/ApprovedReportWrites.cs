@@ -13,6 +13,7 @@ public static class ApprovedReportWrites
         "POST /api/lessons/{id:long}/link", "POST /api/lessons/{id:long}/close", "POST /api/lessons/{id:long}/dismiss", "POST /api/hypotheses/{id:long}/move", "POST /api/changelog/{id:long}/revert", // P8-19 (ADR 0130)
         "POST /api/exports/{kind}", // P8-20 (ADR 0131): a read that makes a file, a POST only because it is audited
         "POST /api/learning/rollback/{id:long}/apply", "PUT /api/learning/ml-settings", "POST /api/learning/models/{id:long}/promote", // CF-10 part 10d-1 (ADR 0220): the owner's apply of a rollback proposal, the owner's three ML switches and the owner's promotion of a model; the routes of the CF-10 spec, which the owner approved on 2026-11-03
+        "POST /api/cells/universe-links/{key}/propose", // BK-11b (ADR 0266): the owner act that proposes one scope hypothesis from a stable tier observation; fresh password, applies nothing
         "POST /api/learning/cells/{key}/re-enable", // CF-12 part 12b (ADR 0219): the owner's re-enable of a paused cell, with a fresh password; the route of the CF-12 spec, which the owner approved on 2026-11-03
     ];
 }

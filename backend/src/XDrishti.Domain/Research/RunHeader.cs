@@ -21,4 +21,5 @@ public sealed record RunHeader(
     EventFilterRecord? Events = null,
     ResultsDaysRecord? ResultsDays = null,
     RunPurpose Purpose = RunPurpose.Research,
-    RelativeStrengthRecord? RelativeStrength = null);
+    RelativeStrengthRecord? RelativeStrength = null,
+    UniverseBasisRecord? UniverseBasis = null);

@@ -51,7 +51,16 @@ internal sealed class GetUniverseLinksHandler(ICellStatsStore store, IUniverseSe
     public async ValueTask<Result<IReadOnlyList<UniverseLinkView>>> HandleAsync(GetUniverseLinksQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var rows = await store.ListUniverseLatestAsync(string.IsNullOrWhiteSpace(query.Strategy) ? null : query.Strategy, null, cancellationToken);
+        return Result.Success(await UniverseLinks.BuildAsync(store, settingsStore, query.Strategy, cancellationToken));
+    }
+}
+
+/// <summary>The links of the newest snapshot, shared by the read side and the proposer so that a proposal is made from exactly what the Setups view shows (BK-11, BK-11b).</summary>
+internal static class UniverseLinks
+{
+    public static async ValueTask<IReadOnlyList<UniverseLinkView>> BuildAsync(ICellStatsStore store, IUniverseSettingsStore settingsStore, string? strategy, CancellationToken cancellationToken)
+    {
+        var rows = await store.ListUniverseLatestAsync(string.IsNullOrWhiteSpace(strategy) ? null : strategy, null, cancellationToken);
         var byKey = rows.ToDictionary(r => (r.Row.Cell, r.Row.Window));
         var settings = (await settingsStore.CurrentAsync(cancellationToken)).Settings;
         var minChild = settings.MinTradesChild;
@@ -71,7 +80,7 @@ internal sealed class GetUniverseLinksHandler(ICellStatsStore store, IUniverseSe
                 child.Row.Cell.Key, parentId.Key, child.Row.Cell.Universe, child.Row.Window.Code(), child.Row.AsOf, choice.Reason, choice.Cell.Cell.Key, child.Row.N, parent.Row.N, choice.ChildLower, choice.ParentLower, observation, hold?.Verdict ?? "not_evaluated", hold?.FirstN, hold?.SecondN, Text(child.Row, parent.Row, choice)));
         }
 
-        return Result.Success<IReadOnlyList<UniverseLinkView>>([.. views.OrderBy(v => v.ChildKey, StringComparer.Ordinal).ThenBy(v => v.Window, StringComparer.Ordinal)]);
+        return [.. views.OrderBy(v => v.ChildKey, StringComparer.Ordinal).ThenBy(v => v.Window, StringComparer.Ordinal)];
     }
 
     private static string Text(CellStatsRow child, CellStatsRow parent, CellChoiceResult choice)

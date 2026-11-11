@@ -63,10 +63,14 @@ public static class ReportErrors
         Error.Validation("reports.dimension_unavailable", dimension switch
         {
             ReportDimension.Regime => "Regime is not a report dimension yet: the regime of a trade is read for the regime cells (GET /api/cells/regimes) and the Lab by_regime block, not for the report engine.",
-            ReportDimension.Universe => "Universe is unavailable: the report engine stores no liquidity tier per trade. The tier cells are read at GET /api/cells/universe (computed with xd learn cells --by-universe), masked below the minimum of trades.",
+            ReportDimension.Universe => "no liquidity tier for these trades",
             ReportDimension.Account => "Account is unavailable: a simulated trade has no account.",
             _ => $"{dimension} is not unavailable.",
         });
+
+    /// <summary>The universe dimension of a training simulation (BK-11b, ADR 0243, ADR 0250): a training run is never tagged, so the tier is never attached to it.</summary>
+    public static Error UniverseNotForTraining() =>
+        Error.Validation("reports.dimension_unavailable", "no liquidity tier for these trades: a training simulation is not tagged by liquidity tier (only research runs are)");
 
     /// <summary>A grouping that would add one signal twice because it does not split by a label that differs between the runs.</summary>
     public static Error DoubleCount(IReadOnlyList<ReportDimension> required) =>

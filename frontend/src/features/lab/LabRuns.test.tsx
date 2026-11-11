@@ -204,6 +204,85 @@ describe('Lab runs', () => {
     });
   });
 
+  it('offers the dated members of a basket for a full test only and posts the basis (BK-11b)', async () => {
+    const bodies: unknown[] = [];
+    const started = buildRun({ state: 'queued', stage: null, method: 'full' });
+    setup(
+      [],
+      [
+        http.get('/api/baskets', () =>
+          HttpResponse.json([{ id: 'b1b1b1b1-0000-4000-8000-000000000001', name: 'Nifty 50', memberCount: 50 }]),
+        ),
+        http.post('/api/lab/runs', async ({ request }) => {
+          bodies.push(await request.json());
+          return HttpResponse.json(started, { status: 202 });
+        }),
+        http.get('/api/lab/runs/:id', () => HttpResponse.json(started)),
+      ],
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<LabPage />);
+    await openFamily(user);
+    await user.click(screen.getByRole('combobox', { name: 'Universe' }));
+    await user.click(await screen.findByRole('option', { name: 'Nifty 50 (50)' }));
+
+    expect(screen.getByRole('combobox', { name: 'Members' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText(/The quick test samples the members of one day/)).toBeInTheDocument();
+    await user.click(screen.getByRole('combobox', { name: 'Method' }));
+    await user.click(await screen.findByRole('option', { name: 'Full test' }));
+    await user.click(screen.getByRole('combobox', { name: 'Members' }));
+    await user.click(await screen.findByRole('option', { name: 'Dated (point in time)' }));
+    await user.click(screen.getByRole('button', { name: 'Run test' }));
+
+    await waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    expect(bodies[0]).toMatchObject({
+      method: 'full',
+      universe: { basketId: 'b1b1b1b1-0000-4000-8000-000000000001', membersBasis: 'dated' },
+    });
+  });
+
+  it('does not post the dated basis after the method is switched back to quick (BK-11b)', async () => {
+    const bodies: unknown[] = [];
+    const started = buildRun({ state: 'queued', stage: null });
+    setup(
+      [],
+      [
+        http.get('/api/baskets', () =>
+          HttpResponse.json([{ id: 'b1b1b1b1-0000-4000-8000-000000000001', name: 'Nifty 50', memberCount: 50 }]),
+        ),
+        http.post('/api/lab/runs', async ({ request }) => {
+          bodies.push(await request.json());
+          return HttpResponse.json(started, { status: 202 });
+        }),
+        http.get('/api/lab/runs/:id', () => HttpResponse.json(started)),
+      ],
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<LabPage />);
+    await openFamily(user);
+    await user.click(screen.getByRole('combobox', { name: 'Universe' }));
+    await user.click(await screen.findByRole('option', { name: 'Nifty 50 (50)' }));
+    await user.click(screen.getByRole('combobox', { name: 'Method' }));
+    await user.click(await screen.findByRole('option', { name: 'Full test' }));
+    await user.click(screen.getByRole('combobox', { name: 'Members' }));
+    await user.click(await screen.findByRole('option', { name: 'Dated (point in time)' }));
+    await user.click(screen.getByRole('combobox', { name: 'Method' }));
+    await user.click(await screen.findByRole('option', { name: 'Quick test' }));
+    await user.click(screen.getByRole('button', { name: 'Run test' }));
+
+    await waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    expect(bodies[0]).toEqual({
+      strategyId: 'MY_ORB',
+      version: 2,
+      method: 'quick',
+      universe: { basketId: 'b1b1b1b1-0000-4000-8000-000000000001' },
+    });
+  });
+
   it('posts a robust run without the chance block or with its own seeds, and shows the server refusal', async () => {
     const bodies: unknown[] = [];
     const started = buildRun({ state: 'queued', stage: null, method: 'robust' });

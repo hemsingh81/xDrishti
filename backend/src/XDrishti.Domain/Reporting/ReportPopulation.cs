@@ -26,6 +26,15 @@ public sealed class ReportPopulation
         Evidence = evidence;
         AnyExitKnown = anyExitRecorded;
         AnyBasketKnown = anyBasketRecorded;
+        foreach (var row in rows)
+        {
+            if (row.Trade.Tier is not null)
+            {
+                AnyTierKnown = true;
+                break;
+            }
+        }
+
         _pools = PoolsOf(rows, exitVaries, styleVaries);
     }
 
@@ -47,6 +56,9 @@ public sealed class ReportPopulation
     internal bool AnyExitKnown { get; }
 
     internal bool AnyBasketKnown { get; }
+
+    /// <summary>At least one trade carries a liquidity tier (BK-11b): the universe dimension is available only then; a population whose trades were not tagged refuses it with the reason.</summary>
+    internal bool AnyTierKnown { get; }
 
     /// <summary>Applies the population rule to the runs and trades and returns the population, or the typed refusal.</summary>
     /// <param name="runs">The runs the report may use.</param>
@@ -507,7 +519,7 @@ public sealed class ReportPopulation
 
         foreach (var dimension in dimensions)
         {
-            if (dimension is ReportDimension.Regime or ReportDimension.Account or ReportDimension.Universe)
+            if (dimension is ReportDimension.Regime or ReportDimension.Account || (dimension == ReportDimension.Universe && !AnyTierKnown))
             {
                 return Fail<Bucketed>(ReportErrors.DimensionUnavailable(dimension));
             }
@@ -817,6 +829,7 @@ public sealed class ReportPopulation
         ReportDimension.Weekday => GroupMath.WeekdayOf(row.Trade.EntryDate),
         ReportDimension.Sector => row.Trade.Sector,
         ReportDimension.Hour => HourOf(row),
+        ReportDimension.Universe => row.Trade.Tier,
         _ => throw new ArgumentOutOfRangeException(nameof(dimension)),
     };
 

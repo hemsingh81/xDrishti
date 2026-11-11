@@ -9,7 +9,11 @@ public sealed record LabInstrument(Guid Id, string Symbol);
 /// The universe of a Lab run as it was resolved when the run was posted (spec P5-02, D2): the basket changes later, the run keeps the list. <paramref name="Requested"/> is the number of members before the quick-test sample;
 /// <paramref name="Sampled"/> says the list was cut to the limit by the seeded shuffle of <paramref name="Seed"/>.
 /// </summary>
-public sealed record LabUniverse(string Kind, Guid? BasketId, string Label, int Requested, IReadOnlyList<LabInstrument> Instruments, bool Sampled, long? Seed);
+public sealed record LabUniverse(string Kind, Guid? BasketId, string Label, int Requested, IReadOnlyList<LabInstrument> Instruments, bool Sampled, long? Seed, string? MembersBasis = null)
+{
+    /// <summary>True for a basket run that replays each day with that day's members (BK-11b): its requests name the basket and the basis, not the list.</summary>
+    public bool IsDated => BasketId is not null && string.Equals(MembersBasis, "dated", StringComparison.Ordinal);
+}
 
 /// <summary>The counts of a finished run: the instruments asked for and replayed, the ones skipped, and the trades (closed and open at the end of the data).</summary>
 public sealed record LabCounts(int Instruments, int InstrumentsRun, int Skipped, int Trades, int OpenAtEnd);

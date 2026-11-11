@@ -115,6 +115,7 @@ public static class ExportSpellings
         NoTradeReason.EventUnavailable => "event_unavailable",
         NoTradeReason.TierExcluded => "tier_excluded",
         NoTradeReason.TurnoverBlocked => "turnover_blocked",
+        NoTradeReason.NotMember => "not_member",
         _ => throw Unknown(reason),
     };
 

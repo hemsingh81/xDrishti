@@ -277,6 +277,8 @@ export const buildCellState = (over: Partial<State> = {}): State => ({
 
 export interface LearningFake {
   overview?: Overview;
+  /** The tier links of BK-11 (default none). */
+  universeLinks?: Schemas['UniverseLinkView'][];
   /** Cells by window code (set each cell's `window` to match); a window not given answers with `all`'s cells. */
   cells?: Partial<Record<string, Cell[]>>;
   changelog?: Entry[];
@@ -296,6 +298,7 @@ export function mountLearning(fake: Omit<LearningFake, 'asked'> = {}): LearningF
   const cellsOf = (window: string) => fake.cells?.[window] ?? fake.cells?.all ?? [];
   server.use(
     http.get('/api/learning/overview', () => HttpResponse.json(fake.overview ?? buildOverview())),
+    http.get('/api/cells/universe-links', () => HttpResponse.json(fake.universeLinks ?? [])),
     http.get('/api/reports/plan-vs-actual', () => HttpResponse.json(fake.planVsActual ?? buildPlanVsActual())),
     http.get('/api/reports/decisions', () => HttpResponse.json(fake.decisions ?? buildDecisions())),
     http.get('/api/autonomy/settings', () => HttpResponse.json(fake.autonomy ?? buildAutonomy())),

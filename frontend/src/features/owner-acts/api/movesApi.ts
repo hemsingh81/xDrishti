@@ -116,6 +116,24 @@ export function useHypothesisAct() {
   );
 }
 
+export interface UniverseProposeAct extends Typed {
+  /** The tier cell key (seven parts). */
+  key: string;
+  baselineRunKey: string;
+}
+
+/** Proposes ONE hypothesis from a stable liquidity-tier observation (BK-11b). It applies nothing: a scope hypothesis cannot be started. */
+export function useUniverseProposeAct() {
+  return useAct(async ({ key, baselineRunKey, reason, password }: UniverseProposeAct) =>
+    unwrap(
+      await api.POST('/api/cells/universe-links/{key}/propose', {
+        params: { path: { key } },
+        body: { baselineRunKey, reason, window: null, password },
+      }),
+    ),
+  );
+}
+
 export interface RevertAct extends Typed {
   id: number;
 }

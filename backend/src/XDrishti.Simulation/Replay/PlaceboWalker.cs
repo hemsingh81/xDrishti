@@ -159,7 +159,7 @@ public static class PlaceboWalker
         }
 
         var side = pair.Placement.Side;
-        var rules = new WalkRules(signal.RewardRisk, squareOff, strategy.Fills, tick, TierOn: input.TierOn, TurnoverOn: input.TurnoverOn);
+        var rules = new WalkRules(signal.RewardRisk, squareOff, strategy.Fills, tick, TierOn: input.TierOn, TurnoverOn: input.TurnoverOn, MemberOn: input.MemberOn);   // BK-11b: a placebo on a session where the instrument was not a member is no trade, as a dated run would take none there
         var candidate = EntryOverride.Forced(instrument, strategy.Record.Id, bars, index, side, EntryOverride.StopAt(side, bars[index].Close, signal.RiskFraction));
         var walked = EntryOverride.Walk(candidate, bars, rules);
         if (walked.IsFailure)

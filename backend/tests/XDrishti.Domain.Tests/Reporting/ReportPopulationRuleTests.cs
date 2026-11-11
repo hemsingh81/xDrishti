@@ -270,11 +270,27 @@ public sealed class ReportPopulationRuleTests
 
         regime.Error.Code.ShouldBe("reports.dimension_unavailable");
         regime.Error.Message.ShouldContain("not a report dimension yet");
-        universe.Error.Code.ShouldBe("reports.dimension_unavailable");   // BK-11: no tier per trade in the report engine; the message names where the tier cells are
-        universe.Error.Message.ShouldContain("/api/cells/universe");
+        universe.Error.Code.ShouldBe("reports.dimension_unavailable");   // BK-11b: refused only when no trade carries a tier; the reason is the one of the spec
+        universe.Error.Message.ShouldBe("no liquidity tier for these trades");
         account.Error.Message.ShouldContain("no account");
         population.Evidence.UnavailableInputs.ShouldContain("style not recorded for run r1");
         population.Evidence.UnavailableInputs.ShouldContain("basket membership not recorded for 3 trades");
+    }
+
+    [Fact]
+    public void BK_11b_trades_that_carry_a_tier_are_grouped_by_it_and_a_population_without_one_still_refuses()
+    {
+        var trades = Series("r1", "ORB", Repeat(1, 6));
+        string[] tiers = ["liq_high", "liq_high", "liq_low", "unknown", "unavailable", "liq_high"];
+        var tiered = trades.Select((t, i) => t with { Tier = tiers[i] }).ToList();
+
+        var groups = Population([Run("r1")], tiered).GroupBy([ReportDimension.Universe]);
+        var untiered = Population([Run("r1")], trades).GroupBy([ReportDimension.Universe]);
+
+        groups.IsSuccess.ShouldBeTrue();
+        groups.Value.Groups.Select(g => (g.Key.ToString(), g.N)).Order().ToList().Count.ShouldBe(4);
+        groups.Value.Groups.Sum(g => g.N).ShouldBe(6, "every trade is in exactly one bucket, the unknown and the unavailable ones included");
+        untiered.IsFailure.ShouldBeTrue();
     }
 
     [Fact]
