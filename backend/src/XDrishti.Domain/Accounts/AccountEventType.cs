@@ -110,4 +110,5 @@ public enum AccountEventType
     DerivedBasketChanged,
     SizingChanged,
     BasketSettingsChanged,
+    HypothesisProposed,
 }

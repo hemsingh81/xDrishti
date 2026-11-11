@@ -306,6 +306,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(OwnerMoveRequest))]
 [JsonSerializable(typeof(LinkLessonRequest))]
 [JsonSerializable(typeof(MoveHypothesisRequest))]
+[JsonSerializable(typeof(ProposeFromUniverseLinkRequest))]
 [JsonSerializable(typeof(LessonMoveOutcome))]
 [JsonSerializable(typeof(HypothesisMoveOutcome))]
 [JsonSerializable(typeof(ChangelogOutcome))]

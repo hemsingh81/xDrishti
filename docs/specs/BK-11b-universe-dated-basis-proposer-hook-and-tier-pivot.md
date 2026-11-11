@@ -62,6 +62,25 @@ None blocking (approved). Left for the owner:
 3. Should the web propose endpoint exist, or stay CLI only like the other proposals? Built both; the web act needs the password.
 
 ## Done when
-- [ ] All acceptance criteria have evidence; `scripts/check.sh` green; reviewer: no blockers/majors (told to look for look-ahead in the dated replay and the report tier, and any path that applies a restriction)
+- [ ] All acceptance criteria have evidence (see the build notes); `scripts/check.sh` green; reviewer: no blockers/majors (told to look for look-ahead in the dated replay and the report tier, and any path that applies a restriction)
 - [ ] `scripts/gen-api.sh` run; migration with `Down` (only if a column or check is needed)
 - [ ] ADR (next free number) amending ADR 0261 points 10 to 12; BK-11 AC 8, 11, 12 marked met
+
+## Build notes 2026-11-11 (ADR 0266)
+**UNVERIFIED items resolved by reading the code**
+- `IBasketQueries.MembersAsync(basketId, cutoff, asOf)` filters by `cutoff` only; `asOf` is just echoed. A per-day call would need `BasketMember.CutoffAfter(day)`. The build instead adds `IBasketQueries.StaysAsync(basketId)` (all stays, one query) and `DatedMembers` (pure) applies the same rule ("a member at the end of that day"): one read per run, no per-day query.
+- The `source` column is `varchar(8)` with `ck_hypotheses_shape` listing `owner`, `grid`, `model`: widened in the migration (`universe`, kind `Scope`); the check of `research.universe_settings_changes` lists its keys, so it is widened for the auto key too. No column and no change to `sim_trades`.
+- The structured basis lives in the run record (`SimulationRun.UniverseBasis`, nullable, omitted from the record text when null), like `RelativeStrength`; the run header table has no column for it.
+- `ReportTrade.EntryDate` is `sim_trades.trade_date`, the same field the cell statistics call `TradeDate`; the universe lens uses it.
+- `ProposeHypothesisHandler` / `OneVariableRule.BaselineProblems` accept the `Scope` knob unchanged (no problem for kinds other than Parameter and Exit); `OneVariableRule.Problems` has no case for it, which is why `Start`/`RunExperiment` refuse it first with `learning.knob_not_runnable`.
+**Decisions taken in the build**
+- `member_days_hash` hashes the member stays clipped to the window, ordered by (instrument, first day, last day), not one line per (day, instrument): the same information, smaller; a different history is a different hash.
+- `members_as_of` of a `single_snapshot` run is the India date of the run, from `TimeProvider`: the members are those of that day, so the key of such a run changes with the day.
+- The new engine fate/counter `not_member` is written to the record only when above 0 (like `tier_excluded`), so every default record and golden is unchanged.
+- The derived-basket `params_hash` is the newest stored version with `effective_from` on or before the window start (`IDerivedVersionStore.ListVersionsAsync`).
+- The web propose endpoint is `POST /api/cells/universe-links/{key}/propose` (key URL-encoded), an owner act behind `learning_moves_ui`; the window defaults to `all`.
+- The auto proposer proposes an observation only once per (cell, tier): a closed (rejected, expired) hypothesis of the same pair is not proposed again by the auto option; the owner can still propose it by hand.
+**Not built (reported)**
+- The Lab: `membersBasis` is accepted by the simulate command (`xd simulate --basket --members dated|single_snapshot`) and the run record carries the structured fields; the Lab start request, its stored universe and the Lab run view do not offer it (the Lab samples a stored instrument list and builds many requests from it). The trial count (`GET /api/lab/strategies/{id}/universe-trials`) counts (basket, basis) pairs and reads `membersBasis` of a stored Lab universe when one exists.
+- The frontend Lab picker and the Setups "Propose as hypothesis" row: the Setups universe-links screen does not exist yet in the frontend (BK-11 built the endpoints only). The pivot builder offers the liquidity tier.
+- The random-entry and placebo walks (CF-07) and the trade-card recomputation (`BuildTradeCards`) do not take the member filter: the card of a trade a dated run took is rebuilt from the same bars; only the entries a dated run refused are not shown.

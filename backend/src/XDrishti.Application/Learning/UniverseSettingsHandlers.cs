@@ -16,13 +16,14 @@ namespace XDrishti.Application.Learning;
 /// <param name="MinTradesChild"><c>learning.universe_min_trades_child</c>.</param>
 /// <param name="LinkMinTrades"><c>learning.universe_link_min_trades</c>.</param>
 /// <param name="RegisteredBaskets"><c>learning.universe_registered_baskets</c>.</param>
+/// <param name="AutoPropose"><c>learning.universe_link.auto_propose</c> (BK-11b): off by default; when on, observations are proposed as hypotheses by the actor auto. Proposes only.</param>
 /// <param name="History">The latest 50 changes, newest first.</param>
 /// <param name="Version">The newest change id (0 when none); a change names it as <c>expectedVersion</c>.</param>
 /// <param name="Notice">What the settings do and do not do.</param>
-public sealed record UniverseSettingsView(int MinTradesChild, int LinkMinTrades, IReadOnlyList<string> RegisteredBaskets, IReadOnlyList<UniverseSettingChangeView> History, long Version, string Notice)
+public sealed record UniverseSettingsView(int MinTradesChild, int LinkMinTrades, IReadOnlyList<string> RegisteredBaskets, IReadOnlyList<UniverseSettingChangeView> History, long Version, string Notice, bool AutoPropose = false)
 {
     /// <summary>Printed with the settings.</summary>
-    public const string NoticeText = "These settings decide what the read side calls a tier cell, an observation and a registered basket. None of them applies a restriction, changes a scan scope or places an order.";
+    public const string NoticeText = "These settings decide what the read side calls a tier cell, an observation and a registered basket. None of them applies a restriction, changes a scan scope or places an order. The auto option (off by default) only proposes a hypothesis, as the actor auto.";
 }
 
 /// <summary>One change in the history.</summary>
@@ -32,13 +33,13 @@ public sealed record UniverseSettingChangeView(long Id, string Key, string OldVa
 public sealed record GetUniverseSettingsQuery : IQuery<UniverseSettingsView>;
 
 /// <summary>The owner's change of the universe settings; a value left null stays. The fresh password is checked for every change.</summary>
-public sealed record ChangeUniverseSettingsCommand(string Actor, Guid SessionId, ClientInfo Client, int? MinTradesChild, int? LinkMinTrades, string? RegisteredBaskets, string? Password, long? ExpectedVersion = null) : ICommand;
+public sealed record ChangeUniverseSettingsCommand(string Actor, Guid SessionId, ClientInfo Client, int? MinTradesChild, int? LinkMinTrades, string? RegisteredBaskets, string? Password, long? ExpectedVersion = null, bool? AutoPropose = null) : ICommand;
 
 internal static class UniverseSettingsViews
 {
     public static UniverseSettingsView Of(UniverseSettingsState state) => new(
         state.Settings.MinTradesChild, state.Settings.LinkMinTrades, state.Settings.RegisteredBaskets,
-        [.. state.History.Select(h => new UniverseSettingChangeView(h.Id, h.Key, h.OldValue, h.NewValue, h.Actor, h.ChangedAt, h.Hash))], state.Version, UniverseSettingsView.NoticeText);
+        [.. state.History.Select(h => new UniverseSettingChangeView(h.Id, h.Key, h.OldValue, h.NewValue, h.Actor, h.ChangedAt, h.Hash))], state.Version, UniverseSettingsView.NoticeText, state.Settings.AutoPropose);
 }
 
 internal sealed class GetUniverseSettingsHandler(IUniverseSettingsStore store) : IQueryHandler<GetUniverseSettingsQuery, UniverseSettingsView>
@@ -118,6 +119,12 @@ internal sealed class ChangeUniverseSettingsHandler(IUniverseSettingsStore store
             {
                 rows.Add(Row(UniverseSettingsRules.RegisteredBasketsKey, now.RegisteredText, string.Join(',', names), command.Actor));
             }
+        }
+
+        if (command.AutoPropose is { } auto && auto != now.AutoPropose)
+        {
+            // BK-11b: the auto option of the tier proposer; it proposes a hypothesis and applies nothing
+            rows.Add(Row(UniverseSettingsRules.AutoProposeKey, now.AutoPropose ? "true" : "false", auto ? "true" : "false", command.Actor));
         }
 
         if (problems.Count > 0)

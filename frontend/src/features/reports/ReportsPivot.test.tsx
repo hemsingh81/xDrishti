@@ -124,6 +124,7 @@ describe('Pivot builder', () => {
       'Exit',
       'Month',
       'Weekday',
+      'Liquidity tier',
     ]);
     expect(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Basket' })).toHaveAttribute(
       'aria-disabled',

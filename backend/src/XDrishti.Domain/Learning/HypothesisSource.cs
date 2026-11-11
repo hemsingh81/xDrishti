@@ -11,4 +11,7 @@ public enum HypothesisSource
 
     /// <summary>The local model proposed it and the owner (or the auto option) accepted the proposal (P9-08); it is still only a proposed hypothesis. Stored as the code <c>model</c> (the column is 8 characters wide and a view depends on it).</summary>
     Assistant,
+
+    /// <summary>A stable liquidity-tier observation (BK-11b) proposed as one hypothesis by the owner's act or the auto option. Stored as the code <c>universe</c> (8 characters, the width of the column).</summary>
+    Universe,
 }

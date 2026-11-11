@@ -22,6 +22,7 @@ namespace XDrishti.Domain.Research;
 /// <param name="Totals">The figures summed over the instruments.</param>
 /// <param name="Costs">What the run charged with (ADR 0042, D14); null for a gross run.</param>
 /// <param name="RelativeStrength">What a run that names mom_rank, rs_vs_index or sector_rs read: the hash and count of the stored rows, the basket ids, basis and parameter hashes (BK-09); null otherwise.</param>
+/// <param name="UniverseBasis">How the members of a basket run were chosen when the request named a members basis (BK-11b, ADR 0266): the basket, parameter hash, basis, the date or the hash of the member days; null otherwise.</param>
 /// <param name="ResultsDays">What a run that names <c>days_to_results</c> or <c>days_since_results</c> read: the calendar snapshot and filing-time hashes, rows, lag and series version (P15-05, ADR 0185); null otherwise.</param>
 /// <param name="EventFilter">What a run that names <c>not_event_day</c> read: the calendar snapshot hash, rows, lag and rule version (P15-06, ADR 0182); null otherwise.</param>
 /// <param name="IsTraining">True for a training run (AU-11, ADR 0243). Set from the header's purpose; a training run's key holds it, and the store takes the purpose from here. Not part of the record text (the exporter leaves it out: SimExportJson.WithoutTrainingFlag), so every research record and its digest are unchanged.</param>
@@ -45,7 +46,8 @@ public sealed record SimulationRun(
     EventFilterRecord? EventFilter = null,
     ResultsDaysRecord? ResultsDays = null,
     bool IsTraining = false,
-    RelativeStrengthRecord? RelativeStrength = null)
+    RelativeStrengthRecord? RelativeStrength = null,
+    UniverseBasisRecord? UniverseBasis = null)
 {
     /// <summary>The schema of the record and of the run key this code writes.</summary>
     public const int CurrentSchemaVersion = 8;

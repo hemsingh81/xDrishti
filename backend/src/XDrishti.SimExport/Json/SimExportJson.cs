@@ -91,7 +91,8 @@ public static class SimExportJson
 
         if (typeInfo.Type == typeof(SimulationRun))
         {
-            foreach (var property in typeInfo.Properties.Where(p => string.Equals(p.Name, "relative_strength", StringComparison.Ordinal)))
+            // BK-11b: universe_basis exists only for a basket run that named a members basis, so every other record text and hash is as before
+            foreach (var property in typeInfo.Properties.Where(p => string.Equals(p.Name, "relative_strength", StringComparison.Ordinal) || string.Equals(p.Name, "universe_basis", StringComparison.Ordinal)))
             {
                 property.ShouldSerialize = static (_, value) => value is not null;
             }
@@ -104,7 +105,7 @@ public static class SimExportJson
             return;
         }
 
-        foreach (var property in typeInfo.Properties.Where(p => (string.Equals(p.Name, "tier_excluded", StringComparison.Ordinal) || string.Equals(p.Name, "turnover_blocked", StringComparison.Ordinal))))
+        foreach (var property in typeInfo.Properties.Where(p => (string.Equals(p.Name, "tier_excluded", StringComparison.Ordinal) || string.Equals(p.Name, "turnover_blocked", StringComparison.Ordinal) || string.Equals(p.Name, "not_member", StringComparison.Ordinal))))
         {
             property.ShouldSerialize = static (_, value) => value is not 0L;
         }

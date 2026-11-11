@@ -22,6 +22,8 @@ The learning engine should be able to say that a setup works differently on high
 12. **Reports.** `ReportDimension.Universe` is refused with 422 `reports.dimension_unavailable` and the reason: the report engine stores no tier per trade; the tier cells are read from `/api/cells/universe`.
 
 ## Deferred to BK-11b (spec partially met)
+*Built 2026-11-11 and amended by [ADR 0266](0266-dated-members-are-an-opt-in-basis-of-a-basket-run-a-tier-observation-is-proposed-as-a-scope-hypothesis-and-never-applied-and-the-universe-lens-tags-trades-at-read-time.md): points 10 to 12 now read as that ADR says (the dated basis is opt-in, the proposer exists as an act, the universe lens is available when a tier can be made). The text below is what was deferred.*
+
 Not built here and carried by [BK-11b](../specs/BK-11b-universe-dated-basis-proposer-hook-and-tier-pivot.md): AC 8 (the dated basis `members(asOf = day)` and the structured label fields `universe_basket_id`, `universe_params_hash`, `members_as_of`, `universe_basis`), AC 11 (the hypothesis proposer hook; the owner creates the hypothesis by hand until then) and AC 12 (the tier as an available pivot dimension; it is refused with the reason now).
 
 ## Owner questions (recorded)

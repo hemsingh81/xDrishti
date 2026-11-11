@@ -3,6 +3,7 @@ using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Market.Baskets;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
@@ -48,7 +49,8 @@ internal sealed class RunSimulationHandler(
     IPlaceboEngine placeboEngine,
     IEntryTierSource? entryTiers = null,
     ICostStressSettings? costStress = null,
-    IRelativeStrengthRunSource? relativeStrength = null) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>
+    IRelativeStrengthRunSource? relativeStrength = null,
+    IDerivedVersionStore? derivedVersions = null) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>
 {
     private readonly InstrumentInputReader _reader = new(bars, barQueries, adjustments);
 
@@ -341,7 +343,8 @@ internal sealed class RunSimulationHandler(
                 events is null ? null : new EventFilterRecord(events.Sha256, events.RowCount, events.LagMinutes, EventCalendarSnapshot.RuleVersion),
                 resultsDays is null ? null : new ResultsDaysRecord(resultsDays.Calendar?.Sha256 ?? "-", resultsDays.Calendar?.RowCount ?? 0, resultsDays.FilingsSha256, resultsDays.FilingCount, resultsDays.LagMinutes, ResultsDaySeries.Version, resultsDays.Surprises?.Sha256, resultsDays.Surprises?.Rows ?? 0, resultsDays.Surprises is null ? null : SurpriseInputs.Version, resultsDays.Surprises?.UnverifiedRows ?? 0, resultsDays.Surprises?.Seasons ?? 0, resultsDays.Surprises?.ThinSeasons ?? 0, missed.Missed, missed.Total),
                 Purpose: request.Purpose,
-                RelativeStrength: context.RelativeStrength?.Record(replays[k].Sum(r => r.Record.Scans.Sum(s => s.FeatureUnknown))));
+                RelativeStrength: context.RelativeStrength?.Record(replays[k].Sum(r => r.Record.Scans.Sum(s => s.FeatureUnknown))),
+                UniverseBasis: targets.Basis);
             firstHeader ??= header;
             runs.Add(RunAssembler.Assemble(header, replays[k]));
         }
@@ -471,6 +474,11 @@ internal sealed class RunSimulationHandler(
         }
 
         var basketId = request.BasketId!.Value;
+        if (request.MembersBasis == UniverseBasisRecord.Dated)
+        {
+            return await ResolveDatedUniverseAsync(request, basketId, cancellationToken);
+        }
+
         var members = await baskets.MembersAsync(basketId, null, null, cancellationToken);
         if (members is null || members.ArchivedAt is not null)
         {
@@ -484,7 +492,47 @@ internal sealed class RunSimulationHandler(
             known[member.Instrument.Id] = new BarsInstrument(member.Instrument.Id, member.Instrument.Symbol, member.Instrument.Name, member.Instrument.TickSize);
         }
 
-        return Result.Success(new Universe(UniverseKind.Basket, basketId, members.Name, UniverseLabels.Basket(basketId), [.. ordered.Select(m => m.Instrument.Id)], known));
+        // BK-11b: a run that names single_snapshot says so in structured fields; one that names nothing is as it was
+        var basis = request.MembersBasis is null ? null : new UniverseBasisRecord(basketId, await ParamsHashAtAsync(basketId, request.From, cancellationToken), IndiaTime.Today(time.GetUtcNow()), UniverseBasisRecord.SingleSnapshot, null);
+        return Result.Success(new Universe(UniverseKind.Basket, basketId, members.Name, UniverseLabels.Basket(basketId), [.. ordered.Select(m => m.Instrument.Id)], known, basis));
+    }
+
+    /// <summary>
+    /// The universe of a run with dated members (BK-11b): the stays of the basket are read once; the run is refused when they cannot stand for the window start; the instruments are those that are a member on some day of the window, and the replay is told, per instrument, on which
+    /// days it may take a new entry.
+    /// </summary>
+    private async ValueTask<Result<Universe>> ResolveDatedUniverseAsync(SimulationRequest request, Guid basketId, CancellationToken cancellationToken)
+    {
+        var stays = await baskets.StaysAsync(basketId, cancellationToken);
+        if (stays is null || stays.ArchivedAt is not null)
+        {
+            return Result.Failure<Universe>(SimulationErrors.BasketNotFound);
+        }
+
+        var dated = new DatedMembers(stays.Items.Select(s => (s.InstrumentId, s.ValidFrom, s.ValidTo)));
+        if (!dated.IsDatedFor(request.From, out var firstDay))
+        {
+            return Result.Failure<Universe>(SimulationErrors.MembersNotDated(firstDay));
+        }
+
+        var ordered = stays.Items.Where(s => dated.IsMemberDuring(s.InstrumentId, request.From, request.To)).GroupBy(s => s.InstrumentId).Select(g => g.OrderBy(s => s.Position).First()).OrderBy(s => s.Position).ThenBy(s => s.Symbol, StringComparer.Ordinal).ToList();
+        var known = ordered.ToDictionary(s => s.InstrumentId, s => new BarsInstrument(s.InstrumentId, s.Symbol, s.Name, s.TickSize));
+        var paramsHash = await ParamsHashAtAsync(basketId, request.From, cancellationToken);
+        SimulationLog.DatedMembers(logger, basketId, dated.ChangeDays.Count, ordered.Count);
+        var basis = new UniverseBasisRecord(basketId, paramsHash, null, UniverseBasisRecord.Dated, dated.Hash(request.From, request.To));
+        return Result.Success(new Universe(UniverseKind.Basket, basketId, stays.Name, UniverseLabels.Dated(basketId, paramsHash), [.. ordered.Select(s => s.InstrumentId)], known, basis, dated));
+    }
+
+    /// <summary>The parameter hash of the version of a derived basket in force at <paramref name="from"/>; null for a manual or index basket, or when the store is not given.</summary>
+    private async ValueTask<string?> ParamsHashAtAsync(Guid basketId, DateOnly from, CancellationToken cancellationToken)
+    {
+        if (derivedVersions is null)
+        {
+            return null;
+        }
+
+        var versions = await derivedVersions.ListVersionsAsync(basketId, 0, 200, cancellationToken);
+        return versions?.Items.Where(v => v.EffectiveFrom <= from).OrderByDescending(v => v.EffectiveFrom).Select(v => v.ParamsHash).FirstOrDefault();
     }
 
     /// <summary>
@@ -504,10 +552,15 @@ internal sealed class RunSimulationHandler(
         var built = InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.ContextDays, context.ContextDays is { Count: > 0 } ? null : (context.ContextDays is null ? null : "no_context"), context.Events, context.ResultsDays,
             request.Fills?.ConservativeSlippage == true && entryTiers is not null ? await entryTiers.ForAsync(id, request.From, request.To, cancellationToken) : null,
             context.ReadsTurnover && entryTiers is not null ? await entryTiers.TurnoverForAsync(id, request.From, request.To, cancellationToken) : null);
+        if (context.Targets.Dated is { } dated)
+        {
+            built = built with { MemberOn = dated.Of(id) };   // BK-11b: a leaver keeps no new entries; a position already open is never force-closed
+        }
+
         return context.RelativeStrength is { } strength ? built with { RelativeStrength = await strength.ReadAsync(id, request.From, cancellationToken) } : built;
     }
 
-    private sealed record Universe(UniverseKind Kind, Guid? BasketId, string? BasketName, string Label, IReadOnlyList<Guid> Ids, IReadOnlyDictionary<Guid, BarsInstrument>? Known);
+    private sealed record Universe(UniverseKind Kind, Guid? BasketId, string? BasketName, string Label, IReadOnlyList<Guid> Ids, IReadOnlyDictionary<Guid, BarsInstrument>? Known, UniverseBasisRecord? Basis = null, DatedMembers? Dated = null);
 
     private sealed record RunContext(
         SimulationRequest Request,
