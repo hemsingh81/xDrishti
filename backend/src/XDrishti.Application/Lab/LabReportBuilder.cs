@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using XDrishti.Domain.Lab;
+using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Lab;
 
@@ -215,12 +216,17 @@ internal static class LabReportBuilder
         return w;
     }
 
+    /// <summary>The sentence on the stored history, from the span the run recorded in its labels (CF-04 C); a run without that label keeps the old reading. The hold-out wording is unchanged: no hold-out is claimed or denied beyond what the run's own labels say.</summary>
+    private static string StoredHistory(LabRunView run) =>
+        HistoryDepth.StoredSpanOf(run.Labels) is { } span
+            ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"the stored history is {span.First:yyyy-MM-dd} to {span.Last:yyyy-MM-dd}, about {HistoryDepth.StoredYears(span.First, span.Last, run.Window.To):0.0} years, with no hold-out")
+            : "the stored history is about 2.1 years with no hold-out";
+
     private static List<string> Limits(LabRunView run, LabVerdictView v, int minFolds)
     {
         var l = new List<string>
         {
-            // Shortcut: the 2.1 years is the history stored today (P0 data load), not read from the store; revisit when the history grows.
-            $"Data: the run window is {run.Window.From:yyyy-MM-dd} to {run.Window.To:yyyy-MM-dd}; the stored history is about 2.1 years with no hold-out, so every figure rests on a short sample.",
+            $"Data: the run window is {run.Window.From:yyyy-MM-dd} to {run.Window.To:yyyy-MM-dd}; {StoredHistory(run)}, so every figure rests on a limited sample.",
             $"Walk-forward folds: {v.Evidence.Folds}; a PASS needs at least {minFolds}.",
             $"Full-period figures are {LabFullTest.ExplorationLabel}.",
         };

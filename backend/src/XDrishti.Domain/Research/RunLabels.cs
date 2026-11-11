@@ -49,8 +49,6 @@ public static class RunLabels
 
     private const string OpeningBarLabel = "opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)";
 
-    private const double DaysPerYear = 365.25;
-
     /// <summary>The three labels of the engine's own gross result, in order: costs, portfolio limits, sample (the engine's header, <c>SimulationHeader.FixedLabels</c>, delegates here). A run record takes the first from <see cref="CostDescription.Label"/>.</summary>
     public static IReadOnlyList<string> FixedLabels { get; } = Array.AsReadOnly([CostDescription.None, "portfolio limits: not simulated", "sample: in-sample"]);
 
@@ -87,6 +85,7 @@ public static class RunLabels
             .. ReferenceLine(run),
             "universe: " + run.Universe.Label + SurvivorshipNote,
             DataLine(run),
+            .. HistoryDepth.Lines(run),
             EngineLine(run.EngineVersion),
             TickLabel,
             OpeningBarLabel,
@@ -228,7 +227,7 @@ public static class RunLabels
         var firstMax = ran.Max(i => i.FirstBar!.Value);
         var lastMin = ran.Min(i => i.LastBar!.Value);
         var lastMax = ran.Max(i => i.LastBar!.Value);
-        var lengths = ran.Select(i => (i.LastBar!.Value.DayNumber - i.FirstBar!.Value.DayNumber) / DaysPerYear).ToList();
+        var lengths = ran.Select(i => (i.LastBar!.Value.DayNumber - i.FirstBar!.Value.DayNumber) / HistoryDepth.DaysPerYear).ToList();
 
         return string.Create(
             CultureInfo.InvariantCulture,

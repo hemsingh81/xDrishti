@@ -124,6 +124,8 @@ internal sealed class StartLabRunHandler(
         var configHash = LabRunIdentity.Sha256((robust ? settings.RobustConfigText(basis) : full ? settings.FullConfigText(basis) : settings.ConfigText(basis)) + (keyOptions is null ? string.Empty : ";" + keyOptions));
         var key = LabRunIdentity.Key(version.Hash, universe.Value.Label, [.. universe.Value.Instruments.Select(i => i.Id)], from, to, method, configHash, engine.EngineVersion);
         var labels = full ? FullLabels(universe.Value, from, to, firstSession, lastSession, basisLabel, robust) : Labels(universe.Value, from, to, firstSession, lastSession, basisLabel);
+        // CF-04 C: depth and survivorship only for a stored history of 3 years or more; labels are not part of the run key, so every current run is unchanged
+        labels = [.. labels, .. HistoryDepth.LabLines(firstSession, lastSession, to, command.MembersBasis == UniverseBasisRecord.Dated)];
         if (holdOutNote is not null)
         {
             labels = [.. labels, holdOutNote];

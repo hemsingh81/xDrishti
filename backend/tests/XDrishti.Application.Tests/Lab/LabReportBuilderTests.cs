@@ -32,6 +32,22 @@ public sealed partial class LabReportBuilderTests
         new SignFlipBaselineView("sign_flip", 400, 1000, "2", 0.4, 0.1, p, "lenient"), "unavailable: x", ["block limit"]);
 
     [Fact]
+    public void CF_04_C_the_data_limit_is_derived_from_the_stored_span_of_the_run_short_and_deep()
+    {
+        static LabRunView With(LabRunView r, string span) => r with { Labels = [span] };
+        string Data(LabRunView r) => Build(Verdict(), r).HonestLimits.First(l => l.StartsWith("Data:", StringComparison.Ordinal));
+
+        var shortRun = Data(With(Run(), "Stored data runs from 2024-04-01 to 2026-04-30; the first and last bar of each instrument are in its simulation record."));
+        var deepRun = Data(With(Run(), "Stored data runs from 2021-05-03 to 2026-04-30."));
+        var none = Data(Run());
+
+        shortRun.ShouldContain("2024-04-01 to 2026-04-30, about 2.1 years, with no hold-out");
+        deepRun.ShouldContain("2021-05-03 to 2026-04-30, about 5.0 years, with no hold-out");
+        deepRun.ShouldNotContain("2.1 years");
+        none.ShouldContain("about 2.1 years with no hold-out");
+    }
+
+    [Fact]
     public void A_clean_report_has_no_warnings_orders_cells_by_oos_mean_and_lists_what_it_does_not_hold()
     {
         var r = Build(Verdict(cells: [Cell("a", 200, 0.1), Cell("b", 200, 0.9), Cell("c", 200, null)]));
