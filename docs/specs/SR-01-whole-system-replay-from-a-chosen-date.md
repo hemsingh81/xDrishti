@@ -202,9 +202,9 @@ All eight answered by the owner on 2026-11-11 as recommended ("Approve all"); th
    - Revisit in SR-02 once the settings history covers the replay range.
 3. **Learning cadence.** In `learning` mode, recompute cell stats every session, or on the scheduled job's cadence?
    - *Recommended:* the scheduled job's cadence, so the replay learns the way the live system does.
-   - UNVERIFIED: the builder confirms the cadence from the schedule and that the P6-01 calculator can run in memory without its store.
+   - **Verified at build (part A, ADR 0272):** no scheduled cell-statistics job exists in code (only `xd learn cells`); the design's weekly learning service (Saturday) is the cadence, so the replay uses weekly. The P6-01 calculator is pure and runs in memory without its store (reading the source runs of the frozen snapshot).
 4. **Cell lifecycle in `learning` mode.** Run the lifecycle rules in memory, or keep the stored changelog as of S?
-   - *Recommended:* the rules in memory, if they are pure (UNVERIFIED); otherwise the stored changelog, labelled "lifecycle as recorded".
+   - *Recommended:* the rules in memory, if they are pure; otherwise the stored changelog, labelled "lifecycle as recorded". **Verified at build (part A, ADR 0272):** the lifecycle is a table of legal moves that need owner approval and out-of-sample facts, so it is not pure in the needed sense; the changelog as of S is used, labelled.
    - Before Oct 2026 the changelog is empty, so "as recorded" means the initial state.
 5. **Compounding.** Size from replay equity (compounding) or from the fixed starting capital?
    - *Recommended:* replay equity, as the live system sizes from the paper book.

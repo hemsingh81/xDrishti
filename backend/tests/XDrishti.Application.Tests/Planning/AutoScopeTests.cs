@@ -10,6 +10,7 @@ using XDrishti.Application.Market.Search;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Tests.LearnedSettings;
 using XDrishti.Domain.Accounts;
+using XDrishti.Domain.Market.Baskets;
 using XDrishti.Domain.Planning;
 
 namespace XDrishti.Application.Tests.Planning;
@@ -103,6 +104,44 @@ public sealed class AutoScopeTests
 
         resolved!.InstrumentIds.ShouldBe([member, stock], ignoreOrder: true);
         (await new AutoScopeResolver(new MemoryScopes(), baskets).ResolveAsync(Ct)).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_null_as_of_date_reads_exactly_what_the_live_resolver_reads()
+    {
+        var basket = Guid.NewGuid();
+        var member = Guid.NewGuid();
+        var store = new MemoryScopes();
+        await store.AppendAsync(AutoScope.Create([basket], []).Value, Owner, DateTimeOffset.UnixEpoch, Ct);
+        var baskets = Substitute.For<IBasketQueries>();
+        baskets.MembersAsync(basket, null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketMembers?>(Members(basket, null, Member(member, null), Member(Guid.NewGuid(), DateTimeOffset.UnixEpoch))));
+        var resolver = new AutoScopeResolver(store, baskets);
+
+        var live = await resolver.ResolveAsync(Ct);
+        var nullDate = await resolver.ResolveAsync((DateOnly?)null, Ct);
+
+        nullDate!.Hash.ShouldBe(live!.Hash);
+        nullDate.InstrumentIds.ShouldBe(live.InstrumentIds, ignoreOrder: true);
+        await baskets.DidNotReceive().MembersAsync(basket, Arg.Is<DateTimeOffset?>(c => c != null), Arg.Any<DateOnly?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task An_as_of_date_expands_the_baskets_to_their_members_at_that_date()
+    {
+        var basket = Guid.NewGuid();
+        var then = Guid.NewGuid();
+        var now = Guid.NewGuid();
+        var stock = Guid.NewGuid();
+        var store = new MemoryScopes();
+        await store.AppendAsync(AutoScope.Create([basket], [stock]).Value, Owner, DateTimeOffset.UnixEpoch, Ct);
+        var day = new DateOnly(2025, 3, 3);
+        var baskets = Substitute.For<IBasketQueries>();
+        baskets.MembersAsync(basket, null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketMembers?>(Members(basket, null, Member(now, null))));
+        baskets.MembersAsync(basket, BasketMember.CutoffAfter(day), null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketMembers?>(Members(basket, null, Member(then, DateTimeOffset.UtcNow))));
+
+        var resolved = await new AutoScopeResolver(store, baskets).ResolveAsync(day, Ct);
+
+        resolved!.InstrumentIds.ShouldBe([then, stock], ignoreOrder: true);
     }
 
     // Only the fields the code under test reads are set; the other fields of these wide records are not looked at.

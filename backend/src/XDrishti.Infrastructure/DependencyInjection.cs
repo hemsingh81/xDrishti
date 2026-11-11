@@ -399,6 +399,7 @@ public static class DependencyInjection
         services.AddSingleton<IPlanBuilderSettings, PlanBuilderSettings>(); // off by default: the empty skeleton stays the nightly builder (P7-04, ADR 0088)
         OpenBookCheck.AddOpenBook(services); // the open-book settings, off by default: the open book is unavailable (P7-09, ADR 0092); AssumedEmpty and UsePaperLedger are exclusive at start (P10-02, ADR 0118)
         services.AddScoped<ITicketSource, StoredTicketSource>();
+        services.AddScoped<XDrishti.Application.Replay.IReplayCandidates, XDrishti.Infrastructure.Replay.ReplayCandidateSource>(); // the conditional tickets of a replayed session from the as-of facts (SR-01)
         services.AddScoped<IPlanContextSource, StoredPlanContextSource>(); // accounts, holdings, sectors and correlations as of the close (P7-09, ADR 0092); read only
         services.AddScoped<ISuggestionStore, SuggestionStore>(); // the append-only suggestion inbox (P7-09, ADR 0092)
         services.AddSingleton<IModelFiles, ModelFiles>(); // the model files under data/models, named by hash (spec P6-07)

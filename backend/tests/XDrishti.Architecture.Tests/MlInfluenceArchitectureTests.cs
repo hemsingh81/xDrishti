@@ -27,8 +27,8 @@ public sealed class MlInfluenceArchitectureTests
     /// <summary>The namespaces that decide what is ranked, sized, planned or approved (spec AC10), by assembly.</summary>
     private static readonly (Assembly Assembly, string Namespace)[] Consumers =
     [
-        (Domain, "XDrishti.Domain.Selection"), (Domain, "XDrishti.Domain.Planning"), (Domain, "XDrishti.Domain.Autonomy"),
-        (Application, "XDrishti.Application.Planning"), (Application, "XDrishti.Application.Selection"), (Application, "XDrishti.Application.Autonomy"),
+        (Domain, "XDrishti.Domain.Selection"), (Domain, "XDrishti.Domain.Planning"), (Domain, "XDrishti.Domain.Autonomy"), (Domain, "XDrishti.Domain.Replay"),
+        (Application, "XDrishti.Application.Planning"), (Application, "XDrishti.Application.Selection"), (Application, "XDrishti.Application.Autonomy"), (Application, "XDrishti.Application.Replay"), // the system replay (SR-01) decides what a replayed plan takes with the live pieces: no score source either
     ];
 
     // what only the gate and its evaluator may read: the predicate, its evidence and switch, the hold-out looks, the checks, the registry and its files, the trainer, the scorer loader and the score query
