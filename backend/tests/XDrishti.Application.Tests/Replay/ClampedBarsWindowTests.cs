@@ -20,7 +20,7 @@ public sealed class ClampedBarsWindowTests
     private static readonly DateOnly HoldOutStart = new(2029, 3, 1);
     private static readonly Guid Id = Guid.NewGuid();
 
-    private static (ClampedBars Bars, IBarStore Store) Make(int barsPerSession = 30)
+    private static (ClampedBars Bars, IBarStore Store) Make(int barsPerSession = 30, DateTimeOffset? seam = null)
     {
         var holdOut = Substitute.For<IHoldOutStore>();
         holdOut.CurrentAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<HoldOutBlock?>(new HoldOutBlock(HoldOutStart, First, First, 6, "h", DateTimeOffset.UnixEpoch)));
@@ -46,32 +46,43 @@ public sealed class ClampedBarsWindowTests
             return ValueTask.FromResult<IReadOnlyList<Bar>>([.. all.Where(b => b.EpochSeconds >= from && b.EpochSeconds <= to)]);
         });
         var seams = Substitute.For<IBackfillSeams>();
+        seams.SeamOfAsync(Id, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(seam));
         return (new ClampedBars(holdOut, new HoldOutOptions(TrainingEmbargoDays: 30), store, seams, Substitute.For<IBarQueries>()), store);
     }
 
     [Fact]
-    public async Task With_a_planned_range_the_bars_are_read_once_and_every_cut_equals_the_read_of_its_own_window()
+    public async Task With_a_planned_range_the_bars_are_read_in_bounded_chunks_and_every_cut_equals_the_read_of_its_own_window_with_a_seam_and_a_backward_cut()
     {
-        var (windowed, store) = Make();
-        var (plain, _) = Make();
+        var seam = new DateTimeOffset(2026, 2, 2, 0, 0, 0, India);
+        var (windowed, store) = Make(seam: seam);
+        var (plain, _) = Make(seam: seam);
         var (from, last) = (new DateOnly(2026, 1, 5), new DateOnly(2028, 6, 30));
         windowed.PlanRange(last);
 
-        for (var cut = from; cut <= last; cut = cut.AddDays(1))
+        async Task Same(DateOnly cut)
         {
-            if (cut.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
-            {
-                continue;
-            }
-
             var a = await windowed.MinutesAsync(Id, cut, Ct);
             var b = await plain.MinutesAsync(Id, cut, Ct);
             a.Count.ShouldBe(b.Count, cut.ToString());
             a.SequenceEqual(b).ShouldBeTrue(cut.ToString());
             (a.Count == 0 || a[^1].EpochSeconds <= new DateTimeOffset(cut.AddDays(1).ToDateTime(TimeOnly.MinValue), India).ToUnixTimeSeconds()).ShouldBeTrue("no bar after the close of the cut");
+            a.ShouldNotBeOfType<ArraySegment<Bar>>("a slice must not expose the array behind it");
+            (a is IList<Bar>).ShouldBeFalse("a slice is read-only and cannot be cast to reach the window");
         }
 
-        await store.Received(1).ReadAsync(Id, Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+        for (var cut = from; cut <= last; cut = cut.AddDays(1))
+        {
+            if (cut.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
+            {
+                await Same(cut);
+            }
+        }
+
+        await Same(new DateOnly(2026, 3, 3)); // a cut before the start of the window reads its own window again
+
+        var reads = store.ReceivedCalls().Where(c => c.GetMethodInfo().Name == nameof(IBarStore.ReadAsync)).Select(c => (From: (DateTimeOffset)c.GetArguments()[1]!, To: (DateTimeOffset)c.GetArguments()[2]!)).ToList();
+        reads.Count.ShouldBeLessThan(40, "chunks, not a read per session");
+        reads.ShouldAllBe(r => (r.To - r.From).TotalDays <= ClampedBars.MinuteLookbackDays + 70, "no read is longer than the lookback plus one chunk");
     }
 
     [Fact]

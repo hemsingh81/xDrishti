@@ -12,8 +12,10 @@ namespace XDrishti.Application.Replay;
 /// The only way the replay reaches stored bars (SR-01, AC 3): every read is asked for a session <c>cut</c>, and a cut after the hold-out start less one day and less the embargo throws <see cref="ReplayHoldOutException"/> before anything is read. With no hold-out block fixed it
 /// fails closed. A bar after the close of the cut is never returned.
 /// </summary>
-internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options, IBarStore minutes, IBackfillSeams seams, IBarQueries days)
+internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options, IBarStore minutes, IBackfillSeams seams, IBarQueries days, int readAheadSessions = 40)
 {
+    private readonly int _readAheadDays = (readAheadSessions * 7 / 5) + 3;
+
     /// <summary>Calendar days of 1-minute bars read before the close: about 270 sessions, as the live ticket source reads.</summary>
     public const int MinuteLookbackDays = 400;
 
@@ -47,8 +49,9 @@ internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options,
     }
 
     /// <summary>
-    /// Tells the reader the last session of the run. From then on the 1-minute bars of an instrument are read once for the whole run (the window of the first cut up to the close of that session, never past the clamp) and every cut is a slice of it
-    /// (the rolling window of the non-functional section of SR-01); the slice still passes <see cref="EnsureAsync"/> and ends at the close of the cut, so nothing after it is returned. Without it each cut reads its own window.
+    /// Tells the reader the last session of the run. From then on the 1-minute bars of an instrument are read once for the run in bounded chunks (the lookback of the first cut plus <c>ReadAheadSessions</c> sessions, then the next chunk when a cut passes the end of the window; never past
+    /// the last session of the run or the clamp), through <see cref="SeamAwareBars"/>, and every cut is a read-only slice of the window. The slice still passes <see cref="EnsureAsync"/> and ends at the close of the cut. The window drops what is older than the lookback of the cut, so
+    /// memory stays at the lookback plus one chunk per instrument (about 5 MB per instrument: 100 instruments are about half a gigabyte) whatever the length of the run. A cut before the start of the window (never in a run, which goes forward) reads its own window again. Without it each cut reads its own window.
     /// </summary>
     public void PlanRange(DateOnly last) => _horizon = last;
 
@@ -63,28 +66,30 @@ internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options,
             return await ReadAsync(instrumentId, from, to, cancellationToken);
         }
 
-        var end = CloseOf(horizon < cut ? cut : horizon); // the clamp holds for it: the horizon is the end of the range, which the driver refuses past the clamp, and a cut was checked above
-        var last = await LastReadableAsync(cancellationToken);
-        if (end > CloseOf(last))
+        var cap = CloseOf(horizon < cut ? cut : horizon);
+        var last = CloseOf(await LastReadableAsync(cancellationToken));
+        if (cap > last)
         {
-            end = CloseOf(last);
+            cap = last; // the window never reaches past the clamp
         }
 
-        if (!_windows.TryGetValue(instrumentId, out var window) || window.From > from.ToUnixTimeSeconds() || window.To < to.ToUnixTimeSeconds())
+        var (fromEpoch, toEpoch) = (from.ToUnixTimeSeconds(), to.ToUnixTimeSeconds());
+        _windows.TryGetValue(instrumentId, out var window);
+        var end = to.AddDays(_readAheadDays) < cap ? to.AddDays(_readAheadDays) : cap;
+        if (window is null || window.From > fromEpoch)
         {
             var bars = await ReadAsync(instrumentId, from, end, cancellationToken);
-            _windows[instrumentId] = window = new Window([.. bars], from.ToUnixTimeSeconds(), end.ToUnixTimeSeconds());
+            _windows[instrumentId] = window = new Window([.. bars], fromEpoch, end.ToUnixTimeSeconds());
         }
-
-        var (low, high) = (window.LowerBound(from.ToUnixTimeSeconds()), window.UpperBound(to.ToUnixTimeSeconds()));
-        if (low > window.Bars.Length / 2 && low > 4096)
+        else if (window.To < toEpoch)
         {
-            window = new Window(window.Bars[low..], from.ToUnixTimeSeconds(), window.To); // the window rolls: bars older than the lookback of this cut are never asked for again, so they are let go
-            _windows[instrumentId] = window;
-            (low, high) = (0, high - low);
+            var kept = window.Bars[window.LowerBound(fromEpoch)..]; // what is older than the lookback of this cut is let go before the next chunk is added
+            var more = await ReadAsync(instrumentId, DateTimeOffset.FromUnixTimeSeconds(window.To + 1), end, cancellationToken);
+            _windows[instrumentId] = window = new Window([.. kept, .. more], fromEpoch, end.ToUnixTimeSeconds());
         }
 
-        return new ArraySegment<Bar>(window.Bars, low, high - low);
+        var (low, high) = (window.LowerBound(fromEpoch), window.UpperBound(toEpoch));
+        return new BarSlice(window.Bars, low, high - low);
     }
 
     private ValueTask<IReadOnlyList<Bar>> ReadAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) =>

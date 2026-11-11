@@ -96,7 +96,7 @@ public sealed partial class ReplayArchitectureTests
 
     private static string[] JobFiles() => Directory.GetFiles(Path.Combine(Src(), "XDrishti.Application", "Replay", "Job"), "*.cs");
 
-    [GeneratedRegex(@"(?<receiver>\w+)\s*\.\s*\w*(Store|Append|Insert|Save|Write|Publish|Delete|Update|Move)\w*Async\(", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"(?<receiver>\w+|\))\s*\.\s*\w*(Store|Append|Insert|Save|Write|Publish|Delete|Update|Move|Finish|Cancel|Claim|Recover|Mark)\w*Async\(", RegexOptions.CultureInvariant)]
     private static partial Regex ReceiverOfWrite();
 
     [GeneratedRegex(@"(INSERT\s+INTO|(?<!FOR\s+)UPDATE|DELETE\s+FROM|TRUNCATE(\s+TABLE)?|COPY|MERGE\s+INTO)\s+(?<table>[\w.]+)", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
@@ -117,6 +117,40 @@ public sealed partial class ReplayArchitectureTests
                 WriteReceivers.ShouldContain(write.Groups["receiver"].Value, $"{Path.GetFileName(file)}: {write.Value} writes through something other than the replay store or the ledger port (SR-01, AC 11)");
             }
         }
+    }
+
+    private static readonly string[] ResolvedAllowed = ["IReplayStore", "IReplayReads", "ReplayDriver", "ReplayInputHasher", "IFreeDiskProbe", "ITradingCalendar", "ISimAllBackfillGate", "ISimAllStore"];
+
+    private static readonly string[] ConstructorAllowed = ["IServiceScopeFactory", "SystemReplayOptions", "TimeProvider", "ILogger`1", "ReplayDriver", "ReplayInputHasher", "IReplayInputs", "IReplayStore", "IReplayReads", "ITestLedger"];
+
+    [GeneratedRegex(@"Get(Required)?Service<(?<t>\w+)>", RegexOptions.CultureInvariant)]
+    private static partial Regex ResolvedType();
+
+    [Fact]
+    public void The_job_resolves_and_takes_in_its_constructors_only_the_listed_types_so_no_other_store_or_gate_can_be_reached()
+    {
+        // SR-01 (AC 11): a write through anything the receiver scan does not name (a chained GetRequiredService<T>().XAsync(...), a verb it does not know) still needs a type; a type outside these two lists fails here and is a decision.
+        foreach (var file in JobFiles())
+        {
+            foreach (Match m in ResolvedType().Matches(File.ReadAllText(file)))
+            {
+                ResolvedAllowed.ShouldContain(m.Groups["t"].Value, $"{Path.GetFileName(file)} resolves {m.Value}");
+            }
+        }
+
+        var types = Application.GetTypes().Where(t => t.Namespace == "XDrishti.Application.Replay.Job" && (t.Name.EndsWith("Runner", StringComparison.Ordinal) || t.Name.EndsWith("Handler", StringComparison.Ordinal))).ToList();
+        types.Count.ShouldBe(3, "the runner and the two handlers");
+        foreach (var type in types)
+        {
+            foreach (var parameter in type.GetConstructors(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SelectMany(c => c.GetParameters()))
+            {
+                ConstructorAllowed.ShouldContain(parameter.ParameterType.Name, $"{type.Name} takes {parameter.ParameterType.Name}");
+            }
+        }
+
+        ConstructorAllowed.ShouldNotContain("IPlanStore", "the sentinel: a plan store is never allowed");
+        ResolvedType().Match("sp.GetRequiredService<IPlanStore>().AppendAsync(x)").Groups["t"].Value.ShouldBe("IPlanStore");
+        ReceiverOfWrite().Match("await sp.GetRequiredService<IPlanStore>().FinishAsync(x)").Groups["receiver"].Value.ShouldBe(")", "a chained write has no named receiver and fails the allow-list of receivers");
     }
 
     [Fact]

@@ -33,6 +33,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     mode varchar(16) NOT NULL,
                     params jsonb NOT NULL,
                     settings_snapshot jsonb NOT NULL,
+                    versions jsonb NOT NULL,
                     input_hash char(64) NOT NULL,
                     scope_hash char(64) NOT NULL,
                     result_hash char(64) NULL,
@@ -42,6 +43,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     created_at timestamptz NOT NULL,
                     finished_at timestamptz NULL,
                     fail_reason varchar(400) NULL,
+                    recorded boolean NOT NULL DEFAULT false,
                     CONSTRAINT pk_replay_runs PRIMARY KEY (id),
                     CONSTRAINT ck_replay_runs_state CHECK (state IN ('queued', 'running', 'cancelling', 'completed', 'failed', 'cancelled')),
                     CONSTRAINT ck_replay_runs_mode CHECK (mode IN ('frozen', 'learning')),
@@ -105,7 +107,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     END IF;
 
                     IF NEW.id <> OLD.id OR NEW.pair_id IS DISTINCT FROM OLD.pair_id OR NEW.range_from <> OLD.range_from OR NEW.range_to <> OLD.range_to OR NEW.mode <> OLD.mode OR NEW.params <> OLD.params
-                       OR NEW.settings_snapshot <> OLD.settings_snapshot OR NEW.input_hash <> OLD.input_hash OR NEW.scope_hash <> OLD.scope_hash OR NEW.sessions_total <> OLD.sessions_total OR NEW.created_at <> OLD.created_at THEN
+                       OR NEW.settings_snapshot <> OLD.settings_snapshot OR NEW.versions <> OLD.versions OR NEW.input_hash <> OLD.input_hash OR NEW.scope_hash <> OLD.scope_hash OR NEW.sessions_total <> OLD.sessions_total OR NEW.created_at <> OLD.created_at THEN
                         RAISE EXCEPTION 'A replay run keeps what it was started with' USING ERRCODE = '23514';
                     END IF;
 
@@ -115,7 +117,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 """);
             migrationBuilder.Sql("CREATE TRIGGER trg_replay_runs_guard BEFORE UPDATE ON research.replay_runs FOR EACH ROW EXECUTE FUNCTION research.guard_replay_run()");
 
-            // Per table, not per schema: the other research tables stay insert-only (ADR 0045). The runtime role reads and inserts; it updates five columns of a run and never deletes.
+            // Per table, not per schema: the other research tables stay insert-only (ADR 0045). The runtime role reads and inserts; it updates six columns of a run and never deletes.
             migrationBuilder.Sql("""
                 DO $$
                 BEGIN
@@ -125,7 +127,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     END IF;
                 END $$;
                 """);
-            migrationBuilder.GrantColumnUpdateToAppRole(Schemas.Research, "replay_runs", "state", "cursor_session", "result_hash", "finished_at", "fail_reason");
+            migrationBuilder.GrantColumnUpdateToAppRole(Schemas.Research, "replay_runs", "state", "cursor_session", "result_hash", "finished_at", "fail_reason", "recorded");
         }
 
         /// <inheritdoc />

@@ -230,7 +230,7 @@ All eight answered by the owner on 2026-11-11 as recommended ("Approve all"); th
 - **AC 15 (cancel).** `A_cancel_stops_the_run_after_the_current_session...` and `A_cancel_of_a_queued_run_never_starts_it`; `ReplayStoreTests` for the states.
 - **AC 16 (deterministic).** `Two_runs_with_the_same_input_hash_give_the_same_result_hash`; `The_input_hash_is_stable_for_the_same_inputs_and_moves_with_each_input`.
 - **AC 17 (no orders).** The job and the store are in the scan for execution, broker and order names.
-- **Speed (non-functional).** The bars are loaded once per run as a rolling window. Measured with the explicit `ReplayBenchmarks` (one year, 100 instruments, in-memory stores, Release): 1.09 s per session, 283.6 s for 259 sessions; the database read of the bars and a held trade's simulation are not in the figure (ADR 0272). The 8-hour target is not threatened by the engine; the figure on the owner's database is still to be measured.
+- **Speed (non-functional).** The bars are loaded once per run as a rolling window. Measured with the explicit `ReplayBenchmarks` (one year, 100 instruments, in-memory stores, Release): 0.88 s per session, 227.9 s for 259 sessions, live managed memory 609 MiB and peak working set 968 MiB for 100 instruments (bounded chunked window; a 1 GiB container is at its edge, see the ADR); the database read of the bars and a held trade's simulation are not in the figure (ADR 0272). The 8-hour target is not threatened by the engine; the figure on the owner's database is still to be measured.
 
 ## Done when
 - [ ] All acceptance criteria have evidence

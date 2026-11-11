@@ -1101,7 +1101,8 @@ public static class DependencyInjection
         services.AddScoped<XDrishti.Application.Replay.IReplayFacts, XDrishti.Application.Replay.ReplayFacts>();
         services.AddScoped<XDrishti.Application.Replay.ReplaySessionRunner>();
         services.AddScoped<XDrishti.Application.Replay.ReplayDriver>();
-        services.AddScoped<XDrishti.Application.Abstractions.Replay.IReplayBarFingerprint>(sp => (XDrishti.Application.Replay.ReplayFacts)sp.GetRequiredService<XDrishti.Application.Replay.IReplayFacts>()); // the bar hash of the input hash (SR-01 part B)
+        services.AddScoped<XDrishti.Application.Replay.ReplayInputHasher>();
+        services.AddScoped<XDrishti.Application.Abstractions.Replay.IReplayInputs>(sp => (XDrishti.Application.Replay.ReplayFacts)sp.GetRequiredService<XDrishti.Application.Replay.IReplayFacts>()); // the bar hash of the input hash (SR-01 part B)
         services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Job.StartReplayCommand, XDrishti.Application.Replay.Job.StartedReplay>, XDrishti.Application.Replay.Job.StartReplayHandler>(); // stores and queues a replay, records it in the trial ledger (SR-01 part B)
         services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Job.CancelReplayCommand, string>, XDrishti.Application.Replay.Job.CancelReplayHandler>(); // stops a replay after its current session (SR-01, AC 15)
         services.AddScoped<IEpochGate, FingerprintEpochGate>(); // the configuration fingerprint decides the epoch (P10-05, ADR 0119): detects, labels and records; applies and blocks nothing

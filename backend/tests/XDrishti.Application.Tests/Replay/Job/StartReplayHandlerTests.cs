@@ -1,3 +1,6 @@
+#pragma warning disable CA2012 // NSubstitute setup on ValueTask members is not awaited
+#pragma warning disable xUnit1051 // The NSubstitute matchers take Arg.Any<CancellationToken>(), not a token
+using NSubstitute;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Replay;
 using XDrishti.Domain.Replay;
@@ -99,6 +102,13 @@ public sealed class StartReplayHandlerTests
         (await HashOf(w => w.Fill = w.Fill with { MaxOpenPositions = 3 }, Six)).ShouldNotBe(baseline, "the settings snapshot");
         (await HashOf(w => w.Versions["S1"][0] = ReplayWorld.Version("S1", 1, new string('9', 64), DateTimeOffset.UnixEpoch), Six)).ShouldNotBe(baseline, "the strategy version hash");
         (await HashOf(w => w.Close["AAA"][new DateOnly(2026, 10, 7)] += 0.01, Six)).ShouldNotBe(baseline, "a bar inside the window");
+        (await HashOf(w => w.Snapshots[0] = (w.Snapshots[0].AsOf, ReplayWorld.Stats(w.Snapshots[0].AsOf, snapshot: "other")), Six)).ShouldNotBe(baseline, "the frozen statistics snapshot");
+        (await HashOf(w =>
+        {
+            w.Close["CCC"] = new SortedDictionary<DateOnly, double>(w.Close["AAA"]);
+            w.Members.Add((ReplayWorld.Ids["CCC"], "CCC", new DateTimeOffset(2026, 10, 7, 0, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 10, 9, 0, 0, 0, TimeSpan.Zero))); // a member that joined and left inside the range
+        }, Six)).ShouldNotBe(baseline, "the membership over the range, not only at its ends");
+        (await HashOf(w => w.Seams.SeamOfAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<DateTimeOffset?>(new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero))), Six)).ShouldNotBe(baseline, "the backfill seam of an instrument");
         (await HashOf(w => w.Close["AAA"][new DateOnly(2026, 10, 14)] += 0.01, Six)).ShouldBe(baseline, "a bar after the range is not an input of this run");
     }
 

@@ -29,6 +29,10 @@ public sealed class SystemReplayOptions
     /// <summary>How often the loop looks at the queue (and at the conditions that make the job wait).</summary>
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
 
+    /// <summary>Sessions of bars read ahead of the cut in one chunk of the rolling window (the lookback is read besides). Bounds the memory of a run: the window is the lookback plus this.</summary>
+    [Range(1, 250)]
+    public int ReadAheadSessions { get; set; } = 40;
+
     /// <summary>The disk floor in bytes.</summary>
     public long MinFreeBytes => MinFreeGb * 1024L * 1024 * 1024;
 }

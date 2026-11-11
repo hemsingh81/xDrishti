@@ -27,8 +27,11 @@ public sealed record LedgerRow(
     /// <summary>True for a training sweep row; evidence readers of the list skip these.</summary>
     public bool IsTrainingSweep => string.Equals(TrialKind, TrainingSweepKind, StringComparison.Ordinal);
 
-    /// <summary>The trial kind of a system replay (SR-01, ADR 0272): one row per strategy version the run uses, with the run's input hash as the run key. It is a look at the strategy and is counted as one (the kind is not filtered out), with no extra trials.</summary>
+    /// <summary>The trial kind of a system replay (SR-01, ADR 0272): one row per strategy version the run uses, with the run's input hash as the run key. Each replay is one look of the family and is counted in the total of looks (<c>TrialCounts.SystemReplays</c>); it is not a variant (a hash is not tested again by being replayed), so the variant count and the hash check leave it out. No extra trials.</summary>
     public const string SystemReplayKind = "system_replay";
+
+    /// <summary>True for a system replay row; the readers that take hashes from the listing skip these as they skip training sweeps.</summary>
+    public bool IsSystemReplay => string.Equals(TrialKind, SystemReplayKind, StringComparison.Ordinal);
 }
 
 /// <summary>

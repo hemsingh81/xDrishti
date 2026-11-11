@@ -43,7 +43,7 @@ internal sealed class ReplayJobRig(ReplayWorld world)
         var calendar = Substitute.For<ITradingCalendar>();
         calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new TradingCalendar());
         var scopes = new FakeScopes(
-            (typeof(IReplayStore), Store), (typeof(ReplayDriver), rig.Driver), (typeof(IFreeDiskProbe), Disk), (typeof(ISimAllBackfillGate), Gate), (typeof(ISimAllStore), SimAll), (typeof(ITradingCalendar), calendar));
+            (typeof(IReplayStore), Store), (typeof(ReplayDriver), rig.Driver), (typeof(ReplayInputHasher), new ReplayInputHasher(rig.Facts, rig.Facts)), (typeof(IReplayReads), Store), (typeof(IFreeDiskProbe), Disk), (typeof(ISimAllBackfillGate), Gate), (typeof(ISimAllStore), SimAll), (typeof(ITradingCalendar), calendar));
         return new ReplayRunner(scopes, options ?? new SystemReplayOptions(), Time, NullLogger<ReplayRunner>.Instance);
     }
 
@@ -51,7 +51,7 @@ internal sealed class ReplayJobRig(ReplayWorld world)
     public async Task<Result<StartedReplay>> StartAsync(params ReplayParams[] runs)
     {
         var rig = ReplayRig.Create(World, candidates: Candidates);
-        var handler = new StartReplayHandler(rig.Driver, rig.Facts, rig.Facts, Store, Ledger, Time, NullLogger<StartReplayHandler>.Instance);
+        var handler = new StartReplayHandler(rig.Driver, new ReplayInputHasher(rig.Facts, rig.Facts), rig.Facts, Store, Ledger, Time, NullLogger<StartReplayHandler>.Instance);
         return await handler.HandleAsync(new StartReplayCommand(runs), TestContext.Current.CancellationToken);
     }
 

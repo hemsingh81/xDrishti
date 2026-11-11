@@ -137,7 +137,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
 
         foreach (var (table, column, expected) in new[]
         {
-            ("replay_runs", "state", true), ("replay_runs", "cursor_session", true), ("replay_runs", "result_hash", true), ("replay_runs", "finished_at", true), ("replay_runs", "fail_reason", true),
+            ("replay_runs", "state", true), ("replay_runs", "cursor_session", true), ("replay_runs", "result_hash", true), ("replay_runs", "finished_at", true), ("replay_runs", "fail_reason", true), ("replay_runs", "recorded", true), ("replay_runs", "versions", false),
             ("replay_runs", "input_hash", false), ("replay_runs", "params", false), ("replay_runs", "settings_snapshot", false), ("replay_runs", "scope_hash", false), ("replay_runs", "range_to", false),
             ("replay_sessions", "record", false), ("replay_sessions", "equity", false), ("replay_trades", "net_pnl", false), ("replay_trades", "exit_at", false),
         })

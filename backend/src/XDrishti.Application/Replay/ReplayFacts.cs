@@ -57,18 +57,19 @@ internal sealed class ReplayFacts(
     IBasketContextStore? basketContext = null,
     ConfidenceOptions? confidence = null,
     ShrinkageOptions? shrinkage = null,
-    ILogger<ReplayFacts>? logger = null) : IReplayFacts, IReplayBarFingerprint
+    ILogger<ReplayFacts>? logger = null) : IReplayFacts, IReplayInputs
 {
     /// <summary>Calendar days of daily bars read before the close of the session for the correlations (about 60 sessions plus slack), as the live context source reads.</summary>
     public const int ReturnLookbackDays = 120;
 
     private static readonly TimeSpan IndiaOffset = TimeSpan.FromHours(5.5);
 
-    private readonly ClampedBars _bars = new(holdOut, holdOutOptions, minuteBars, seams, dayBars);
+    private readonly ClampedBars _bars = new(holdOut, holdOutOptions, minuteBars, seams, dayBars, options.ReadAheadSessions);
     private readonly Dictionary<string, StoredVersion?> _startVersions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<StoredVersion>> _allVersions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<ChangelogEntry>> _histories = new(StringComparer.Ordinal);
     private readonly Dictionary<DateOnly, IReadOnlyList<StoredCellStats>> _learned = [];
+    private bool _versionsFixed;
     private IReadOnlyList<StoredCellStats>? _frozen;
     private IReadOnlyList<CellInput>? _learningInputs;
     private ReplaySettingsSnapshot? _settings;
@@ -76,10 +77,48 @@ internal sealed class ReplayFacts(
 
     public ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken) => _bars.LastReadableAsync(cancellationToken);
 
-    public void BeginRun(DateOnly last, ReplaySettingsSnapshot? stored)
+    public void BeginRun(DateOnly last, ReplaySettingsSnapshot? stored, IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>>? versions = null)
     {
         _bars.PlanRange(last);
         _settings = stored ?? _settings;
+        if (versions is not null)
+        {
+            _versionsFixed = true;
+            foreach (var (strategy, list) in versions)
+            {
+                _allVersions[strategy] = list;
+                _startVersions[strategy] = list.MaxBy(v => v.Version);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The strategy versions the run reads, each strategy of its cells: under the <c>Start</c> rule the active version, under <c>AsOf</c> every version written before the close of the last session. Stored with the run and hashed into its input hash; a resumed run uses the stored map.
+    /// </summary>
+    public async ValueTask<IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>>> VersionsAsync(ReplayParams parameters, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        var map = new SortedDictionary<string, IReadOnlyList<StoredVersion>>(StringComparer.Ordinal);
+        var close = BasketMember.CutoffAfter(parameters.To);
+        foreach (var cell in (await CellsAsync(parameters, parameters.From, cancellationToken)).Cells)
+        {
+            var strategy = cell.Stored.Row.Cell.Strategy;
+            if (map.ContainsKey(strategy))
+            {
+                continue;
+            }
+
+            if (parameters.VersionRule == ReplayVersionRule.Start)
+            {
+                map[strategy] = await strategies.GetVersionAsync(strategy, null, cancellationToken) is { } active ? [active] : [];
+            }
+            else
+            {
+                map[strategy] = [.. (await strategies.ListVersionsAsync(strategy, cancellationToken)).Where(v => v.CreatedAt < close).OrderBy(v => v.Version)];
+            }
+        }
+
+        return map;
     }
 
     /// <summary>A hash of the day bars (their times, prices, volumes and the count of 1-minute bars in each) of the instruments over the window the run reads, up to its last session: a change in the stored minutes changes it. Read through the clamp.</summary>
@@ -89,7 +128,7 @@ internal sealed class ReplayFacts(
         var text = new System.Text.StringBuilder();
         foreach (var id in instrumentIds.Distinct().Order())
         {
-            text.Append(id.ToString("N")).Append('\n');
+            text.Append(id.ToString("N")).Append(" seam=").Append((await seams.SeamOfAsync(id, cancellationToken))?.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "none").Append('\n');
             foreach (var bar in await _bars.DaysAsync(id, from.AddDays(-ClampedBars.MinuteLookbackDays), to, cancellationToken))
             {
                 text.Append(bar.Ts.ToUnixTimeSeconds()).Append(' ').Append(bar.Open.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(' ').Append(bar.High.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(' ')
@@ -262,6 +301,13 @@ internal sealed class ReplayFacts(
 
     private async ValueTask<StoredVersion?> VersionAsync(ReplayVersionRule rule, string strategy, DateOnly cut, CancellationToken cancellationToken)
     {
+        if (_versionsFixed)
+        {
+            // the run carries its version map: a strategy outside it has no version, and the store is never asked
+            var known = _allVersions.GetValueOrDefault(strategy) ?? [];
+            return rule == ReplayVersionRule.Start ? known.MaxBy(v => v.Version) : known.Where(v => v.CreatedAt < BasketMember.CutoffAfter(cut)).MaxBy(v => v.Version);
+        }
+
         if (rule == ReplayVersionRule.Start)
         {
             if (!_startVersions.TryGetValue(strategy, out var active))

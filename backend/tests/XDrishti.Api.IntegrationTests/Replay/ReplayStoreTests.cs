@@ -42,7 +42,7 @@ public sealed class ReplayStoreTests(ApiFactory factory) : IAsyncLifetime
     }
 
     private static NewReplayRun New(Guid? id = null, DateOnly? to = null, string mode = "frozen", int minutes = 0) => new(
-        id ?? Guid.NewGuid(), D1, to ?? D3, mode, """{"capital":1000000,"mode":"Frozen"}""", """{"fill":{}}""", new string('a', 64), new string('b', 64), 3, T0.AddMinutes(minutes));
+        id ?? Guid.NewGuid(), D1, to ?? D3, mode, """{"capital":1000000,"mode":"Frozen"}""", """{"fill":{}}""", """{"S1":[]}""", new string('a', 64), new string('b', 64), 3, T0.AddMinutes(minutes));
 
     private static ReplaySessionRow Session(DateOnly day, decimal equity = 1_000_000m) => new(day, "{\"session\":\"" + day.ToString("yyyy-MM-dd") + "\"}", equity, 0.5m, new string('c', 64));
 
@@ -54,6 +54,11 @@ public sealed class ReplayStoreTests(ApiFactory factory) : IAsyncLifetime
     {
         var run = New(mode: mode, minutes: minutes);
         (await WithAsync((s, _) => s.InsertAsync(null, [run], Ct).AsTask())).Started.ShouldBeTrue();
+        await WithAsync(async (s, _) =>
+        {
+            await s.MarkRecordedAsync([run.Id], Ct);
+            return 0;
+        });
         return run.Id;
     }
 
@@ -89,6 +94,11 @@ public sealed class ReplayStoreTests(ApiFactory factory) : IAsyncLifetime
         await WithAsync((s, _) => s.CancelAsync(first, T0, Ct).AsTask()); // not active any more, so a second can be queued
         var (second, third) = (New(minutes: 1), New(minutes: 2));
         await WithAsync((s, _) => s.InsertAsync(null, [third, second], Ct).AsTask());
+        await WithAsync(async (s, _) =>
+        {
+            await s.MarkRecordedAsync([third.Id, second.Id], Ct);
+            return 0;
+        });
 
         var claimed = await WithAsync((s, _) => s.ClaimAsync(Ct).AsTask());
 
@@ -133,6 +143,18 @@ public sealed class ReplayStoreTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_run_is_claimed_only_once_it_is_recorded_and_recovery_cancels_one_that_never_was()
+    {
+        var run = New();
+        await WithAsync((s, _) => s.InsertAsync(null, [run], Ct).AsTask());
+
+        (await WithAsync((s, _) => s.ClaimAsync(Ct).AsTask())).ShouldBeNull("its ledger rows do not exist yet");
+        (await WithAsync((s, _) => s.RecoverAsync(T0, Ct).AsTask())).ShouldBe(1);
+        (await WithAsync((s, _) => s.StateAsync(run.Id, Ct).AsTask())).ShouldBe("cancelled");
+        (await WithAsync((_, r) => r.AnyRunningAsync(Ct).AsTask())).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task A_cancel_ends_a_queued_run_at_once_and_a_running_run_after_its_session()
     {
         var queued = await QueueAsync();
@@ -164,7 +186,8 @@ public sealed class ReplayStoreTests(ApiFactory factory) : IAsyncLifetime
         var run = (await WithAsync((_, r) => r.GetRunAsync(done, Ct).AsTask()))!;
         (run.State, run.ResultHash, run.Complete).ShouldBe(("completed", new string('d', 64), true));
 
-        await Should.ThrowAsync<PostgresException>(async () => await StoreKit.ExecuteAsync(Db.ConnectionString, $"UPDATE research.replay_runs SET state = 'running' WHERE id = '{done}'", Ct)); // a finished run stays final
+        var refused = await Should.ThrowAsync<PostgresException>(async () => await StoreKit.ExecuteAsync(Db.ConnectionString, $"UPDATE research.replay_runs SET state = 'running' WHERE id = '{done}'", Ct)); // a finished run stays final
+        refused.SqlState.ShouldBe("23514");
         (await WithAsync((s, _) => s.FinishAsync(done, "failed", null, "x", [], T0, Ct).AsTask())).ShouldBeFalse();
 
         var broken = await QueueAsync(minutes: 9);
@@ -198,7 +221,16 @@ public sealed class ReplayStoreTests(ApiFactory factory) : IAsyncLifetime
         var row = new LedgerRow(Guid.NewGuid(), new string('a', 64), "S1", 1, new string('1', 64), null, "system replay", D1, D3, LedgerRow.SystemReplayKind, T0, LedgerRow.SystemReplayKind, 0);
 
         (await ledger.AppendAsync(row, Ct)).ShouldBeTrue();
-        await Should.ThrowAsync<PostgresException>(async () => await ledger.AppendAsync(row with { RunId = Guid.NewGuid(), TrialKind = "other" }, Ct));
-        (await ledger.CountVariantsAsync("S1", Ct)).ShouldBe(1);
+        var unknown = await Should.ThrowAsync<PostgresException>(async () => await ledger.AppendAsync(row with { RunId = Guid.NewGuid(), TrialKind = "other" }, Ct));
+        unknown.SqlState.ShouldBe("23514");
+
+        // each replay is a look and a variant is not: one more replay of the same hash adds a look and no variant (SR-01, ADR 0272)
+        await ledger.AppendAsync(row with { RunId = Guid.NewGuid() }, Ct);
+        var counts = await ledger.CountTrialsAsync("S1", Ct);
+        counts.SystemReplays.ShouldBe(2);
+        counts.Total.ShouldBe(2);
+        counts.DistinctHashes.ShouldBe(0);
+        (await ledger.CountVariantsAsync("S1", Ct)).ShouldBe(0);
+        (await ledger.HasHashAsync("S1", new string('1', 64), Ct)).ShouldBeFalse();
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Replay;
+using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Platform.Services;
@@ -34,6 +35,9 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
     /// <summary>How many sessions pass between two progress log lines.</summary>
     private const int ProgressEvery = 50;
 
+    /// <summary>After this many consecutive failures of the store (or of the preparation) the run ends failed with the reason instead of being tried every poll interval for ever.</summary>
+    private const int MaxConsecutiveFailures = 3;
+
     /// <summary>No run starts a session within this time of the market window opening (the session is short, the margin is as for the simulate-everything chunk).</summary>
     private static readonly TimeSpan WindowMargin = TimeSpan.FromMinutes(30);
 
@@ -43,13 +47,13 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
     private bool _backfillIncomplete;
     private string? _lastYield;
     private ActiveRun? _active;
+    private bool _recovered;
 
     /// <summary>The loop of the host: recover once, then look every poll interval until the host stops.</summary>
     public async Task RunAsync(CancellationToken stoppingToken)
     {
         try
         {
-            await GuardedAsync(RecoverAsync, stoppingToken);
             while (!stoppingToken.IsCancellationRequested)
             {
                 await GuardedAsync(TickAsync, stoppingToken);
@@ -71,7 +75,9 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
     public async Task RecoverAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
-        var touched = await scope.ServiceProvider.GetRequiredService<IReplayStore>().RecoverAsync(time.GetUtcNow(), cancellationToken);
+        var store = scope.ServiceProvider.GetRequiredService<IReplayStore>();
+        var touched = await store.RecoverAsync(time.GetUtcNow(), cancellationToken);
+        _recovered = true; // only after it worked: a failed recovery is tried again at the next tick, so a stale running row cannot block the claims until a restart
         if (touched > 0)
         {
             ReplayLog.Recovered(logger, touched);
@@ -81,6 +87,11 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
     /// <summary>One look at the queue: go on with the run in hand, or claim the oldest queued one, and work it until it ends, the yield rules say wait or the host stops.</summary>
     public async Task TickAsync(CancellationToken cancellationToken)
     {
+        if (!_recovered)
+        {
+            await RecoverAsync(cancellationToken);
+        }
+
         if (_active is null)
         {
             var scope = scopes.CreateAsyncScope();
@@ -91,7 +102,8 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
                 return;
             }
 
-            var claimed = await scope.ServiceProvider.GetRequiredService<IReplayStore>().ClaimAsync(cancellationToken);
+            var store = scope.ServiceProvider.GetRequiredService<IReplayStore>();
+            var claimed = await store.ClaimAsync(cancellationToken);
             if (claimed is null)
             {
                 await scope.DisposeAsync();
@@ -110,6 +122,21 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
         try
         {
             ended = await WorkAsync(run, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw; // the host stops: the run stays running and the next start takes it back
+        }
+#pragma warning disable CA1031 // a failed read or write of the store must not leave a book that has stepped past what is stored: the run is rebuilt from its stored sessions at the next tick, and ends failed after repeated failures
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            ReplayLog.SessionCrashed(logger, run.Row.Id, ex);
+            run.Reset();
+            if (++run.Failures >= MaxConsecutiveFailures)
+            {
+                ended = await EndAsync(run, run.Scope.ServiceProvider.GetRequiredService<IReplayStore>(), ReplayRunStates.Failed, null, "replay.store_failed: " + ex.GetType().Name + ": " + ex.Message, cancellationToken);
+            }
         }
         finally
         {
@@ -131,20 +158,29 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
         {
             var parameters = ReplayJson.Read<ReplayParams>(run.Row.ParamsJson);
             var settings = ReplayJson.Read<ReplaySettingsSnapshot>(run.Row.SettingsJson);
-            if (parameters is null || settings is null)
+            var stored = ReplayJson.Read<Dictionary<string, List<StoredVersion>>>(run.Row.VersionsJson);
+            if (parameters is null || settings is null || stored is null)
             {
-                return await FailAsync(run, store, null, "replay.unreadable", "The stored parameters or settings snapshot cannot be read.", cancellationToken);
+                return await FailAsync(run, store, null, "replay.unreadable", "The stored parameters, settings snapshot or strategy versions cannot be read.", cancellationToken);
             }
 
-            var prepared = await services.GetRequiredService<ReplayDriver>().PrepareAsync(parameters, settings, cancellationToken);
+            var versions = stored.ToDictionary(p => p.Key, p => (IReadOnlyList<StoredVersion>)p.Value, StringComparer.Ordinal);
+            var hasher = services.GetRequiredService<ReplayInputHasher>();
+            var prepared = await services.GetRequiredService<ReplayDriver>().PrepareAsync(parameters, settings, versions, cancellationToken);
             if (prepared.IsFailure)
             {
                 return await FailAsync(run, store, null, prepared.Error.Code, prepared.Error.Message, cancellationToken);
             }
 
+            var (input, _) = await hasher.ComputeAsync(parameters, settings, versions, prepared.Value.Sessions, cancellationToken);
+            if (input != run.Row.InputHash)
+            {
+                return await FailAsync(run, store, null, "replay.diverged", "The inputs (bars, members, statistics, versions or settings) have changed since the run was started, so it cannot go on.", cancellationToken);
+            }
+
             run.Prepared = prepared.Value;
-            run.Stored = run.Row.CursorSession is null ? new Dictionary<DateOnly, string>() : new Dictionary<DateOnly, string>(await store.SessionHashesAsync(id, cancellationToken));
-            run.Cursor = run.Row.CursorSession;
+            run.Stored = new Dictionary<DateOnly, string>(await store.SessionHashesAsync(id, cancellationToken));
+            run.Cursor = run.Stored.Count == 0 ? null : run.Stored.Keys.Max();
         }
 
         var prep = run.Prepared;
@@ -154,21 +190,18 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
             cancellationToken.ThrowIfCancellationRequested();
             var session = prep.Sessions[run.Next];
             var replayed = run.Cursor is { } cursor && session <= cursor; // stored already: replayed again only to rebuild the book and to check the hash
-            if (!replayed)
+            if (await store.StateAsync(id, cancellationToken) == ReplayRunStates.Cancelling)
             {
-                if (await store.StateAsync(id, cancellationToken) == ReplayRunStates.Cancelling)
-                {
-                    return await EndAsync(run, store, ReplayRunStates.Cancelled, null, null, cancellationToken);
-                }
-
-                if (await YieldAsync(services, true, cancellationToken) is { } reason)
-                {
-                    NoteYield(id, reason);
-                    return false;
-                }
-
-                _lastYield = null;
+                return await EndAsync(run, store, ReplayRunStates.Cancelled, null, null, cancellationToken); // also while the stored sessions are replayed: a cancel is not made to wait for the rebuild
             }
+
+            if (await YieldAsync(services, true, cancellationToken) is { } reason)
+            {
+                NoteYield(id, reason);
+                return false;
+            }
+
+            _lastYield = null;
 
             Result<ReplaySessionRecord> stepped;
             try
@@ -210,7 +243,12 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
             }
             else
             {
-                await store.SaveSessionAsync(id, new ReplaySessionRow(session, text, record.Equity, record.DrawdownPct, hash), closed, cancellationToken);
+                if (!await store.SaveSessionAsync(id, new ReplaySessionRow(session, text, record.Equity, record.DrawdownPct, hash), closed, cancellationToken))
+                {
+                    return await FailAsync(run, store, session, "replay.diverged", "The session could not be stored as new: it is stored already or the run is no longer active.", cancellationToken);
+                }
+
+                run.Failures = 0;
                 run.Stored[session] = hash;
                 run.Cursor = session;
                 if (run.Stored.Count % ProgressEvery == 0)
@@ -366,5 +404,18 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
         public int Next { get; set; }
 
         public int Booked { get; set; }
+
+        public int Failures { get; set; }
+
+        /// <summary>Forgets what was built in memory, so the next tick rebuilds the book from the stored sessions and checks their hashes.</summary>
+        public void Reset()
+        {
+            Prepared = null;
+            Next = 0;
+            Booked = 0;
+            Cursor = null;
+            Stored = [];
+            StoredTrades.Clear();
+        }
     }
 }

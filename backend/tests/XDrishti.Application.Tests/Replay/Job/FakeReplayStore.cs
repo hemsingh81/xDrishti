@@ -14,6 +14,8 @@ internal sealed class FakeReplayStore : IReplayStore, IReplayReads
 
         public string State { get; set; } = ReplayRunStates.Queued;
 
+        public bool Recorded { get; set; }
+
         public DateOnly? Cursor { get; set; }
 
         public string? ResultHash { get; set; }
@@ -31,6 +33,13 @@ internal sealed class FakeReplayStore : IReplayStore, IReplayReads
 
     public int SaveCalls { get; private set; }
 
+    /// <summary>How many of the next saves throw (a store that fails): they store nothing, or, with <see cref="FailAfterStoring"/>, store the session and then throw as a lost connection would.</summary>
+    public int FailSaves { get; set; }
+
+    public bool FailAfterStoring { get; set; }
+
+    public bool FailRecoverOnce { get; set; }
+
     /// <summary>Called after a session was stored, with the run and how many sessions it has now.</summary>
     public Action<Guid, int>? AfterSave { get; set; }
 
@@ -40,7 +49,7 @@ internal sealed class FakeReplayStore : IReplayStore, IReplayReads
     public Run Of(Guid id) => Runs.Single(r => r.Created.Id == id);
 
     private ReplayRunRow Row(Run r) => new(
-        r.Created.Id, r.Pair, r.Created.From, r.Created.To, r.Created.Mode, r.Created.ParamsJson, r.Created.SettingsJson, r.Created.InputHash, r.Created.ScopeHash, r.ResultHash, r.State, r.Cursor, r.Sessions.Count, r.Created.SessionsTotal,
+        r.Created.Id, r.Pair, r.Created.From, r.Created.To, r.Created.Mode, r.Created.ParamsJson, r.Created.SettingsJson, r.Created.VersionsJson, r.Created.InputHash, r.Created.ScopeHash, r.ResultHash, r.State, r.Cursor, r.Sessions.Count, r.Created.SessionsTotal,
         Runs.Count(o => o.Created.From == r.Created.From && o.Created.To == r.Created.To && (o.Created.CreatedAt, o.Created.Id).CompareTo((r.Created.CreatedAt, r.Created.Id)) <= 0), r.Created.CreatedAt, r.FinishedAt, r.FailReason);
 
     public ValueTask<ReplayInsert> InsertAsync(Guid? pairId, IReadOnlyList<NewReplayRun> runs, CancellationToken cancellationToken)
@@ -55,9 +64,24 @@ internal sealed class FakeReplayStore : IReplayStore, IReplayReads
         return ValueTask.FromResult(new ReplayInsert(true, [.. added.Select(Row)]));
     }
 
+    public ValueTask MarkRecordedAsync(IReadOnlyList<Guid> runIds, CancellationToken cancellationToken)
+    {
+        foreach (var r in Runs.Where(r => runIds.Contains(r.Created.Id) && r.State == ReplayRunStates.Queued))
+        {
+            r.Recorded = true;
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
+    /// <summary>Makes every queued run recorded, as the start does after its ledger rows are written (a test that sets a run up by hand).</summary>
+    public void RecordAll() => Runs.ForEach(r => r.Recorded = true);
+
+    public ValueTask<bool> AnyRunningAsync(CancellationToken cancellationToken) => ValueTask.FromResult(Runs.Any(r => r.State is ReplayRunStates.Running or ReplayRunStates.Cancelling));
+
     public ValueTask<ReplayRunRow?> ClaimAsync(CancellationToken cancellationToken)
     {
-        if (Runs.Any(r => r.State is ReplayRunStates.Running or ReplayRunStates.Cancelling) || Runs.Where(r => r.State == ReplayRunStates.Queued).OrderBy(r => r.Created.CreatedAt).ThenBy(r => r.Created.Id).FirstOrDefault() is not { } next)
+        if (Runs.Any(r => r.State is ReplayRunStates.Running or ReplayRunStates.Cancelling) || Runs.Where(r => r.State == ReplayRunStates.Queued && r.Recorded).OrderBy(r => r.Created.CreatedAt).ThenBy(r => r.Created.Id).FirstOrDefault() is not { } next)
         {
             return ValueTask.FromResult<ReplayRunRow?>(null);
         }
@@ -68,6 +92,12 @@ internal sealed class FakeReplayStore : IReplayStore, IReplayReads
 
     public ValueTask<int> RecoverAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
+        if (FailRecoverOnce)
+        {
+            FailRecoverOnce = false;
+            throw new InvalidOperationException("the store is down");
+        }
+
         var touched = 0;
         foreach (var r in Runs)
         {
@@ -76,7 +106,7 @@ internal sealed class FakeReplayStore : IReplayStore, IReplayReads
                 r.State = ReplayRunStates.Queued;
                 touched++;
             }
-            else if (r.State == ReplayRunStates.Cancelling)
+            else if (r.State == ReplayRunStates.Cancelling || (r.State == ReplayRunStates.Queued && !r.Recorded))
             {
                 r.State = ReplayRunStates.Cancelled;
                 r.FinishedAt = now;
@@ -90,6 +120,16 @@ internal sealed class FakeReplayStore : IReplayStore, IReplayReads
     public ValueTask<bool> SaveSessionAsync(Guid runId, ReplaySessionRow session, IReadOnlyList<ReplayTradeRow> trades, CancellationToken cancellationToken)
     {
         SaveCalls++;
+        var failing = FailSaves > 0;
+        if (failing)
+        {
+            FailSaves--;
+            if (!FailAfterStoring)
+            {
+                throw new InvalidOperationException("the store is down");
+            }
+        }
+
         var run = Of(runId);
         if (run.State is not (ReplayRunStates.Running or ReplayRunStates.Cancelling) || run.Sessions.ContainsKey(session.Session))
         {
@@ -105,10 +145,19 @@ internal sealed class FakeReplayStore : IReplayStore, IReplayReads
         }
 
         AfterSave?.Invoke(runId, run.Sessions.Count);
-        return ValueTask.FromResult(true);
+        return failing ? throw new InvalidOperationException("the connection was lost after the write") : ValueTask.FromResult(true);
     }
 
-    public ValueTask<string?> StateAsync(Guid runId, CancellationToken cancellationToken) => ValueTask.FromResult(Runs.FirstOrDefault(r => r.Created.Id == runId)?.State);
+    /// <summary>Called at every look at the state, with the run and how many looks there have been.</summary>
+    public Action<Guid, int>? OnState { get; set; }
+
+    private int _stateLooks;
+
+    public ValueTask<string?> StateAsync(Guid runId, CancellationToken cancellationToken)
+    {
+        OnState?.Invoke(runId, ++_stateLooks);
+        return ValueTask.FromResult(Runs.FirstOrDefault(r => r.Created.Id == runId)?.State);
+    }
 
     public ValueTask<IReadOnlyDictionary<DateOnly, string>> SessionHashesAsync(Guid runId, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyDictionary<DateOnly, string>>(Of(runId).Sessions.ToDictionary(p => p.Key, p => p.Value.RecordSha256));

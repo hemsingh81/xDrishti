@@ -127,7 +127,7 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
         statements.ShouldNotBeEmpty();
 
         // a read passes only by leaving training sweeps out (<> 'training_sweep') or by naming an evidence kind; "= 'training_sweep'" is the separate count and is not a fence
-        var unfenced = statements.Where(st => st.Split('\n').Where(l => l.Contains("FROM lab.test_ledger", StringComparison.OrdinalIgnoreCase)).Any(l => !(l.Contains("trial_kind <> 'training_sweep'", StringComparison.Ordinal) || Regex.IsMatch(l, "trial_kind = '(run|replan|null)'", RegexOptions.None, ScanRegex.Timeout) || Regex.IsMatch(l, "trial_kind = 'training_sweep'", RegexOptions.None, ScanRegex.Timeout)))).ToList();
+        var unfenced = statements.Where(st => st.Split('\n').Where(l => l.Contains("FROM lab.test_ledger", StringComparison.OrdinalIgnoreCase)).Any(l => !(l.Contains("trial_kind <> 'training_sweep'", StringComparison.Ordinal) || Regex.IsMatch(l, "trial_kind = '(run|replan|null|system_replay)'", RegexOptions.None, ScanRegex.Timeout) || Regex.IsMatch(l, "trial_kind = 'training_sweep'", RegexOptions.None, ScanRegex.Timeout)))).ToList();
         unfenced.Count.ShouldBe(1, "exactly one ledger statement is unfiltered: the listing, which shows training sweeps beside the looks (ADR 0243)");
         unfenced[0].ShouldContain("ORDER BY created_at DESC");
 
@@ -288,6 +288,7 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
             "XDrishti.Application/Replay/Job/CancelReplayHandler.cs",
             "XDrishti.Application/Replay/Job/ReplayRunner.cs",
             "XDrishti.Application/Replay/Job/StartReplayHandler.cs",
+            "XDrishti.Application/SimAll/SimAllRunner.cs",
             "XDrishti.Infrastructure/DependencyInjection.cs",
             "XDrishti.Infrastructure/Replay/ReplayStore.cs",
         ]);

@@ -53,8 +53,8 @@ public sealed class ReplayBenchmarks
     public async Task One_year_over_one_hundred_instruments_prints_the_time_per_session()
     {
         var ids = Enumerable.Range(0, Instruments).Select(i => new Guid(i + 1, 0, 0, [0, 0, 0, 0, 0, 0, 0, 1])).ToList();
-        var series = ids.Select((_, i) => Walk(i)).ToList();
-        var daily = series.Select(all => all.GroupBy(b => SessionClock.DateOf(b.EpochSeconds)).Select(g => new BarRow(new DateTimeOffset(g.Key.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(5.5)), g.First().Open, g.Max(b => b.High), g.Min(b => b.Low), g.Last().Close, g.Sum(b => b.Volume), g.Count(), true, null)).ToArray()).ToList();
+        // the minutes are generated on demand (a random walk seeded by instrument and day), so the working set measured below is the engine's and not a resident copy of the data
+        var daily = ids.Select((_, i) => Sessions().Select(d => { var bars = Day(i, d); return new BarRow(new DateTimeOffset(d.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(5.5)), bars[0].Open, bars.Max(b => b.High), bars.Min(b => b.Low), bars[^1].Close, bars.Sum(b => b.Volume), bars.Length, true, null); }).ToArray()).ToList();
         var (basket, seedText) = (Guid.NewGuid(), XDrishti.Infrastructure.Research.StrategySeeder.EmbeddedTexts().First(t => t.Name.StartsWith("BASE_BREAKOUT", StringComparison.Ordinal)).Text);
         var hash = CanonicalText.Sha256Hex(CanonicalStrategy.Json(StrategyFile.Read(seedText).Definition!));
         var version = new StoredVersion("BASE_BREAKOUT", 1, 1, hash, seedText, "{}", null, null, DateTimeOffset.UnixEpoch);
@@ -79,11 +79,10 @@ public sealed class ReplayBenchmarks
         var minutes = Substitute.For<IBarStore>();
         minutes.ReadAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
-            var all = series[ids.IndexOf(call.Arg<Guid>())];
+            var instrument = ids.IndexOf(call.Arg<Guid>());
             var (from, to) = (call.ArgAt<DateTimeOffset>(1).ToUnixTimeSeconds(), call.ArgAt<DateTimeOffset>(2).ToUnixTimeSeconds());
-            var lo = LowerBound(all, from);
-            var hi = LowerBound(all, to + 1);
-            return ValueTask.FromResult<IReadOnlyList<Bar>>(all[lo..hi]);
+            IReadOnlyList<Bar> read = [.. Sessions().Where(d => Day0(d) + (24 * 3600) > from && Day0(d) <= to).SelectMany(d => Day(instrument, d)).Where(b => b.EpochSeconds >= from && b.EpochSeconds <= to)];
+            return ValueTask.FromResult(read);
         });
         var days = Substitute.For<IBarQueries>();
         days.ReadDailyBarsAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(call =>
@@ -119,11 +118,14 @@ public sealed class ReplayBenchmarks
         var driver = new ReplayDriver(facts, runner);
         var parameters = new ReplayParams(Start, End, new ReplayScope([basket], []), 1_000_000m, ReplayRiskProfile.Standard, null, ReplayVersionRule.Start, ReplayMode.Frozen);
 
-        var prepared = await driver.PrepareAsync(parameters, null, Ct);
+        var prepared = await driver.PrepareAsync(parameters, null, null, Ct);
         prepared.IsSuccess.ShouldBeTrue(prepared.IsFailure ? prepared.Error.Message : string.Empty);
         var watch = Stopwatch.StartNew();
         var slowest = TimeSpan.Zero;
         var candidates = 0;
+        long live = 0; // the live managed bytes after a full collection, sampled every 25 sessions: what the run really holds
+        var sampled = 0;
+        long peak = 0; // the peak working set after any session (PeakWorkingSet64 reads 0 on macOS)
         foreach (var session in prepared.Value.Sessions)
         {
             var one = Stopwatch.StartNew();
@@ -131,58 +133,48 @@ public sealed class ReplayBenchmarks
             record.IsSuccess.ShouldBeTrue(record.IsFailure ? record.Error.Message : string.Empty);
             candidates += record.Value.Candidates.Count;
             slowest = one.Elapsed > slowest ? one.Elapsed : slowest;
+            peak = Math.Max(peak, Environment.WorkingSet);
+            if (++sampled % 25 == 0)
+            {
+                live = Math.Max(live, GC.GetTotalMemory(true));
+            }
         }
 
         watch.Stop();
-        var line = FormattableString.Invariant($"SR-01 benchmark: {prepared.Value.Sessions.Count} sessions x {Instruments} instruments in {watch.Elapsed.TotalSeconds:F1} s, {watch.Elapsed.TotalSeconds / prepared.Value.Sessions.Count:F2} s per session (slowest {slowest.TotalSeconds:F2} s), {candidates} candidates, working set {Environment.WorkingSet / 1024 / 1024} MiB");
+        var line = FormattableString.Invariant($"SR-01 benchmark: {prepared.Value.Sessions.Count} sessions x {Instruments} instruments in {watch.Elapsed.TotalSeconds:F1} s, {watch.Elapsed.TotalSeconds / prepared.Value.Sessions.Count:F2} s per session (slowest {slowest.TotalSeconds:F2} s), {candidates} candidates, peak working set {peak / 1024 / 1024} MiB, live managed {live / 1024 / 1024} MiB");
         Console.WriteLine(line);
         await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "replay-benchmark.txt"), line + Environment.NewLine, Ct); // the runner of the test hides the console of a passing test
     }
 
-    private static int LowerBound(Bar[] bars, long epoch)
+    private static IEnumerable<DateOnly> Sessions()
     {
-        int lo = 0, hi = bars.Length;
-        while (lo < hi)
-        {
-            var mid = (lo + hi) / 2;
-            if (bars[mid].EpochSeconds < epoch)
-            {
-                lo = mid + 1;
-            }
-            else
-            {
-                hi = mid;
-            }
-        }
-
-        return lo;
-    }
-
-    /// <summary>A random walk of 375 bars a session from 2025-01-01 to the end of the benchmark's year, deterministic by instrument.</summary>
-    private static Bar[] Walk(int instrument)
-    {
-        var state = (uint)((instrument * 7919) + 17);
-        var price = 100.0 + instrument;
-        var bars = new List<Bar>(700 * SessionClock.RegularBars);
         for (var d = new DateOnly(2025, 1, 1); d <= End; d = d.AddDays(1))
         {
-            if (d.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            if (d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
             {
-                continue;
-            }
-
-            var open = new DateTimeOffset(d.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(5.5)).AddMinutes(SessionClock.OpenMinute);
-            for (var m = 0; m < SessionClock.RegularBars; m++)
-            {
-                state = ((state * 1103515245u) + 12345u) & 0x7fffffffu;
-                var step = ((state >> 8) % 9 - 4) * 0.01;
-                var next = Math.Max(1, price + step);
-                bars.Add(new Bar(open.AddMinutes(m).ToUnixTimeSeconds(), price, Math.Max(price, next) + 0.01, Math.Min(price, next) - 0.01, next, 1000 + (state % 4000)));
-                price = next;
+                yield return d;
             }
         }
+    }
 
-        return [.. bars];
+    private static long Day0(DateOnly d) => new DateTimeOffset(d.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(5.5)).ToUnixTimeSeconds();
+
+    /// <summary>The 375 bars of one session of one instrument: a random walk seeded by instrument and day, from a slow drift of the day's level.</summary>
+    private static Bar[] Day(int instrument, DateOnly d)
+    {
+        var state = (uint)((instrument * 7919) + (d.DayNumber * 104729) + 17);
+        var price = 100.0 + instrument + (5 * Math.Sin(d.DayNumber / 20.0));
+        var open = new DateTimeOffset(d.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(5.5)).AddMinutes(SessionClock.OpenMinute);
+        var bars = new Bar[SessionClock.RegularBars];
+        for (var m = 0; m < bars.Length; m++)
+        {
+            state = ((state * 1103515245u) + 12345u) & 0x7fffffffu;
+            var next = Math.Max(1, price + (((state >> 8) % 9) - 4) * 0.01);
+            bars[m] = new Bar(open.AddMinutes(m).ToUnixTimeSeconds(), price, Math.Max(price, next) + 0.01, Math.Min(price, next) - 0.01, next, 1000 + (state % 4000));
+            price = next;
+        }
+
+        return bars;
     }
 
     private static T Blank<T>() => (T)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(T));

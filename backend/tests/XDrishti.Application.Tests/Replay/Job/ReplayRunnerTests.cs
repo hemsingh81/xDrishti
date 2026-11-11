@@ -1,6 +1,9 @@
+using NSubstitute;
+using XDrishti.Application.Abstractions.Replay;
 using XDrishti.Application.Replay;
 using XDrishti.Application.Replay.Job;
 using XDrishti.Application.SimAll;
+using XDrishti.Application.Tests.SimAll;
 using XDrishti.Domain.Replay;
 using XDrishti.Domain.Research.SimAll;
 
@@ -259,6 +262,164 @@ public sealed class ReplayRunnerTests
         again.Error.Code.ShouldBe("replay.busy");
         rig.Store.Runs.Count.ShouldBe(1);
         rig.Ledger.Rows.Count.ShouldBe(rows);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_failed_save_does_not_leave_a_book_that_stepped_past_the_store_the_next_tick_rebuilds_it_and_the_records_are_unchanged(bool afterStoring)
+    {
+        var (whole, wholeId) = await Queued();
+        var expected = await Finished(whole, wholeId);
+        var (rig, id) = await Queued();
+        rig.Store.FailSaves = 0;
+        rig.Store.AfterSave = (_, stored) =>
+        {
+            if (stored == 2 && rig.Store.SaveCalls == 2)
+            {
+                rig.Store.FailSaves = 1; // the third save fails
+                rig.Store.FailAfterStoring = afterStoring;
+            }
+        };
+        var runner = rig.Runner();
+
+        await runner.TickAsync(Ct);
+        rig.Store.Of(id).State.ShouldBe(ReplayRunStates.Running, "one failure does not end the run");
+        rig.Store.AfterSave = null;
+        await runner.TickAsync(Ct);
+
+        var run = rig.Store.Of(id);
+        run.State.ShouldBe(ReplayRunStates.Completed);
+        run.Sessions.Values.Select(s => s.RecordJson).ShouldBe(expected.Sessions.Values.Select(s => s.RecordJson));
+        run.ResultHash.ShouldBe(expected.ResultHash);
+        run.Trades.Select(t => t.TradeNo).ShouldBe(expected.Trades.Select(t => t.TradeNo));
+    }
+
+    [Fact]
+    public async Task A_store_that_keeps_failing_ends_the_run_failed_with_the_reason_after_a_few_ticks()
+    {
+        var (rig, id) = await Queued(r => r.Store.FailSaves = int.MaxValue);
+        var runner = rig.Runner();
+
+        for (var i = 0; i < 3; i++)
+        {
+            await runner.TickAsync(Ct);
+        }
+
+        var run = rig.Store.Of(id);
+        run.State.ShouldBe(ReplayRunStates.Failed);
+        run.FailReason!.ShouldContain("replay.store_failed");
+    }
+
+    [Fact]
+    public async Task A_failed_recovery_is_tried_again_at_the_next_tick_so_a_stale_running_row_does_not_block_the_claim()
+    {
+        var (rig, id) = await Queued();
+        rig.Store.Of(id).State = ReplayRunStates.Running; // left by a process that died
+        rig.Store.FailRecoverOnce = true;
+        var runner = rig.Runner();
+
+        await Should.ThrowAsync<InvalidOperationException>(async () => await runner.TickAsync(Ct));
+        await runner.TickAsync(Ct);
+
+        rig.Store.Of(id).State.ShouldBe(ReplayRunStates.Completed);
+    }
+
+    [Fact]
+    public async Task A_cancel_that_arrives_while_the_stored_sessions_are_replayed_is_honoured_before_the_rebuild_ends()
+    {
+        var (rig, id) = await Queued();
+        using var kill = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        rig.Store.AfterSave = (_, stored) =>
+        {
+            if (stored == 3)
+            {
+                kill.Cancel();
+            }
+        };
+        var first = rig.Runner();
+        await Should.ThrowAsync<OperationCanceledException>(async () => await first.TickAsync(kill.Token));
+        rig.Store.AfterSave = null;
+        var second = rig.Runner();
+        await second.RecoverAsync(Ct);
+        var looks = 0;
+        rig.Store.OnState = (_, _) =>
+        {
+            if (++looks == 2)
+            {
+                rig.Store.Of(id).State = ReplayRunStates.Cancelling; // the owner cancels while the second process rebuilds the first session
+            }
+        };
+        await second.TickAsync(Ct);
+
+        (rig.Store.Of(id).State, rig.Store.Of(id).Sessions.Count).ShouldBe((ReplayRunStates.Cancelled, 3));
+    }
+
+    [Fact]
+    public async Task A_run_that_was_never_recorded_in_the_ledger_is_not_claimed_and_recovery_cancels_it()
+    {
+        var rig = new ReplayJobRig(ReplayJobRig.SwingWorld());
+        var started = await rig.StartAsync(Six);
+        var id = started.Value.RunIds[0];
+        var runner = rig.Runner();
+        await runner.RecoverAsync(Ct);
+        rig.Store.Of(id).Recorded = false; // the start died between the insert and the ledger rows
+
+        await runner.TickAsync(Ct);
+        rig.Store.Of(id).State.ShouldBe(ReplayRunStates.Queued);
+        await runner.RecoverAsync(Ct);
+
+        rig.Store.Of(id).State.ShouldBe(ReplayRunStates.Cancelled);
+    }
+
+    [Fact]
+    public async Task A_run_whose_bars_changed_after_the_start_fails_as_diverged_and_one_whose_version_changed_uses_the_stored_version()
+    {
+        var (rig, id) = await Queued();
+        rig.World.Versions["S1"].Add(ReplayWorld.Version("S1", 2, new string('7', 64), DateTimeOffset.UnixEpoch.AddYears(60))); // a newer active version appears after the start
+        var run = await Finished(rig, id);
+        run.State.ShouldBe(ReplayRunStates.Completed, "the stored version map is used, not today's active version");
+
+        var (changed, changedId) = await Queued();
+        changed.World.Close["AAA"][new DateOnly(2026, 10, 7)] += 0.01; // a bar inside the window is corrected after the start
+        var failed = await Finished(changed, changedId);
+
+        failed.State.ShouldBe(ReplayRunStates.Failed);
+        failed.FailReason!.ShouldContain("replay.diverged");
+        failed.Sessions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_simulate_everything_job_does_not_start_a_chunk_while_a_replay_runs()
+    {
+        var (rig, id) = await Queued();
+        rig.Store.Of(id).State = ReplayRunStates.Running;
+        rig.SimAll.Seed(1, 3);
+        var executor = new FakeExecutor();
+        var calendar = NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Market.Calendar.ITradingCalendar>();
+        calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new XDrishti.Domain.Market.Calendar.TradingCalendar());
+        var scopes = new FakeScopes(
+            (typeof(XDrishti.Application.Abstractions.SimAll.ISimAllStore), rig.SimAll), (typeof(XDrishti.Application.Abstractions.Lab.ITestLedger), rig.Ledger), (typeof(XDrishti.Application.Abstractions.SimAll.ISimAllBackfillGate), rig.Gate),
+            (typeof(XDrishti.Application.Abstractions.SimAll.IFreeDiskProbe), rig.Disk), (typeof(XDrishti.Application.SimAll.ISimAllChunkExecutor), executor), (typeof(XDrishti.Application.Abstractions.Market.Calendar.ITradingCalendar), calendar),
+            (typeof(IReplayReads), rig.Store));
+        var simAll = new XDrishti.Application.SimAll.SimAllRunner(scopes, new SimAllSettings(), rig.Time, Microsoft.Extensions.Logging.Abstractions.NullLogger<XDrishti.Application.SimAll.SimAllRunner>.Instance);
+
+        await simAll.TickAsync(Ct);
+
+        executor.Ran.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_stored_record_gives_the_same_hash_after_the_round_trip_through_the_database_text()
+    {
+        var direct = await ReplayRig.Create(ReplayJobRig.SwingWorld()).Driver.RunAsync(Six, Ct);
+
+        foreach (var record in direct.Value.Sessions)
+        {
+            var text = ReplayJson.Canonical(record);
+            var reordered = text.Replace("{\"", "{ \"", StringComparison.Ordinal); // jsonb changes spacing and key order; the hash is over the canonical form, which is rebuilt from the value
+            ReplayHashes.Session(ReplayJson.Read<ReplaySessionRecord>(reordered)!).ShouldBe(ReplayHashes.Session(record));
+        }
     }
 }
 
