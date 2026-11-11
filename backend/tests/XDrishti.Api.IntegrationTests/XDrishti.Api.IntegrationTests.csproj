@@ -5,6 +5,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="NSubstitute" /><!-- the stores of the explicit replay benchmark (SR-01 part B) answer from memory -->
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="YamlDotNet" />
   </ItemGroup>

@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace XDrishti.Application.Replay;
 
 /// <summary>
-/// The configuration section <c>Replay</c> (SR-01, AU-08 Internal): the bounds of the system replay. A value out of range fails start-up.
+/// The configuration section <c>Replay</c> (SR-01, AU-08 Internal): the bounds of the system replay and the yield rules of its job (the same rules as the simulate-everything job, ADR 0248). A value out of range fails start-up.
 /// </summary>
 public sealed class SystemReplayOptions
 {
@@ -15,4 +15,20 @@ public sealed class SystemReplayOptions
     /// </summary>
     [Range(0.0, 1.0)]
     public double IncompleteDataShare { get; set; } = 0.2;
+
+    /// <summary>Whether this host runs the replay job loop (off for a host that only serves the API of the tests).</summary>
+    public bool RunWorker { get; set; } = true;
+
+    /// <summary>The job waits while free disk is under this many GiB.</summary>
+    [Range(10, 500)]
+    public int MinFreeGb { get; set; } = 40;
+
+    /// <summary>Whether the job also runs from 09:00 to 15:45 IST on a trading day (default off).</summary>
+    public bool RunInMarketHours { get; set; }
+
+    /// <summary>How often the loop looks at the queue (and at the conditions that make the job wait).</summary>
+    public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>The disk floor in bytes.</summary>
+    public long MinFreeBytes => MinFreeGb * 1024L * 1024 * 1024;
 }

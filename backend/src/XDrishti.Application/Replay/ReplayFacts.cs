@@ -8,6 +8,7 @@ using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Abstractions.Replay;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Abstractions.Selection;
 using XDrishti.Application.Learning;
@@ -56,7 +57,7 @@ internal sealed class ReplayFacts(
     IBasketContextStore? basketContext = null,
     ConfidenceOptions? confidence = null,
     ShrinkageOptions? shrinkage = null,
-    ILogger<ReplayFacts>? logger = null) : IReplayFacts
+    ILogger<ReplayFacts>? logger = null) : IReplayFacts, IReplayBarFingerprint
 {
     /// <summary>Calendar days of daily bars read before the close of the session for the correlations (about 60 sessions plus slack), as the live context source reads.</summary>
     public const int ReturnLookbackDays = 120;
@@ -74,6 +75,30 @@ internal sealed class ReplayFacts(
     private TradingCalendar? _calendar;
 
     public ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken) => _bars.LastReadableAsync(cancellationToken);
+
+    public void BeginRun(DateOnly last, ReplaySettingsSnapshot? stored)
+    {
+        _bars.PlanRange(last);
+        _settings = stored ?? _settings;
+    }
+
+    /// <summary>A hash of the day bars (their times, prices, volumes and the count of 1-minute bars in each) of the instruments over the window the run reads, up to its last session: a change in the stored minutes changes it. Read through the clamp.</summary>
+    public async ValueTask<string> BarHashAsync(IReadOnlyList<Guid> instrumentIds, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(instrumentIds);
+        var text = new System.Text.StringBuilder();
+        foreach (var id in instrumentIds.Distinct().Order())
+        {
+            text.Append(id.ToString("N")).Append('\n');
+            foreach (var bar in await _bars.DaysAsync(id, from.AddDays(-ClampedBars.MinuteLookbackDays), to, cancellationToken))
+            {
+                text.Append(bar.Ts.ToUnixTimeSeconds()).Append(' ').Append(bar.Open.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(' ').Append(bar.High.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(' ')
+                    .Append(bar.Low.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(' ').Append(bar.Close.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(' ').Append(bar.Volume).Append(' ').Append(bar.Bars).Append(bar.Complete ? 'c' : 'i').Append('\n');
+            }
+        }
+
+        return ReplayJson.Sha256(text.ToString());
+    }
 
     public async ValueTask<TradingCalendar> CalendarAsync(CancellationToken cancellationToken) => _calendar ??= await calendars.GetAsync(cancellationToken);
 
@@ -235,7 +260,6 @@ internal sealed class ReplayFacts(
         return session.AddDays(1);
     }
 
-    // shortcut: the 400 calendar days of minute bars are read again for every session (the rolling window of the non-functional section is part B); upgrade when the measured time per session needs it.
     private async ValueTask<StoredVersion?> VersionAsync(ReplayVersionRule rule, string strategy, DateOnly cut, CancellationToken cancellationToken)
     {
         if (rule == ReplayVersionRule.Start)

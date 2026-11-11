@@ -16,6 +16,12 @@ public interface IReplayFacts
     /// <summary>The last session the replay may read: the hold-out start less one day and less the embargo. Throws <see cref="ReplayHoldOutException"/> when no block is fixed.</summary>
     ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Tells the facts of one run the last session it will replay (so the bars of each instrument are read once for the whole run) and, when the run resumes after a restart, the settings snapshot that was stored with it (so the snapshot is never re-read from today's settings).
+    /// The default does nothing: a facts source that keeps no window and has no stored snapshot needs neither.
+    /// </summary>
+    void BeginRun(DateOnly last, ReplaySettingsSnapshot? stored) { }
+
     /// <summary>The trading calendar.</summary>
     ValueTask<TradingCalendar> CalendarAsync(CancellationToken cancellationToken);
 

@@ -834,6 +834,13 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetSimTrainingQuery, Result<SimTrainingView>>, GetSimTrainingHandler>();
     }
 
+    /// <summary>The runner of the system replay job (SR-01 part B, ADR 0272): only the host that runs the job (the API) calls this. Recovery class <see cref="XDrishti.Application.Replay.Job.ReplayRunner.Recovery"/> (convergent).</summary>
+    public static IServiceCollection AddReplayRunner(this IServiceCollection services)
+    {
+        services.AddSingleton<XDrishti.Application.Replay.Job.ReplayRunner>();
+        return services;
+    }
+
     /// <summary>The chunk executor and the runner of the simulate-everything job (AU-12): only the host that runs the job (the API) calls this.</summary>
     public static IServiceCollection AddSimAllRunner(this IServiceCollection services)
     {
@@ -1094,6 +1101,9 @@ public static class DependencyInjection
         services.AddScoped<XDrishti.Application.Replay.IReplayFacts, XDrishti.Application.Replay.ReplayFacts>();
         services.AddScoped<XDrishti.Application.Replay.ReplaySessionRunner>();
         services.AddScoped<XDrishti.Application.Replay.ReplayDriver>();
+        services.AddScoped<XDrishti.Application.Abstractions.Replay.IReplayBarFingerprint>(sp => (XDrishti.Application.Replay.ReplayFacts)sp.GetRequiredService<XDrishti.Application.Replay.IReplayFacts>()); // the bar hash of the input hash (SR-01 part B)
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Job.StartReplayCommand, XDrishti.Application.Replay.Job.StartedReplay>, XDrishti.Application.Replay.Job.StartReplayHandler>(); // stores and queues a replay, records it in the trial ledger (SR-01 part B)
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Job.CancelReplayCommand, string>, XDrishti.Application.Replay.Job.CancelReplayHandler>(); // stops a replay after its current session (SR-01, AC 15)
         services.AddScoped<IEpochGate, FingerprintEpochGate>(); // the configuration fingerprint decides the epoch (P10-05, ADR 0119): detects, labels and records; applies and blocks nothing
         services.AddScoped<IConfigSnapshotSource, ConfigSnapshotSource>();
         services.AddScoped<IQueryHandler<GetEpochsQuery, Result<EpochList>>, GetEpochsHandler>();

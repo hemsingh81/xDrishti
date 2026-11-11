@@ -137,6 +137,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("StrategyLab:RunWorker", "false"); // Lab runs are driven by the tests through LabRunDispatcher.DrainAsync
         builder.UseSetting("Experiments:RunWorker", "false"); // replay jobs are driven by the tests through ExperimentJobDispatcher.DrainAsync
         builder.UseSetting("Simulate:RunWorker", "false"); // the simulate-everything job is driven by the tests through SimAllRunner.TickAsync
+        builder.UseSetting("Replay:RunWorker", "false"); // the system replay job is driven by the tests through ReplayRunner.TickAsync (SR-01 part B)
         builder.UseSetting("Simulate:RunInMarketHours", "true"); // the clock is pinned inside market hours; the yield rules are unit-tested
         builder.UseSetting("Simulate:MinFreeGb", "10"); // the lowest the setting allows, so a small disk of a developer machine does not pause the test
         builder.UseSetting("Data:CsvFolder", CsvFolder);

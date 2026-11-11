@@ -90,6 +90,60 @@ public sealed partial class ReplayArchitectureTests
         }
     }
 
+    private static string Src() => Path.GetDirectoryName(Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Domain", "XDrishti.Domain.csproj")))!;
+
+    private static readonly string[] WriteReceivers = ["store", "ledger"];
+
+    private static string[] JobFiles() => Directory.GetFiles(Path.Combine(Src(), "XDrishti.Application", "Replay", "Job"), "*.cs");
+
+    [GeneratedRegex(@"(?<receiver>\w+)\s*\.\s*\w*(Store|Append|Insert|Save|Write|Publish|Delete|Update|Move)\w*Async\(", RegexOptions.CultureInvariant)]
+    private static partial Regex ReceiverOfWrite();
+
+    [GeneratedRegex(@"(INSERT\s+INTO|(?<!FOR\s+)UPDATE|DELETE\s+FROM|TRUNCATE(\s+TABLE)?|COPY|MERGE\s+INTO)\s+(?<table>[\w.]+)", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
+    private static partial Regex SqlWrite();
+
+    [Fact]
+    public void The_job_names_no_execution_project_broker_or_order_and_writes_only_through_the_replay_store_and_the_trial_ledger()
+    {
+        var files = JobFiles().ToList();
+        files.Count.ShouldBeGreaterThan(4, "the scan sees the job files");
+        foreach (var file in files)
+        {
+            var text = File.ReadAllText(file);
+            text.ShouldNotContain("XDrishti.Execution", customMessage: file);
+            Banned().IsMatch(text).ShouldBeFalse(file);
+            foreach (Match write in ReceiverOfWrite().Matches(text))
+            {
+                WriteReceivers.ShouldContain(write.Groups["receiver"].Value, $"{Path.GetFileName(file)}: {write.Value} writes through something other than the replay store or the ledger port (SR-01, AC 11)");
+            }
+        }
+    }
+
+    [Fact]
+    public void The_replay_may_write_only_its_three_tables_and_only_the_one_store_names_them()
+    {
+        // AC 11 (ADR 0272): the whole list of what a replay writes. Planning, paper, shadow, learning, model and settings tables are not on it; the trial-ledger row goes through the ledger port, which is the ledger's own writer.
+        string[] allowed = ["research.replay_runs", "research.replay_sessions", "research.replay_trades"];
+        var store = File.ReadAllText(Path.Combine(Src(), "XDrishti.Infrastructure", "Replay", "ReplayStore.cs"));
+        var written = SqlWrite().Matches(store).Select(m => m.Groups["table"].Value.ToLowerInvariant()).Distinct().Order(StringComparer.Ordinal).ToList();
+
+        written.ShouldBe(allowed);
+        Regex.IsMatch(store, @"DELETE\s+FROM|TRUNCATE", RegexOptions.IgnoreCase).ShouldBeFalse("the replay tables are never deleted from in this slice");
+        foreach (var file in Directory.GetFiles(Path.Combine(Src(), "XDrishti.Infrastructure", "Replay"), "*.cs", SearchOption.AllDirectories).Where(f => !f.EndsWith("ReplayStore.cs", StringComparison.Ordinal)))
+        {
+            SqlWrite().IsMatch(File.ReadAllText(file)).ShouldBeFalse(file + " writes SQL: only ReplayStore does");
+        }
+
+        var namers = Directory.EnumerateFiles(Src(), "*.cs", SearchOption.AllDirectories)
+            .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal) && Regex.IsMatch(string.Join("\n", File.ReadAllLines(f).Where(l => !l.TrimStart().StartsWith("//", StringComparison.Ordinal))), @"replay_(runs|sessions|trades)\b"))
+            .Select(f => Path.GetRelativePath(Src(), f).Replace('\\', '/')).ToList();
+        namers.ShouldBe(["XDrishti.Infrastructure/Replay/ReplayStore.cs"]);
+        SqlWrite().IsMatch("INSERT INTO research.replay_runs (a)").ShouldBeTrue("the scan does see a write");
+        SqlWrite().IsMatch("UPDATE research.replay_runs SET").ShouldBeTrue();
+        SqlWrite().IsMatch("SELECT 1 FROM research.replay_runs").ShouldBeFalse("a read is not a write");
+        SqlWrite().IsMatch("SELECT id FROM research.replay_runs FOR UPDATE SKIP LOCKED").ShouldBeFalse("a row lock is not a write");
+    }
+
     [Fact]
     public void The_scans_see_what_they_are_meant_to_see_sentinels()
     {
@@ -98,6 +152,8 @@ public sealed partial class ReplayArchitectureTests
         WriteCall().IsMatch("await store.InsertOnceAsync(x, ct);").ShouldBeTrue();
         WriteCall().IsMatch("await plans.UpdateStateAsync(x, ct);").ShouldBeTrue();
         WriteCall().IsMatch("await facts.CellsAsync(p, d, ct);").ShouldBeFalse();
+        ReceiverOfWrite().Match("await store.SaveSessionAsync(x, ct);").Groups["receiver"].Value.ShouldBe("store");
+        ReceiverOfWrite().Match("await planStore.AppendAsync(x, ct);").Groups["receiver"].Value.ShouldBe("planStore");
         Types.InAssembly(Application).That().HaveName("ClampedBars").Should().HaveDependencyOn("XDrishti.Application.Abstractions.Market.Bars.IBarStore").GetResult().IsSuccessful.ShouldBeTrue();
         Types.InAssembly(Application).That().HaveName("ReplayFacts").Should().HaveDependencyOn("XDrishti.Application.Abstractions.Market.Bars.IBarStore").GetResult().IsSuccessful.ShouldBeTrue();
     }

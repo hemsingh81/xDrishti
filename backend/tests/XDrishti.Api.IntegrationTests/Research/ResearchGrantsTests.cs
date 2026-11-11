@@ -100,7 +100,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             }
         }
 
-        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "expression_legs", "expression_runs", "expression_trades", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "ml_influence_checks", "ml_monitor_checks", "ml_switch_settings", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "rollback_proposals", "sim_all_chunks", "sim_all_jobs", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "sim_training_runs", "trade_features", "trade_features_ext", "training_sets", "training_sim_cell_stats", "universe_settings_changes"]);
+        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "expression_legs", "expression_runs", "expression_trades", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "ml_influence_checks", "ml_monitor_checks", "ml_switch_settings", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "replay_runs", "replay_sessions", "replay_trades", "rollback_proposals", "sim_all_chunks", "sim_all_jobs", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "sim_training_runs", "trade_features", "trade_features_ext", "training_sets", "training_sim_cell_stats", "universe_settings_changes"]);
         foreach (var name in names)
         {
             // a rollback proposal is inserted column by column (never as an already-decided row), so the role holds no table-level INSERT on it (RollbackGrantsTests covers its columns)
@@ -121,6 +121,26 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
         await connection.OpenAsync(Ct);
 
         foreach (var (table, column, expected) in new[] { ("sim_all_jobs", "state", true), ("sim_all_jobs", "pause_reason", true), ("sim_all_jobs", "window_to", false), ("sim_all_jobs", "started_by", false), ("sim_all_chunks", "state", true), ("sim_all_chunks", "run_key", true), ("sim_all_chunks", "strategy_hash", false), ("sim_all_chunks", "instrument_id", false) })
+        {
+            await using var check = new NpgsqlCommand("SELECT has_column_privilege('xd_app', @t, @c, 'UPDATE')", connection);
+            check.Parameters.AddWithValue("t", "research." + table);
+            check.Parameters.AddWithValue("c", column);
+            ((bool)(await check.ExecuteScalarAsync(Ct))!).ShouldBe(expected, $"UPDATE of {table}.{column}");
+        }
+    }
+
+    [Fact]
+    public async Task The_replay_tables_let_the_runtime_role_update_only_five_columns_of_a_run_and_nothing_of_a_session_or_a_trade()
+    {
+        await using var connection = new NpgsqlConnection(_owner);
+        await connection.OpenAsync(Ct);
+
+        foreach (var (table, column, expected) in new[]
+        {
+            ("replay_runs", "state", true), ("replay_runs", "cursor_session", true), ("replay_runs", "result_hash", true), ("replay_runs", "finished_at", true), ("replay_runs", "fail_reason", true),
+            ("replay_runs", "input_hash", false), ("replay_runs", "params", false), ("replay_runs", "settings_snapshot", false), ("replay_runs", "scope_hash", false), ("replay_runs", "range_to", false),
+            ("replay_sessions", "record", false), ("replay_sessions", "equity", false), ("replay_trades", "net_pnl", false), ("replay_trades", "exit_at", false),
+        })
         {
             await using var check = new NpgsqlCommand("SELECT has_column_privilege('xd_app', @t, @c, 'UPDATE')", connection);
             check.Parameters.AddWithValue("t", "research." + table);
@@ -233,7 +253,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             (await SqlStateAsync(_app, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
 
-        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(38);
+        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(41);
     }
 
     [Fact]

@@ -3,7 +3,7 @@ using XDrishti.Domain.Lab;
 namespace XDrishti.Application.Abstractions.Lab;
 
 /// <summary>
-/// One row of the test ledger (spec P5-03): a Lab run that was created for a strategy family. <paramref name="TrialKind"/> is <c>run</c> (a run or a sweep point) or <c>replan</c> (a changed frozen plan, CF-06); <paramref name="ExtraTrials"/> is the number of
+/// One row of the test ledger (spec P5-03): a Lab run that was created for a strategy family. <paramref name="TrialKind"/> is <c>run</c> (a run or a sweep point), <c>replan</c> (a changed frozen plan, CF-06) or <c>system_replay</c> (SR-01); <paramref name="ExtraTrials"/> is the number of
 /// extra candidate exits the first full test of the hash walked (CF-06, D3), zero on every other row.
 /// </summary>
 public sealed record LedgerRow(
@@ -26,6 +26,9 @@ public sealed record LedgerRow(
 
     /// <summary>True for a training sweep row; evidence readers of the list skip these.</summary>
     public bool IsTrainingSweep => string.Equals(TrialKind, TrainingSweepKind, StringComparison.Ordinal);
+
+    /// <summary>The trial kind of a system replay (SR-01, ADR 0272): one row per strategy version the run uses, with the run's input hash as the run key. It is a look at the strategy and is counted as one (the kind is not filtered out), with no extra trials.</summary>
+    public const string SystemReplayKind = "system_replay";
 }
 
 /// <summary>
