@@ -123,7 +123,15 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
         var run = _active;
         if (run.NotBefore > time.GetUtcNow())
         {
-            return; // backing off after a failure of the store
+            // backing off after a failure of the store; a cancel is not made to wait for it
+            var waiting = run.Scope.ServiceProvider.GetRequiredService<IReplayStore>();
+            if (await waiting.StateAsync(run.Row.Id, cancellationToken) == ReplayRunStates.Cancelling && await EndAsync(run, waiting, ReplayRunStates.Cancelled, null, null, cancellationToken))
+            {
+                run.Scope.Dispose();
+                _active = null;
+            }
+
+            return;
         }
 
         var ended = false;

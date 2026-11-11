@@ -331,6 +331,19 @@ public sealed class ReplayRunnerTests
     }
 
     [Fact]
+    public async Task A_cancel_is_honoured_while_the_run_waits_after_a_failure()
+    {
+        var (rig, id) = await Queued(r => r.Store.FailSaves = int.MaxValue);
+        var runner = rig.Runner();
+        await runner.TickAsync(Ct); // fails and backs off
+        rig.Store.Of(id).State = ReplayRunStates.Cancelling;
+
+        await runner.TickAsync(Ct); // no time has passed
+
+        rig.Store.Of(id).State.ShouldBe(ReplayRunStates.Cancelled);
+    }
+
+    [Fact]
     public async Task A_refresh_of_the_statistics_after_the_start_does_not_fail_a_learning_run()
     {
         var rig = new ReplayJobRig(ReplayJobRig.SwingWorld());

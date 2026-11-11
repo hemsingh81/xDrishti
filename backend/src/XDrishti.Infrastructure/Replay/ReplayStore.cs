@@ -36,6 +36,12 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
             await advisory.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        // a start that died between its insert and its ledger rows left a queued, unrecorded row: past five minutes it is cancelled here, so it cannot refuse every later start
+        await using (var stale = new NpgsqlCommand("UPDATE research.replay_runs SET state = 'cancelled', finished_at = now() WHERE state = 'queued' AND NOT recorded AND created_at < now() - interval '5 minutes'", connection, transaction))
+        {
+            await stale.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         var active = await ReadRunsAsync(connection, transaction, RunSelect + " WHERE r.state IN ('queued', 'running', 'cancelling') ORDER BY r.created_at, r.id", null, cancellationToken);
         if (active.Count > 0)
         {

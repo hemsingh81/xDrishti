@@ -172,6 +172,23 @@ public sealed class ReplayStoreTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_start_that_died_before_its_ledger_rows_do_not_block_later_starts_once_it_is_five_minutes_old()
+    {
+        var recent = New() with { CreatedAt = DateTimeOffset.UtcNow };
+        await WithAsync((s, _) => s.InsertAsync(null, [recent], Ct).AsTask());
+
+        var tooSoon = await WithAsync((s, _) => s.InsertAsync(null, [New()], Ct).AsTask());
+        tooSoon.Started.ShouldBeFalse("a start that may still be writing its rows holds the slot");
+
+        var old = New() with { CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-6) };
+        await StoreKit.ExecuteAsync(Db.ConnectionString, $"UPDATE research.replay_runs SET created_at = now() - interval '6 minutes' WHERE id = '{recent.Id}'", Ct);
+        var later = await WithAsync((s, _) => s.InsertAsync(null, [old], Ct).AsTask());
+
+        later.Started.ShouldBeTrue("the stale unrecorded run was cancelled under the lock");
+        (await WithAsync((s, _) => s.StateAsync(recent.Id, Ct).AsTask())).ShouldBe("cancelled");
+    }
+
+    [Fact]
     public async Task A_cancel_ends_a_queued_run_at_once_and_a_running_run_after_its_session()
     {
         var queued = await QueueAsync();

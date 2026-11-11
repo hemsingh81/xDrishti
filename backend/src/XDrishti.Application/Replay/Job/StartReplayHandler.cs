@@ -11,13 +11,13 @@ namespace XDrishti.Application.Replay.Job;
 
 /// <summary>
 /// Stores a replay and queues it (SR-01 part B, AC 1, 2, 3 and 12): checks the parameters and the hold-out clamp through the driver, takes the one settings snapshot, hashes the input (parameters, snapshot, scope, strategy versions, bars), stores the run or runs as queued unless a replay
-/// is active (<c>replay.busy</c>), and records each run in the trial ledger as a look of kind <c>system_replay</c>, one row per strategy version it may use (under the as-of rule every version written before the close of its last session). A run whose ledger rows cannot be written is cancelled and the failure goes on: no run starts unrecorded. Reads stored bars only (through the clamp)
+/// is active (<c>replay.busy</c>, which is also the answer while the 1-minute history backfill is incomplete) or the scope needs more memory than <c>Replay:MaxWindowMb</c> (<c>replay.invalid</c>), and records each run in the trial ledger as a look of kind <c>system_replay</c>, one row per strategy version it may use (under the as-of rule every version written before the close of its last session). A run whose ledger rows cannot be written is cancelled and the failure goes on: no run starts unrecorded. Reads stored bars only (through the clamp)
 /// and writes only the replay tables and the ledger.
 /// </summary>
 internal sealed class StartReplayHandler(ReplayDriver driver, ReplayInputHasher hasher, IReplayInputs inputs, ISimAllBackfillGate backfill, SystemReplayOptions options, IReplayStore store, ITestLedger ledger, TimeProvider time, ILogger<StartReplayHandler> logger)
     : ICommandHandler<StartReplayCommand, StartedReplay>
 {
-    /// <summary>The error code of a start while a replay is queued, running or being cancelled.</summary>
+    /// <summary>The error code of a start while a replay is queued, running or being cancelled, or while the 1-minute history backfill is incomplete (try again later).</summary>
     public const string BusyCode = "replay.busy";
 
     public async ValueTask<Result<StartedReplay>> HandleAsync(StartReplayCommand command, CancellationToken cancellationToken)
