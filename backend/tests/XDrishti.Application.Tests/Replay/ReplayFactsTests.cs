@@ -71,13 +71,26 @@ public sealed class ReplayFactsTests
     }
 
     [Fact]
+    public async Task Minute_bars_before_the_instruments_high_water_seam_never_reach_the_replay()
+    {
+        var world = new ReplayWorld().WithDefaults("AAA");
+        var seam = new DateTimeOffset(2026, 10, 12, 0, 0, 0, TimeSpan.FromHours(5.5));
+        world.Seams.SeamOfAsync(ReplayWorld.Ids["AAA"], Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<DateTimeOffset?>(seam));
+
+        var bars = await world.Facts().MinuteBarsAsync(ReplayWorld.Ids["AAA"], new DateOnly(2026, 10, 14), Ct);
+
+        bars.ShouldNotBeEmpty();
+        bars.ShouldAllBe(b => b.EpochSeconds >= seam.ToUnixTimeSeconds());
+    }
+
+    [Fact]
     public async Task With_no_hold_out_block_the_replay_cannot_read_a_bar()
     {
         var world = new ReplayWorld().WithDefaults("AAA");
         var facts = world.Facts();
         var holdOut = Substitute.For<XDrishti.Application.Abstractions.Lab.IHoldOutStore>();
         holdOut.CurrentAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<XDrishti.Application.Abstractions.Lab.HoldOutBlock?>(null));
-        var bars = new ClampedBars(holdOut, new XDrishti.Domain.Confidence.HoldOutOptions(), Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarStore>(), Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarQueries>());
+        var bars = new ClampedBars(holdOut, new XDrishti.Domain.Confidence.HoldOutOptions(), Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarStore>(), Substitute.For<XDrishti.Application.Abstractions.Market.History.IBackfillSeams>(), Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarQueries>());
 
         await Should.ThrowAsync<ReplayHoldOutException>(async () => await bars.MinutesAsync(ReplayWorld.Ids["AAA"], D, Ct));
         (await facts.LastReadableSessionAsync(Ct)).ShouldBeGreaterThan(D); // the world's block exists: the control

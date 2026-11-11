@@ -1,6 +1,8 @@
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Market.Bars;
+using XDrishti.Application.Market.History;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Market.Bars;
 
@@ -10,7 +12,7 @@ namespace XDrishti.Application.Replay;
 /// The only way the replay reaches stored bars (SR-01, AC 3): every read is asked for a session <c>cut</c>, and a cut after the hold-out start less one day and less the embargo throws <see cref="ReplayHoldOutException"/> before anything is read. With no hold-out block fixed it
 /// fails closed. A bar after the close of the cut is never returned.
 /// </summary>
-internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options, IBarStore minutes, IBarQueries days)
+internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options, IBarStore minutes, IBackfillSeams seams, IBarQueries days)
 {
     /// <summary>Calendar days of 1-minute bars read before the close: about 270 sessions, as the live ticket source reads.</summary>
     public const int MinuteLookbackDays = 400;
@@ -47,7 +49,7 @@ internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options,
     {
         await EnsureAsync(cut, cancellationToken);
         var to = new DateTimeOffset(cut.AddDays(1).ToDateTime(TimeOnly.MinValue), IndiaOffset);
-        return await minutes.ReadAsync(instrumentId, to.AddDays(-MinuteLookbackDays), to, cancellationToken);
+        return await SeamAwareBars.ReadAsync(minutes, seams, instrumentId, to.AddDays(-MinuteLookbackDays), to, cancellationToken); // bars before the high-water seam are raw backfill and never enter a simulation, learning or planning path (ADR 0270, decision 10)
     }
 
     /// <summary>The day bars of the India dates from <paramref name="from"/> up to and including <paramref name="cut"/>.</summary>

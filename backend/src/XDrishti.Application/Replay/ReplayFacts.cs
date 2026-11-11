@@ -5,6 +5,7 @@ using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Context;
+using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Research;
@@ -39,6 +40,7 @@ internal sealed class ReplayFacts(
     ILearningChangelog changelog,
     IRunStore runs,
     IBarStore minuteBars,
+    IBackfillSeams seams,
     IBarQueries dayBars,
     ITradingCalendar calendars,
     IContextFigures contextFigures,
@@ -61,7 +63,7 @@ internal sealed class ReplayFacts(
 
     private static readonly TimeSpan IndiaOffset = TimeSpan.FromHours(5.5);
 
-    private readonly ClampedBars _bars = new(holdOut, holdOutOptions, minuteBars, dayBars);
+    private readonly ClampedBars _bars = new(holdOut, holdOutOptions, minuteBars, seams, dayBars);
     private readonly Dictionary<string, StoredVersion?> _startVersions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<StoredVersion>> _allVersions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<ChangelogEntry>> _histories = new(StringComparer.Ordinal);

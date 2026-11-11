@@ -72,6 +72,8 @@ internal sealed class ReplayWorld
 
     public IStrategyStore? Strategies { get; private set; }
 
+    public XDrishti.Application.Abstractions.Market.History.IBackfillSeams Seams { get; } = Substitute.For<XDrishti.Application.Abstractions.Market.History.IBackfillSeams>();
+
     public IRunStore Runs { get; } = Substitute.For<IRunStore>();
 
     public Dictionary<string, List<StoredVersion>> Versions { get; } = [];
@@ -223,7 +225,7 @@ internal sealed class ReplayWorld
         sizing.BudgetsAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyDictionary<Guid, double>>(new Dictionary<Guid, double>()));
 
         return new ReplayFacts(
-            holdOut, new HoldOutOptions(TrainingEmbargoDays: EmbargoDays), baskets, Substitute.For<IInstrumentQueries>(), strategies, stats, changelog, Runs, minute, days, calendar, context, classifications, sheets, basketSettings, sizing,
+            holdOut, new HoldOutOptions(TrainingEmbargoDays: EmbargoDays), baskets, Substitute.For<IInstrumentQueries>(), strategies, stats, changelog, Runs, minute, Seams, days, calendar, context, classifications, sheets, basketSettings, sizing,
             new SystemReplayOptions { IncompleteDataShare = incompleteShare }, Smart, Rules, Fill);
     }
 

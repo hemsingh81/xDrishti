@@ -89,7 +89,7 @@ public sealed class TicketSourcesGoldenTests
         store.ReadAsync(InstrumentId, Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<Bar>>(bars));
         var calendar = Substitute.For<ITradingCalendar>();
         calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(new TradingCalendar()));
-        var live = (await new StoredTicketSource(stats, changelog, strategies, baskets, store, calendar).ReadAsync(Session, ForDate, Ct)).Value;
+        var live = (await new StoredTicketSource(stats, changelog, strategies, baskets, store, Substitute.For<XDrishti.Application.Abstractions.Market.History.IBackfillSeams>(), calendar).ReadAsync(Session, ForDate, Ct)).Value;
 
         // replay, over the facts that read the same
         var parameters = new ReplayParams(Session, Session.AddDays(30), new ReplayScope([Guid.NewGuid()], []), 1_000_000m, ReplayRiskProfile.Standard, null, ReplayVersionRule.Start, ReplayMode.Frozen);
