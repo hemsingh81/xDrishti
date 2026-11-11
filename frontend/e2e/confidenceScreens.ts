@@ -7,6 +7,7 @@ import { recoveryScreens } from './recoveryScreen';
 import { autoScreens } from './autoMounts';
 import { simulationScreens } from './simulationMounts';
 import { settingsScreens } from './settingsScreen';
+import { basketScreens } from './basketScreens';
 
 /** The CF-12 Learning tabs (Decay and Loop; the Loop tab is also covered in today's all-unavailable state) and the CF-11 Readiness screen. */
 const confidenceScreens: Screen[] = [
@@ -61,5 +62,6 @@ export const laterScreens: Screen[] = [
   ...recoveryScreens,
   ...settingsScreens,
   ...simulationScreens,
+  ...basketScreens,
   ...autoScreens,
 ];

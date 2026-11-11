@@ -3,6 +3,7 @@ import EditIcon from '@mui/icons-material/EditOutlined';
 import HistoryIcon from '@mui/icons-material/HistoryOutlined';
 import LockIcon from '@mui/icons-material/LockOutlined';
 import { Button, Chip, Stack, Typography } from '@mui/material';
+import { Link as RouterLink } from 'react-router';
 import type { Basket } from '@/shared/api';
 import { AsOfField } from './AsOfField';
 import { isStored } from '../lib/system';
@@ -42,6 +43,9 @@ export function BasketHeader({ basket, asOf, onAsOfChange, onEdit, onHistory, on
           <Typography variant="h3" component="h2" sx={{ overflowWrap: 'anywhere' }}>
             {basket.name}
           </Typography>
+          <Button component={RouterLink} to={`/baskets/${basket.id}/profile`} size="small" variant="outlined">
+            Performance
+          </Button>
         </Stack>
         {system && !stored && (
           <Chip size="small" variant="outlined" icon={<LockIcon />} label="Portfolio · read only" />

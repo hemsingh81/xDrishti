@@ -200,6 +200,8 @@ public static class DependencyInjection
         services.AddScoped<ITrainingSetStore, TrainingSetStore>(); // the training-set records (spec P6-04)
         services.AddOptions<ReportBenchmarkOptions>().Bind(configuration.GetSection(ReportBenchmarkOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // basket benchmarks (spec P8-07)
         services.AddScoped(sp => sp.GetRequiredService<IOptions<ReportBenchmarkOptions>>().Value);
+        services.AddOptions<BasketProfileSettings>().Bind(configuration.GetSection(BasketProfileSettings.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the basket profile minimums and limits (spec BK-07, ADR 0262)
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<BasketProfileSettings>>().Value);
         services.AddOptions<ReportTrainingOptions>().Bind(configuration.GetSection(ReportTrainingOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // reports over a simulate-everything job (AU-14, ADR 0250)
         services.AddScoped(sp => sp.GetRequiredService<IOptions<ReportTrainingOptions>>().Value);
         services.AddOptions<RecoverySettings>().Bind(configuration.GetSection(RecoverySettings.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the reach, debounce and attempts of the recovery pass (ADR 0240)

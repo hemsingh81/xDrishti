@@ -65,6 +65,7 @@ title shows the current screen.
 - **Left-hand catalogue:** Overview · Basket comparison · Strategies · Exit policies · Side & regime · Calendar &
   time · MAE/MFE · Calibration · Instruments · Accounts · Decisions · Pivot builder · Trade list.
 - **Global filters:** date range with presets, **multi-select baskets**, side, style, account.
+- **Basket profile (BK-07, ADR 0262):** a lazy screen `/baskets/:basketId/profile` per basket (rebased line against an index, risk, drawdown, rolling beta, relative strength, breadth, correlation, contribution, regimes, turnover and capacity, the median split of its strategy trades) and `/baskets/ranking` for 2 to 12 baskets; every figure with its n or its honest state, the membership basis printed in the header.
 - **Basket comparison:** choose 2+ baskets → side-by-side KPIs (trades, win rate, expectancy, total R, profit
   factor, max drawdown, net ₹, best strategy, buy-and-hold return), overlaid cumulative-R curves, expectancy by
   strategy per basket, basket × side and basket × style heatmaps.
