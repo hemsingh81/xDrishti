@@ -64,6 +64,26 @@ public sealed class RelativeStrengthRunTests
     }
 
     [Fact]
+    public void Several_unknown_conditions_in_one_decision_step_count_as_one_feature_unknown()
+    {
+        var definition = Definition();
+        var buy = definition.Buy!;
+        var two = definition with { Buy = buy with { Trigger = new ConditionList(ListMode.All, [.. buy.Trigger!.Items, "sector_rs(63) <= 3"]) } };
+        var rows = Rows();
+        SimulationResult Go(StrategyDefinition d)
+        {
+            var r = Sim.Create(d, Timeframe.D1, Cand.NoSlippage).Run(Scan.Instrument, SwingBatchDays.Bars(SwingBatchDays.High52Rows()), Sim.Tick, Rep.DefaultCalendar, relativeStrength: rows);
+            return r.Value;
+        }
+
+        var one = Go(definition).Scans.Sum(s => s.FeatureUnknown);
+        var both = Go(two).Scans.Sum(s => s.FeatureUnknown);
+
+        one.ShouldBeGreaterThan(0);
+        both.ShouldBe(one, "two conditions that are unknown at one decision step are one feature_unknown step");
+    }
+
+    [Fact]
     public void A_row_as_of_the_decision_session_or_later_is_never_seen()
     {
         var result = Run(Rows((Trigger, 0.99), (Trigger + 1, 0.99), (Trigger + 5, 0.99)));

@@ -155,14 +155,14 @@ internal sealed class ComputeRelativeStrengthHandler(
 
             foreach (var id in seen.Order())
             {
-                var metric = IndexRelative.Compute(series[id].Closes, indexCloses, day, StrengthOptions.IndexWindow);
+                var metric = IndexRelative.Compute(series[id].Closes, indexCloses, day, StrengthOptions.IndexWindow, exDates.GetValueOrDefault(id));
                 rows.Add(new StrengthRow(day, id, Guid.Empty, StrengthOptions.IndexWindow, 0, metric.Number, null, 0, State(metric), "none"));
             }
 
             var sectors = seen.Where(i => !string.IsNullOrWhiteSpace(members[i].Sector))
                 .GroupBy(i => members[i].Sector!.Trim(), StringComparer.Ordinal)
                 .ToDictionary(g => g.Key, g => (IReadOnlyList<MemberSeries>)[.. g.Select(i => series[i])], StringComparer.Ordinal);
-            var sectorRows = SectorStrength.Compute(sectors, day, StrengthOptions.SectorWindows, options)
+            var sectorRows = SectorStrength.Compute(sectors, day, StrengthOptions.SectorWindows, options, seen.Where(exDates.ContainsKey).ToDictionary(i => members[i].Symbol, i => (IReadOnlyCollection<DateOnly>)exDates[i], StringComparer.Ordinal))
                 .Select(s => new SectorRow(day, s.Sector, s.Window, s.Return.Number, s.Rank, s.Members, State(s.Return))).ToList();
 
             if (await store.InsertDayAsync(day, rows, sectorRows, cancellationToken))

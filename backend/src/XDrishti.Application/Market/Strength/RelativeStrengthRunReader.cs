@@ -52,7 +52,7 @@ internal sealed class RelativeStrengthRunReader(IRelativeStrengthStore store, IB
         return new RelativeStrengthRun(this, found.ToDictionary(f => f.Basis.BasketId, f => f.Code), [.. found.Select(f => f.Basis)], sectors, to);
     }
 
-    internal async ValueTask<RelativeStrengthInputs> ReadAsync(Guid instrumentId, string? sector, IReadOnlyDictionary<Guid, int> codes, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    internal async ValueTask<RelativeStrengthInputs> ReadAsync(Guid instrumentId, string? sector, IReadOnlyDictionary<Guid, int> codes, DateOnly from, DateOnly to, ConcurrentDictionary<string, Task<IReadOnlyList<SectorRow>>> sectorCache, CancellationToken cancellationToken)
     {
         var first = from.AddDays(-LeadDays);
         var last = to.AddDays(-1);
@@ -72,7 +72,7 @@ internal sealed class RelativeStrengthRunReader(IRelativeStrengthStore store, IB
 
         if (!string.IsNullOrWhiteSpace(sector))
         {
-            foreach (var r in await store.SectorRowsAsync(sector.Trim(), first, last, cancellationToken))
+            foreach (var r in await sectorCache.GetOrAdd(sector.Trim(), key => store.SectorRowsAsync(key, first, last, cancellationToken).AsTask()))
             {
                 points.Add(new StrengthPoint("sector_rs", r.WindowSessions, 0, 0, r.AsOf, r.State == "value" && r.Rank is { } k ? k : double.NaN));
             }
@@ -87,9 +87,12 @@ internal sealed class RelativeStrengthRun(RelativeStrengthRunReader reader, IRea
 {
     private readonly ConcurrentDictionary<Guid, (string Digest, int Rows)> _read = new();
 
+    // the sector rows are the same for every share of the sector: read once per run
+    private readonly ConcurrentDictionary<string, Task<IReadOnlyList<SectorRow>>> _sectorRows = new(StringComparer.Ordinal);
+
     public async ValueTask<RelativeStrengthInputs> ReadAsync(Guid instrumentId, DateOnly from, CancellationToken cancellationToken)
     {
-        var inputs = await reader.ReadAsync(instrumentId, sectors.GetValueOrDefault(instrumentId), codes, from, to, cancellationToken);
+        var inputs = await reader.ReadAsync(instrumentId, sectors.GetValueOrDefault(instrumentId), codes, from, to, _sectorRows, cancellationToken);
         var text = new StringBuilder();
         foreach (var p in inputs.Points.OrderBy(p => p.Feature, StringComparer.Ordinal).ThenBy(p => p.P1).ThenBy(p => p.P2).ThenBy(p => p.P3).ThenBy(p => p.AsOf))
         {

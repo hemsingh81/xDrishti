@@ -106,5 +106,6 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 - Built: kernels, tables, the daily step (off by default), `xd market rs`, the read endpoint, the three DSL features, the engine feed of the stored rows into Lab runs (as of the previous closed session), the run record, key line and label (basket id, `params_hash`, basis, "members as of"), the `feature_unknown` counter, and `RS_ROTATION` as stored text.
 - Open question 1 answered for the build: "liquid-100" is the derived basket "Most liquid"; the pre-registered baskets are Nifty 50, Nifty 100, F&O stocks and Most liquid.
 - `EqualWeightIndex` is not reused: criterion 5 is a plain mean of member window returns, the compounded daily-rebalanced index gives another number.
+- Not built (shortcut): the trade card and ticket explanation (`TicketBuilder`, explain) do not read the stored rows, so a stored strategy that names the features fails closed there; a multi-exit comparison run (`SimulatorComparison`) does not read them either and fails closed.
 - Sector universe = members of the pre-registered baskets as of the day (not the whole tracked set); the index-relative row is stored with the empty basket id.
 

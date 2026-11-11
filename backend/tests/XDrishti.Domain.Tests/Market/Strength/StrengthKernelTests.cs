@@ -162,6 +162,44 @@ public sealed class StrengthKernelTests
         shareGap.State.ShouldBe(MetricState.Unavailable);
     }
 
+    [Fact]
+    public void A_share_with_an_ex_date_in_the_index_window_is_not_evaluable_and_one_before_it_is_not()
+    {
+        var share = Series("S", Enumerable.Repeat(100.0, 21).ToArray());
+        var index = Series("N", Enumerable.Repeat(100.0, 21).ToArray());
+
+        var split = IndexRelative.Compute(share.Closes, index.Closes, D(20), 20, [D(10)]);
+        var before = IndexRelative.Compute(share.Closes, index.Closes, D(20), 20, [D(0)]);
+
+        split.State.ShouldBe(MetricState.NotEvaluable);
+        split.Reason.ShouldBe(RelativeStrengthRank.CorporateActionUnresolved);
+        before.State.ShouldBe(MetricState.Value);
+    }
+
+    [Fact]
+    public void A_sector_member_with_an_ex_date_in_the_window_is_left_out_of_the_mean_and_counted()
+    {
+        var sectors = new Dictionary<string, IReadOnlyList<MemberSeries>>
+        {
+            ["Banks"] = [Moving("a", 0.04), Moving("b", 0.02), Moving("c", 0.06), Moving("d", 0.0), Moving("e", 0.03), Moving("split", 0.9)],
+        };
+        var ex = new Dictionary<string, IReadOnlyCollection<DateOnly>> { ["split"] = [D(1)] };
+
+        var row = SectorStrength.Compute(sectors, D(1), [1], new StrengthOptions(), ex).Single();
+
+        row.Return.Number!.Value.ShouldBe(0.03, 1e-12);
+        (row.Members, row.Excluded).ShouldBe((5, 1));
+    }
+
+    [Fact]
+    public void The_counters_differ_when_only_the_feature_unknown_count_differs()
+    {
+        var a = XDrishti.Domain.Research.ScanCounters.Empty(XDrishti.Domain.Research.Side.Buy);
+
+        a.Equals(a with { FeatureUnknown = 1 }).ShouldBeFalse();
+        a.Equals(a with { }).ShouldBeTrue();
+    }
+
     private static MemberSeries Moving(string symbol, double ret) => Series(symbol, 100, 100 * (1 + ret));
 
     [Fact]

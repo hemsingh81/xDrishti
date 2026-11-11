@@ -43,6 +43,8 @@ public sealed class EntryScanner
     private readonly bool[] _readsStored;
 
     private long _featureUnknown;
+
+    private bool _stepCounted;
     private readonly int _setupCount;
     private readonly int _invalidateFrom;
     private readonly int[] _readyHandles;
@@ -221,6 +223,7 @@ public sealed class EntryScanner
         }
 
         _decisionSteps++;
+        _stepCounted = false;
         var closedNow = _frame.ClosedBarsAt(_timeframe);
         if (closedNow > 1)
         {
@@ -359,9 +362,11 @@ public sealed class EntryScanner
                     _false[i]++;
                     break;
                 default:
-                    if (_readsStored[i])
+                    if (_readsStored[i] && !_stepCounted)
                     {
+                        // once per decision step, whatever the number of conditions that name a stored feature (BK-09, feature_unknown)
                         _featureUnknown++;
+                        _stepCounted = true;
                     }
 
                     if (AnyEmpty(_itemHandles[i]))

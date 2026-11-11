@@ -200,6 +200,20 @@ public sealed class ComputeRelativeStrengthTests
     }
 
     [Fact]
+    public async Task A_split_inside_the_window_also_leaves_the_index_relative_row_and_the_sector_mean()
+    {
+        var rig = new Rig(12, exDate: Last.AddDays(-10), exIndex: 3);
+
+        await rig.RunAsync();
+
+        var day = rig.Store.Days[Last];
+        day.Rows.Single(r => r.Lookback == 20 && r.InstrumentId == Guid.Parse("00000000-0000-7000-8000-000000000103")).State.ShouldBe("corporate_action_unresolved");
+        day.Rows.Count(r => r.Lookback == 20 && r.State == "value").ShouldBe(11);
+        var it = day.Sectors.Single(x => x.Sector == "IT" && x.WindowSessions == 21);
+        it.NMembers.ShouldBe(5, "six IT members, one with a split in the window left out of the mean");
+    }
+
+    [Fact]
     public async Task Fewer_than_ten_voters_leave_every_rank_insufficient()
     {
         var rig = new Rig(9);

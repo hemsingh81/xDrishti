@@ -86,6 +86,7 @@ public sealed class SimulatorComparison
             return Result.Failure<ComparisonResult>(Simulator.ContextNotGivenError());
         }
 
+        // shortcut: a comparison (several exits in one scan) does not read the stored relative-strength rows (BK-09): a member that names one of the features gets a frame without them and fails closed in EntryScanner.Create (options.relativeStrength); a later slice passes them here
         var readsDays = _members.Any(m => m.ReadsResultsDays);
         if (readsDays && (resultsDays is null || calendar is null))
         {

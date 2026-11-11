@@ -50,7 +50,17 @@ internal sealed class RelativeStrengthStore(XDrishtiDbContext db) : IRelativeStr
                 NMembers = s.NMembers,
                 State = s.State,
             }));
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.UniqueViolation })
+            {
+                // a second writer got the day first: insert-once, so this one writes nothing
+                db.ChangeTracker.Clear();
+                return false;
+            }
+
             await transaction.CommitAsync(ct);
             db.ChangeTracker.Clear();
             return true;
