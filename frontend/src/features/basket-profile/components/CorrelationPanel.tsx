@@ -51,7 +51,7 @@ export function CorrelationPanel({ profile }: { profile: BasketProfile }) {
       title="Correlation inside the basket"
       note={
         matrix.total > matrix.symbols.length
-          ? `Too many members for a matrix: showing the ${String(matrix.symbols.length)} most liquid of ${String(matrix.total)}.`
+          ? `Too many members for a matrix: showing the ${String(matrix.symbols.length)} most liquid of ${String(matrix.total)}. Sampled ${String(matrix.symbols.length)} of ${String(matrix.total)}.`
           : 'Pairwise correlation of daily returns over the last 60 sessions.'
       }
     >

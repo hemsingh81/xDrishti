@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Reporting;
 
 namespace XDrishti.Application.Reporting;
@@ -16,6 +17,7 @@ internal sealed class GetBasketRankingHandler(
     IBarQueries bars,
     BasketProfileSettings settings,
     ReportBenchmarkOptions benchmarkSettings,
+    CostStressOptions costStress,
     TimeProvider time,
     ILogger<GetBasketRankingHandler> logger) : IQueryHandler<GetBasketRankingQuery, Result<BasketRankingView>>
 {
@@ -55,7 +57,7 @@ internal sealed class GetBasketRankingHandler(
         }
 
         var reader = new ProfileBars(bars);
-        var options = settings.ToOptions(benchmarkSettings.DiscontinuityThreshold);
+        var options = settings.ToOptions(benchmarkSettings.DiscontinuityThreshold, (double)costStress.CapacityDailyShare);
         IReadOnlyList<DailyClose> benchmark = win.Index is { } index ? (await reader.ReadAsync(index.Id, win.From, win.To, cancellationToken)).Closes : [];
         var inputs = new List<RankInput>(loaded.Count);
         var states = new Dictionary<Guid, IndexSeries>();

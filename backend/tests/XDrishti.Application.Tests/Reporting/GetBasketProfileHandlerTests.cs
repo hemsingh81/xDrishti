@@ -1,6 +1,8 @@
+#pragma warning disable CA2012 // NSubstitute setup calls on ValueTask members are not awaited
 using System.Collections;
 using System.Reflection;
 using System.Text.Json;
+using NSubstitute;
 using XDrishti.Application.Reporting;
 using XDrishti.Domain.Common;
 
@@ -300,6 +302,77 @@ public sealed class GetBasketProfileHandlerTests
 
         error.Code.ShouldBe("reports.invalid");
         _world.DailyReads.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Capacity_is_the_system_share_of_the_adv20_and_the_view_prints_the_share_used()
+    {
+        var k = Enumerable.Range(0, 3).Select(i => _world.Instrument($"K{i}", _ => 100)).ToArray();
+        _world.IndexIsBenchmark(_world.Instrument("NIFTY", i => 1000 + i));
+        var basket = _world.Basket("Flat", null, k);
+
+        var view = await OkAsync(basket);
+
+        // close 100 x volume 1000 on every session: ADV20 100,000 per member, 0.5 % of it 500, three members 1,500
+        view.Capacity.CapacityPct.ShouldBe(0.005, 1e-12);
+        view.Capacity.BasketCapacity.Number!.Value.ShouldBe(1500, 1e-6);
+        view.Evidence.Limits.ShouldContain(l => l.Contains("0.5%", StringComparison.Ordinal) && l.Contains("CapacityDailyShare", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_portfolio_profile_misses_the_cache_when_a_holding_changes()
+    {
+        var (_, a, b, c, _) = Seeded();
+        var id = Guid.NewGuid();
+        var holdings = _world.PortfolioBasket(id, "Dhan");
+        holdings.AddRange([(a, 10), (b, 5), (c, 7)]);
+        await OkAsync(id);
+        var reads = _world.DailyReads.Count;
+        await OkAsync(id);
+        _world.DailyReads.Count.ShouldBe(reads);
+
+        holdings[0] = (a, 12);
+        await OkAsync(id);
+
+        _world.DailyReads.Count.ShouldBeGreaterThan(reads);
+    }
+
+    [Fact]
+    public async Task A_member_added_and_removed_inside_the_window_has_its_flags_named_unknown_not_false()
+    {
+        var (_, a, b, c, _) = Seeded();
+        var basket = _world.Basket("Churn", null, a, b, c);
+        var brief = _world.Instrument("BRIEF", i => 100 + i);
+        _world.Stay(basket, brief, ProfileWorld.At(ProfileWorld.Sessions[3]), ProfileWorld.At(ProfileWorld.Sessions[8]));
+
+        var view = await OkAsync(basket);
+
+        view.MembershipBasis.ShouldBe("dated");
+        view.Evidence.Limits.ShouldContain(l => l.Contains("flags are not known for BRIEF", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Changes_before_the_window_leave_a_single_snapshot()
+    {
+        var (_, a, b, c, _) = Seeded();
+        var basket = _world.Basket("Early", null, a, b);
+        _world.Stay(basket, c, new DateTimeOffset(2026, 7, 1, 6, 0, 0, TimeSpan.Zero));
+
+        var view = await OkAsync(basket);
+
+        view.MembershipBasis.ShouldBe("single_snapshot");
+    }
+
+    [Fact]
+    public async Task A_window_of_fewer_than_20_trading_days_is_422_by_the_calendar_not_the_weekdays()
+    {
+        var (basket, _, _, _, _) = Seeded();
+        var holidays = Enumerable.Range(0, 8).Select(i => XDrishti.Domain.Market.Calendar.TradingDay.Holiday(ProfileWorld.Sessions[i], XDrishti.Domain.Market.Calendar.CalendarSource.Manual, XDrishti.Domain.Market.Calendar.CalendarStatus.Confirmed, null, DateTimeOffset.UnixEpoch)).ToList();
+        _world.Calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new ValueTask<XDrishti.Domain.Market.Calendar.TradingCalendar>(new XDrishti.Domain.Market.Calendar.TradingCalendar(holidays)));
+
+        var error = await RefusedAsync(basket.ToString("D"));
+
+        error.Code.ShouldBe("reports.invalid");
     }
 
     [Fact]

@@ -5,6 +5,7 @@ using NSubstitute;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Baskets;
+using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Market.Bars;
@@ -44,6 +45,10 @@ internal sealed class ProfileWorld
 
     public ReportBenchmarkOptions Limits { get; } = new();
 
+    public XDrishti.Domain.Confidence.CostStressOptions Cost { get; set; } = new();
+
+    public ITradingCalendar Calendar { get; } = Substitute.For<ITradingCalendar>();
+
     public FakeTimeProvider Time { get; } = new(Now);
 
     public ProfileCache Cache { get; }
@@ -62,6 +67,7 @@ internal sealed class ProfileWorld
     public ProfileWorld()
     {
         Cache = new ProfileCache(Settings);
+        Calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new ValueTask<XDrishti.Domain.Market.Calendar.TradingCalendar>(new XDrishti.Domain.Market.Calendar.TradingCalendar()));
         Benchmark.GetAsync(Arg.Any<CancellationToken>()).Returns(new ValueTask<ConfiguredBenchmark?>((ConfiguredBenchmark?)null));
         Context.AsOfManyAsync(Arg.Any<IReadOnlyCollection<DateOnly>>(), Arg.Any<CancellationToken>()).Returns(call =>
             new ValueTask<IReadOnlyDictionary<DateOnly, ContextRead>>(call.ArgAt<IReadOnlyCollection<DateOnly>>(0).ToDictionary(d => d, _ => ContextRead.Not(ContextRead.NoContext))));
@@ -123,6 +129,16 @@ internal sealed class ProfileWorld
     /// <summary>One more stay in a basket (an addition at <paramref name="from"/> and perhaps a removal).</summary>
     public void Stay(Guid basket, Guid instrument, DateTimeOffset from, DateTimeOffset? to = null) => _stays[basket].Add(new Membership(instrument, from, to));
 
+    /// <summary>Makes the id a portfolio basket: current holdings (instrument, quantity), read from the returned list, which a test may change.</summary>
+    public List<(Guid Instrument, long Quantity)> PortfolioBasket(Guid id, string name)
+    {
+        var holdings = new List<(Guid Instrument, long Quantity)>();
+        Portfolio.ExistsAsync(id, Arg.Any<CancellationToken>()).Returns(new ValueTask<bool>(true));
+        Portfolio.MembersAsync(id, Arg.Any<CancellationToken>()).Returns(_ => new ValueTask<BasketMembers?>(new BasketMembers(
+            id, name, null, null, holdings.Count, [.. holdings.Select((h, n) => new BasketMemberView(Guid.NewGuid(), Summary(h.Instrument), n, Now, null, null, "portfolio", h.Quantity, "Dhan"))])));
+        return holdings;
+    }
+
     public static DateTimeOffset At(DateOnly day) => new(day.Year, day.Month, day.Day, 12, 0, 0, TimeSpan.FromMinutes(330));
 
     public void IndexIsBenchmark(Guid index) =>
@@ -167,11 +183,11 @@ internal sealed class ProfileWorld
     private InstrumentSummary Summary(Guid id) =>
         new(id, Symbols[id], Symbols[id], Symbols[id], "share", null, null, "Banks", 1, null, null, false, false, false, TrackedInfo.Never);
 
-    public ProfileWindowResolver Resolver() => new(Bars, Benchmark, Settings, Limits, Time);
+    public ProfileWindowResolver Resolver() => new(Bars, Benchmark, Calendar, Settings, Limits, Time);
 
-    public BasketMembershipLoader Memberships() => new(Baskets, Portfolio, Derived, Settings, Time);
+    public BasketMembershipLoader Memberships() => new(Baskets, Portfolio, Derived, Runs, Settings, Time);
 
-    public GetBasketProfileHandler Profile() => new(Resolver(), Memberships(), Bars, Context, Runs.Loader, Runs, Cache, Settings, Limits, Time, NullLogger<GetBasketProfileHandler>.Instance);
+    public GetBasketProfileHandler Profile() => new(Resolver(), Memberships(), Bars, Context, Runs.Loader, Runs, Cache, Settings, Limits, Cost, Time, NullLogger<GetBasketProfileHandler>.Instance);
 
-    public GetBasketRankingHandler Ranking() => new(Resolver(), Memberships(), Bars, Settings, Limits, Time, NullLogger<GetBasketRankingHandler>.Instance);
+    public GetBasketRankingHandler Ranking() => new(Resolver(), Memberships(), Bars, Settings, Limits, Cost, Time, NullLogger<GetBasketRankingHandler>.Instance);
 }

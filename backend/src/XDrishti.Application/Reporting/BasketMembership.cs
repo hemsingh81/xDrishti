@@ -2,8 +2,8 @@ using XDrishti.Domain.Reporting;
 
 namespace XDrishti.Application.Reporting;
 
-/// <summary>An instrument of a basket in the window, with what the capacity and the flags need.</summary>
-internal sealed record MemberRef(Guid Id, string Symbol, string? Sector, bool IsFno, bool IsAsmGsm);
+/// <summary>An instrument of a basket in the window, with what the capacity and the flags need; <paramref name="FlagsKnown"/> is false for one added and removed inside the window, whose F&amp;O and ASM/GSM flags are not read.</summary>
+internal sealed record MemberRef(Guid Id, string Symbol, string? Sector, bool IsFno, bool IsAsmGsm, bool FlagsKnown = true);
 
 /// <summary>
 /// A basket's membership over a window (BK-07 criterion 4): every instrument that is a member on some day, the set by date (<see cref="At"/>), the dates on which a snapshot exists and the basis: <see cref="MemberTurnover.Dated"/> when there is membership history,

@@ -1,6 +1,8 @@
 using System.Globalization;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Baskets;
+using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Market.Baskets;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Baskets;
@@ -12,7 +14,7 @@ namespace XDrishti.Application.Reporting;
 /// Reads a basket's members over a window through the existing ports (BK-07 Decision 6): the members at the start, the history of additions and removals replayed day by day (members at the end of a day, as the members read says), and the members at the stated date.
 /// With no more than one day of change the members are those of one date and the basis says so; before the first known date the first known members apply (ISS-22).
 /// </summary>
-internal sealed class BasketMembershipLoader(IBasketQueries baskets, IPortfolioBasketSource portfolio, IDerivedVersionStore derived, BasketProfileSettings settings, TimeProvider time)
+internal sealed class BasketMembershipLoader(IBasketQueries baskets, IPortfolioBasketSource portfolio, IDerivedVersionStore derived, IHoldingClassifications classifications, BasketProfileSettings settings, TimeProvider time)
 {
     private const int HistoryTake = 20_000;
 
@@ -51,7 +53,8 @@ internal sealed class BasketMembershipLoader(IBasketQueries baskets, IPortfolioB
 
         var events = history.Items.OrderBy(e => e.At).ThenBy(e => e.Kind == "removed" ? 0 : 1).ToList();
         var dates = events.Select(e => IndiaTime.Today(e.At)).Distinct().Order().ToList();
-        var dated = dates.Count >= 2;
+        // dated = more than one day of change and some of it inside the window; a creation on one day, or changes all before the window, leave one set over the whole window (a single snapshot)
+        var dated = dates.Count >= 2 && events.Any(e => IndiaTime.Today(e.At) > window.From && IndiaTime.Today(e.At) <= window.To);
         var refs = new Dictionary<string, MemberRef>(StringComparer.Ordinal);
         foreach (var m in start.Items.Concat(end.Items))
         {
@@ -70,7 +73,7 @@ internal sealed class BasketMembershipLoader(IBasketQueries baskets, IPortfolioB
                     if (e.Kind == "added")
                     {
                         current.Add(e.Symbol);
-                        refs.TryAdd(e.Symbol, new MemberRef(e.InstrumentId, e.Symbol, null, false, false));
+                        refs.TryAdd(e.Symbol, new MemberRef(e.InstrumentId, e.Symbol, null, false, false, false));
                     }
                     else
                     {
@@ -105,6 +108,16 @@ internal sealed class BasketMembershipLoader(IBasketQueries baskets, IPortfolioB
             refs = refs.Where(kv => constant.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
         }
 
+        var noSector = refs.Values.Where(r => r.Sector is null && !r.FlagsKnown).Select(r => r.Id).ToList();
+        if (noSector.Count > 0)
+        {
+            var sectors = await classifications.SectorsAsync(noSector, cancellationToken);
+            foreach (var r in refs.Values.Where(r => !r.FlagsKnown && sectors.ContainsKey(r.Id)).ToList())
+            {
+                refs[r.Symbol] = r with { Sector = sectors[r.Id] };
+            }
+        }
+
         if (refs.Count > settings.MaxInstruments)
         {
             return Result.Failure<BasketMembership>(ReportErrors.Invalid($"Basket '{view.Name}' holds {refs.Count} instruments; at most {settings.MaxInstruments} are read."));
@@ -117,7 +130,7 @@ internal sealed class BasketMembershipLoader(IBasketQueries baskets, IPortfolioB
         }
 
         var version = $"{events.Count}:{(events.Count == 0 ? 0 : events[^1].At.UtcTicks)}";
-        return Result.Success(new BasketMembership(id, view.Name, view.Kind, hash, [.. refs.Values.OrderBy(r => r.Symbol, StringComparer.Ordinal)], at, dates, asOf, dated ? MemberTurnover.Dated : MemberTurnover.SingleSnapshot, version));
+        return Result.Success(new BasketMembership(id, view.Name, view.Kind, hash, [.. refs.Values.OrderBy(r => r.Symbol, StringComparer.Ordinal)], at, dated ? dates : [.. dates.Take(1)], asOf, dated ? MemberTurnover.Dated : MemberTurnover.SingleSnapshot, version));
     }
 
     private async ValueTask<Result<BasketMembership>> PortfolioAsync(Guid id, DateOnly? asked, CancellationToken cancellationToken)
@@ -147,7 +160,14 @@ internal sealed class BasketMembershipLoader(IBasketQueries baskets, IPortfolioB
 
         IReadOnlySet<string> set = refs.Select(r => r.Symbol).ToHashSet(StringComparer.Ordinal);
         var today = IndiaTime.Today(time.GetUtcNow());
-        return Result.Success(new BasketMembership(id, holdings.Name, BasketKinds.Portfolio, null, refs, _ => set, [today], today, MemberTurnover.SingleSnapshot, "holdings"));
+        return Result.Success(new BasketMembership(id, holdings.Name, BasketKinds.Portfolio, null, refs, _ => set, [today], today, MemberTurnover.SingleSnapshot, Fingerprint(holdings)));
+    }
+
+    /// <summary>A hash of the sorted instrument ids and quantities: a trade that changes a holding changes the cache key.</summary>
+    private static string Fingerprint(BasketMembers holdings)
+    {
+        var text = string.Join(';', holdings.Items.OrderBy(m => m.Instrument.Id).Select(m => $"{m.Instrument.Id:N}:{m.Quantity?.ToString(CultureInfo.InvariantCulture) ?? "-"}"));
+        return "holdings:" + Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text)))[..16];
     }
 
     private static Error NotFound(Guid id) => Error.NotFound("reports.not_found", $"Basket '{id:D}' does not exist or is archived.");

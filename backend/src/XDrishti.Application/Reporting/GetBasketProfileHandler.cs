@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Reporting;
 using XDrishti.Domain.Selection.SmartRules;
@@ -25,6 +26,7 @@ internal sealed class GetBasketProfileHandler(
     IProfileCache cache,
     BasketProfileSettings settings,
     ReportBenchmarkOptions benchmarkSettings,
+    CostStressOptions costStress,
     TimeProvider time,
     ILogger<GetBasketProfileHandler> logger) : IQueryHandler<GetBasketProfileQuery, Result<BasketProfileView>>
 {
@@ -69,6 +71,7 @@ internal sealed class GetBasketProfileHandler(
 
     private async ValueTask<string> KeyAsync(BasketMembership basket, ResolvedWindow win, CancellationToken cancellationToken)
     {
+        // Shortcut (ADR 0262): the key does not see a backfill of old bars or a rewrite of the stored market context; those show when the index gets a newer bar or the cache is emptied (a restart).
         // the strategy panel reads the default run set, so a new run changes the answer as a new bar does
         var chosen = RunSelection.Default(await runs.ListRunsAsync(cancellationToken)).Chosen.Select(r => r.RunKey[..Math.Min(12, r.RunKey.Length)]).Order(StringComparer.Ordinal);
         return string.Join('|', "profile", basket.Id.ToString("D"), basket.ParamsHash ?? "-", basket.Version, basket.AsOf.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
@@ -78,7 +81,7 @@ internal sealed class GetBasketProfileHandler(
 
     private async ValueTask<BasketProfileView> BuildAsync(BasketMembership basket, ResolvedWindow win, ProfileBars reader, CancellationToken cancellationToken)
     {
-        var options = settings.ToOptions(benchmarkSettings.DiscontinuityThreshold);
+        var options = settings.ToOptions(benchmarkSettings.DiscontinuityThreshold, (double)costStress.CapacityDailyShare);
         var members = new List<MemberSeries>(basket.Instruments.Count);
         foreach (var m in basket.Instruments)
         {
@@ -114,7 +117,7 @@ internal sealed class GetBasketProfileHandler(
             new ProfileBasketView(basket.Id, basket.Name, basket.Kind, basket.ParamsHash),
             win.View,
             basket.AsOf,
-            profile.MembershipBasis,
+            basket.Basis,
             profile.FirstDatedMembership,
             new ProfileMembersView(basket.Instruments.Count, basket.Instruments.Count - excluded.Count, excluded),
             new ProfileIndexView(win.Index?.Id, win.Index?.Symbol, win.IndexIsDefault),
@@ -172,8 +175,15 @@ internal sealed class GetBasketProfileHandler(
             $"An instrument-day with a one-session move above {options.DiscontinuityThreshold:P0} is left out, named and never repaired; a corporate action not adjusted in the stored bars looks the same.",
             "Beta, alpha, tracking error and the information ratio are against the chosen index with the risk-free rate ignored; the effective number of bets is a heuristic, not a measured count.",
             "The difference to the index is passive (hold against hold) and is not a trading result; it is never to be read as alpha.",
+            $"Capacity is {options.CapacityPct * 100:0.##}% of each member's ADV20: the one capacity share of the system (Confidence:CostStress:CapacityDailyShare), not a setting of this screen.",
             "The profile describes the past; no figure here predicts.",
         };
+        var unknown = basket.Instruments.Where(i => !i.FlagsKnown).Select(i => i.Symbol).ToList();
+        if (unknown.Count > 0)
+        {
+            limits.Insert(limits.Count - 1, $"F&O and ASM/GSM flags are not known for {string.Join(", ", unknown)} (members added and removed inside the window); they count in neither share.");
+        }
+
         return limits;
     }
 
