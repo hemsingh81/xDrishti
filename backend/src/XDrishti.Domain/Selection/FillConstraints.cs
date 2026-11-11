@@ -20,6 +20,7 @@ namespace XDrishti.Domain.Selection;
 /// <param name="CountEntriesOn">What the entries limit applies to.</param>
 /// <param name="MaxPlanItems">Most tickets listed in trigger mode.</param>
 /// <param name="ReserveSize">Most reserve entries.</param>
+/// <param name="MaxClusterRiskPct">Open risk per correlation cluster (BK-08, ADR 0260), percent of capital; null (default) is OFF: no check, no cluster text, the fill is what it was. Turning it on is an owner act.</param>
 public sealed record FillConstraints(
     int MaxEntriesPerDay = 3,
     int MaxOpenPositions = 5,
@@ -35,7 +36,8 @@ public sealed record FillConstraints(
     bool SkipSellOnHeldLongTerm = true,
     EntriesCountMode CountEntriesOn = EntriesCountMode.Trigger,
     int MaxPlanItems = 5,
-    int ReserveSize = 3)
+    int ReserveSize = 3,
+    double? MaxClusterRiskPct = null)
 {
     /// <summary>The basket limits in force; none by default.</summary>
     public IReadOnlyDictionary<string, int> BasketLimits => MaxPerBasket ?? new Dictionary<string, int>();
@@ -58,6 +60,11 @@ public sealed record FillConstraints(
         if (!double.IsFinite(MaxPairCorrelation) || MaxPairCorrelation is < -1 or > 1)
         {
             p.Add("MaxPairCorrelation must be a number from -1 to 1");
+        }
+
+        if (MaxClusterRiskPct is { } cap && (!double.IsFinite(cap) || cap is <= 0 or > 100))
+        {
+            p.Add("MaxClusterRiskPct must be a number above 0 and at most 100, or not set");
         }
 
         if (!Enum.IsDefined(CountEntriesOn))

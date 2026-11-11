@@ -73,6 +73,7 @@ rank_score = exp_R_lower + w_conf·confluence + w_regime·regime_fit
 | Per basket (optional) | e.g. max 2 from MyChoice |
 | Already held long-term | Skip SELL setups on instruments in your holdings (configurable) |
 | Per basket risk budget (optional, owner-set, none by default) | A share (1 to 100 %) of the total open risk limit: a candidate is scaled to the room left in its basket, or goes to the reserve (`basket_budget`) when the room is under the floor ([ADR 0259](../adr/0259-position-sizing-only-scales-down-by-volatility-capacity-and-basket-budgets-and-every-setting-is-an-owner-act-with-a-fresh-password.md)) |
+| Per correlation cluster risk cap (optional, owner-set, none by default) | Open risk of one cluster (average-linkage clusters on 1 - rho, cut at 0.70, over the plan-day candidates and the open book) is at most the cap, percent of capital; checked after the pair, sector, mix and basket rules; a cluster that cannot be told is `unavailable` and blocks; a cap broken against the open book alone is rejected, one broken by earlier picks goes to the reserve (`cluster_cap`) ([ADR 0260](../adr/0260-correlated-names-share-one-risk-cap-by-average-linkage-clusters-and-the-gate-can-read-a-baskets-own-breadth-both-off-by-default-and-every-change-an-owner-act.md)) |
 
 `count_entries_on: trigger` (default): the plan may list up to `max_plan_items` (e.g. 5) conditional tickets;
 once 3 trigger, the rest are cancelled. `plan` mode limits the plan itself to 3.

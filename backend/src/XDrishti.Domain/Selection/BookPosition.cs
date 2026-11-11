@@ -7,4 +7,5 @@ namespace XDrishti.Domain.Selection;
 /// <param name="RiskPct">Open risk as a percentage of capital.</param>
 /// <param name="Sector">The sector; null when not known.</param>
 /// <param name="Baskets">Baskets the symbol belongs to; null when not known, empty when none.</param>
-public sealed record BookPosition(string Symbol, string Side, string Style, double RiskPct, string? Sector = null, IReadOnlyList<string>? Baskets = null);
+/// <param name="ClusterId">The id of its correlation cluster (BK-08); null when unknown.</param>
+public sealed record BookPosition(string Symbol, string Side, string Style, double RiskPct, string? Sector = null, IReadOnlyList<string>? Baskets = null, string? ClusterId = null);

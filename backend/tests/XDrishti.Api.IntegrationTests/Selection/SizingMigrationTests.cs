@@ -42,13 +42,16 @@ public sealed class SizingMigrationTests(ApiFactory factory)
         [
             "basket_risk_budgets.id|bigint|NO", "basket_risk_budgets.basket_id|uuid|NO", "basket_risk_budgets.budget_pct|numeric|YES", "basket_risk_budgets.direction|character varying|NO", "basket_risk_budgets.changed_by|character varying|NO",
             "basket_risk_budgets.changed_at|timestamp with time zone|NO", "basket_risk_budgets.hash|character varying|NO",
+            "basket_settings_changes.id|bigint|NO", "basket_settings_changes.key|character varying|NO", "basket_settings_changes.old_value|character varying|NO", "basket_settings_changes.new_value|character varying|NO",
+            "basket_settings_changes.direction|character varying|NO", "basket_settings_changes.changed_by|character varying|NO", "basket_settings_changes.changed_at|timestamp with time zone|NO", "basket_settings_changes.hash|character varying|NO",
             "sizing_settings_changes.id|bigint|NO", "sizing_settings_changes.key|character varying|NO", "sizing_settings_changes.old_value|character varying|NO", "sizing_settings_changes.new_value|character varying|NO",
             "sizing_settings_changes.direction|character varying|NO", "sizing_settings_changes.changed_by|character varying|NO", "sizing_settings_changes.changed_at|timestamp with time zone|NO", "sizing_settings_changes.hash|character varying|NO",
         ]);
         (await ListAsync(connection, "SELECT conname FROM pg_constraint WHERE connamespace = 'selection'::regnamespace AND contype <> 'n' ORDER BY 1")).ShouldBe(
         [
-            "ck_basket_risk_budgets_direction", "ck_basket_risk_budgets_owner", "ck_basket_risk_budgets_pct", "ck_sizing_settings_changes_direction", "ck_sizing_settings_changes_key", "ck_sizing_settings_changes_owner",
-            "pk_basket_risk_budgets", "pk_sizing_settings_changes",
+            "ck_basket_risk_budgets_direction", "ck_basket_risk_budgets_owner", "ck_basket_risk_budgets_pct", "ck_basket_settings_changes_direction", "ck_basket_settings_changes_key", "ck_basket_settings_changes_owner",
+            "ck_sizing_settings_changes_direction", "ck_sizing_settings_changes_key", "ck_sizing_settings_changes_owner",
+            "pk_basket_risk_budgets", "pk_basket_settings_changes", "pk_sizing_settings_changes",
         ]);
         scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>().Database.HasPendingModelChanges().ShouldBeFalse("the migration and the model snapshot agree");
     }
@@ -89,6 +92,6 @@ public sealed class SizingMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'selection' ORDER BY 1")).ShouldBe(["basket_risk_budgets", "sizing_settings_changes"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'selection' ORDER BY 1")).ShouldBe(["basket_risk_budgets", "basket_settings_changes", "sizing_settings_changes"]);
     }
 }

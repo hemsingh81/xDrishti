@@ -19062,6 +19062,173 @@
         }
       }
     },
+    "/api/selection/basket-settings": {
+      "get": {
+        "tags": [
+          "Selection"
+        ],
+        "summary": "The basket settings in force (the gate's breadth source, tracked by default or basket:<id>; the cap on open risk per correlation cluster, percent of capital, off by default; the cluster cut, 0.70) with the version, the newest loosening change and the latest 50 changes (key, old and new value, direction tighten, loosen or neutral, actor, time, hash). Read only",
+        "operationId": "GetBasketSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketSettingsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Selection"
+        ],
+        "summary": "The owner changes the basket settings (breadthSource tracked or basket:<id>, maxClusterRiskPct above 0 up to 100 or clearCap true to turn the cap off, clusterRho 0.1 to 1.0); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row with its direction. 400 selection.invalid, 403 selection.owner_only, 404 selection.basket_not_found, 409 selection.stale",
+        "operationId": "ChangeBasketSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BasketSettingsChangeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketSettingsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market/basket-context": {
+      "get": {
+        "tags": [
+          "Market"
+        ],
+        "summary": "The stored daily context of one basket (basket, optional from and to as yyyy-MM-dd; the newest 400 rows, newest first): members, voters, the 20, 50 and 200 day breadth, advance and new-high shares, dispersion, average correlation, state and membership basis (point_in_time or single_snapshot). Descriptive only; read only",
+        "operationId": "GetBasketContext",
+        "parameters": [
+          {
+            "name": "basket",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketContextView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/selection/sizing-settings": {
       "get": {
         "tags": [
@@ -25932,6 +26099,113 @@
         },
         "description": "The budget of one basket: its share of the total open risk limit, in percent."
       },
+      "BasketContextDay": {
+        "required": [
+          "asOf",
+          "nMembers",
+          "nVoters",
+          "b20",
+          "b50",
+          "b200",
+          "adShare",
+          "newHighShare",
+          "dispersion",
+          "rhoBar",
+          "state",
+          "membershipBasis"
+        ],
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date"
+          },
+          "nMembers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nVoters": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "b20": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "b50": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "b200": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "adShare": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "newHighShare": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "dispersion": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "rhoBar": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "state": {
+            "type": "string"
+          },
+          "membershipBasis": {
+            "type": "string"
+          }
+        },
+        "description": "One stored day of a basket's context. A figure that is not a number is null; `state` is value or insufficient; `membershipBasis` is point_in_time or single_snapshot (never presented as point in time)."
+      },
+      "BasketContextView": {
+        "required": [
+          "basketId",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "basketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BasketContextDay"
+            }
+          }
+        },
+        "description": "The newest stored rows of one basket (at most 400), newest first. Descriptive only: nothing here is a signal."
+      },
       "BasketFetchRun": {
         "required": [
           "outcomes"
@@ -26246,6 +26520,152 @@
           }
         },
         "description": "The basket budgets in force (a basket with none has no budget) and their history, newest first (the latest 50)."
+      },
+      "BasketSettingChangeView": {
+        "required": [
+          "id",
+          "key",
+          "oldValue",
+          "newValue",
+          "direction",
+          "actor",
+          "changedAt",
+          "hash"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "key": {
+            "type": "string"
+          },
+          "oldValue": {
+            "type": "string"
+          },
+          "newValue": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hash": {
+            "type": "string"
+          }
+        },
+        "description": "One change of a basket setting in the history."
+      },
+      "BasketSettingsChangeBody": {
+        "required": [
+          "breadthSource",
+          "maxClusterRiskPct",
+          "clearCap",
+          "clusterRho",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "breadthSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "maxClusterRiskPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "clearCap": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "clusterRho": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The owner change of the basket settings (BK-08). A value left out stays as it is; clearCap true turns the cluster cap off. The password is needed for every change. The actor is never taken from the body."
+      },
+      "BasketSettingsView": {
+        "required": [
+          "breadthSource",
+          "maxClusterRiskPct",
+          "clusterRho",
+          "version",
+          "notice",
+          "latestLoosening",
+          "history"
+        ],
+        "type": "object",
+        "properties": {
+          "breadthSource": {
+            "type": "string",
+            "description": "`gate.breadth_source`: `tracked` or `basket:&lt;id&gt;`."
+          },
+          "maxClusterRiskPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "`selection.max_cluster_risk_pct`, percent of capital; null is OFF.",
+            "format": "double"
+          },
+          "clusterRho": {
+            "type": "number",
+            "description": "`selection.cluster_rho`.",
+            "format": "double"
+          },
+          "version": {
+            "type": "integer",
+            "description": "The newest row id (0 when none).",
+            "format": "int64"
+          },
+          "notice": {
+            "type": "string",
+            "description": "Advisory, no order."
+          },
+          "latestLoosening": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The newest change with direction loosen, or null when none was ever made.",
+                "$ref": "#/components/schemas/BasketSettingChangeView"
+              }
+            ]
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BasketSettingChangeView"
+            },
+            "description": "The changes, newest first."
+          }
+        },
+        "description": "The basket settings in force with their history (newest first, the latest 50). With no row everything is OFF: the gate reads the tracked set's breadth and no cap on open risk per correlation cluster applies."
       },
       "BasketSourceSummary": {
         "required": [
@@ -70265,6 +70685,9 @@
     },
     {
       "name": "Selection"
+    },
+    {
+      "name": "Market"
     },
     {
       "name": "Calendar"
