@@ -70,6 +70,7 @@ using XDrishti.Application.Selection;
 using XDrishti.Application.Shadow;
 using XDrishti.Application.SimAll;
 using XDrishti.Application.Sizing;
+using XDrishti.Application.OpeningBars;
 using XDrishti.Application.Ticks;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Portfolio;
@@ -134,6 +135,9 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(TickRecorderView))]
 [JsonSerializable(typeof(TickRecorderSwitched))]
 [JsonSerializable(typeof(TickSwitchRequest))]
+[JsonSerializable(typeof(OpeningBarsRecorderView))]
+[JsonSerializable(typeof(OpeningBarsSwitched))]
+[JsonSerializable(typeof(OpeningBarsSwitchRequest))]
 [JsonSerializable(typeof(OptionChainRecorderView))]
 [JsonSerializable(typeof(OptionChainRecorderSwitched))]
 [JsonSerializable(typeof(OptionChainSwitchRequest))]

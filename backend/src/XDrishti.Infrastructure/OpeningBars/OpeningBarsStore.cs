@@ -47,6 +47,14 @@ internal sealed class OpeningBarsStore(NpgsqlDataSource dataSource) : IOpeningBa
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async ValueTask<int> PruneAsync(int keepDays, CancellationToken cancellationToken)
+    {
+        // the runtime role cannot remove rows from the table: the owner-defined function (SECURITY DEFINER, created by the migration) deletes only rows older than the cutoff
+        await using var command = dataSource.CreateCommand("SELECT market.prune_opening_bars(@keep)");
+        command.Parameters.AddWithValue("keep", keepDays);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
     public ValueTask<long?> FreeBytesAsync(CancellationToken cancellationToken)
     {
         try

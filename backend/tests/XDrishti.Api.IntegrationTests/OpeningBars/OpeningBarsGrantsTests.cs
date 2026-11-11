@@ -59,4 +59,11 @@ public sealed class OpeningBarsGrantsTests(ResearchGrantsTests.DedicatedServer s
         (await SqlStateAsync(server.App, "INSERT INTO market.opening_bars_switch (enabled, actor, reason) VALUES (true, 'owner:probe@example.invalid', 'probe')")).ShouldBeNull();
         (await SqlStateAsync(server.App, "DELETE FROM market.opening_bars_switch")).ShouldBe("42501");
     }
+
+    [Fact]
+    public async Task The_runtime_role_runs_the_retention_function_and_still_cannot_delete_directly()
+    {
+        (await SqlStateAsync(server.App, "SELECT market.prune_opening_bars(60)")).ShouldBeNull();
+        (await SqlStateAsync(server.App, "DELETE FROM market.bars_1m_live WHERE false")).ShouldBe("42501");
+    }
 }

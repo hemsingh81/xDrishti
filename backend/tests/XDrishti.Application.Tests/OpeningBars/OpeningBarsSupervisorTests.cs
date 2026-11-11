@@ -242,6 +242,22 @@ public sealed class OpeningBarsSupervisorTests
         run.Message.ShouldContain("gaps");
     }
 
+    // ---- criterion 8: retention ----
+
+    [Fact]
+    public async Task The_retention_runs_once_a_day_with_the_keep_days_even_on_a_weekend_and_never_with_the_deployment_flag_off()
+    {
+        var world = new World(day: 10, hour: 9, minute: 25); // a Saturday
+        var off = new World(deployment: false);
+
+        await world.TickAsync();
+        await world.TickAsync();
+        await off.TickAsync();
+
+        world.Store.Prunes.ShouldBe([60]);
+        off.Store.Prunes.ShouldBeEmpty();
+    }
+
     // ---- criterion 10: a non-trading day ----
 
     [Fact]

@@ -113,4 +113,5 @@ public enum AccountEventType
     LooseningDismissed,
     LooseningSettingsChanged,
     HypothesisProposed,
+    OpeningBarsSwitched,
 }

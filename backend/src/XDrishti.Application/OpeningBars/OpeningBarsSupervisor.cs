@@ -38,6 +38,7 @@ internal sealed class OpeningBarsSupervisor(IServiceScopeFactory scopes, Opening
     private Running? _running;
     private DateOnly? _doneDay;
     private DateOnly? _frozenDay;
+    private DateOnly? _prunedDay;
     private DateOnly? _lowDiskDay;
     private DateTimeOffset _resumeAt = DateTimeOffset.MinValue;
 
@@ -91,6 +92,13 @@ internal sealed class OpeningBarsSupervisor(IServiceScopeFactory scopes, Opening
         await using var scope = scopes.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var today = IndiaTime.Today(now);
+        if (_prunedDay != today)
+        {
+            _prunedDay = today; // once a day, whatever happens (a failure is tried again tomorrow)
+            var removed = await services.GetRequiredService<IOpeningBarsStore>().PruneAsync(settings.KeepDays, cancellationToken);
+            OpeningBarsLog.Pruned(logger, removed);
+        }
+
         var calendar = await services.GetRequiredService<ITradingCalendar>().GetAsync(cancellationToken);
         if (!calendar.IsTradingDay(today))
         {

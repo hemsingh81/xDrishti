@@ -75,6 +75,14 @@ internal sealed class FakeOpeningStore : IOpeningBarsStore
         return ValueTask.CompletedTask;
     }
 
+    public List<int> Prunes { get; } = [];
+
+    public ValueTask<int> PruneAsync(int keepDays, CancellationToken cancellationToken)
+    {
+        Prunes.Add(keepDays);
+        return ValueTask.FromResult(0);
+    }
+
     public ValueTask<long?> FreeBytesAsync(CancellationToken cancellationToken) => ValueTask.FromResult(Free);
 }
 
@@ -101,9 +109,15 @@ internal sealed class FakeOpeningSwitch : IOpeningBarsSwitchStore
 
     public ValueTask<bool> IsOnAsync(CancellationToken cancellationToken) => ValueTask.FromResult(On);
 
-    public ValueTask AppendAsync(bool enabled, string actor, string reason, CancellationToken cancellationToken)
+    public List<OpeningBarsSwitchRow> Rows { get; } = [];
+
+    public ValueTask<IReadOnlyList<OpeningBarsSwitchRow>> HistoryAsync(int take, CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<OpeningBarsSwitchRow>>([.. Rows.OrderByDescending(r => r.Id).Take(take)]);
+
+    public ValueTask<OpeningBarsSwitchRow> AppendAsync(bool enabled, string actor, string reason, CancellationToken cancellationToken)
     {
         On = enabled;
-        return ValueTask.CompletedTask;
+        var row = new OpeningBarsSwitchRow(Rows.Count + 1, enabled, actor, reason, DateTimeOffset.UnixEpoch);
+        Rows.Add(row);
+        return ValueTask.FromResult(row);
     }
 }

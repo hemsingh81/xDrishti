@@ -23,6 +23,12 @@ internal static partial class OpeningBarsLog
     [LoggerMessage(EventId = 3565, Level = LogLevel.Information, Message = "feed.opening_bars freeze: {Waiting} waiting, {Formed} written")]
     public static partial void Frozen(ILogger logger, int waiting, int formed);
 
+    [LoggerMessage(EventId = 3567, Level = LogLevel.Warning, Message = "feed.opening_bars switch audit event not written {Kind}")]
+    public static partial void AuditFailed(ILogger logger, string kind);
+
+    [LoggerMessage(EventId = 3568, Level = LogLevel.Information, Message = "feed.opening_bars retention removed {Rows} rows")]
+    public static partial void Pruned(ILogger logger, int rows);
+
     [LoggerMessage(EventId = 3566, Level = LogLevel.Warning, Message = "feed.opening_bars stopped: low free disk space")]
     public static partial void LowDisk(ILogger logger);
 }

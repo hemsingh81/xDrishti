@@ -8,6 +8,9 @@ public interface IOpeningBarsStore
 
     ValueTask AddEventAsync(DateOnly day, OpeningBarsEvent @event, CancellationToken cancellationToken);
 
+    /// <summary>Deletes live bars older than <paramref name="keepDays"/> days through the owner-defined retention function (the runtime role itself cannot delete). Returns how many.</summary>
+    ValueTask<int> PruneAsync(int keepDays, CancellationToken cancellationToken);
+
     /// <summary>The free bytes of the file system this process runs on; null when they cannot be read.</summary>
     ValueTask<long?> FreeBytesAsync(CancellationToken cancellationToken);
 }

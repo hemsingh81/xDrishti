@@ -34,6 +34,7 @@ function mockRecorders(
   ticks = view(),
   chain = buildOptionRecorderView(),
   backfill = buildBackfillView(),
+  opening = view(),
 ) {
   const puts: Put[] = [];
   const reads: string[] = [];
@@ -49,12 +50,14 @@ function mockRecorders(
     }),
     http.get('/api/options/chain-recorder', () => HttpResponse.json(chain)),
     http.get('/api/options/backfill', () => HttpResponse.json(backfill)),
+    http.get('/api/opening-bars/recorder', () => HttpResponse.json(opening)),
     ...(
       [
         ['depth', '/api/depth/recorder'],
         ['ticks', '/api/ticks/recorder'],
         ['chain', '/api/options/chain-recorder'],
         ['backfill', '/api/options/backfill'],
+        ['opening', '/api/opening-bars/recorder'],
       ] as const
     ).map(([kind, path]) =>
       http.put(path, async ({ request }) => {
@@ -308,5 +311,25 @@ describe('Services: the option recorders', () => {
       expect(m.puts).toHaveLength(1);
     });
     expect(m.puts[0]).toEqual({ kind: 'chain', body: { enabled: false, reason: 'stop', password: 'secret-pw' } });
+  });
+
+  it('turns the opening-minute bars recorder on with its own switch, password and reason', async () => {
+    const m = mockRecorders();
+    renderServices();
+    await openSection();
+    const card = await screen.findByRole('region', { name: 'Opening-minute bars recorder' });
+    expect(await within(card).findByText('Switch OFF')).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole('button', { name: 'Turn on Opening-minute bars recorder' }));
+    const dialog = await screen.findByRole('dialog', { name: /Turn on the opening-minute bars recorder/ });
+    await userEvent.type(within(dialog).getByLabelText(/Reason/), 'form the opening baskets');
+    await userEvent.type(within(dialog).getByLabelText(/Password/), 'secret-pw');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Turn on' }));
+    await waitFor(() => {
+      expect(m.puts).toHaveLength(1);
+    });
+    expect(m.puts[0]).toEqual({
+      kind: 'opening',
+      body: { enabled: true, reason: 'form the opening baskets', password: 'secret-pw' },
+    });
   });
 });

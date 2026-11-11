@@ -21,5 +21,5 @@ On a trading day with all three gates on, baskets 4 and 12 are formed once from 
 
 ## Deviations and interpretations (see the spec's build notes)
 - The freeze is asked by the feed host's loop (it owns the clock at 09:20), not by the `derived-baskets` service, which stays an after-EOD service in `xd-api`; the freeze handler is the same use case and is registered in the application layer.
-- The switch has a table and a store but no API route in this slice (the spec lists none); it is turned on by the owner's database act until a route is added.
-- Retention (`OpeningBars:KeepDays`) is an option only; no delete job exists (about 8,000 rows a day).
+- The switch has an API route and a Services-screen card (owner decision 2026-11-11): fresh password per change, an audit event, insert-only rows.
+- Retention (`OpeningBars:KeepDays`, 60) is a SECURITY DEFINER function `market.prune_opening_bars` owned by the migration role and called once a day by the recorder loop; the runtime role stays insert-only on the table.
