@@ -247,6 +247,21 @@ public sealed class ReadOnlyRolesTests(ReadOnlyDatabase db)
     }
 
     [Fact]
+    public async Task The_read_roles_can_execute_no_function_of_schema_market_and_the_runtime_role_can()
+    {
+        const string Count = "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'market' AND p.prokind = 'f' AND has_function_privilege('{0}', p.oid, 'EXECUTE')";
+        var all = (long)(await ReadOnlyDatabase.ScalarAsync(db.Owner, "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'market' AND p.prokind = 'f'"))!;
+
+        all.ShouldBeGreaterThan(0);
+        foreach (var role in Roles)
+        {
+            (await ReadOnlyDatabase.ScalarAsync(db.Owner, string.Format(System.Globalization.CultureInfo.InvariantCulture, Count, role))).ShouldBe(0L, role);
+        }
+
+        (await ReadOnlyDatabase.ScalarAsync(db.Owner, string.Format(System.Globalization.CultureInfo.InvariantCulture, Count, "xd_app"))).ShouldBe(all);
+    }
+
+    [Fact]
     public async Task The_runtime_role_reads_and_inserts_settings_and_nothing_else_about_them()
     {
         (await HasAsync("has_table_privilege", "xd_app", "ai.settings", "SELECT")).ShouldBeTrue();

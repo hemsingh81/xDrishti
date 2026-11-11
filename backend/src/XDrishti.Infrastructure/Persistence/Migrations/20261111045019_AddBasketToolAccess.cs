@@ -22,11 +22,34 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     END IF;
                 END $$
                 """);
+
+            // USAGE on market would also let the read role call the functions of the schema (EXECUTE is granted to PUBLIC by default): take it from PUBLIC and give it to the runtime role, which is the only caller.
+            migrationBuilder.Sql("""
+                DO $$
+                DECLARE f regprocedure;
+                BEGIN
+                    FOR f IN SELECT p.oid::regprocedure FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'market' AND p.prokind = 'f' LOOP
+                        EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC', f);
+                        IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'xd_app') THEN
+                            EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO xd_app', f);
+                        END IF;
+                    END LOOP;
+                END $$
+                """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("""
+                DO $$
+                DECLARE f regprocedure;
+                BEGIN
+                    FOR f IN SELECT p.oid::regprocedure FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'market' AND p.prokind = 'f' LOOP
+                        EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO PUBLIC', f);
+                    END LOOP;
+                END $$
+                """);
             migrationBuilder.Sql("""
                 DO $$
                 BEGIN

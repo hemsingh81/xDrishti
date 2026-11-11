@@ -171,7 +171,7 @@ public sealed class BasketReportReaderTests
         body["hold"]!["state"]!.GetValue<string>().ShouldBe("value");
         body["membershipBasis"]!.GetValue<string>().ShouldBe("single_snapshot");
         body["members"]!["counted"]!.GetValue<int>().ShouldBe(3);
-        foreach (var name in new[] { "basket", "window", "membersAsOf", "membershipBasis", "members", "index", "hold", "risk", "indexDifference", "dispersion", "regime", "turnover", "capacity", "holdOut", "relativeStrength" })
+        foreach (var name in new[] { "basket", "window", "membersAsOf", "membershipBasis", "members", "index", "hold", "risk", "indexDifference", "dispersion", "regime", "turnover", "capacity", "relativeStrength" })
         {
             JsonNode.DeepEquals(body[name], screen[name]).ShouldBeTrue(name);
         }
@@ -221,6 +221,8 @@ public sealed class BasketReportReaderTests
         view.Series.Dates.Count.ShouldBe(300, "the screen keeps the full series");
         answer.Data["breadth"]!.AsObject().ContainsKey("seriesB20").ShouldBeFalse();
         answer.Data["correlation"]!.AsObject().ContainsKey("matrix").ShouldBeFalse();
+        answer.Data.AsObject().ContainsKey("holdOut").ShouldBeFalse("the strategy hold-out is not a basket figure and stays on the screen");
+        answer.Notes.ShouldContain(n => n.Contains("left out of this answer", StringComparison.Ordinal) && n.Contains("correlation matrix", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -243,6 +245,27 @@ public sealed class BasketReportReaderTests
         var (fitted, json) = envelope.Fit();
         fitted.Ok.ShouldBeTrue(json);
         json.Length.ShouldBeLessThanOrEqualTo(ToolLimits.MaxModelChars);
+    }
+
+    [Fact]
+    public async Task The_worst_case_of_300_members_hold_out_cells_and_long_regime_lists_fits_or_is_marked_cut()
+    {
+        var view = Profile(members: 300, points: 400, excluded: 300);
+        var cells = Enumerable.Range(0, 80).Select(i => new ProfileHoldOutCellView($"STRATEGY_{i}", new DateOnly(2026, 1, 1), 30, 30, V(0.1), V(0.2), "agrees")).ToList();
+        var regimes = Enumerable.Range(0, 40).Select(i => new RegimeRowView(i, $"regime {i} with a long label", 50, V(0.001), V(0.01), V(0.5), "value")).ToList();
+        view = view with { HoldOut = view.HoldOut with { Cells = cells }, Regime = view.Regime with { Rows = regimes } };
+        var (reader, _, _, _) = Build(view);
+
+        var answer = await reader.GetAsync("basket_profile", Q(("basket", "Banking")), Ct);
+
+        var envelope = new ToolEnvelope(true, "get_report", DateTimeOffset.UnixEpoch, [], null, answer.Data, null, false, answer.Evidence, answer.Notes, null);
+        var (fitted, json) = envelope.Fit();
+        (fitted.Ok || answer.Data!["truncated"]?.GetValue<bool>() == true).ShouldBeTrue(json);
+        answer.Data!.AsObject().ContainsKey("holdOut").ShouldBeFalse();
+        if (fitted.Ok)
+        {
+            json.Length.ShouldBeLessThanOrEqualTo(ToolLimits.MaxModelChars);
+        }
     }
 
     [Fact]

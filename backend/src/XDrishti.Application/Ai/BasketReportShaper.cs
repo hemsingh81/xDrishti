@@ -20,7 +20,7 @@ internal static class BasketReportShaper
 
     private const int MinPoints = 8;
 
-    private static readonly string[] CutLists = ["excluded", "shortMembers", "noBar"];
+    private static readonly string[] CutLists = ["excluded", "shortMembers", "noBar", "rows"];
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
 
@@ -39,7 +39,17 @@ internal static class BasketReportShaper
             }
         }
 
-        return AiToolData.OfData(data, Evidence(view.Evidence, $"basket profile ({view.Basket.Kind} basket), price returns of its members"), ProfileSummary(view));
+        var notes = ProfileSummary(view);
+        if (data.ToJsonString().Length > DataBudgetChars)
+        {
+            // still over after the smallest step: drop the two optional panels and say so; if it is still too long the runner answers tool.too_large (fails closed)
+            data.Remove("regime");
+            data.Remove("capacity");
+            data["truncated"] = true;
+            notes.Add("the answer was cut to fit: the regime and capacity panels were left out; they are on the basket screen");
+        }
+
+        return AiToolData.OfData(data, Evidence(view.Evidence, $"basket profile ({view.Basket.Kind} basket), price returns of its members"), notes);
     }
 
     public static AiToolData Ranking(BasketRankingView view)
@@ -93,6 +103,7 @@ internal static class BasketReportShaper
         data["breadth"]!.AsObject().Remove("seriesB20");
         data["correlation"]!.AsObject().Remove("matrix");
         data["contribution"]!.AsObject().Remove("rows"); // contributions: only the top and bottom 5 (AC 7)
+        data.Remove("holdOut"); // the median split of strategy trades is a strategy figure (gross R of stored runs), not a basket price figure: it stays on the screen
         Cut(data, maxRows);
         return data;
     }
@@ -140,7 +151,11 @@ internal static class BasketReportShaper
     /// <summary>One line for every headline figure that is not a value: the state in words and the engine's own reason (it holds the n and the minimum). No figure is written for it.</summary>
     private static List<string> ProfileSummary(BasketProfileView v)
     {
-        var notes = new List<string> { "figures are price returns of the basket's own members, not trading results" };
+        var notes = new List<string>
+        {
+            "figures are price returns of the basket's own members, not trading results",
+            "left out of this answer, on the basket screen: the daily breadth series, the correlation matrix, the index series, the rolling beta, the contribution of every member and the strategy hold-out panel",
+        };
         void Add(string label, MetricView m)
         {
             if (m.State == "value")
