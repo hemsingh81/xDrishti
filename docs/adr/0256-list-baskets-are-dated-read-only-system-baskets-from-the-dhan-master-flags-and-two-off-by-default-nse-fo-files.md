@@ -26,3 +26,7 @@ Scans, the plan and reports need "usable now / excluded now" lists: F&O stocks, 
 - The series of a share that moved between EQ and a restricted series before the first recorded refresh is not known; the master series is the only source (a share with a series other than EQ or the four restricted ones is never EQ).
 - A ban list that is not refreshed (a failed fetch) keeps its members for the members views, but basket 13 treats the days after `known_through` as unknown.
 - NSE terms and the acceptance of a non-browser user agent for the `fo_*` files are UNVERIFIED; so is whether the files keep their layout.
+
+## Owner decision 2026-11-11
+
+Given in chat. (1) NSE lot sizes from `fo_mktlots.csv` are written into **`options.lot_sizes`** (P14-01, ADR 0175); `market.fo_lot_sizes` is never built. REVIEW-2026-11-10 question 5 is answered yes. Built in [BK-05b](../specs/BK-05b-nse-lot-sizes-into-options-lot-sizes.md). (2) The owner will enable the two F&O files (`fo_secban.csv`, `fo_mktlots.csv`) first, together with the Nifty 50 and Nifty 500 index lists, **after reading NSE's terms**, and sets the User-Agent himself. Until then `FetchEnabled` stays false.

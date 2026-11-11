@@ -25,3 +25,7 @@ The owner wants to ask "which basket held up best", "how correlated is my Bankin
 ## Consequences
 - The model can quote the basket screens' figures with their states in the same envelope as the other reports; it cannot rank a board the screen would not rank, write anything, or read class C0.
 - The profile answer is the largest of the tools; it is held under the envelope by cutting, with every cut stated in the answer.
+
+## Owner decision 2026-11-11
+
+Given in chat. The basket profile and ranking reports reach the assistant **through the API**: the tool server calls the API's read endpoints `GET /api/reports/baskets/{id}/profile` and `GET /api/reports/baskets/ranking`. The tool server's database role (`xd_mcp_read`) stays narrow; no grant on the bar or basket tables and no read-only copies of the eight ports. Built in [BK-12b](../specs/BK-12b-basket-reports-for-the-assistant-via-the-api.md); until then the deviation above stands.

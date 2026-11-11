@@ -35,3 +35,7 @@ Strategies and reports need a share's relative strength inside a basket, against
 - Two to three years of history: a 252-session lookback has about one year of valid ranks (`short_history` before that). A basket of today's members flatters momentum (survivorship); the basis says so.
 - Sector equal-weight returns of a small set are noisy; rank flips near ties are common.
 - The pre-registered basket names are the ones the system baskets carry today; the liquid basket is the derived "Most liquid" one.
+
+## Owner decision 2026-11-11
+
+Given in chat. The pre-registered relative-strength rank universes stay the **four** chosen at build: Nifty 50, Nifty 100, F&O stocks and Most liquid. No change.

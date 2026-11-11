@@ -22,3 +22,7 @@ A single snapshot is survivorship biased; thin histories leave most 252-day figu
 
 ## Deviations from the spec text
 `Regime` is an object (`Status`, `Unknown`, `MinDays`, `Rows`); `HoldOut` is a field of the profile; the difference to the index is a line, not an area; the rank window is the longest relative strength window most baskets have a value for; alpha, tracking error and the information ratio are the 252-day window; the correlation matrix is the 40 most liquid members in sector order and says "sampled N of M" (no cluster order until BK-08); a portfolio basket is supported as a single snapshot and `membersAsOf` on it is refused.
+
+## Owner decision 2026-11-11
+
+Given in chat. The default index of the profile and ranking endpoints is **Nifty 500** (spec BK-07 open question 2, via BK-06 question 1). Built in [BK-06c](../specs/BK-06c-nifty-500-default-benchmark-for-the-basket-profile.md). The route `/baskets/:basketId/profile` stays as built.

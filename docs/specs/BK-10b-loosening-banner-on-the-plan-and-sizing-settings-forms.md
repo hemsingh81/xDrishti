@@ -55,6 +55,8 @@ None blocking; recorded with the default chosen:
 1. Should dismissing a loosening need a fresh password? The existing dismiss pattern (P7-20) takes none, so none is asked.
 2. Is "auto hides each line after one plan" the automatic behaviour wanted for a warning? It stays OFF unless the owner switches it on.
 
+**Answered.** Owner (2026-11-11, in chat): 1. **No password** to dismiss. 2. Keep the auto-dismiss option, **OFF**. Both as built.
+
 ## Done when
 - [ ] All acceptance criteria have evidence; `scripts/check.sh` green; reviewer: no blockers/majors (told to look for any path that hides a loosening without a dismissal row, and any change of a stored plan or its hash)
 - [ ] `scripts/gen-api.sh` run; migration `AddLooseningDismissals` with `Down`; grants test updated

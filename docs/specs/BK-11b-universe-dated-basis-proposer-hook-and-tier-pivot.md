@@ -61,6 +61,8 @@ None blocking (approved). Left for the owner:
 2. A leaver's open position is kept to its normal exit (AC 2). Confirm, or should leaving force an exit at the next open?
 3. Should the web propose endpoint exist, or stay CLI only like the other proposals? Built both; the web act needs the password.
 
+**Answered.** Owner (2026-11-11, in chat): 1. Equal thirds (ADR 0261 note). 2. A leaver **keeps to its normal exit**. 3. **Keep** the web propose form (password, as built). To be noted in ADR 0266 when BK-11b merges (ADR 0266 is on `feature/bk-11b`, not on `main`).
+
 ## Done when
 - [ ] All acceptance criteria have evidence; `scripts/check.sh` green; reviewer: no blockers/majors (told to look for look-ahead in the dated replay and the report tier, and any path that applies a restriction)
 - [ ] `scripts/gen-api.sh` run; migration with `Down` (only if a column or check is needed)

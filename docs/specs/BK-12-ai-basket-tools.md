@@ -74,6 +74,8 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 1. Is a token budget of 2,300 (from 2,200) acceptable, or should one of the older descriptions be cut to hold 2,200?
 2. Should the assistant be allowed to quote the BK-10 sizing study (read only), or keep sizing out of the assistant entirely in this wave? Recommended: out.
 
+**Answered.** Owner (2026-11-11, in chat): the profile and ranking reach the assistant via the API; the tool server's role stays narrow. Follow-up slice [BK-12b](BK-12b-basket-reports-for-the-assistant-via-the-api.md). Questions 1 and 2 above were settled at build (2,300 budget, ADR 0264; sizing stays out).
+
 ## Done when
 - [ ] All acceptance criteria have evidence; `scripts/check.sh` green; reviewer: no blockers/majors (told to look for any number the model can produce that is not a tool result, and for C0 leakage)
 - [ ] Migration `AddBasketToolAccess` with `Down`; golden schema file regenerated; eval set addendum merged

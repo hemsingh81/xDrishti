@@ -105,6 +105,8 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 1. Default benchmark: Nifty 50 (the owner's portfolio benchmark setting, as P8-07) or Nifty 500 for broad baskets? Recommended: keep the one app-wide benchmark.
 2. Is "difference to the index" acceptable wording (Decision 6)?
 
+**Answered.** Owner (2026-11-11, in chat): 1. Default benchmark = **Nifty 500** for the basket profile (not the app-wide Nifty 50); slice [BK-06c](BK-06c-nifty-500-default-benchmark-for-the-basket-profile.md). 2. As built (ADR 0257).
+
 ## Done when
 - [ ] All acceptance criteria have evidence; `scripts/check.sh` green; reviewer: no blockers/majors (told to look for a number shown for a non-value state and for look-ahead)
 - [ ] No contract change, no migration; ADR (next free number at build time) on the daily-rebalanced index and the previous-close membership rule
