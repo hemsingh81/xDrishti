@@ -317,6 +317,8 @@ Five learned rules sit between the scanner's candidates and tomorrow's plan, plu
 in the nightly pipeline without you; their state is shown on Plan review and **Learning → Smart rules**, and
 switching one off needs your password.
 
+**Gate breadth source (BK-08, [ADR 0260](../adr/0260-correlated-names-share-one-risk-cap-by-average-linkage-clusters-and-the-gate-can-read-a-baskets-own-breadth-both-off-by-default-and-every-change-an-owner-act.md)).** The gate's breadth is, by default, that of your tracked set. The owner may choose a stated basket instead (setting `gate.breadth_source`, `basket:<id>`, an owner act with a fresh password; any change of the source counts as a loosening): the gate then reads the `b20` of the basket's newest stored daily row before the planned day (`market.basket_context_daily`, insert-once). A missing, stale or insufficient row is `unavailable` for breadth, never a pass and never the tracked figure; the note names the basket.
+
 ```mermaid
 flowchart LR
     C["Candidates<br/>(cells, P(win), E[R])"] --> G{"Market gate<br/>normal / reduced / no-trade"}

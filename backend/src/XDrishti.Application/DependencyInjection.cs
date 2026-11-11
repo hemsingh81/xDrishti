@@ -982,6 +982,11 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<XDrishti.Application.Sizing.ChangeSizingSettingsCommand, XDrishti.Application.Sizing.SizingSettingsView>, XDrishti.Application.Sizing.ChangeSizingSettingsHandler>();
         services.AddScoped<ICommandHandler<XDrishti.Application.Sizing.ChangeBasketRiskBudgetCommand, XDrishti.Application.Sizing.BasketRiskBudgetsView>, XDrishti.Application.Sizing.ChangeBasketRiskBudgetHandler>();
         services.AddScoped<IQueryHandler<XDrishti.Application.Sizing.GetSizingStudyQuery, Result<XDrishti.Application.Sizing.SizingStudyView>>, XDrishti.Application.Sizing.GetSizingStudyHandler>();
+        // BK-08: the cluster cap and the gate's breadth source (owner settings, all OFF by default) and the daily context of the gate basket. Nothing here places an order.
+        services.AddScoped<IQueryHandler<XDrishti.Application.Selection.GetBasketSettingsQuery, XDrishti.Application.Selection.BasketSettingsView>, XDrishti.Application.Selection.GetBasketSettingsHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Selection.ChangeBasketSettingsCommand, XDrishti.Application.Selection.BasketSettingsView>, XDrishti.Application.Selection.ChangeBasketSettingsHandler>();
+        services.AddScoped<ICommandHandler<ComputeBasketContextCommand, BasketContextComputed>, ComputeBasketContextHandler>();
+        services.AddScoped<IQueryHandler<GetBasketContextQuery, Result<BasketContextView>>, GetBasketContextHandler>();
         services.AddScoped<IAutoScopeSource, AutoScopeResolver>(); // the stored auto scope with its baskets expanded, read by the selection builder at the nightly run (AU-16)
         services.AddScoped<IQueryHandler<GetAutoScopeQuery, AutoScopeView>, GetAutoScopeHandler>();
         services.AddScoped<ICommandHandler<SetAutoScopeCommand, AutoScopeView>, SetAutoScopeHandler>();
@@ -1034,6 +1039,7 @@ public static class DependencyInjection
         services.AddScoped<INightlyGate, QualityGate>();
         services.AddScoped<INightlyGate, SelectionInputsGate>();
         services.AddScoped<NullPlanBuilder>();
+        services.AddSingleton(new XDrishti.Domain.Selection.SmartRules.SmartRulesOptions()); // the one instance of the gate's limits: the selection builder and the stored plan context (basket row age, BK-08) both read it, so they cannot disagree; the code defaults until a settings home binds it
         services.AddScoped<SelectionPlanBuilder>(); // P7-04, ADR 0088: registered, not the default
         // the selection builder when configured on; else, where the Auto switch can be read, the builder follows the switch at build time (AU-17, ADR 0252); else the skeleton
         services.AddScoped<IPlanBuilder>(sp => sp.GetService<IPlanBuilderSettings>()?.UseSelection == true ? sp.GetRequiredService<SelectionPlanBuilder>()

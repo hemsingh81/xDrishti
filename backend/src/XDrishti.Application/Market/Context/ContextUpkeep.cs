@@ -5,11 +5,12 @@ using XDrishti.Application.Market.Strength;
 
 namespace XDrishti.Application.Market.Context;
 
-/// <summary>After a data job that aggregated, writes the context days that became final (P3-01d) and then the breadth of the days that have none (P3-01e). Never fails the job: whatever goes wrong is a warning of the job, a missing index is only logged (the coverage endpoint names it).</summary>
+/// <summary>After a data job that aggregated, writes the context days that became final (P3-01d), then the breadth of the days that have none (P3-01e), then the context of the gate basket (BK-08). Never fails the job: whatever goes wrong is a warning of the job, a missing index is only logged (the coverage endpoint names it).</summary>
 internal sealed class ContextUpkeep(
     ICommandHandler<RefreshContextCommand, ContextRefreshed> refresh,
     ICommandHandler<ComputeBreadthCommand, BreadthComputed> breadth,
     ILogger<ContextUpkeep> logger,
+    ICommandHandler<ComputeBasketContextCommand, BasketContextComputed>? basketContext = null,
     ICommandHandler<ComputeRelativeStrengthCommand, RelativeStrengthComputed>? strength = null) : IContextUpkeep
 {
     private const string Crashed = "The market context could not be updated. See the API log.";
@@ -30,6 +31,16 @@ internal sealed class ContextUpkeep(
             if (computed.IsFailure)
             {
                 await reporter.WarnAsync("Breadth: " + computed.Error.Message, cancellationToken);
+            }
+
+            // BK-08: the daily context of the gate basket, when the owner chose one; insert-once, so a failure only leaves the gate reading unavailable.
+            if (basketContext is not null)
+            {
+                var basket = await basketContext.HandleAsync(new ComputeBasketContextCommand(), cancellationToken);
+                if (basket.IsFailure)
+                {
+                    await reporter.WarnAsync("Basket context: " + basket.Error.Message, cancellationToken);
+                }
             }
 
             // The relative strength of the sessions that have none (BK-09): insert-once, OFF by default; a failure is a warning of its own and the rows of earlier days stay.

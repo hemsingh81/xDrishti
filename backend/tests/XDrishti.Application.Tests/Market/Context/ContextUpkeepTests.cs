@@ -106,6 +106,17 @@ public sealed class ContextUpkeepTests
         job.Warnings.ShouldBe(["Market context: The context is broken."]);
     }
 
+    private sealed class FailingBasket : ICommandHandler<ComputeBasketContextCommand, BasketContextComputed>
+    {
+        public int Runs { get; private set; }
+
+        public ValueTask<Result<BasketContextComputed>> HandleAsync(ComputeBasketContextCommand command, CancellationToken cancellationToken)
+        {
+            Runs++;
+            return ValueTask.FromResult(Result.Failure<BasketContextComputed>(Error.Validation("basket.broken", "The basket is broken.")));
+        }
+    }
+
     private sealed class FixedStrength(Result<RelativeStrengthComputed> answer) : ICommandHandler<ComputeRelativeStrengthCommand, RelativeStrengthComputed>
     {
         public int Runs { get; private set; }
@@ -118,12 +129,25 @@ public sealed class ContextUpkeepTests
     }
 
     [Fact]
+    public async Task The_gate_basket_step_runs_last_and_a_failure_of_it_is_a_warning_that_leaves_the_other_steps_alone()
+    {
+        var (reporter, job) = Reporter();
+        var breadth = new FixedBreadth();
+        var basket = new FailingBasket();
+
+        await new ContextUpkeep(new OkRefresh(), breadth, NullLogger<ContextUpkeep>.Instance, basket).RunAsync(reporter, Ct);
+
+        (breadth.Runs, basket.Runs).ShouldBe((1, 1));
+        job.Warnings.ShouldBe(["Basket context: The basket is broken."]);
+    }
+
+    [Fact]
     public async Task The_relative_strength_step_runs_after_the_breadth_and_a_failure_of_it_is_a_warning_of_its_own()
     {
         var (reporter, job) = Reporter();
         var strength = new FixedStrength(Result.Failure<RelativeStrengthComputed>(Error.Validation("strength.broken", "Strength is broken.")));
 
-        await new ContextUpkeep(new OkRefresh(), new FixedBreadth(), NullLogger<ContextUpkeep>.Instance, strength).RunAsync(reporter, Ct);
+        await new ContextUpkeep(new OkRefresh(), new FixedBreadth(), NullLogger<ContextUpkeep>.Instance, strength: strength).RunAsync(reporter, Ct);
 
         strength.Runs.ShouldBe(1);
         job.Warnings.ShouldBe(["Relative strength: Strength is broken."]);

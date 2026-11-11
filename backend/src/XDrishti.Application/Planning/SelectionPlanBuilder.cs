@@ -3,7 +3,9 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Planning;
+using XDrishti.Application.Abstractions.Selection;
 using XDrishti.Application.Filings;
+using XDrishti.Application.Selection;
 using XDrishti.Application.Sizing;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Planning;
@@ -27,7 +29,8 @@ internal sealed class SelectionPlanBuilder(
     FillConstraints? fillConstraints = null,
     PlanEventFilter? eventFilter = null,
     IAutoScopeSource? scopeSource = null,
-    ISizingInputs? sizing = null) : IPlanBuilder
+    ISizingInputs? sizing = null,
+    IBasketSettingsStore? basketSettings = null) : IPlanBuilder
 {
     public const string BuilderId = "selection";
 
@@ -104,11 +107,24 @@ internal sealed class SelectionPlanBuilder(
 
         var accountRisk = ctx.Accounts.Where(a => a.Mode == Domain.Accounts.TradingMode.Paper && a.RiskPerTradePct is { } r && double.IsFinite(r) && r > 0).Select(a => a.RiskPerTradePct!.Value).ToList();
         double? ticketRisk = accountRisk.Count == 0 ? null : accountRisk.Max() * smart.RiskMultiplier;
-        var fill = PortfolioFiller.Fill(
-            smart.Primary.Select(r => Facts(r, ticketRisk, ctx)),
-            ctx.Book,
-            ctx.Correlations?.Matrix,
-            fillConstraints ?? new FillConstraints());
+        // BK-08: with the owner's cluster cap OFF (the default) nothing below changes: no clusters are built, no check runs, no text is written and the plan, its hash included, is what it was.
+        var constraints = fillConstraints ?? new FillConstraints();
+        var clusterSettings = basketSettings is null ? BasketSettings.Defaults : (await basketSettings.CurrentAsync(cancellationToken)).Settings;
+        var clusterCap = clusterSettings.MaxClusterRiskPct ?? constraints.MaxClusterRiskPct;
+        ClusterResult? clusters = null;
+        var candidatesForFill = smart.Primary.Select(r => Facts(r, ticketRisk, ctx)).ToList();
+        var book = ctx.Book;
+        if (clusterCap is { } cap)
+        {
+            constraints = constraints with { MaxClusterRiskPct = cap };
+            var symbols = candidatesForFill.Select(c => c.Symbol).Concat(ctx.Book?.Select(b => b.Symbol) ?? []).ToList();
+            clusters = CorrelationClusters.Compute(ctx.Correlations?.Matrix, symbols, new ClusterOptions(clusterSettings.ClusterRho));
+            BasketSettingsLog.ClustersBuilt(logger, request.ForDate, symbols.Count, clusters.Clusters.Count, clusters.Unknown.Count);
+            candidatesForFill = [.. candidatesForFill.Select(c => c with { ClusterId = ClusterIdOf(clusters, c.Symbol) })];
+            book = ctx.Book?.Select(b => b with { ClusterId = ClusterIdOf(clusters, b.Symbol) }).ToList();
+        }
+
+        var fill = PortfolioFiller.Fill(candidatesForFill, book, ctx.Correlations?.Matrix, constraints);
 
         // BK-10: the down-only scaling, once, after the fill. Without the inputs port (or with nothing to read) nothing changes.
         IReadOnlyList<FillDecision> taken = fill.Primary;
@@ -117,7 +133,7 @@ internal sealed class SelectionPlanBuilder(
         if (sizing is not null && fill.Primary.Count > 0)
         {
             var inputs = await sizing.ReadAsync(request.Session, request.ForDate, [.. fill.Primary.Select(d => new ContextInstrument(ids.GetValueOrDefault(d.Candidate.Symbol), d.Candidate.Symbol))], cancellationToken);
-            var all = SizeScaler.Apply([.. fill.Primary.Select(d => (d, drafts[Key(d.Candidate.Ranked.Merged.Winner.Candidate)].IndicativeEntry, drafts[Key(d.Candidate.Ranked.Merged.Winner.Candidate)].StopLevel))], ctx, inputs, smart.RiskMultiplier, (fillConstraints ?? new FillConstraints()).MaxTotalOpenRiskPct);
+            var all = SizeScaler.Apply([.. fill.Primary.Select(d => (d, drafts[Key(d.Candidate.Ranked.Merged.Winner.Candidate)].IndicativeEntry, drafts[Key(d.Candidate.Ranked.Merged.Winner.Candidate)].StopLevel))], ctx, inputs, smart.RiskMultiplier, constraints.MaxTotalOpenRiskPct);
             scaled = [.. all.Where(t => !t.IsReserved)];
             sizedOut = [.. all.Where(t => t.IsReserved)];
             taken = [.. scaled.Select(t => t.Decision)];
@@ -138,11 +154,11 @@ internal sealed class SelectionPlanBuilder(
                 notApplied.AddRange(scaled[i].Flags);
             }
 
-            items.Add(Item(items.Count + 1, TicketGroup.Primary, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, taken[i].Candidate.Ranked.Caveats, [], taken[i].Candidate.Ranked.AdvisoryPWin, notApplied, [.. wired[i].Standings, PlanWiring.IndicativeEntry, .. (ctx.Book is { Count: 0 } && !ctx.BookFromLedger ? [PlanWording.OpenBookAssumedEmpty] : (string[])[])], wired[i].Allocations, scaled.Count > 0 ? scaled[i].Note : null));
+            items.Add(Item(items.Count + 1, TicketGroup.Primary, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, taken[i].Candidate.Ranked.Caveats, ClusterReasons(taken[i], clusters, clusterCap), taken[i].Candidate.Ranked.AdvisoryPWin, notApplied, [.. wired[i].Standings, PlanWiring.IndicativeEntry, .. (ctx.Book is { Count: 0 } && !ctx.BookFromLedger ? [PlanWording.OpenBookAssumedEmpty] : (string[])[])], wired[i].Allocations, scaled.Count > 0 ? scaled[i].Note : null));
         }
 
         var reserve = smart.Reserve.Select(r => new ReserveEntry(r.Ranked, [r.Code], false))
-            .Concat(fill.Reserve.Select(d => new ReserveEntry(d.Candidate.Ranked, Codes(d), true)))
+            .Concat(fill.Reserve.Select(d => new ReserveEntry(d.Candidate.Ranked, [.. Codes(d), .. ClusterReasons(d, clusters, clusterCap)], true)))
             .Concat(sizedOut.Select(t => new ReserveEntry(t.Decision.Candidate.Ranked, t.ReserveReasons!, true)))
             .OrderBy(x => x.Ranked.Rank).ThenBy(x => x.Ranked.Merged.Winner.Candidate.Symbol, StringComparer.Ordinal).ThenBy(x => x.Ranked.Merged.Winner.Candidate.Cell.Key, StringComparer.Ordinal);
         foreach (var (ranked, reasons, filled) in reserve)
@@ -154,7 +170,7 @@ internal sealed class SelectionPlanBuilder(
         foreach (var d in fill.Rejected)
         {
             var winner = d.Candidate.Ranked.Merged.Winner;
-            items.Add(Item(items.Count + 1, TicketGroup.Rejected, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, d.Candidate.Ranked.Caveats, Codes(d), d.Candidate.Ranked.AdvisoryPWin, Applied(always, flagCodes, filled: true, sized: false), [], []));
+            items.Add(Item(items.Count + 1, TicketGroup.Rejected, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, d.Candidate.Ranked.Caveats, [.. Codes(d), .. ClusterReasons(d, clusters, clusterCap)], d.Candidate.Ranked.AdvisoryPWin, Applied(always, flagCodes, filled: true, sized: false), [], []));
         }
 
         foreach (var held in selection.NotEligible)
@@ -207,6 +223,26 @@ internal sealed class SelectionPlanBuilder(
         var symbol = ranked.Merged.Winner.Candidate.Symbol;
         var facts = ctx.Instruments.GetValueOrDefault(symbol.ToUpperInvariant());
         return new FillCandidate(ranked, risk, facts?.Sector, facts?.Baskets, facts?.HeldLong);
+    }
+
+    private static string? ClusterIdOf(ClusterResult clusters, string symbol) => clusters.Of(symbol) is { CorrelationUnknown: false } c ? c.Id : null;
+
+    // BK-08 criterion 6: the cluster, its open risk and the cap in words ("unknown correlation" when it could not be told). Only when the owner's cap is ON; no checklist check is added.
+    private static List<string> ClusterReasons(FillDecision decision, ClusterResult? clusters, double? cap)
+    {
+        if (clusters is null || cap is not { } limit)
+        {
+            return [];
+        }
+
+        var cluster = clusters.Of(decision.Candidate.Symbol);
+        var check = decision.Checks.FirstOrDefault(c => c.Code == FillCodes.ClusterCap);
+        if (cluster is null || cluster.CorrelationUnknown || check?.Outcome == FilterOutcome.Unavailable || check?.Value is not { } risk)
+        {
+            return [string.Create(CultureInfo.InvariantCulture, $"cluster of {decision.Candidate.Symbol}: unknown correlation (its own or an open position's), cap {limit:0.###}%")];
+        }
+
+        return [string.Create(CultureInfo.InvariantCulture, $"cluster {cluster.MembersText}: open risk {risk:0.###}% of cap {limit:0.###}%")];
     }
 
     private static List<string> Codes(FillDecision decision)

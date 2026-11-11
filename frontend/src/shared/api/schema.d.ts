@@ -5661,6 +5661,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/selection/basket-settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The basket settings in force (the gate's breadth source, tracked by default or basket:<id>; the cap on open risk per correlation cluster, percent of capital, off by default; the cluster cut, 0.70) with the version, the newest loosening change and the latest 50 changes (key, old and new value, direction tighten, loosen or neutral, actor, time, hash). Read only */
+    get: operations['GetBasketSettings'];
+    /** The owner changes the basket settings (breadthSource tracked or basket:<id>, maxClusterRiskPct above 0 up to 100 or clearCap true to turn the cap off, clusterRho 0.1 to 1.0); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row with its direction. 400 selection.invalid, 403 selection.owner_only, 404 selection.basket_not_found, 409 selection.stale */
+    put: operations['ChangeBasketSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/market/basket-context': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored daily context of one basket (basket, optional from and to as yyyy-MM-dd; the newest 400 rows, newest first): members, voters, the 20, 50 and 200 day breadth, advance and new-high shares, dispersion, average correlation, state and membership basis (point_in_time or single_snapshot). Descriptive only; read only */
+    get: operations['GetBasketContext'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/universe/settings': {
     parameters: {
       query?: never;
@@ -7755,6 +7790,37 @@ export interface components {
       /** Format: double */
       budgetPct: number;
     };
+    /** @description One stored day of a basket's context. A figure that is not a number is null; `state` is value or insufficient; `membershipBasis` is point_in_time or single_snapshot (never presented as point in time). */
+    BasketContextDay: {
+      /** Format: date */
+      asOf: string;
+      /** Format: int32 */
+      nMembers: number;
+      /** Format: int32 */
+      nVoters: number;
+      /** Format: double */
+      b20: null | number;
+      /** Format: double */
+      b50: null | number;
+      /** Format: double */
+      b200: null | number;
+      /** Format: double */
+      adShare: null | number;
+      /** Format: double */
+      newHighShare: null | number;
+      /** Format: double */
+      dispersion: null | number;
+      /** Format: double */
+      rhoBar: null | number;
+      state: string;
+      membershipBasis: string;
+    };
+    /** @description The newest stored rows of one basket (at most 400), newest first. Descriptive only: nothing here is a signal. */
+    BasketContextView: {
+      /** Format: uuid */
+      basketId: string;
+      items: components['schemas']['BasketContextDay'][];
+    };
     /** @description What a fetch run did, one outcome per source it checked. */
     BasketFetchRun: {
       outcomes: components['schemas']['FetchOutcomeView'][];
@@ -7918,6 +7984,54 @@ export interface components {
       budgets: components['schemas']['BasketBudgetView'][];
       notice: string;
       history: components['schemas']['BudgetChangeView'][];
+    };
+    /** @description One change of a basket setting in the history. */
+    BasketSettingChangeView: {
+      /** Format: int64 */
+      id: number;
+      key: string;
+      oldValue: string;
+      newValue: string;
+      direction: string;
+      actor: string;
+      /** Format: date-time */
+      changedAt: string;
+      hash: string;
+    };
+    /** @description The owner change of the basket settings (BK-08). A value left out stays as it is; clearCap true turns the cluster cap off. The password is needed for every change. The actor is never taken from the body. */
+    BasketSettingsChangeBody: {
+      breadthSource: null | string;
+      /** Format: double */
+      maxClusterRiskPct: null | number;
+      clearCap: null | boolean;
+      /** Format: double */
+      clusterRho: null | number;
+      password: null | string;
+    };
+    /** @description The basket settings in force with their history (newest first, the latest 50). With no row everything is OFF: the gate reads the tracked set's breadth and no cap on open risk per correlation cluster applies. */
+    BasketSettingsView: {
+      /** @description `gate.breadth_source`: `tracked` or `basket:&lt;id&gt;`. */
+      breadthSource: string;
+      /**
+       * Format: double
+       * @description `selection.max_cluster_risk_pct`, percent of capital; null is OFF.
+       */
+      maxClusterRiskPct: null | number;
+      /**
+       * Format: double
+       * @description `selection.cluster_rho`.
+       */
+      clusterRho: number;
+      /**
+       * Format: int64
+       * @description The newest row id (0 when none).
+       */
+      version: number;
+      /** @description Advisory, no order. */
+      notice: string;
+      latestLoosening: null | components['schemas']['BasketSettingChangeView'];
+      /** @description The changes, newest first. */
+      history: components['schemas']['BasketSettingChangeView'][];
     };
     /** @description The state of a system basket's file (`reason` = the short reason of the newest rejected or failed fetch while the state is rejected or failed): `state` never · ok · stale · rejected · failed; `unmatched` = members of the last applied or checked list that are not in the instrument list ("N members not in your instrument list"). */
     BasketSourceSummary: {
@@ -38431,6 +38545,137 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetBasketSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketSettingsView'];
+        };
+      };
+    };
+  };
+  ChangeBasketSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BasketSettingsChangeBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketSettingsView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetBasketContext: {
+    parameters: {
+      query?: {
+        basket?: string;
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketContextView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
         headers: {
           [name: string]: unknown;
         };
