@@ -7,16 +7,18 @@ interface EmptyMembersProps {
   asOf: string | null;
   /** A portfolio basket: its members are the account's holdings, nothing to add. */
   readOnly?: boolean;
+  /** Replaces the portfolio wording of a read-only basket (a stored system basket has no holdings). */
+  readOnlyText?: string;
   onAdd: () => void;
 }
 
 /** Nothing in the list: an empty basket invites adding; a look-back date says there was nothing then. */
-export function EmptyMembers({ asOf, readOnly = false, onAdd }: EmptyMembersProps) {
+export function EmptyMembers({ asOf, readOnly = false, readOnlyText, onAdd }: EmptyMembersProps) {
   if (readOnly) {
     return (
       <Box sx={{ p: 4, textAlign: 'center' }}>
         <Typography color="text.secondary">
-          No holdings in this bucket yet — they arrive when the account&apos;s portfolio is imported
+          {readOnlyText ?? "No holdings in this bucket yet — they arrive when the account's portfolio is imported"}
         </Typography>
       </Box>
     );

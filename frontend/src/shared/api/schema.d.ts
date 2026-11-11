@@ -828,6 +828,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/baskets/system/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Which owner-act switches are on (read only): fetchEnabled (Baskets:System:Fetch:Enabled, index lists), listFetchEnabled (Baskets:System:Lists:FetchEnabled, the NSE F&O files), derivedEnabled (Baskets:System:Derived:Enabled); the Baskets screen disables its Fetch now and Recompute now buttons from them */
+    get: operations['GetSystemBasketSettings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/baskets/system/derived/refresh': {
     parameters: {
       query?: never;
@@ -7708,7 +7725,7 @@ export interface components {
       notice: string;
       history: components['schemas']['BudgetChangeView'][];
     };
-    /** @description The state of a system basket's file: `state` never · ok · stale · rejected · failed; `unmatched` = members of the last applied or checked list that are not in the instrument list ("N members not in your instrument list"). */
+    /** @description The state of a system basket's file (`reason` = the short reason of the newest rejected or failed fetch while the state is rejected or failed): `state` never · ok · stale · rejected · failed; `unmatched` = members of the last applied or checked list that are not in the instrument list ("N members not in your instrument list"). */
     BasketSourceSummary: {
       state: string;
       /** Format: date-time */
@@ -7717,8 +7734,9 @@ export interface components {
       lastCheckedAt: null | string;
       /** Format: int32 */
       unmatched: number;
+      reason?: null | string;
     };
-    /** @description The source of a system basket and its last 20 fetches (no raw file). `enabled` = the owner has turned this file on. */
+    /** @description The source of a system basket and its last 20 fetches (no raw file). `enabled` = the owner has turned this file on; `unmatchedSymbols` = the symbols of the last checked list that are not in the instrument list (the "N members not in your instrument list"). */
     BasketSourceView: {
       /** Format: uuid */
       basketId: string;
@@ -7738,6 +7756,7 @@ export interface components {
       /** Format: int32 */
       expectedMax: number;
       fetches: components['schemas']['FetchOutcomeView'][];
+      unmatchedSymbols?: null | string[];
     };
     /** @description One version with its scores, named exclusions (`universeSize = members + belowThreshold + excluded`) and the parameters it was computed with. */
     BasketVersionDetail: {
@@ -7750,10 +7769,12 @@ export interface components {
         [key: string]: number;
       };
     };
+    /** @description The versions of a derived basket, newest first, with the definition they were formed by. */
     BasketVersionPage: {
       items: components['schemas']['BasketVersionSummary'][];
       /** Format: int32 */
       total: number;
+      definition?: null | components['schemas']['DerivedDefinitionInfo'];
     };
     /** @description One version of a derived basket in the list (`outcome`: applied, not_formed; `provenance`: derived or recomputed). */
     BasketVersionSummary: {
@@ -10876,6 +10897,18 @@ export interface components {
       universe: number;
       /** Format: int32 */
       excluded: number;
+    };
+    /**
+     * @description What a derived basket is, from the catalogue: its name, the rule in one line, the one-line "what this basket is NOT" and the unit of its score
+     *     (`ratio` printed with 2 decimals, `percent` a share printed as "2.10 %", `rupees` printed in crore).
+     */
+    DerivedDefinitionInfo: {
+      /** Format: int32 */
+      no: number;
+      name: string;
+      description: string;
+      notThis: string;
+      unit: string;
     };
     /** @description The switch and parameters of a derived basket after an owner act. */
     DerivedDefinitionView: {
@@ -22862,6 +22895,12 @@ export interface components {
       /** Format: date-time */
       retryAt?: null | string;
     };
+    /** @description Which owner-act switches are on (BK-04): `fetchEnabled` = Baskets:System:Fetch:Enabled (index lists), `listFetchEnabled` = Baskets:System:Lists:FetchEnabled (the two NSE F&amp;O files), `derivedEnabled` = Baskets:System:Derived:Enabled. The screen disables its buttons from these; the API stays the authority. */
+    SystemBasketSettingsView: {
+      fetchEnabled: boolean;
+      listFetchEnabled: boolean;
+      derivedEnabled: boolean;
+    };
     /** @description The system card (spec CF-11 D5). */
     SystemScorecardView: {
       /**
@@ -26186,6 +26225,26 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetSystemBasketSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SystemBasketSettingsView'];
         };
       };
     };

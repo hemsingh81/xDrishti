@@ -5,6 +5,7 @@ import LockIcon from '@mui/icons-material/LockOutlined';
 import { Button, Chip, Stack, Typography } from '@mui/material';
 import type { Basket } from '@/shared/api';
 import { AsOfField } from './AsOfField';
+import { isStored } from '../lib/system';
 import { BasketDot } from './BasketDot';
 
 interface BasketHeaderProps {
@@ -18,6 +19,8 @@ interface BasketHeaderProps {
 
 export const portfolioNote =
   "Portfolio — follows the account's holdings; read only. Copy instruments to one of your baskets.";
+const systemNote = (kind: string) =>
+  `System ${kind} basket: kept by the system and read only. Copy instruments to one of your baskets.`;
 export const manualNote = 'Manual — you add and remove instruments.';
 
 /**
@@ -27,6 +30,7 @@ export const manualNote = 'Manual — you add and remove instruments.';
  */
 export function BasketHeader({ basket, asOf, onAsOfChange, onEdit, onHistory, onArchive }: BasketHeaderProps) {
   const system = basket.system;
+  const stored = isStored(basket);
   return (
     <Stack spacing={0.75} sx={{ px: 2, pt: 1.5, pb: 1.25 }}>
       <Stack
@@ -39,9 +43,19 @@ export function BasketHeader({ basket, asOf, onAsOfChange, onEdit, onHistory, on
             {basket.name}
           </Typography>
         </Stack>
-        {system ? (
+        {system && !stored && (
           <Chip size="small" variant="outlined" icon={<LockIcon />} label="Portfolio · read only" />
-        ) : (
+        )}
+        {stored && (
+          <Stack direction="row" sx={{ gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            <AsOfField value={asOf} onChange={onAsOfChange} />
+            <Button size="small" variant="outlined" startIcon={<HistoryIcon />} onClick={onHistory}>
+              History
+            </Button>
+            <Chip size="small" variant="outlined" icon={<LockIcon />} label={`${basket.kind} · read only`} />
+          </Stack>
+        )}
+        {!system && (
           <Stack direction="row" sx={{ gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
             <AsOfField value={asOf} onChange={onAsOfChange} />
             <Button size="small" variant="outlined" startIcon={<HistoryIcon />} onClick={onHistory}>
@@ -57,7 +71,15 @@ export function BasketHeader({ basket, asOf, onAsOfChange, onEdit, onHistory, on
         )}
       </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>
-        {system ? portfolioNote : basket.description?.trim() ? basket.description : manualNote}
+        {stored
+          ? basket.description?.trim()
+            ? basket.description
+            : systemNote(basket.kind)
+          : system
+            ? portfolioNote
+            : basket.description?.trim()
+              ? basket.description
+              : manualNote}
       </Typography>
     </Stack>
   );

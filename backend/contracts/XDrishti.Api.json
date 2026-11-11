@@ -2727,6 +2727,27 @@
         }
       }
     },
+    "/api/baskets/system/settings": {
+      "get": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "Which owner-act switches are on (read only): fetchEnabled (Baskets:System:Fetch:Enabled, index lists), listFetchEnabled (Baskets:System:Lists:FetchEnabled, the NSE F&O files), derivedEnabled (Baskets:System:Derived:Enabled); the Baskets screen disables its Fetch now and Recompute now buttons from them",
+        "operationId": "GetSystemBasketSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemBasketSettingsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/baskets/system/derived/refresh": {
       "post": {
         "tags": [
@@ -26276,9 +26297,15 @@
           "unmatched": {
             "type": "integer",
             "format": "int32"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "The state of a system basket's file: `state` never · ok · stale · rejected · failed; `unmatched` = members of the last applied or checked list that are not in the instrument list (\"N members not in your instrument list\")."
+        "description": "The state of a system basket's file (`reason` = the short reason of the newest rejected or failed fetch while the state is rejected or failed): `state` never · ok · stale · rejected · failed; `unmatched` = members of the last applied or checked list that are not in the instrument list (\"N members not in your instrument list\")."
       },
       "BasketSourceView": {
         "required": [
@@ -26350,9 +26377,18 @@
             "items": {
               "$ref": "#/components/schemas/FetchOutcomeView"
             }
+          },
+          "unmatchedSymbols": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           }
         },
-        "description": "The source of a system basket and its last 20 fetches (no raw file). `enabled` = the owner has turned this file on."
+        "description": "The source of a system basket and its last 20 fetches (no raw file). `enabled` = the owner has turned this file on; `unmatchedSymbols` = the symbols of the last checked list that are not in the instrument list (the \"N members not in your instrument list\")."
       },
       "BasketVersionDetail": {
         "required": [
@@ -26409,8 +26445,19 @@
           "total": {
             "type": "integer",
             "format": "int32"
+          },
+          "definition": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DerivedDefinitionInfo"
+              }
+            ]
           }
-        }
+        },
+        "description": "The versions of a derived basket, newest first, with the definition they were formed by."
       },
       "BasketVersionSummary": {
         "required": [
@@ -34573,6 +34620,35 @@
           }
         },
         "description": "What one basket did in a run: `applied`, `unchanged` or `skipped` (with a reason)."
+      },
+      "DerivedDefinitionInfo": {
+        "required": [
+          "no",
+          "name",
+          "description",
+          "notThis",
+          "unit"
+        ],
+        "type": "object",
+        "properties": {
+          "no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "notThis": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          }
+        },
+        "description": "What a derived basket is, from the catalogue: its name, the rule in one line, the one-line \"what this basket is NOT\" and the unit of its score\n(`ratio` printed with 2 decimals, `percent` a share printed as \"2.10 %\", `rupees` printed in crore)."
       },
       "DerivedDefinitionView": {
         "required": [
@@ -67094,6 +67170,26 @@
           }
         },
         "description": "The refresh settings of an account and its latest run. Mode \"off\" or \"daily\"; NextRunAt is null when the mode is off. FirstImportDate is the date holdings\nget when they are imported without a date of their own; HasHoldings is true once the account has any holding (the first import has happened). Running is\ntrue while a sync or import of the account is in progress. The health (ADR 0027): `ConsecutiveFailedDays` are the days in a row whose last attempt failed (0 when the latest succeeded), `LastFailureReason` a code (`unavailable`, `rate_limited`,\n`interrupted`, `rejected`, `token_expired`, `token_refused`, `not_connected`, `unexpected`; null while healthy), `Attempts` the failed attempts of the day of the latest failure and `RetryAt` when the next quiet retry is due (null when none is pending)."
+      },
+      "SystemBasketSettingsView": {
+        "required": [
+          "fetchEnabled",
+          "listFetchEnabled",
+          "derivedEnabled"
+        ],
+        "type": "object",
+        "properties": {
+          "fetchEnabled": {
+            "type": "boolean"
+          },
+          "listFetchEnabled": {
+            "type": "boolean"
+          },
+          "derivedEnabled": {
+            "type": "boolean"
+          }
+        },
+        "description": "Which owner-act switches are on (BK-04): `fetchEnabled` = Baskets:System:Fetch:Enabled (index lists), `listFetchEnabled` = Baskets:System:Lists:FetchEnabled (the two NSE F&amp;O files), `derivedEnabled` = Baskets:System:Derived:Enabled. The screen disables its buttons from these; the API stays the authority."
       },
       "SystemScorecardView": {
         "required": [

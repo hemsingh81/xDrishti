@@ -22,7 +22,8 @@ internal sealed class GetBasketSourceHandler(IBasketSourceStore sources) : IQuer
 
         var s = found[0];
         var fetches = await sources.RecentFetchesAsync(s.BasketId, Recent, cancellationToken);
+        var unmatched = await sources.UnmatchedSymbolsAsync(s.BasketId, cancellationToken);
         return Result.Success(new BasketSourceView(
-            s.BasketId, s.Name, s.FileName, s.SourceUrl, s.Enabled, s.State, s.LastOkAt, s.LastCheckedAt, s.NextAttemptAt, s.ExpectedMin, s.ExpectedMax, fetches));
+            s.BasketId, s.Name, s.FileName, s.SourceUrl, s.Enabled, s.State, s.LastOkAt, s.LastCheckedAt, s.NextAttemptAt, s.ExpectedMin, s.ExpectedMax, fetches, unmatched));
     }
 }
