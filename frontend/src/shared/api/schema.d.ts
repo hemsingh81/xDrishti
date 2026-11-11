@@ -5559,6 +5559,75 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/selection/sizing-settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The sizing settings in force (volatility targeting and the capacity cap, both OFF by default, the volatility floor 0.5, the capacity share 0.005, the budget minimum fit 0.5) with the version, the newest loosening change and the latest 50 changes (key, old and new value, direction tighten or loosen, actor, time, hash). Sizing only scales a suggestion down. Read only */
+    get: operations['GetSizingSettings'];
+    /** The owner changes the sizing settings (volTargetEnabled, floor 0.25 to 1.0, capacityEnabled, capacityPct above 0 and at most 0.005, the one capacity share of the app: it can only be tightened, minFit 0.25 to 1.0, the lowest share of its size a basket budget may cut a candidate to); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row with its direction. 400 selection.invalid, 403 selection.owner_only, 409 selection.stale */
+    put: operations['ChangeSizingSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/selection/basket-risk-budgets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The basket risk budgets in force (a basket's share, 1 to 100 percent, of the day's total open risk limit; a basket with no row has no budget) and the latest 50 changes. Read only */
+    get: operations['GetBasketRiskBudgets'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/selection/basket-risk-budgets/{basketId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** The owner sets one basket's risk budget (budgetPct 1 to 100, or null to remove it) with the password on EVERY change. Raising or removing a budget is recorded as loosen. 400 selection.invalid, 403 selection.owner_only, 404 selection.basket_not_found, 409 selection.stale */
+    put: operations['ChangeBasketRiskBudget'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/sizing-study': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What the stored closed trades of one run (run, the 64-character key) would have done with the down-only volatility scale, on the same trades: cumulative net R, maximum drawdown and total with and without it, the two halves (a half below 30 trades is insufficient), the trades with no scale. Optional from and to (entry dates) and floor (0.25, 0.5 or 0.75 as a labelled sensitivity; left out it is the stored floor). Descriptive, before costs, recommends nothing, writes nothing, never scales above 1. 422 reports.invalid or reports.too_large */
+    get: operations['GetSizingStudy'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/selection/event-filter': {
     parameters: {
       query?: never;
@@ -7559,6 +7628,13 @@ export interface components {
       /** @description Members left out, each with its reason. */
       excluded: components['schemas']['BenchmarkExclusionView'][];
     };
+    /** @description The budget of one basket: its share of the total open risk limit, in percent. */
+    BasketBudgetView: {
+      /** Format: uuid */
+      basketId: string;
+      /** Format: double */
+      budgetPct: number;
+    };
     /** @description What a fetch run did, one outcome per source it checked. */
     BasketFetchRun: {
       outcomes: components['schemas']['FetchOutcomeView'][];
@@ -7636,6 +7712,18 @@ export interface components {
     /** @description Every active basket exactly once, in the wanted order. */
     BasketOrderInput: {
       ids: null | string[];
+    };
+    /** @description The owner's change of one basket's risk budget: 1 to 100 percent of the total open risk limit, or null to remove it. The password is needed for every change. The actor is never taken from the body. */
+    BasketRiskBudgetChangeBody: {
+      /** Format: double */
+      budgetPct: null | number;
+      password: null | string;
+    };
+    /** @description The basket budgets in force (a basket with none has no budget) and their history, newest first (the latest 50). */
+    BasketRiskBudgetsView: {
+      budgets: components['schemas']['BasketBudgetView'][];
+      notice: string;
+      history: components['schemas']['BudgetChangeView'][];
     };
     /** @description The state of a system basket's file (`reason` = the short reason of the newest rejected or failed fetch while the state is rejected or failed): `state` never · ok · stale · rejected · failed; `unmatched` = members of the last applied or checked list that are not in the instrument list ("N members not in your instrument list"). */
     BasketSourceSummary: {
@@ -8231,6 +8319,20 @@ export interface components {
       /** Format: uuid */
       accountId: null | string;
       accountName: null | string;
+    };
+    /** @description One change of a basket budget; BudgetPct null means the budget was removed. */
+    BudgetChangeView: {
+      /** Format: int64 */
+      id: number;
+      /** Format: uuid */
+      basketId: string;
+      /** Format: double */
+      budgetPct: null | number;
+      direction: string;
+      actor: string;
+      /** Format: date-time */
+      changedAt: string;
+      hash: string;
     };
     /**
      * @description A date of the trading calendar (ADR 0017 §1). `kind`: holiday · special. A special session has `sessionFrom` and `sessionTo` (`HH:mm`, India time,
@@ -18131,6 +18233,7 @@ export interface components {
       /** @description Size per account. */
       allocations: components['schemas']['PlanAllocationView'][];
       levels?: null | components['schemas']['TicketLevelsView'];
+      sizing?: null | components['schemas']['PlanSizingNote'];
     };
     /** @description The journal of one plan. */
     PlanJournalView: {
@@ -18364,6 +18467,46 @@ export interface components {
        * @description End.
        */
       finishedAt: string;
+    };
+    /** @description What the down-only size scaling did to a ticket (spec BK-10, AC 10), stored as JSON on the plan item. Every figure is a factor at most 1 or a count; none is an amount of capital. */
+    PlanSizingNote: {
+      /**
+       * Format: double
+       * @description The volatility scale applied (floor to 1.0); null when not applied or unavailable.
+       */
+      volScale: null | number;
+      /**
+       * Format: double
+       * @description The gate's scale, 0.75 in reduced mode, else 1.
+       */
+      gateScale: number;
+      /**
+       * Format: double
+       * @description min(volatility scale, gate scale) times the budget ratio, at most 1.
+       */
+      factor: number;
+      /**
+       * Format: int64
+       * @description The capacity cap in shares; null when off or unavailable.
+       */
+      capacityShares: null | number;
+      /**
+       * Format: double
+       * @description The room left in the tightest basket budget, percent of capital; null when there is no budget or it is unavailable.
+       */
+      budgetRoom: null | number;
+      /**
+       * Format: double
+       * @description Share of that budget used after this ticket; null as above.
+       */
+      budgetUsesPct: null | number;
+      /**
+       * Format: int64
+       * @description The newest settings row id the scaling read (0 when none).
+       */
+      settingsVersion: number;
+      /** @description The same in words, for the ticket. */
+      text: string;
     };
     /** @description A plan as the API shows it (P7-03, ADR 0083): header, current state, the sentences it carries as data, and for one plan the tickets and the trail. */
     PlanView: {
@@ -22154,6 +22297,131 @@ export interface components {
       /** Format: date-time */
       createdAt: string;
     };
+    /** @description One change of a sizing setting (or a budget) in the history. */
+    SizingChangeView: {
+      /** Format: int64 */
+      id: number;
+      key: string;
+      oldValue: string;
+      newValue: string;
+      direction: string;
+      actor: string;
+      /** Format: date-time */
+      changedAt: string;
+      hash: string;
+    };
+    /** @description The owner's change of the sizing settings. A value left out stays as it is. The password is needed for every change. The actor is never taken from the body. */
+    SizingSettingsChangeBody: {
+      volTargetEnabled: null | boolean;
+      /** Format: double */
+      floor: null | number;
+      capacityEnabled: null | boolean;
+      /** Format: double */
+      capacityPct: null | number;
+      password: null | string;
+      /** Format: double */
+      minFit?: null | number;
+    };
+    /** @description The sizing settings in force with their history (newest first, the latest 50). With no row everything is OFF. SizingChangeView? SizingSettingsView.LatestLoosening is the newest change that can only raise a suggested quantity or remove a limit, or null when none was ever made. */
+    SizingSettingsView: {
+      /** @description `sizing.vol_target.enabled`. */
+      volTargetEnabled: boolean;
+      /**
+       * Format: double
+       * @description `sizing.vol_target.floor`.
+       */
+      floor: number;
+      /** @description `sizing.capacity.enabled`. */
+      capacityEnabled: boolean;
+      /**
+       * Format: double
+       * @description `sizing.capacity.pct`.
+       */
+      capacityPct: number;
+      /**
+       * Format: double
+       * @description `sizing.budget.min_fit`.
+       */
+      minFit: number;
+      /**
+       * Format: int64
+       * @description The newest settings row id (0 when none).
+       */
+      version: number;
+      /** @description Down-only, advisory, no order. */
+      notice: string;
+      latestLoosening: null | components['schemas']['SizingChangeView'];
+      /** @description The changes, newest first. */
+      history: components['schemas']['SizingChangeView'][];
+    };
+    /** @description What the same stored trades would have returned with and without the scale (descriptive, before costs). Nothing here is a recommendation. */
+    SizingStudyResult: {
+      /**
+       * Format: int32
+       * @description Number of trades.
+       */
+      trades: number;
+      /**
+       * Format: double
+       * @description Total R as stored.
+       */
+      unscaledTotalR: number;
+      /**
+       * Format: double
+       * @description Total R with each trade's R times its scale.
+       */
+      scaledTotalR: number;
+      /**
+       * Format: double
+       * @description Largest fall of the cumulative R from a peak (the start is a peak of 0), as stored.
+       */
+      unscaledMaxDrawdownR: number;
+      /**
+       * Format: double
+       * @description The same with the scale.
+       */
+      scaledMaxDrawdownR: number;
+      /**
+       * Format: double
+       * @description Change of the maximum drawdown in percent of the unscaled one (negative is lower); null when the unscaled one is 0.
+       */
+      drawdownChangePct: null | number;
+      /**
+       * Format: double
+       * @description Change of the total R in percent of the unscaled one (negative is lower); null when the unscaled one is 0.
+       */
+      totalChangePct: null | number;
+      /** @description The first and the second half of the trades in decision order. */
+      halves: components['schemas']['StudyHalf'][];
+      /** @description The words, for example `max drawdown 20 % lower, total R 40 % lower`. */
+      summary: string;
+    };
+    /** @description What the stored trades would have done with the down scale (read only, descriptive, before costs, same trades). */
+    SizingStudyView: {
+      /** @description The run key. */
+      run: string;
+      /**
+       * Format: double
+       * @description The floor used.
+       */
+      floor: number;
+      /** @description `setting` (the stored floor) or `sensitivity` (one of 0.25, 0.5, 0.75 asked for). */
+      floorSource: string;
+      /**
+       * Format: int32
+       * @description Trades with no scale (too little history): taken at scale 1.
+       */
+      withoutScale: number;
+      /**
+       * Format: int32
+       * @description Closed trades with no net R (a gross run): left out.
+       */
+      skippedNoNetR: number;
+      /** @description The comparison. */
+      result: components['schemas']['SizingStudyResult'];
+      /** @description Descriptive, before costs, same trades; nothing here is a recommendation. */
+      caveat: string;
+    };
     /** @description The owner's skip, with an optional plain-text reason of at most 200 characters. */
     SkipTicketBody: {
       reason: null | string;
@@ -22461,6 +22729,26 @@ export interface components {
       createdAt: string;
       text: string;
       problemsFree: boolean;
+    };
+    /** @description One half of the sizing study (a median split of the trades in decision order). */
+    StudyHalf: {
+      /**
+       * Format: int32
+       * @description Trades in the half.
+       */
+      trades: number;
+      /** @description True with at least 30 trades; otherwise the figures below are null. */
+      sufficient: boolean;
+      /**
+       * Format: int32
+       * @description -1, 0 or 1: the sign of the change of the maximum drawdown, scaled against unscaled (negative is a smaller drawdown).
+       */
+      drawdownSign: null | number;
+      /**
+       * Format: int32
+       * @description -1, 0 or 1: the sign of the change of the total R, scaled against unscaled.
+       */
+      totalSign: null | number;
     };
     /** @description One of the six sub-scores as the API sends it. */
     SubScoreView: {
@@ -37389,6 +37677,229 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetSizingSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SizingSettingsView'];
+        };
+      };
+    };
+  };
+  ChangeSizingSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SizingSettingsChangeBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SizingSettingsView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetBasketRiskBudgets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketRiskBudgetsView'];
+        };
+      };
+    };
+  };
+  ChangeBasketRiskBudget: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        basketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BasketRiskBudgetChangeBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketRiskBudgetsView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetSizingStudy: {
+    parameters: {
+      query?: {
+        run?: string;
+        from?: string;
+        to?: string;
+        floor?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SizingStudyView'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };

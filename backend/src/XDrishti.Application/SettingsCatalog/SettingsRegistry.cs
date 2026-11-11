@@ -50,6 +50,12 @@ public static class SettingsRegistry
         Stored("ml.auto_promote", "Promote models automatically", SettingTier.Advanced, "false"),
         Stored("ml.auto_rollback", "Roll models back automatically", SettingTier.Advanced, "false"),
         Stored("execution_enabled", "Global execution switch (owner only, password every change)", SettingTier.Advanced, "false"),
+        Stored("sizing.vol_target.enabled", "Scale suggestions down in unusually volatile shares (owner only, password every change)", SettingTier.Advanced, "false"),
+        Stored("sizing.vol_target.floor", "Lowest volatility scale, 0.25 to 1.0; raising it loosens (owner only, password every change)", SettingTier.Advanced, "0.5"),
+        Stored("sizing.budget.min_fit", "Lowest share of its size a basket budget may cut a candidate to, 0.25 to 1.0; lowering it loosens (owner only, password every change)", SettingTier.Advanced, "0.5"),
+        Stored("sizing.capacity.enabled", "Cap suggestions at a share of the 20-day traded value (owner only, password every change)", SettingTier.Advanced, "false"),
+        Stored("sizing.capacity.pct", "Capacity share of the 20-day traded value, at most the configured capacity share 0.005: tighten only (owner only, password every change)", SettingTier.Advanced, "0.005"),
+        Stored("sizing.basket_budgets", "Basket risk budgets, a share of the total open risk limit (owner only, password every change)", SettingTier.Advanced, null),
         Stored("options.backfill_stocks", "Frozen share order of the options backfill", SettingTier.Internal, null),
     ];
 

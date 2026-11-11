@@ -70,6 +70,20 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
     }
 
     [Fact]
+    public async Task The_structured_sizing_note_of_an_item_is_stored_and_read_back_and_an_item_without_one_reads_null()
+    {
+        var note = new PlanSizingNote(0.76, 0.75, 0.75, 100, 0.4, 100.0, 3, "sizing: test");
+        var plain = Item(2, TicketGroup.Reserve);
+        var noted = Item(1, TicketGroup.Primary) with { Sizing = note };
+
+        var published = await PublishAsync(Plan("plan-sizing-note", 1, noted, plain));
+
+        var items = await ItemsAsync(published.Id);
+        items[0].Item.Sizing.ShouldBe(note);
+        items[1].Item.Sizing.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Before_any_plan_the_list_is_empty_one_is_not_found_and_a_bad_limit_is_refused()
     {
         using var list = await Client.GetAsync(new Uri("/api/plans", UriKind.Relative), Ct);

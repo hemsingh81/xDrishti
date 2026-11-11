@@ -13,6 +13,11 @@ namespace XDrishti.Application.Planning;
 /// <param name="Standings">Codes for the evidence list: <c>allocation:{code}</c> for an account that got nothing, <c>checklist:{code}:{outcome}</c> for a check that is not a pass.</param>
 internal sealed record WiredTicket(IReadOnlyList<NewAllocation> Allocations, IReadOnlyList<string> Standings);
 
+/// <summary>The down-only scaling of one ticket (spec BK-10), looked up by symbol at the wiring.</summary>
+/// <param name="RiskFactor">Factor on the risk of the ticket, at most 1; the wiring takes the smaller of it and the gate's.</param>
+/// <param name="PoolCap">The most shares of the ticket's pool (the capacity cap); null for none.</param>
+internal sealed record TicketScale(double RiskFactor, long? PoolCap);
+
 /// <summary>
 /// Per-account allocation (P7-07) and the pre-trade checklist (P7-05) for the primary tickets, in plan order (spec P7-09, ADR 0092). Pure: everything comes in as arguments. Each ticket is sized against what the earlier tickets of the same plan
 /// already took from the account (risk and funds), so one account is not given more than its limits across the whole plan. An input with no data source is passed as null, which the allocator and the checklist read as unavailable, never as a pass.
@@ -28,7 +33,7 @@ internal static class PlanWiring
 
     private static readonly ChecklistLimits Limits = ChecklistLimits.Default;
 
-    public static IReadOnlyList<WiredTicket> Wire(IReadOnlyList<(FillCandidate Candidate, TicketDraft Draft)> primaries, PlanContext context, double riskMultiplier, Func<string, int?>? daysToResults = null)
+    public static IReadOnlyList<WiredTicket> Wire(IReadOnlyList<(FillCandidate Candidate, TicketDraft Draft)> primaries, PlanContext context, double riskMultiplier, Func<string, int?>? daysToResults = null, Func<string, TicketScale?>? scaleOf = null)
     {
         ArgumentNullException.ThrowIfNull(primaries);
         ArgumentNullException.ThrowIfNull(context);
@@ -37,13 +42,13 @@ internal static class PlanWiring
         var wired = new List<WiredTicket>(primaries.Count);
         foreach (var (candidate, draft) in primaries)
         {
-            wired.Add(WireOne(candidate, draft, context, riskMultiplier, addedRisk, addedCost, daysToResults));
+            wired.Add(WireOne(candidate, draft, context, riskMultiplier, addedRisk, addedCost, daysToResults, scaleOf?.Invoke(candidate.Symbol)));
         }
 
         return wired;
     }
 
-    private static WiredTicket WireOne(FillCandidate candidate, TicketDraft draft, PlanContext context, double riskMultiplier, Dictionary<Guid, double> addedRisk, Dictionary<Guid, double> addedCost, Func<string, int?>? daysToResults)
+    private static WiredTicket WireOne(FillCandidate candidate, TicketDraft draft, PlanContext context, double riskMultiplier, Dictionary<Guid, double> addedRisk, Dictionary<Guid, double> addedCost, Func<string, int?>? daysToResults, TicketScale? scale)
     {
         if (context.Accounts.Count == 0)
         {
@@ -52,14 +57,20 @@ internal static class PlanWiring
 
         var symbol = candidate.Symbol;
         var facts = context.Instruments.TryGetValue(symbol.ToUpperInvariant(), out var f) ? f : null;
-        var ticket = new AllocationTicket(symbol, candidate.Side, draft.IndicativeEntry, draft.StopLevel, Pool(draft), 1);
+        // BK-10: the scaling only lowers the factor (never above the gate's) and the pool; no scaling leaves both as they were.
+        if (scale is not null)
+        {
+            riskMultiplier = Math.Min(riskMultiplier, scale.RiskFactor);
+        }
+
+        var ticket = new AllocationTicket(symbol, candidate.Side, draft.IndicativeEntry, draft.StopLevel, Capped(Pool(draft), scale?.PoolCap), 1);
 
         // Two pools (spec P11-04): the paper accounts share the ticket's pool as before (output unchanged for a paper-only book); the manual-live accounts are sized separately, each cut by its ramp scale.
         var paper = PerAccountAllocator.Allocate(ticket, [.. context.Accounts.Where(a => a.Mode != TradingMode.ManualLive).Select(a => ToAllocationAccount(a, symbol, riskMultiplier, addedRisk, addedCost))]);
         var live = context.Accounts.Where(a => a.Mode == TradingMode.ManualLive).ToList();
         var result = live.Count == 0
             ? paper
-            : new AllocationResult([.. paper.Decisions, .. PerAccountAllocator.Allocate(ticket, [.. live.Select(a => ToAllocationAccount(a, symbol, riskMultiplier, addedRisk, addedCost))], PoolMode.Live).Decisions], paper.TicketQuantity);
+            : new AllocationResult([.. paper.Decisions, .. PerAccountAllocator.Allocate(LiveTicket(ticket, scale?.PoolCap, paper), [.. live.Select(a => ToAllocationAccount(a, symbol, riskMultiplier, addedRisk, addedCost))], PoolMode.Live).Decisions], paper.TicketQuantity);
         var standings = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var d in result.Decisions.Where(d => !d.IsAllocated))
         {
@@ -86,6 +97,12 @@ internal static class PlanWiring
 
         return new WiredTicket(AllocationRows.ToNew(result), [.. standings]);
     }
+
+    // BK-10: the capacity cap is for the whole ticket, so the live pool gets only what the paper accounts left of it (never a second full cap).
+    private static AllocationTicket LiveTicket(AllocationTicket ticket, long? cap, AllocationResult paper) =>
+        cap is { } c && ticket.Quantity is { } pool ? ticket with { Quantity = (int)Math.Max(0, Math.Min(pool, c - paper.Allocated.Sum(d => (long)d.Quantity))) } : ticket;
+
+    private static int? Capped(int? pool, long? cap) => pool is { } p && cap is { } c ? (int)Math.Min(p, c) : pool;
 
     // The ticket's pool: the share of the average daily volume the checklist allows (turnover / close), so the split can never hand out more than the liquidity check would pass. Unknown turnover or entry: no pool, nothing allocated.
     private static int? Pool(TicketDraft draft)

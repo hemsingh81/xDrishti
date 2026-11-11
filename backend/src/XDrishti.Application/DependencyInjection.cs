@@ -954,6 +954,13 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetCellStateQuery, Result<CellStateView>>, GetCellStateHandler>();
         services.AddScoped<IQueryHandler<ListPlansQuery, Result<IReadOnlyList<PlanView>>>, ListPlansHandler>(); // the plan record (P7-03, ADR 0083)
         services.AddScoped<IQueryHandler<GetPlanQuery, Result<PlanView>>, GetPlanHandler>();
+        // BK-10: the down-only size scaling (owner settings and basket budgets, the inputs of the plan, the study). All OFF until the owner turns a setting on; nothing here places an order.
+        services.AddScoped<XDrishti.Application.Abstractions.Planning.ISizingInputs, XDrishti.Application.Sizing.SizingInputSource>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.Sizing.GetSizingSettingsQuery, XDrishti.Application.Sizing.SizingSettingsView>, XDrishti.Application.Sizing.GetSizingSettingsHandler>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.Sizing.GetBasketRiskBudgetsQuery, XDrishti.Application.Sizing.BasketRiskBudgetsView>, XDrishti.Application.Sizing.GetBasketRiskBudgetsHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Sizing.ChangeSizingSettingsCommand, XDrishti.Application.Sizing.SizingSettingsView>, XDrishti.Application.Sizing.ChangeSizingSettingsHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Sizing.ChangeBasketRiskBudgetCommand, XDrishti.Application.Sizing.BasketRiskBudgetsView>, XDrishti.Application.Sizing.ChangeBasketRiskBudgetHandler>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.Sizing.GetSizingStudyQuery, Result<XDrishti.Application.Sizing.SizingStudyView>>, XDrishti.Application.Sizing.GetSizingStudyHandler>();
         services.AddScoped<IAutoScopeSource, AutoScopeResolver>(); // the stored auto scope with its baskets expanded, read by the selection builder at the nightly run (AU-16)
         services.AddScoped<IQueryHandler<GetAutoScopeQuery, AutoScopeView>, GetAutoScopeHandler>();
         services.AddScoped<ICommandHandler<SetAutoScopeCommand, AutoScopeView>, SetAutoScopeHandler>();

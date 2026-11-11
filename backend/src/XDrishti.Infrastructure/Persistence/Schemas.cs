@@ -45,4 +45,7 @@ public static class Schemas
 
     /// <summary>The learned setting changes (spec AU-10, ADR 0247): <c>learned_setting_changes</c>, insert-only for the runtime role except a column grant on the decision columns. Raw SQL, no EF entity. A schema of its own, so that no other grant is touched.</summary>
     public const string Config = "config";
+
+    /// <summary>The down-only size scaling's owner settings and basket risk budgets (spec BK-10, ADR 0259): <c>sizing_settings_changes</c> and <c>basket_risk_budgets</c>, raw SQL, no EF entity, insert-only for the runtime role.</summary>
+    public const string Selection = "selection";
 }
