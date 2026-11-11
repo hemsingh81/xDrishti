@@ -114,6 +114,21 @@ public sealed class SystemBasketsApiTests(ApiFactory factory) : BasketsTestBase(
     }
 
     [Fact]
+    public async Task The_system_settings_route_tells_the_screen_which_switches_are_on_and_needs_a_session()
+    {
+        using var anonymous = await Factory.CreateAnonymousClient().GetAsync("/api/baskets/system/settings", Ct);
+        anonymous.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        using var response = await Owner.Client.GetAsync("/api/baskets/system/settings", Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadAsStringAsync(Ct);
+        body.ShouldContain("\"fetchEnabled\"");
+        body.ShouldContain("\"listFetchEnabled\"");
+        body.ShouldContain("\"derivedEnabled\"");
+    }
+
+    [Fact]
     public async Task The_owner_switches_a_source_on_and_off_with_a_step_up_and_it_is_audited_and_fetch_now_never_does_it()
     {
         var plain = await Factory.SignInAsync(Ct);
@@ -195,6 +210,43 @@ public sealed class SystemBasketsApiTests(ApiFactory factory) : BasketsTestBase(
         withoutStepUp.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         (await withoutStepUp.ReadProblemAsync(Ct)).Code.ShouldBe("auth.step_up_required");
         Factory.BasketSources.Calls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task The_source_lists_the_symbols_that_are_not_in_the_instrument_list()
+    {
+        Factory.BasketSources.Enabled = true;
+        Factory.BasketSources.Serve(File, Csv(1, 47) + "Company X,Misc,ZZ1,EQ,INE9001A01010\r\nCompany Y,Misc,ZZ2,EQ,INE9002A01010\r\nCompany Z,Misc,ZZ3,EQ,INE9003A01010\r\n");
+        await FetchAsync();
+
+        using var response = await Client.GetAsync($"/api/baskets/{_basketId}/source", Ct);
+
+        var source = await response.ReadAsync<BasketSourceView>(Ct);
+        source.UnmatchedSymbols.ShouldBe(["ZZ1", "ZZ2", "ZZ3"]);
+        (await ListBasketsAsync()).Single(b => b.Id == _basketId).Source!.Unmatched.ShouldBe(3);
+
+        Factory.BasketSources.Serve(File, Csv(1, 50));
+        await FetchAsync();
+
+        using var again = await Client.GetAsync($"/api/baskets/{_basketId}/source", Ct);
+        (await again.ReadAsync<BasketSourceView>(Ct)).UnmatchedSymbols.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_list_carries_the_reason_of_a_rejected_fetch_until_a_later_one_is_ok()
+    {
+        Factory.BasketSources.Enabled = true;
+        Factory.BasketSources.Serve(File, Csv(1, 10));
+        (await FetchAsync()).View.Outcome.ShouldBe("rejected");
+
+        var rejected = (await ListBasketsAsync()).Single(b => b.Id == _basketId).Source!;
+        (rejected.State, rejected.Reason).ShouldBe(("rejected", "row_count"));
+
+        Factory.BasketSources.Serve(File, Csv(1, 50));
+        (await FetchAsync()).View.Outcome.ShouldBe("applied");
+
+        var ok = (await ListBasketsAsync()).Single(b => b.Id == _basketId).Source!;
+        (ok.State, ok.Reason).ShouldBe(("ok", null));
     }
 
     [Fact]

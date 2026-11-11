@@ -14,6 +14,9 @@ public interface IBasketSourceStore
     /// <summary>The newest fetches of a basket, newest first.</summary>
     ValueTask<IReadOnlyList<FetchOutcomeView>> RecentFetchesAsync(Guid basketId, int take, CancellationToken cancellationToken);
 
+    /// <summary>The symbols the newest fetch that did not fail could not match to the instrument list (empty when none).</summary>
+    ValueTask<IReadOnlyList<string>> UnmatchedSymbolsAsync(Guid basketId, CancellationToken cancellationToken);
+
     /// <summary>Turns a source on or off and saves it together with the audit events collected meanwhile; false when there is no such source or it is in that state already.</summary>
     ValueTask<bool> SetEnabledAsync(Guid basketId, bool enabled, CancellationToken cancellationToken);
 

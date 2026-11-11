@@ -18,6 +18,7 @@ using XDrishti.Application.Abstractions.OptionChain;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Abstractions.Selection;
 using XDrishti.Application.Abstractions.Ticks;
@@ -701,6 +702,11 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetReportWhatWorksQuery, Result<WhatWorksView>>, GetReportWhatWorksHandler>();
         services.AddScoped<IQueryHandler<PageReportTradesQuery, Result<TradesView>>, PageReportTradesHandler>();
         services.AddScoped<IQueryHandler<GetReportBenchmarksQuery, Result<ReportBenchmarksView>>, GetReportBenchmarksHandler>();
+        services.AddScoped<ProfileWindowResolver>(); // the window and the index of a basket profile (BK-07, ADR 0262)
+        services.AddScoped<BasketMembershipLoader>();
+        services.AddSingleton<IProfileCache, ProfileCache>(); // in process, bounded, keyed by everything the answer depends on
+        services.AddScoped<IQueryHandler<GetBasketProfileQuery, Result<BasketProfileView>>, GetBasketProfileHandler>();
+        services.AddScoped<IQueryHandler<GetBasketRankingQuery, Result<BasketRankingView>>, GetBasketRankingHandler>();
         services.AddScoped<IQueryHandler<ListSimReportJobsQuery, Result<SimReportJobsView>>, ListSimReportJobsHandler>(); // the jobs a training report can read (AU-14)
         services.AddScoped<IQueryHandler<EvaluateReportsPhaseCheckQuery, Result<ReportsPhaseCheckView>>, EvaluateReportsPhaseCheckHandler>(); // the P8 exit judged from what can be read; MET only on real evidence, read only (P8-17, ADR 0126)
         services.TryAddSingleton<IEndpointCatalogue, NoEndpointCatalogue>(); // a host without a route table says so; the API host replaces it
@@ -974,6 +980,7 @@ public static class DependencyInjection
         services.AddScoped<XDrishti.Application.Market.Baskets.ListFileProcessor>(); // BK-05: plans the ban and lot-size files
         services.AddScoped<ICommandHandler<XDrishti.Application.Market.Baskets.RefreshFlagListsCommand, XDrishti.Application.Market.Baskets.FlagListRun>, XDrishti.Application.Market.Baskets.RefreshFlagListsHandler>(); // BK-05: the lists read from the master, after its refresh
         services.AddScoped<ICommandHandler<XDrishti.Application.Market.Baskets.SetBasketSourceEnabledCommand, XDrishti.Application.Market.Baskets.BasketSourceView>, XDrishti.Application.Market.Baskets.SetBasketSourceEnabledHandler>(); // BK-01: the owner switches a source on or off
+        services.AddScoped<IQueryHandler<XDrishti.Application.Market.Baskets.GetSystemBasketSettingsQuery, XDrishti.Application.Market.Baskets.SystemBasketSettingsView>, XDrishti.Application.Market.Baskets.GetSystemBasketSettingsHandler>(); // BK-04: which owner-act switches are on
         services.AddScoped<IQueryHandler<XDrishti.Application.Market.Baskets.GetBasketSourceQuery, Result<XDrishti.Application.Market.Baskets.BasketSourceView>>, XDrishti.Application.Market.Baskets.GetBasketSourceHandler>();
         services.AddScoped<ICommandHandler<RefreshDerivedBasketsCommand, DerivedRun>, RefreshDerivedBasketsHandler>(); // BK-03: form the due derived versions from our own bars
         services.AddScoped<ICommandHandler<BackfillDerivedBasketCommand, DerivedRun>, BackfillDerivedBasketHandler>(); // BK-03: owner-triggered recomputed versions of a past range

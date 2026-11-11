@@ -828,6 +828,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/baskets/system/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Which owner-act switches are on (read only): fetchEnabled (Baskets:System:Fetch:Enabled, index lists), listFetchEnabled (Baskets:System:Lists:FetchEnabled, the NSE F&O files), derivedEnabled (Baskets:System:Derived:Enabled); the Baskets screen disables its Fetch now and Recompute now buttons from them */
+    get: operations['GetSystemBasketSettings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/baskets/system/derived/refresh': {
     parameters: {
       query?: never;
@@ -4718,6 +4735,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/reports/baskets/{id}/profile': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The performance profile of one basket (manual, portfolio or system) from its own stored daily bars against an index: the equal-weight, daily-rebalanced, price-return index rebased to 100 beside the index, volatility, drawdown, beta, alpha (the regression intercept, never a trading result), tracking error, capture, rolling beta, relative strength, breadth, dispersion and correlation inside the basket, contribution, the index by market regime, turnover, ADV20 and capacity, and the median split of the basket's strategy trades. Every figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) with a number only for a value, and the membership basis (dated, or a single snapshot with survivorship) and every instrument left out are named. Takes from and to (default the last 252 sessions ending at the newest stored daily bar of the index; window.source says which), index (instrument id; default the owner's benchmark) and membersAsOf (default the window end). A window under 20 sessions or a basket above the instrument cap is 422 reports.invalid; an unknown or archived basket 404 reports.not_found. Read only; the answer is cached by basket, membership, window, index and newest bar. */
+    get: operations['GetBasketProfile'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/baskets/ranking': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Two to twelve baskets side by side on relative strength against an index: the return of the relative strength line over 21, 63, 126 and 252 sessions, its rank (1 = strongest) on the longest window most baskets have a value for, the return over the annualised volatility, and the Jaccard overlap of each pair's members. A basket with no value has its state and no rank; when a gap between neighbours is within its noise (indicative, pairwise, uncorrected) separated is false and no order is to be shown; no basket is labelled best. Takes basket (ids, comma separated), from, to and index as the profile does. Read only. 422 reports.invalid; 404 reports.not_found. */
+    get: operations['GetBasketRanking'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/reports/plan-vs-actual': {
     parameters: {
       query?: never;
@@ -7762,6 +7813,80 @@ export interface components {
     BasketOrderInput: {
       ids: null | string[];
     };
+    /** @description The performance profile of one basket (BK-07, metrics m1b to m16, m23): its own prices against an index, with every figure a MetricView (a number only for a value) and the basis printed. Nothing here is a trading result and none is a forecast. */
+    BasketProfileView: {
+      /** @description Who it is. */
+      basket: components['schemas']['ProfileBasketView'];
+      /** @description The window and where each end came from. */
+      window: components['schemas']['BenchmarkWindowView'];
+      /**
+       * Format: date
+       * @description The India date of the member list.
+       */
+      membersAsOf: string;
+      /** @description `dated` (membership history exists) or `single_snapshot` (members as of one date, not as of each trading day; survivorship applies, ISS-22). */
+      membershipBasis: string;
+      /**
+       * Format: date
+       * @description The first date with membership history.
+       */
+      membershipFrom: null | string;
+      /** @description The members counted and the ones left out, named. */
+      members: components['schemas']['ProfileMembersView'];
+      /** @description The index the basket is set against. */
+      index: components['schemas']['ProfileIndexView'];
+      /** @description The basket's buy-and-hold price return in percent (P8-07). */
+      hold: components['schemas']['MetricView'];
+      /** @description The daily series of the charts; the same numbers are in the tables. */
+      series: components['schemas']['ProfileSeriesView'];
+      /** @description Volatility, drawdown, beta, tracking and capture. */
+      risk: components['schemas']['ProfileRiskView'];
+      /** @description The passive difference to the index; never a trading result and never called alpha (BK-07 review). */
+      indexDifference: components['schemas']['IndexDifferenceView'];
+      /** @description Breadth inside the basket. */
+      breadth: components['schemas']['ProfileBreadthView'];
+      /** @description Dispersion of member returns. */
+      dispersion: components['schemas']['ProfileDispersionView'];
+      /** @description Average correlation, effective bets and the matrix. */
+      correlation: components['schemas']['ProfileCorrelationView'];
+      /** @description Who made the return. */
+      contribution: components['schemas']['ProfileContributionView'];
+      /** @description The index by regime. */
+      regime: components['schemas']['ProfileRegimeView'];
+      /** @description Member turnover. */
+      turnover: components['schemas']['ProfileTurnoverView'];
+      /** @description Liquidity and capacity. */
+      capacity: components['schemas']['ProfileCapacityView'];
+      /** @description The median split of the strategy trades of this basket (m23). */
+      holdOut: components['schemas']['ProfileHoldOutView'];
+      /** @description The relative strength returns (m8); the rank is on the ranking board. */
+      relativeStrength: components['schemas']['RelativeStrengthReturnView'][];
+      /** @description The evidence block. */
+      evidence: components['schemas']['BenchmarkEvidenceView'];
+    };
+    /**
+     * @description Baskets side by side (BK-07): the relative strength return of each over 21, 63, 126 and 252 sessions, its rank (1 = strongest) on `RankWindow` and the return over the annualised volatility. A basket with no value has no rank, only its state. No label "best":
+     *     when a pair of neighbours is within its noise, `Separated` is false and the screen shows no order.
+     */
+    BasketRankingView: {
+      /** @description The window and where it came from. */
+      window: components['schemas']['BenchmarkWindowView'];
+      /** @description The index the strengths are against. */
+      index: components['schemas']['ProfileIndexView'];
+      /**
+       * Format: int32
+       * @description Sessions of the relative strength return the ranks are on; null when fewer than two baskets have one.
+       */
+      rankWindow: null | number;
+      /** @description One per basket, in the order asked. */
+      rows: components['schemas']['RankingRowView'][];
+      /** @description The Jaccard index of the member sets of each pair of baskets at the end of the window. */
+      overlap: components['schemas']['OverlapView'][];
+      /** @description False means "not separated": every gap is not larger than its standard error (indicative, pairwise, uncorrected; not a significance test). */
+      separated: boolean;
+      /** @description The evidence block. */
+      evidence: components['schemas']['BenchmarkEvidenceView'];
+    };
     /** @description The owner's change of one basket's risk budget: 1 to 100 percent of the total open risk limit, or null to remove it. The password is needed for every change. The actor is never taken from the body. */
     BasketRiskBudgetChangeBody: {
       /** Format: double */
@@ -7822,7 +7947,7 @@ export interface components {
       /** @description The changes, newest first. */
       history: components['schemas']['BasketSettingChangeView'][];
     };
-    /** @description The state of a system basket's file: `state` never · ok · stale · rejected · failed; `unmatched` = members of the last applied or checked list that are not in the instrument list ("N members not in your instrument list"). */
+    /** @description The state of a system basket's file (`reason` = the short reason of the newest rejected or failed fetch while the state is rejected or failed): `state` never · ok · stale · rejected · failed; `unmatched` = members of the last applied or checked list that are not in the instrument list ("N members not in your instrument list"). */
     BasketSourceSummary: {
       state: string;
       /** Format: date-time */
@@ -7831,8 +7956,9 @@ export interface components {
       lastCheckedAt: null | string;
       /** Format: int32 */
       unmatched: number;
+      reason?: null | string;
     };
-    /** @description The source of a system basket and its last 20 fetches (no raw file). `enabled` = the owner has turned this file on. */
+    /** @description The source of a system basket and its last 20 fetches (no raw file). `enabled` = the owner has turned this file on; `unmatchedSymbols` = the symbols of the last checked list that are not in the instrument list (the "N members not in your instrument list"). */
     BasketSourceView: {
       /** Format: uuid */
       basketId: string;
@@ -7852,6 +7978,7 @@ export interface components {
       /** Format: int32 */
       expectedMax: number;
       fetches: components['schemas']['FetchOutcomeView'][];
+      unmatchedSymbols?: null | string[];
     };
     /** @description One version with its scores, named exclusions (`universeSize = members + belowThreshold + excluded`) and the parameters it was computed with. */
     BasketVersionDetail: {
@@ -7864,10 +7991,12 @@ export interface components {
         [key: string]: number;
       };
     };
+    /** @description The versions of a derived basket, newest first, with the definition they were formed by. */
     BasketVersionPage: {
       items: components['schemas']['BasketVersionSummary'][];
       /** Format: int32 */
       total: number;
+      definition?: null | components['schemas']['DerivedDefinitionInfo'];
     };
     /** @description One version of a derived basket in the list (`outcome`: applied, not_formed; `provenance`: derived or recomputed). */
     BasketVersionSummary: {
@@ -8130,6 +8259,14 @@ export interface components {
       code: string;
       action: string;
       reason: string;
+    };
+    /** @description One breadth share with the members behind it. */
+    BreadthFigureView: {
+      share: components['schemas']['MetricView'];
+      /** Format: int32 */
+      voters: number;
+      excluded: string[];
+      excludedReason: string;
     };
     /** @description One model attempt, as the API shows it. The refused text itself stays in the audit table. */
     BriefingAttemptView: {
@@ -9542,6 +9679,14 @@ export interface components {
       /** Format: int32 */
       bars: number;
     };
+    /** @description One member's part of the hold return. */
+    ContributionRowView: {
+      symbol: string;
+      /** Format: double */
+      returnPct: number;
+      /** Format: double */
+      share: number;
+    };
     /** @description A conversation with its messages in order. */
     ConversationDetail: {
       /** Format: uuid */
@@ -9614,6 +9759,13 @@ export interface components {
       decidedBy: null | string;
       /** Format: date */
       csvAdjustedThrough?: null | string;
+    };
+    /** @description The matrix: `Total` members behind the figure, `Symbols` those drawn (at most 40, the most liquid, in sector order); a pair without enough common sessions is null. */
+    CorrelationMatrixView: {
+      /** Format: int32 */
+      total: number;
+      symbols: string[];
+      rho: (null | number)[][];
     };
     /** @description One page of cost import batches, newest first. */
     CostBatchPage: {
@@ -10990,6 +11142,18 @@ export interface components {
       universe: number;
       /** Format: int32 */
       excluded: number;
+    };
+    /**
+     * @description What a derived basket is, from the catalogue: its name, the rule in one line, the one-line "what this basket is NOT" and the unit of its score
+     *     (`ratio` printed with 2 decimals, `percent` a share printed as "2.10 %", `rupees` printed in crore).
+     */
+    DerivedDefinitionInfo: {
+      /** Format: int32 */
+      no: number;
+      name: string;
+      description: string;
+      notThis: string;
+      unit: string;
     };
     /** @description The switch and parameters of a derived basket after an owner act. */
     DerivedDefinitionView: {
@@ -14254,6 +14418,12 @@ export interface components {
       isDefault: boolean;
       return: components['schemas']['MetricView'];
     };
+    /** @description The basket's hold return, the index's over the same dates and their difference, all in percent and all passive. */
+    IndexDifferenceView: {
+      basket: components['schemas']['MetricView'];
+      index: components['schemas']['MetricView'];
+      difference: components['schemas']['MetricView'];
+    };
     /** @description One auto-insight (doc 15 section 6): a fixed-template sentence. string InsightView.State is `value` when the sentence states something; otherwise the text says why it states nothing and carries no figure. */
     InsightView: {
       /** @description The rule: best_strategy, weakest_strategy, basket_gap, side_bias, best_exit, weekday, regime or calibration. */
@@ -17070,6 +17240,14 @@ export interface components {
       usableChainSessions: number;
       truncated: boolean;
     };
+    /** @description How much two baskets share: the Jaccard index of their member sets. */
+    OverlapView: {
+      /** Format: uuid */
+      a: string;
+      /** Format: uuid */
+      b: string;
+      jaccard: components['schemas']['MetricView'];
+    };
     /** @description One account on Today. string OverviewAccount.Mode is the effective mode and DateTimeOffset? OverviewAccount.EffectiveFrom the time its trail row took effect (null: never changed from the configured one). */
     OverviewAccount: {
       /** Format: uuid */
@@ -19255,6 +19433,152 @@ export interface components {
        */
       wouldClose?: number;
     };
+    /** @description The basket: `Kind` is manual, portfolio, index, list or derived; `ParamsHash` only for a derived basket. */
+    ProfileBasketView: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      kind: string;
+      paramsHash: null | string;
+    };
+    /** @description Breadth inside the basket on the last session with a bar; `SeriesB20` is the share above the 20-day average per day (null where too few voted). */
+    ProfileBreadthView: {
+      b20: components['schemas']['BreadthFigureView'];
+      b50: components['schemas']['BreadthFigureView'];
+      b200: components['schemas']['BreadthFigureView'];
+      adShare: components['schemas']['BreadthFigureView'];
+      newHighShare: components['schemas']['BreadthFigureView'];
+      noBar: string[];
+      seriesDates: string[];
+      seriesB20: (null | number)[];
+    };
+    /** @description What the basket can absorb: the ADV20 (the CF-05 median of traded value, in rupees) of the members, a share of it as capacity and the flag shares. A member with fewer than 20 sessions of volume is listed, never guessed. */
+    ProfileCapacityView: {
+      medianAdv: components['schemas']['MetricView'];
+      p10Adv: components['schemas']['MetricView'];
+      basketCapacity: components['schemas']['MetricView'];
+      asmGsmShare: components['schemas']['MetricView'];
+      fnoShare: components['schemas']['MetricView'];
+      /** Format: int32 */
+      counted: number;
+      shortMembers: string[];
+      /** Format: double */
+      capacityPct: number;
+    };
+    /** @description Who made the return: the five largest and five smallest parts, the share of the three largest and every member (empty unless the shares exist). */
+    ProfileContributionView: {
+      top3Share: components['schemas']['MetricView'];
+      /** Format: int32 */
+      included: number;
+      top: components['schemas']['ContributionRowView'][];
+      bottom: components['schemas']['ContributionRowView'][];
+      rows: components['schemas']['ContributionRowView'][];
+    };
+    /** @description Average pairwise correlation, the effective number of bets (a heuristic) and the matrix of the most liquid members (null when there is no correlation figure). */
+    ProfileCorrelationView: {
+      rhoBar: components['schemas']['MetricView'];
+      nEff: components['schemas']['MetricView'];
+      /** Format: int32 */
+      members: number;
+      /** Format: int32 */
+      pairs: number;
+      sampled: boolean;
+      matrix: null | components['schemas']['CorrelationMatrixView'];
+    };
+    /** @description Dispersion of member returns on the last session, its mean over 20 sessions and the interquartile range. */
+    ProfileDispersionView: {
+      today: components['schemas']['MetricView'];
+      mean20: components['schemas']['MetricView'];
+      iqr: components['schemas']['MetricView'];
+      /** Format: int32 */
+      voters: number;
+    };
+    /** @description An instrument left out and why. */
+    ProfileExclusionView: {
+      symbol: string;
+      reason: string;
+    };
+    /** @description One strategy's cell: the n and the expectancy of each half and the verdict (agrees, disagrees, insufficient, not_evaluable). */
+    ProfileHoldOutCellView: {
+      strategy: string;
+      /** Format: date */
+      splitDate: null | string;
+      /** Format: int32 */
+      firstN: number;
+      /** Format: int32 */
+      secondN: number;
+      firstExpectancy: components['schemas']['MetricView'];
+      secondExpectancy: components['schemas']['MetricView'];
+      verdict: string;
+    };
+    /** @description The median split of the strategy trades of the basket in the default run set (m23): not the locked hold-out of ADR 0207. `Status` says whether trades could be read. */
+    ProfileHoldOutView: {
+      status: components['schemas']['MetricView'];
+      /** Format: int32 */
+      trades: number;
+      /** Format: int32 */
+      minPerHalf: number;
+      cells: components['schemas']['ProfileHoldOutCellView'][];
+    };
+    /** @description The index in force: null symbol when there is none. */
+    ProfileIndexView: {
+      /** Format: uuid */
+      id: null | string;
+      symbol: null | string;
+      isDefault: boolean;
+    };
+    /** @description Instruments in the basket in the window (`Total`), the ones the figures rest on (`Counted`) and every one left out with its reason (no_bars, starts_late, ends_early, discontinuity, bad_price, too_few_bars). */
+    ProfileMembersView: {
+      /** Format: int32 */
+      total: number;
+      /** Format: int32 */
+      counted: number;
+      excluded: components['schemas']['ProfileExclusionView'][];
+    };
+    /** @description The regime panel: `Status` is a value when a regime was recorded, else why not; `Unknown` days sit in no row. */
+    ProfileRegimeView: {
+      status: components['schemas']['MetricView'];
+      /** Format: int32 */
+      unknown: number;
+      /** Format: int32 */
+      minDays: number;
+      rows: components['schemas']['RegimeRowView'][];
+    };
+    /** @description Risk figures (fractions, not percent). Alpha, tracking error and information ratio are those of the 252-day window; `Alpha` is the regression intercept against the index, not a trading result. */
+    ProfileRiskView: {
+      vol20: components['schemas']['MetricView'];
+      vol60: components['schemas']['MetricView'];
+      vol252: components['schemas']['MetricView'];
+      mdd: components['schemas']['MetricView'];
+      mddDuration: components['schemas']['MetricView'];
+      drawdownOpen: boolean;
+      /** Format: int32 */
+      daysSincePeak: number;
+      beta60: components['schemas']['MetricView'];
+      beta252: components['schemas']['MetricView'];
+      alpha: components['schemas']['MetricView'];
+      trackingError: components['schemas']['MetricView'];
+      informationRatio: components['schemas']['MetricView'];
+      upCapture: components['schemas']['MetricView'];
+      downCapture: components['schemas']['MetricView'];
+    };
+    /** @description The series of the charts, one entry per index date. The basket and the index are rebased to 100 on the first date; an entry without a value is null (the index has no bar that day), never zero. */
+    ProfileSeriesView: {
+      dates: string[];
+      basket: number[];
+      index: (null | number)[];
+      relativeStrength: (null | number)[];
+      drawdown: number[];
+      rollingBeta60: (null | number)[];
+    };
+    /** @description Member turnover over the window. */
+    ProfileTurnoverView: {
+      turnover: components['schemas']['MetricView'];
+      /** Format: int32 */
+      adds: number;
+      /** Format: int32 */
+      removes: number;
+    };
     /** @description The body of a promotion. The owner is never part of it: the actor comes from the signed-in session. */
     PromoteModelRequest: {
       /** @description Why, 1 to 500 characters. */
@@ -19923,6 +20247,19 @@ export interface components {
       /** @description The lower bound of expectancy is above 0: the only reading of "works" the engine allows. */
       lowerBoundPositive: boolean;
     };
+    /** @description One basket on the ranking board. */
+    RankingRowView: {
+      /** Format: uuid */
+      basketId: string;
+      name: string;
+      rsReturn21: components['schemas']['MetricView'];
+      rsReturn63: components['schemas']['MetricView'];
+      rsReturn126: components['schemas']['MetricView'];
+      rsReturn252: components['schemas']['MetricView'];
+      rsRank: components['schemas']['MetricView'];
+      riskAdjusted: components['schemas']['MetricView'];
+      state: string;
+    };
     /** @description A rate with its sample and its Wilson 95 % interval (spec P9-09 AC 9: every rate is printed with its interval). */
     RateLine: {
       name: string;
@@ -20251,6 +20588,18 @@ export interface components {
       /** Format: int32 */
       trades: number;
     };
+    /** @description The index on days that followed one regime of the previous session. */
+    RegimeRowView: {
+      /** Format: int32 */
+      code: number;
+      label: string;
+      /** Format: int32 */
+      days: number;
+      meanReturn: components['schemas']['MetricView'];
+      vol: components['schemas']['MetricView'];
+      hitRate: components['schemas']['MetricView'];
+      state: string;
+    };
     /** @description Sessions with no label, by reason. */
     RegimeUnavailableView: {
       reason: string;
@@ -20288,6 +20637,12 @@ export interface components {
     RejectTicketRequest: {
       /** @description Why, 1 to 500 characters. */
       reason: null | string;
+    };
+    /** @description The relative strength return over a window of sessions (fraction). */
+    RelativeStrengthReturnView: {
+      /** Format: int32 */
+      window: number;
+      return: components['schemas']['MetricView'];
     };
     /** @description The owner's release of a halt: a reason and the password, checked afresh for this act. */
     ReleaseHaltRequest: {
@@ -22975,6 +23330,12 @@ export interface components {
       attempts: number;
       /** Format: date-time */
       retryAt?: null | string;
+    };
+    /** @description Which owner-act switches are on (BK-04): `fetchEnabled` = Baskets:System:Fetch:Enabled (index lists), `listFetchEnabled` = Baskets:System:Lists:FetchEnabled (the two NSE F&amp;O files), `derivedEnabled` = Baskets:System:Derived:Enabled. The screen disables its buttons from these; the API stays the authority. */
+    SystemBasketSettingsView: {
+      fetchEnabled: boolean;
+      listFetchEnabled: boolean;
+      derivedEnabled: boolean;
     };
     /** @description The system card (spec CF-11 D5). */
     SystemScorecardView: {
@@ -26300,6 +26661,26 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetSystemBasketSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SystemBasketSettingsView'];
         };
       };
     };
@@ -35605,6 +35986,94 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ReportBenchmarksView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetBasketProfile: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+        index?: string;
+        membersAsOf?: string;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketProfileView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetBasketRanking: {
+    parameters: {
+      query?: {
+        basket?: string;
+        from?: string;
+        to?: string;
+        index?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketRankingView'];
         };
       };
       /** @description Not Found */

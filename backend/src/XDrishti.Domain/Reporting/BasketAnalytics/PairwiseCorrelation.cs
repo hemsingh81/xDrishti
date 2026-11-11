@@ -29,6 +29,73 @@ public static class PairwiseCorrelation
             symbols = [.. symbols.OrderByDescending(s => adv.TryGetValue(s, out var a) && double.IsFinite(a) ? a : 0.0).ThenBy(s => s, StringComparer.Ordinal).Take(options.MaxCorrelationMembers).Order(StringComparer.Ordinal)];
         }
 
+        var (grid, count) = Grid(symbols, returns, asOf, options);
+
+        var rhos = new List<double>();
+        var x = new double[count];
+        var y = new double[count];
+        for (var a = 0; a < symbols.Count; a++)
+        {
+            for (var b = a + 1; b < symbols.Count; b++)
+            {
+                var n = Common(grid[a], grid[b], x, y);
+
+                if (n >= Math.Max(2, options.MinCommonSessions) && Pair(x[..n], y[..n]) is { } rho)
+                {
+                    rhos.Add(rho);
+                }
+            }
+        }
+
+        return Summarise(symbols.Count, rhos, options, sampled);
+    }
+
+    /// <summary>The correlation matrix of the given symbols (in the order given), over the same sessions and the same pair rule as <see cref="Compute"/>; a pair with too few common sessions or no variance is null. The caller limits the size (the screen draws up to 40).</summary>
+    public static CorrelationMatrix Matrix(IReadOnlyList<string> symbols, IReadOnlyDictionary<string, IReadOnlyList<DailyReturn>> returns, DateOnly asOf, BasketProfileOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(symbols);
+        ArgumentNullException.ThrowIfNull(returns);
+        ArgumentNullException.ThrowIfNull(options);
+        var (grid, count) = Grid(symbols, returns, asOf, options);
+        var rho = new double?[symbols.Count][];
+        for (var a = 0; a < symbols.Count; a++)
+        {
+            rho[a] = new double?[symbols.Count];
+            rho[a][a] = 1.0;
+        }
+
+        var x = new double[count];
+        var y = new double[count];
+        for (var a = 0; a < symbols.Count; a++)
+        {
+            for (var b = a + 1; b < symbols.Count; b++)
+            {
+                var n = Common(grid[a], grid[b], x, y);
+                rho[a][b] = rho[b][a] = n >= Math.Max(2, options.MinCommonSessions) ? Pair(x[..n], y[..n]) : null;
+            }
+        }
+
+        return new CorrelationMatrix([.. symbols], [.. rho.Select(r => (IReadOnlyList<double?>)r)]);
+    }
+
+    private static int Common(double[] a, double[] b, double[] x, double[] y)
+    {
+        var n = 0;
+        for (var d = 0; d < a.Length; d++)
+        {
+            if (!double.IsNaN(a[d]) && !double.IsNaN(b[d]))
+            {
+                x[n] = a[d];
+                y[n] = b[d];
+                n++;
+            }
+        }
+
+        return n;
+    }
+
+    private static (double[][] Grid, int Count) Grid(IReadOnlyList<string> symbols, IReadOnlyDictionary<string, IReadOnlyList<DailyReturn>> returns, DateOnly asOf, BasketProfileOptions options)
+    {
         var dates = symbols.SelectMany(s => returns[s]).Where(r => r.Date <= asOf).Select(r => r.Date).Distinct().OrderDescending().Take(options.CorrelationWindow).ToList();
         var slot = new Dictionary<DateOnly, int>(dates.Count);
         for (var i = 0; i < dates.Count; i++)
@@ -50,32 +117,7 @@ public static class PairwiseCorrelation
             }
         }
 
-        var rhos = new List<double>();
-        var x = new double[dates.Count];
-        var y = new double[dates.Count];
-        for (var a = 0; a < symbols.Count; a++)
-        {
-            for (var b = a + 1; b < symbols.Count; b++)
-            {
-                var n = 0;
-                for (var d = 0; d < dates.Count; d++)
-                {
-                    if (!double.IsNaN(grid[a][d]) && !double.IsNaN(grid[b][d]))
-                    {
-                        x[n] = grid[a][d];
-                        y[n] = grid[b][d];
-                        n++;
-                    }
-                }
-
-                if (n >= Math.Max(2, options.MinCommonSessions) && Pair(x[..n], y[..n]) is { } rho)
-                {
-                    rhos.Add(rho);
-                }
-            }
-        }
-
-        return Summarise(symbols.Count, rhos, options, sampled);
+        return (grid, dates.Count);
     }
 
     /// <summary>The mean of the pair correlations and the effective number of bets (clamped to 1..N).</summary>

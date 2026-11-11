@@ -3,7 +3,14 @@ namespace XDrishti.Application.Market.Baskets;
 /// <summary>One version of a derived basket in the list (<c>outcome</c>: applied, not_formed; <c>provenance</c>: derived or recomputed).</summary>
 public sealed record BasketVersionSummary(Guid VersionId, DateOnly AsOf, DateOnly EffectiveFrom, DateTimeOffset? FormedAt, int MemberCount, int UniverseSize, string ParamsHash, string Outcome, string Provenance);
 
-public sealed record BasketVersionPage(IReadOnlyList<BasketVersionSummary> Items, int Total);
+/// <summary>
+/// What a derived basket is, from the catalogue: its name, the rule in one line, the one-line "what this basket is NOT" and the unit of its score
+/// (<c>ratio</c> printed with 2 decimals, <c>percent</c> a share printed as "2.10 %", <c>rupees</c> printed in crore).
+/// </summary>
+public sealed record DerivedDefinitionInfo(int No, string Name, string Description, string NotThis, string Unit);
+
+/// <summary>The versions of a derived basket, newest first, with the definition they were formed by.</summary>
+public sealed record BasketVersionPage(IReadOnlyList<BasketVersionSummary> Items, int Total, DerivedDefinitionInfo? Definition = null);
 
 /// <summary>A ranked instrument of a version: members and the next non-members by rank (the "why").</summary>
 public sealed record VersionScoreView(Guid InstrumentId, string Symbol, string Name, double Score, int Rank, bool IsMember);

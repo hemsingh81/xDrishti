@@ -70,6 +70,21 @@ public static class RiskMetrics
         return new DrawdownResult(Metric.Of(worst), Metric.Of(longest), since > 0, since);
     }
 
+    /// <summary>The drawdown of every index point from its running peak (fraction, zero or negative); empty unless the index is sound.</summary>
+    public static IReadOnlyList<double> DrawdownSeries(IndexSeries index)
+    {
+        ArgumentNullException.ThrowIfNull(index);
+        var result = new List<double>(index.Points.Count);
+        var peak = double.MinValue;
+        foreach (var p in index.Points)
+        {
+            peak = Math.Max(peak, p.Level);
+            result.Add((p.Level / peak) - 1.0);
+        }
+
+        return result;
+    }
+
     internal static double[] Returns(IndexSeries index)
     {
         var r = new double[Math.Max(0, index.Points.Count - 1)];

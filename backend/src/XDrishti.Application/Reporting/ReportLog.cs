@@ -11,6 +11,12 @@ internal static partial class ReportLog
     [LoggerMessage(EventId = 4802, Level = LogLevel.Information, Message = "report.benchmark: {Baskets} baskets, {Instruments} instruments read, {Excluded} excluded, {Milliseconds} ms")]
     public static partial void Benchmark(ILogger logger, int baskets, int instruments, int excluded, long milliseconds);
 
+    [LoggerMessage(EventId = 4804, Level = LogLevel.Information, Message = "report.basket_profile: {Members} members, {Reads} bar reads, cacheHit {CacheHit}, {Milliseconds} ms")]
+    public static partial void BasketProfile(ILogger logger, int members, int reads, bool cacheHit, long milliseconds);
+
+    [LoggerMessage(EventId = 4805, Level = LogLevel.Information, Message = "report.basket_ranking: {Baskets} baskets, {Reads} bar reads, {Milliseconds} ms")]
+    public static partial void BasketRanking(ILogger logger, int baskets, int reads, long milliseconds);
+
     [LoggerMessage(EventId = 4801, Level = LogLevel.Information, Message = "reports.refused kind {Kind}: {Code}")]
     public static partial void Refused(ILogger logger, string kind, string code);
 

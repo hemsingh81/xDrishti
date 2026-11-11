@@ -14,13 +14,16 @@ import { useBasketDnd } from '../hooks/useBasketDnd';
 import { useMemberActions } from '../hooks/useMemberActions';
 import type { DragSession, DropOutcome } from '../lib/dropRules';
 import { isConflict, isStaleOrder, reorderProblemText } from '../lib/errors';
-import { splitBaskets } from '../lib/groups';
+import { filterGroups, splitBaskets } from '../lib/groups';
 import { subject } from '../lib/messages';
+import { isPortfolio, type KindFilter } from '../lib/system';
 import { BasketCardList } from './BasketCardList';
 import { BasketInsights } from './BasketInsights';
 import { BasketSelect } from './BasketSelect';
 import { DragPreview } from './DragPreview';
+import { KindFilterChips } from './KindFilterChips';
 import { MembersPanel } from './MembersPanel';
+import { SystemTools } from './SystemTools';
 
 interface BasketsWorkspaceProps {
   baskets: readonly Basket[];
@@ -28,6 +31,8 @@ interface BasketsWorkspaceProps {
   onSelect: (id: string) => void;
   asOf: string | null;
   onAsOfChange: (value: string | null) => void;
+  kind: KindFilter;
+  onKindChange: (value: KindFilter) => void;
   onEdit: () => void;
   onArchive: () => void;
 }
@@ -44,6 +49,8 @@ export function BasketsWorkspace({
   onSelect,
   asOf,
   onAsOfChange,
+  kind,
+  onKindChange,
   onEdit,
   onArchive,
 }: BasketsWorkspaceProps) {
@@ -52,9 +59,10 @@ export function BasketsWorkspace({
   const { notify } = useToast();
   const queryClient = useQueryClient();
   const readOnly = selected.system;
-  // A portfolio basket has no look-back view: a date in the URL is kept for the owner's baskets and not sent for it.
-  const shownAsOf = readOnly ? null : asOf;
+  // A portfolio basket has no look-back view: a date in the URL is kept for the other baskets and not sent for it.
+  const shownAsOf = isPortfolio(selected) ? null : asOf;
   const groups = useMemo(() => splitBaskets(baskets), [baskets]);
+  const shown = useMemo(() => filterGroups(groups, kind), [groups, kind]);
   const members = useQuery(membersQuery(selected.id, shownAsOf));
   const items = useMemo(() => members.data?.items ?? [], [members.data]);
   const selection = useScopedSelection(`${selected.id}|${shownAsOf ?? ''}`);
@@ -114,10 +122,20 @@ export function BasketsWorkspace({
       <BasketDragContext value={drag}>
         <MemberPanelContext value={panel}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+            {groups.system.length > 0 && <KindFilterChips value={kind} onChange={onKindChange} />}
             {phone ? (
-              <BasketSelect groups={groups} selectedId={selected.id} onSelect={onSelect} />
+              <>
+                {groups.system.length > 0 && <SystemTools />}
+                <BasketSelect groups={shown} selectedId={selected.id} onSelect={onSelect} />
+              </>
             ) : (
-              <BasketCardList groups={groups} selectedId={selected.id} onSelect={onSelect} />
+              <BasketCardList
+                groups={shown}
+                kind={kind}
+                systemTotal={groups.system.length}
+                selectedId={selected.id}
+                onSelect={onSelect}
+              />
             )}
             <Box
               sx={{
