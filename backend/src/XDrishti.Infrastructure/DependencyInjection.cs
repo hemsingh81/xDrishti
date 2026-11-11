@@ -377,6 +377,7 @@ public static class DependencyInjection
         services.AddScoped<XDrishti.Application.Abstractions.Filings.IResultFactsStore, XDrishti.Infrastructure.FilingArchive.ResultFactsStore>(); // filings.result_facts + filings.result_parses, insert-only (P15-03)
         services.AddScoped<XDrishti.Application.Abstractions.Filings.IResultFactRows, XDrishti.Infrastructure.FilingArchive.ResultFactRows>(); // stored parse rows and facts (P15-03)
         services.AddScoped<XDrishti.Application.Abstractions.Filings.IShareholdingRows, XDrishti.Infrastructure.FilingArchive.ShareholdingRows>(); // stored shareholding groups up to a cutoff (P15-04)
+        services.AddScoped<XDrishti.Application.Abstractions.Selection.ISizingStore, XDrishti.Infrastructure.Selection.SizingStore>(); // selection.sizing_settings_changes and selection.basket_risk_budgets, insert-only (BK-10)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
         services.AddSingleton<IBrokerAllowList, BrokerAllowList>(); // the broker allow-list read only, for the P7 phase check (P7-18, ADR 0097)
         services.AddSingleton<IPlanBuilderSettings, PlanBuilderSettings>(); // off by default: the empty skeleton stays the nightly builder (P7-04, ADR 0088)

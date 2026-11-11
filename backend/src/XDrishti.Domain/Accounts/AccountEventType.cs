@@ -108,4 +108,5 @@ public enum AccountEventType
     BasketMembershipChanged,
     BasketSourceSwitched,
     DerivedBasketChanged,
+    SizingChanged,
 }

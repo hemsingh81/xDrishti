@@ -116,6 +116,8 @@ Learned multipliers on top ([doc 09](09-learning-engine.md) §14): **meta-labell
 **equity-curve throttle** × 0.5 while the system's equity is below its 20-trade average, **reduced market-gate
 day** × 0.75. The multipliers never raise risk above the profile's maximum per trade.
 
+**Down-only scaling of the plan's suggestion** ([ADR 0259](../adr/0259-position-sizing-only-scales-down-by-volatility-capacity-and-basket-budgets-and-every-setting-is-an-owner-act-with-a-fresh-password.md), spec BK-10; every setting OFF by default, each change the owner's with a fresh password): after the portfolio fill the suggested quantity is `floor(q_fixed × min(volatility scale, gate scale) × budget ratio)` capped by a share of the 20-day traded value, where the volatility scale is the share's EWMA volatility against its own 252-session median, clamped to the floor (0.5) and **1.0** (a constant, not a setting). No path scales up, and no order is placed. A basket's risk budget is a share of the total open risk limit; a candidate is scaled to the room or goes to the reserve (`basket_budget`).
+
 ## 7. Portfolio limits (per account, from its risk profile)
 
 | Limit | Default |

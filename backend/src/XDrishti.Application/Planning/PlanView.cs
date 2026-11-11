@@ -71,6 +71,7 @@ public sealed record PlanView(
 /// <param name="Evidence">The evidence block.</param>
 /// <param name="Levels">Indicative numbers as of the close of D (P7-19), or null for a plan stored without them or a ticket with no numeric level.</param>
 /// <param name="Allocations">Size per account.</param>
+/// <param name="Sizing">What the down-only size scaling did (BK-10), or null when nothing acted.</param>
 public sealed record PlanItemView(
     long Id,
     int Rank,
@@ -88,7 +89,8 @@ public sealed record PlanItemView(
     IReadOnlyList<string> Reasons,
     PlanEvidenceView Evidence,
     IReadOnlyList<PlanAllocationView> Allocations,
-    TicketLevelsView? Levels = null)
+    TicketLevelsView? Levels = null,
+    PlanSizingNote? Sizing = null)
 {
     /// <summary>Builds the view from the stored row.</summary>
     public static PlanItemView Of(PlanItemRow row)
@@ -102,7 +104,8 @@ public sealed record PlanItemView(
             i.Symbol, i.Side, i.StrategyId, i.StrategyVersionHash, i.Trigger, i.Stop, i.Target, i.Validity, i.Reasons,
             new PlanEvidenceView(e.CellKey, e.Trades, e.DataRange, e.PWinBasis, e.PWin, e.ConservativeExpectancyR, e.Unavailable, e.AdvisoryNote),
             [.. i.Allocations.Select(a => new PlanAllocationView(a.AccountId, a.Mode, a.Quantity))],
-            i.Levels is { } l ? new TicketLevelsView(l.EntryRef, l.Session, l.Stop, l.Anchor?.Code(), l.Target, l.RewardRisk, TicketLevelsView.BasisText) : null);
+            i.Levels is { } l ? new TicketLevelsView(l.EntryRef, l.Session, l.Stop, l.Anchor?.Code(), l.Target, l.RewardRisk, TicketLevelsView.BasisText) : null,
+            i.Sizing);
     }
 }
 
