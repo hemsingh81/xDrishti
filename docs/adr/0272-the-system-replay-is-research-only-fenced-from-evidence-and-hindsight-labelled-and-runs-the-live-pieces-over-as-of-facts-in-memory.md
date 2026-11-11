@@ -25,5 +25,14 @@
 - **The session after the end of the range is never read**: the last replayed session records its plan and the note `end_of_range`, and books no fill. The range may not pass the clamp.
 - **With the default selection rules every candidate with no event, F&O ban or surveillance data is held back** (live behaviour, unchanged); the snapshot takes the rules the live builder has, so a replay of the default settings takes few or no trades. Loosening is the owner's, in part C.
 
+## Review changes (Opus review of part A)
+- **Fills know their instrument.** `TicketReplayer.ReplayAsync` has an overload taking the candidate's instrument id, so a past member that has left every basket is still filled and holds its slot (the live callers pass nothing and are unchanged).
+- **The clamp holds on the fill and exit paths.** The simulator reads bars outside `ClampedBars`, so the session runner checks the clamp (`LastReadableSessionAsync`) before the plan's session, every fill and every exit check, whatever the run context says. A missing hold-out block is a `replay.holdout` result from the driver.
+- **Learning reads the sources of the newest snapshot**, not those of the frozen one: a run made after the start holds the trades that the replay "learns" from, and the P6-01 calculator's rule (only trades that exited on or before the as-of date) makes the cut. The strategies were designed on this history: the `data_seen_before` label covers it.
+- **One classification helper** (`TicketClassification`) turns a cell and a version into a compiled strategy and an instrument into tickets for both the live ticket source and the replay's candidate source.
+- **Two per-run switches, both off by default (the live behaviour):** `FiltersWithoutHistory` makes the event, F&O-ban and surveillance filters optional (label `filters_without_history`); `IncludeResearchCells` lets a cell in the research state, or with no recorded state, be a candidate (label `research_cells`). Both are in the parameters that are stored with the run.
+- **No frozen cell statistics as of the start** is refused with `replay.invalid`, so a run never draws a flat curve.
+- **Accepted as hindsight under `settings_now`:** the latest auto-scope definition (part B stores its hash). A basket archived on or before the cut contributes no member. The rolling-window bar load is part B (a `shortcut:` comment marks it).
+
 ## Consequences
 Parts B to E add the job, tables, API and screen on this core. Reading bars once per run as a rolling window (non-functional) is not done in part A: each session reads its 400-day window; the measured time per session is part B's to report.

@@ -31,7 +31,13 @@ internal sealed class TicketReplayer(IStrategyStore strategies, IBasketQueries b
     private Dictionary<string, Guid>? _instruments;
 
     /// <summary>Replays one ticket planned for <paramref name="forDate"/>, reading no bar after <paramref name="lastClosed"/>.</summary>
-    public async Task<TicketReplay> ReplayAsync(DateOnly forDate, DateOnly lastClosed, TradingCalendar calendar, NewPlanItem item, CostChoice costs, CancellationToken cancellationToken)
+    public Task<TicketReplay> ReplayAsync(DateOnly forDate, DateOnly lastClosed, TradingCalendar calendar, NewPlanItem item, CostChoice costs, CancellationToken cancellationToken) =>
+        ReplayAsync(forDate, lastClosed, calendar, item, costs, null, cancellationToken);
+
+    /// <summary>
+    /// Like the overload above, but with the instrument the caller already knows (the system replay, SR-01: a past member that has left every basket is still the instrument of its ticket). With <c>null</c> it is the live mapping through today's baskets, unchanged.
+    /// </summary>
+    public async Task<TicketReplay> ReplayAsync(DateOnly forDate, DateOnly lastClosed, TradingCalendar calendar, NewPlanItem item, CostChoice costs, Guid? knownInstrument, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(item);
         ArgumentNullException.ThrowIfNull(calendar);
@@ -58,10 +64,18 @@ internal sealed class TicketReplayer(IStrategyStore strategies, IBasketQueries b
         }
 
         // Shortcut: the symbol is mapped to an instrument through the non-archived baskets, first match wins (the plan item stores no instrument id). An instrument that has left every basket is pending, not final.
-        _instruments ??= await InstrumentsAsync(cancellationToken);
-        if (!_instruments.TryGetValue(item.Symbol, out var instrumentId))
+        Guid instrumentId;
+        if (knownInstrument is { } known)
         {
-            return Wait("the symbol `" + item.Symbol + "` is in no basket now, so its instrument is unknown");
+            instrumentId = known;
+        }
+        else
+        {
+            _instruments ??= await InstrumentsAsync(cancellationToken);
+            if (!_instruments.TryGetValue(item.Symbol, out instrumentId))
+            {
+                return Wait("the symbol `" + item.Symbol + "` is in no basket now, so its instrument is unknown");
+            }
         }
 
         // The engine cuts trades by the day of the DECISION. A ticket on a daily-or-longer timeframe is decided at the close of D (the session it was built on) and fills at the open of F, so its window starts on D; a ticket on an intraday

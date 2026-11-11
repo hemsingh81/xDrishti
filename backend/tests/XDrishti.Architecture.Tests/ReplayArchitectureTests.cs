@@ -13,7 +13,7 @@ public sealed partial class ReplayArchitectureTests
     private static readonly System.Reflection.Assembly Domain = typeof(XDrishti.Domain.Replay.BlockReason).Assembly;
     private static readonly System.Reflection.Assembly Infrastructure = typeof(XDrishti.Infrastructure.DependencyInjection).Assembly;
 
-    [GeneratedRegex(@"\.\s*(StoreAsync|AppendAsync|InsertAsync|InsertOnceAsync|WriteSessionAsync|PublishAsync|SaveAsync|MoveItemAsync)\(", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\.\s*\w*(Store|Append|Insert|Save|Write|Publish|Delete|Update|Move)\w*Async\(", RegexOptions.CultureInvariant)]
     private static partial Regex WriteCall();
 
     [GeneratedRegex(@"PlaceOrder|IOrder\w*|\bBroker\w*|\bExecution\w*|IExec\w*", RegexOptions.CultureInvariant)]
@@ -88,6 +88,18 @@ public sealed partial class ReplayArchitectureTests
         {
             WriteCall().IsMatch(File.ReadAllText(file)).ShouldBeFalse(file);
         }
+    }
+
+    [Fact]
+    public void The_scans_see_what_they_are_meant_to_see_sentinels()
+    {
+        // the write-call pattern matches the write verbs a store has, and the bar-port scan sees the one type that may hold them
+        WriteCall().IsMatch("await store.AppendAsync(x, ct);").ShouldBeTrue();
+        WriteCall().IsMatch("await store.InsertOnceAsync(x, ct);").ShouldBeTrue();
+        WriteCall().IsMatch("await plans.UpdateStateAsync(x, ct);").ShouldBeTrue();
+        WriteCall().IsMatch("await facts.CellsAsync(p, d, ct);").ShouldBeFalse();
+        Types.InAssembly(Application).That().HaveName("ClampedBars").Should().HaveDependencyOn("XDrishti.Application.Abstractions.Market.Bars.IBarStore").GetResult().IsSuccessful.ShouldBeTrue();
+        Types.InAssembly(Application).That().HaveName("ReplayFacts").Should().HaveDependencyOn("XDrishti.Application.Abstractions.Market.Bars.IBarStore").GetResult().IsSuccessful.ShouldBeTrue();
     }
 
     [Fact]

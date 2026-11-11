@@ -21,6 +21,12 @@ public static class HindsightLabels
     /// <summary>Learning mode used the cell lifecycle as recorded, not recomputed (Q4).</summary>
     public const string LifecycleAsRecorded = "lifecycle_as_recorded";
 
+    /// <summary>The event, F&amp;O-ban and surveillance filters were not required: they have no history.</summary>
+    public const string FiltersWithoutHistory = "filters_without_history";
+
+    /// <summary>Research-state cells were allowed to be candidates.</summary>
+    public const string ResearchCells = "research_cells";
+
     /// <summary>The labels that always apply, plus those the parameters add; the survivorship label is added per session by the facts.</summary>
     public static IReadOnlyList<string> For(ReplayParams p)
     {
@@ -41,6 +47,16 @@ public static class HindsightLabels
         if (p.Mode == ReplayMode.Learning)
         {
             labels.Add(LifecycleAsRecorded);
+        }
+
+        if (p.FiltersWithoutHistory)
+        {
+            labels.Add(FiltersWithoutHistory);
+        }
+
+        if (p.IncludeResearchCells)
+        {
+            labels.Add(ResearchCells);
         }
 
         return labels;

@@ -8,9 +8,7 @@ using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Learning;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
-using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Planning;
-using XDrishti.Domain.Research;
 using XDrishti.Simulation.Scanning;
 
 namespace XDrishti.Infrastructure.Planning;
@@ -44,7 +42,7 @@ internal sealed class StoredTicketSource(
         }
 
         var cut = new DateTimeOffset(forDate.ToDateTime(TimeOnly.MinValue), IndiaOffset);
-        var cells = new List<(StoredCellStats Stored, CellState? State, PreparedTicketStrategy Strategy)>();
+        var cells = new List<ClassifiedCell>();
         var versions = new Dictionary<string, StoredVersion?>(StringComparer.Ordinal);
         var reasons = new SortedSet<string>(StringComparer.Ordinal);
         var unavailable = 0;
@@ -58,7 +56,7 @@ internal sealed class StoredTicketSource(
                 versions[cell.Strategy] = version;
             }
 
-            if (version is null || !Timeframes.TryParse(cell.Timeframe, out var timeframe) || !TrySide(cell.Side, out var side))
+            if (version is null)
             {
                 unavailable++;
                 AddReason(reasons, "strategy or cell not usable: " + cell.Strategy);
@@ -66,16 +64,16 @@ internal sealed class StoredTicketSource(
             }
 
             // Read, hash-checked and compiled once for the cell, then used for every instrument.
-            var prepared = PreparedTicketStrategy.Prepare(version.SourceText, version.Hash, timeframe, side, cell.Style, cell.Exit);
-            if (prepared.Problem is { } problem)
+            var (prepared, problem) = TicketClassification.Prepare(cell, version);
+            if (prepared is null)
             {
                 unavailable++;
-                AddReason(reasons, problem);
+                AddReason(reasons, problem!);
                 continue;
             }
 
             var history = await changelog.HistoryAsync(cell.Key, cancellationToken);
-            cells.Add((stored, CellStateAsOf.Of(history, cut), prepared));
+            cells.Add(new ClassifiedCell(stored, CellStateAsOf.Of(history, cut), prepared));
         }
 
         var members = await MembersAsync(cancellationToken);
@@ -83,34 +81,23 @@ internal sealed class StoredTicketSource(
         var to = new DateTimeOffset(session.AddDays(1).ToDateTime(TimeOnly.MinValue), IndiaOffset);
         var from = to.AddDays(-LookbackDays);
         var found = new List<TicketCandidate>();
-        var rejected = 0;
+        var tally = new ClassificationTally();
         foreach (var (id, symbol) in members)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var minutes = await bars.ReadAsync(id, from, to, cancellationToken);
             var prepared = TicketBars.Prepare(minutes, session, calendar); // truncated and sorted once for every cell of the instrument
-            foreach (var (stored, state, strategy) in cells)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var draft = TicketBuilder.Build(strategy, prepared, symbol, session, forDate, calendar);
-                switch (draft.Verdict)
-                {
-                    case TicketVerdict.Conditional:
-                        found.Add(new TicketCandidate(draft, stored.Row.Cell, stored.Row, state, id));
-                        break;
-                    case TicketVerdict.Rejected:
-                        rejected++;
-                        break;
-                    default:
-                        unavailable++;
-                        AddReason(reasons, Generic(draft.Reason));
-
-                        break;
-                }
-            }
+            TicketClassification.Classify(cells, id, symbol, prepared, session, forDate, calendar, found, tally, cancellationToken);
         }
 
-        return Result.Success(new TicketSourceResult(found, rejected, unavailable, [.. reasons]));
+        foreach (var reason in tally.Reasons)
+        {
+            AddReason(reasons, reason);
+        }
+
+        unavailable += tally.Unavailable;
+
+        return Result.Success(new TicketSourceResult(found, tally.Rejected, unavailable, [.. reasons]));
     }
 
     private async Task<List<(Guid Id, string Symbol)>> MembersAsync(CancellationToken cancellationToken)
@@ -137,15 +124,4 @@ internal sealed class StoredTicketSource(
             reasons.Add(reason);
         }
     }
-
-    private static bool TrySide(string text, out Side side)
-    {
-        side = text == "SELL" ? Side.Sell : Side.Buy;
-        return text is "BUY" or "SELL";
-    }
-
-    /// <summary>The reason without the dates and path lists, so the same cause is one line.</summary>
-    private static string Generic(string reason) => reason.Contains("not ready", StringComparison.Ordinal) ? "history not ready at the close"
-        : reason.Contains("not complete", StringComparison.Ordinal) ? "session not complete in the bars"
-        : reason;
 }

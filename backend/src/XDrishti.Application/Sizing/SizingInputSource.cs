@@ -32,8 +32,16 @@ internal sealed class SizingInputSource(ISizingStore store, IBarQueries bars, IT
 
         // The one capacity share of the app (ADR 0223) is the ceiling: the owner's value can only be lower.
         state = ClampCapacity(state, costStress);
+        if (IsOff(state, budgets))
+        {
+            // Everything OFF and no budget: nothing would be used, so no bar and no calendar is read and the plan is what it was.
+            return new SizingInputs(state.Settings, state.Version, new Dictionary<string, SymbolSizingInputs>(StringComparer.Ordinal));
+        }
+
         return await ComputeAsync(state, budgets, session, forDate, instruments, bars.ReadDailyBarsAsync, await calendars.GetAsync(cancellationToken), classifications, cancellationToken);
     }
+
+    private static bool IsOff(SizingState state, IReadOnlyDictionary<Guid, double> budgets) => !state.Settings.VolTargetEnabled && !state.Settings.CapacityEnabled && budgets.Count == 0;
 
     /// <summary>The settings with the capacity share held at the app's ceiling.</summary>
     internal static SizingState ClampCapacity(SizingState state, CostStressOptions costStress) =>
@@ -51,7 +59,7 @@ internal sealed class SizingInputSource(ISizingStore store, IBarQueries bars, IT
         IHoldingClassifications classifications,
         CancellationToken cancellationToken)
     {
-        if (!state.Settings.VolTargetEnabled && !state.Settings.CapacityEnabled && budgets.Count == 0)
+        if (IsOff(state, budgets))
         {
             // Everything OFF and no budget: nothing would be used, so no bar is read and the plan is what it was.
             return new SizingInputs(state.Settings, state.Version, new Dictionary<string, SymbolSizingInputs>(StringComparer.Ordinal));

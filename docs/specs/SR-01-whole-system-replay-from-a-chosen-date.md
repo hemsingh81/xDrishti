@@ -216,6 +216,11 @@ All eight answered by the owner on 2026-11-11 as recommended ("Approve all"); th
 8. **Scope default.** Default the scope to the auto scope as of D?
    - *Recommended:* yes. This needs `AutoScopeResolver` to accept an as-of date, which is the same change as REVIEW-2026-11-10 question 3, so build it once in part A.
 
+## Decisions taken at build (part A review, ADR 0272)
+- Two per-run parameters, both off by default: `filtersWithoutHistory` (event, F&O-ban and surveillance filters not required; label `filters_without_history`) and `includeResearchCells` (research-state cells may be candidates; label `research_cells`). Part C adds them to the start request.
+- A start with no frozen cell statistics as of D answers 422 `replay.invalid`.
+- The rolling-window bar load is part B. The latest auto-scope definition is accepted under `settings_now`; part B stores the scope hash.
+
 ## Done when
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors (Opus for parts A and B)

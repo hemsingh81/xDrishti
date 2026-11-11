@@ -23,10 +23,24 @@ internal sealed class ReplayDriver(IReplayFacts facts, ReplaySessionRunner runne
             return Result.Failure<ReplayRunResult>(Error.Validation(InvalidCode, string.Join("; ", problems)));
         }
 
-        var last = await facts.LastReadableSessionAsync(cancellationToken);
+        DateOnly last;
+        try
+        {
+            last = await facts.LastReadableSessionAsync(cancellationToken);
+        }
+        catch (ReplayHoldOutException)
+        {
+            return Result.Failure<ReplayRunResult>(Error.Conflict(HoldOutCode, "No hold-out block is fixed, so the replay cannot know how far it may read."));
+        }
+
         if (parameters.To > last)
         {
             return Result.Failure<ReplayRunResult>(Error.Conflict(HoldOutCode, $"The range reaches the hold-out; the last allowed date is {last:yyyy-MM-dd}."));
+        }
+
+        if ((await facts.CellsAsync(parameters, parameters.From, cancellationToken)).Cells.Count == 0)
+        {
+            return Result.Failure<ReplayRunResult>(Error.Validation(InvalidCode, "no cell statistics as of " + parameters.From.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ": a replay without them would only draw a flat curve"));
         }
 
         var sheet = await facts.CostSheetAsync(parameters, cancellationToken);

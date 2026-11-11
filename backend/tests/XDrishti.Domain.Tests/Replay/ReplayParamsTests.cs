@@ -41,6 +41,15 @@ public sealed class ReplayParamsTests
     }
 
     [Fact]
+    public void The_two_switches_are_off_by_default_and_add_their_labels_when_on()
+    {
+        Good.FiltersWithoutHistory.ShouldBeFalse();
+        Good.IncludeResearchCells.ShouldBeFalse();
+        HindsightLabels.For(Good with { FiltersWithoutHistory = true, IncludeResearchCells = true }).ShouldContain(HindsightLabels.FiltersWithoutHistory);
+        HindsightLabels.For(Good with { FiltersWithoutHistory = true, IncludeResearchCells = true }).ShouldContain(HindsightLabels.ResearchCells);
+    }
+
+    [Fact]
     public void The_closed_list_has_eight_reasons_each_with_its_own_code()
     {
         BlockReasons.All.Count.ShouldBe(8);

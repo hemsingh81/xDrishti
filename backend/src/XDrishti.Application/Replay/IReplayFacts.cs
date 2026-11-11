@@ -1,43 +1,11 @@
-using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Planning;
-using XDrishti.Application.Abstractions.Research;
 using XDrishti.Domain.Common;
-using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Replay;
 using XDrishti.Domain.Research;
-using XDrishti.Domain.Selection.SmartRules;
 
 namespace XDrishti.Application.Replay;
-
-/// <summary>One instrument of the replay universe.</summary>
-/// <param name="Id">The instrument id.</param>
-/// <param name="Symbol">The symbol.</param>
-public sealed record ReplayInstrument(Guid Id, string Symbol);
-
-/// <summary>The universe at a session: the members of the chosen baskets and instruments as they were at its close, and whether the earliest known membership stood in for a date before it was known.</summary>
-/// <param name="Members">The members, by symbol.</param>
-/// <param name="Survivorship">True when a basket's membership is not known as far back as the session (ISS-22): the earliest known membership was used.</param>
-public sealed record ReplayUniverse(IReadOnlyList<ReplayInstrument> Members, bool Survivorship);
-
-/// <summary>One cell as the replay sees it at a session: its statistics row, its state, and the strategy version the rule gives (null: <c>no_version</c>).</summary>
-/// <param name="Stored">The statistics row with its snapshot facts.</param>
-/// <param name="State">The state as of the cut; null when not known.</param>
-/// <param name="Version">The strategy version under the version rule; null when none.</param>
-public sealed record ReplayCell(StoredCellStats Stored, CellState? State, StoredVersion? Version);
-
-/// <summary>The cells of a session.</summary>
-/// <param name="Cells">The cash cells.</param>
-/// <param name="Notes">Plain notes, for example the label that the lifecycle is as recorded.</param>
-public sealed record ReplayCells(IReadOnlyList<ReplayCell> Cells, IReadOnlyList<string> Notes);
-
-/// <summary>The market facts of a session: the gate and its note, the correlations of the ranked instruments, and the instrument facts by upper-case symbol.</summary>
-/// <param name="Gate">The market gate input; null when none can be formed.</param>
-/// <param name="MarketNote">What the breadth is.</param>
-/// <param name="Correlations">Correlations of the daily returns up to the close of the session; null when not computable.</param>
-/// <param name="Instruments">Sector and baskets by symbol.</param>
-public sealed record ReplayMarket(MarketGateInput? Gate, string? MarketNote, CorrelationTable? Correlations, IReadOnlyDictionary<string, InstrumentFacts> Instruments);
 
 /// <summary>
 /// The as-of facts of the system replay (SR-01): every read takes the close of a session as its cut and returns only what was known then. Bars are read only through a reader clamped to the hold-out start less its embargo; a read past it fails loudly with

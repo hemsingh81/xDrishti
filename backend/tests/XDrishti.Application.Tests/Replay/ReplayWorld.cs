@@ -62,6 +62,12 @@ internal sealed class ReplayWorld
 
     public DateOnly? KnownSince { get; set; }
 
+    public DateTimeOffset? ArchivedAt { get; set; }
+
+    public bool NoHoldOut { get; set; }
+
+    public SelectionRules Rules { get; set; } = Loose;
+
     public IBasketQueries? Baskets { get; private set; }
 
     public IStrategyStore? Strategies { get; private set; }
@@ -135,7 +141,7 @@ internal sealed class ReplayWorld
     public ReplayFacts Facts(double incompleteShare = 0.2)
     {
         var holdOut = Substitute.For<IHoldOutStore>();
-        holdOut.CurrentAsync(Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult<HoldOutBlock?>(new HoldOutBlock(HoldOutStart, Start.AddYears(-3), Start, 6, "h", DateTimeOffset.UnixEpoch)));
+        holdOut.CurrentAsync(Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult<HoldOutBlock?>(NoHoldOut ? null : new HoldOutBlock(HoldOutStart, Start.AddYears(-3), Start, 6, "h", DateTimeOffset.UnixEpoch)));
 
         var baskets = Substitute.For<IBasketQueries>();
         Baskets = baskets;
@@ -143,8 +149,8 @@ internal sealed class ReplayWorld
         baskets.MembersAsync(Basket, Arg.Any<DateTimeOffset?>(), Arg.Any<DateOnly?>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
             var cutoff = call.ArgAt<DateTimeOffset?>(1);
-            var rows = Members.Where(m => cutoff is { } c ? m.From < c && (m.To is null || m.To >= c) : true).Select(m => Member(m)).ToList();
-            return ValueTask.FromResult<BasketMembers?>(new BasketMembers(Basket, "B", null, null, rows.Count, rows, KnownSince));
+            var rows = Members.Where(m => cutoff is { } c ? m.From < c && (m.To is null || m.To >= c) : m.To is null).Select(m => Member(m)).ToList();
+            return ValueTask.FromResult<BasketMembers?>(new BasketMembers(Basket, "B", ArchivedAt, null, rows.Count, rows, KnownSince));
         });
         baskets.GetAsync(Basket, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketView?>(Blank<BasketView>() with { Id = Basket, Name = "B" }));
 
@@ -160,6 +166,12 @@ internal sealed class ReplayWorld
             var before = call.Arg<DateOnly>();
             var newest = Snapshots.Where(s => s.AsOf < before).Select(s => (DateOnly?)s.AsOf).Max();
             return ValueTask.FromResult<IReadOnlyList<StoredCellStats>>(newest is null ? [] : [.. Snapshots.Where(s => s.AsOf == newest).Select(s => s.Row)]);
+        });
+
+        stats.ListLatestCashAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            var newest = Snapshots.Select(x => (DateOnly?)x.AsOf).Max();
+            return ValueTask.FromResult<IReadOnlyList<StoredCellStats>>(newest is null ? [] : [.. Snapshots.Where(x => x.AsOf == newest).Select(x => x.Row)]);
         });
 
         var changelog = Substitute.For<ILearningChangelog>();
@@ -212,7 +224,7 @@ internal sealed class ReplayWorld
 
         return new ReplayFacts(
             holdOut, new HoldOutOptions(TrainingEmbargoDays: EmbargoDays), baskets, Substitute.For<IInstrumentQueries>(), strategies, stats, changelog, Runs, minute, days, calendar, context, classifications, sheets, basketSettings, sizing,
-            new SystemReplayOptions { IncompleteDataShare = incompleteShare }, Smart, Loose, Fill);
+            new SystemReplayOptions { IncompleteDataShare = incompleteShare }, Smart, Rules, Fill);
     }
 
     private static BasketMemberView Member((Guid Id, string Symbol, DateTimeOffset From, DateTimeOffset? To) m) =>

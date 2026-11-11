@@ -120,6 +120,11 @@ internal sealed class ReplayFacts(
                 continue;
             }
 
+            if (found.ArchivedAt is { } archived && archived <= BasketMember.CutoffAfter(cut))
+            {
+                continue; // a basket archived on or before the cut contributes no member (as the live scope does for an archived basket)
+            }
+
             survivorship |= found.MembersKnownSince is { } since && cut < since;
             foreach (var m in found.Items)
             {
@@ -168,7 +173,13 @@ internal sealed class ReplayFacts(
                 _histories[key] = history = await changelog.HistoryAsync(key, cancellationToken);
             }
 
-            cells.Add(new ReplayCell(stored, CellStateAsOf.Of(history, stateCut), await VersionAsync(parameters.VersionRule, stored.Row.Cell.Strategy, cut, cancellationToken)));
+            var state = CellStateAsOf.Of(history, stateCut);
+            if (parameters.IncludeResearchCells && state is null or CellState.Research)
+            {
+                state = CellState.Candidate; // hindsight, labelled research_cells: the changelog is empty before October 2026
+            }
+
+            cells.Add(new ReplayCell(stored, state, await VersionAsync(parameters.VersionRule, stored.Row.Cell.Strategy, cut, cancellationToken)));
         }
 
         return new ReplayCells(cells, notes);
@@ -183,6 +194,7 @@ internal sealed class ReplayFacts(
         ArgumentNullException.ThrowIfNull(ranked);
         await _bars.EnsureAsync(cut, cancellationToken);
         var ids = instrumentList.Where(i => i.Id is not null).Select(i => i.Id!.Value).Distinct().ToList();
+        // shortcut: sectors and basket names are today's, not those of the session (part of settings_now); upgrade when dated classifications exist.
         var sectors = ids.Count == 0 ? new Dictionary<Guid, string>() : (await classifications.SectorsAsync(ids, cancellationToken)).ToDictionary(p => p.Key, p => p.Value);
         var memberships = ids.Count == 0 ? new Dictionary<Guid, IReadOnlyList<BasketRef>>() : (await classifications.BasketsAsync(ids, cancellationToken)).ToDictionary(p => p.Key, p => p.Value);
         var facts = new Dictionary<string, InstrumentFacts>(StringComparer.Ordinal);
@@ -221,6 +233,7 @@ internal sealed class ReplayFacts(
         return session.AddDays(1);
     }
 
+    // shortcut: the 400 calendar days of minute bars are read again for every session (the rolling window of the non-functional section is part B); upgrade when the measured time per session needs it.
     private async ValueTask<StoredVersion?> VersionAsync(ReplayVersionRule rule, string strategy, DateOnly cut, CancellationToken cancellationToken)
     {
         if (rule == ReplayVersionRule.Start)
@@ -260,7 +273,12 @@ internal sealed class ReplayFacts(
         }
 
         var first = frozen[0];
-        if (CellSource.TryParseList(first.Sources) is not { } sources)
+
+        // The sources of the NEWEST snapshot, not of the frozen one: a run made after the start holds the trades the replay "learns" from, and the calculator's own rule (only trades that exited on or before the as-of date) makes the cut.
+        // The strategies were designed on this history, which the data_seen_before label says.
+        var newest = await stats.ListLatestCashAsync(null, CellWindow.All.Code(), cancellationToken);
+        var sourceText = newest.Count > 0 ? newest[0].Sources : first.Sources;
+        if (CellSource.TryParseList(sourceText) is not { } sources)
         {
             return frozen; // a snapshot whose sources cannot be read keeps its rows: nothing is guessed
         }

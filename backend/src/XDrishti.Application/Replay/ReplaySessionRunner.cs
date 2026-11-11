@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging.Abstractions;
 using XDrishti.Application.Abstractions.Planning;
+using XDrishti.Application.Abstractions.Replay;
 using XDrishti.Application.Planning;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
@@ -8,6 +9,7 @@ using XDrishti.Domain.Market;
 using XDrishti.Domain.Paper;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Replay;
+using XDrishti.Domain.Selection;
 
 namespace XDrishti.Application.Replay;
 
@@ -28,11 +30,13 @@ internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates 
         var p = run.Parameters;
         var forDate = ReplayFacts.NextSession(run.Calendar, session);
         var notes = new List<string>();
+        await EnsureReadableAsync(session, cancellationToken);
 
         // 1. The exits of positions held from earlier sessions that fall on or before S (the replay reads no bar after S).
         foreach (var held in book.Unexited(session).Where(t => t.EntrySession < session))
         {
-            var again = await replayer.ReplayAsync(held.ForDate, session, run.Calendar, held.Item, run.Costs, cancellationToken);
+            await EnsureReadableAsync(session, cancellationToken); // the simulator reads bars outside the clamped reader: the runner checks the clamp itself, whatever the context says
+            var again = await replayer.ReplayAsync(held.ForDate, session, run.Calendar, held.Item, run.Costs, held.InstrumentId, cancellationToken);
             if (again.Trade is { } closed && again.Grade is not null)
             {
                 var exit = PaperPnl.Exit(closed, held.Qty, run.Sheet);
@@ -80,7 +84,7 @@ internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates 
                 new FixedTicketSource(new TicketSourceResult(set.Found, set.Rejected, set.Unavailable, [])),
                 new ReplayContextSource(facts, run, book, session),
                 NullLogger<SelectionPlanBuilder>.Instance,
-                run.Settings.Rules,
+                RulesOf(run),
                 run.Settings.Smart,
                 run.Settings.Fill,
                 null,
@@ -147,7 +151,9 @@ internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates 
     private async ValueTask<ReplayFill> FillAsync(ReplayRunContext run, ReplayBook book, NewPlanItem item, ReplayCandidateSet set, DateOnly forDate, CancellationToken cancellationToken)
     {
         var qty = QuantityOf(item);
-        var replay = await replayer.ReplayAsync(forDate, forDate, run.Calendar, item, run.Costs, cancellationToken);
+        var instrumentId = set.Found.FirstOrDefault(c => c.Draft.Symbol == item.Symbol && c.Cell.Key == item.Evidence.CellKey)?.InstrumentId;
+        await EnsureReadableAsync(forDate, cancellationToken);
+        var replay = await replayer.ReplayAsync(forDate, forDate, run.Calendar, item, run.Costs, instrumentId, cancellationToken);
         ReplayFill None(string status, string detail) => new(item.Symbol, item.Side, item.Evidence.CellKey, forDate, status, 0, null, detail);
         if (replay.Trade is null)
         {
@@ -164,7 +170,7 @@ internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates 
         var entryAt = DateTimeOffset.FromUnixTimeSeconds(trade.EntryEpochSeconds);
         var entry = PaperPnl.Price(trade.EntryFilledPrice);
         var booked = new ReplayTrade(
-            book.Trades.Count + 1, item, forDate, qty, set.Found.FirstOrDefault(c => c.Draft.Symbol == item.Symbol && c.Cell.Key == item.Evidence.CellKey)?.InstrumentId, entryAt, entry, PaperPnl.Price(trade.StopPrice),
+            book.Trades.Count + 1, item, forDate, qty, instrumentId, entryAt, entry, PaperPnl.Price(trade.StopPrice),
             string.Equals(cell?.Style, "swing", StringComparison.OrdinalIgnoreCase), trade.Key);
         if (replay.Grade is not null)
         {
@@ -180,6 +186,21 @@ internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates 
         book.Add(booked);
         return new ReplayFill(item.Symbol, item.Side, item.Evidence.CellKey, IndiaTime.Today(entryAt), ReplayFill.Filled, qty, entry, string.Empty);
     }
+
+    /// <summary>Throws <see cref="ReplayHoldOutException"/> when <paramref name="day"/> is past the hold-out clamp: fail closed on the fill and exit paths too.</summary>
+    private async ValueTask EnsureReadableAsync(DateOnly day, CancellationToken cancellationToken)
+    {
+        var last = await facts.LastReadableSessionAsync(cancellationToken);
+        if (day > last)
+        {
+            throw new ReplayHoldOutException(day, last);
+        }
+    }
+
+    /// <summary>The selection rules of the snapshot; with <c>FiltersWithoutHistory</c> the event, F&amp;O-ban and surveillance filters are optional (an unavailable answer does not hold a candidate back; a fail still rejects).</summary>
+    private static SelectionRules RulesOf(ReplayRunContext run) => run.Parameters.FiltersWithoutHistory
+        ? run.Settings.Rules with { OptionalFilters = [.. run.Settings.Rules.Optional.Union([FilterCodes.Event, FilterCodes.FnoBan, FilterCodes.Surveillance])] }
+        : run.Settings.Rules;
 
     private static int QuantityOf(NewPlanItem item) => item.Allocations.FirstOrDefault(a => a.AccountId == ReplayBook.AccountId)?.Quantity ?? 0;
 

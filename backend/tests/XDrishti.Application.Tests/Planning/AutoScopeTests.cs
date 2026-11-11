@@ -107,22 +107,37 @@ public sealed class AutoScopeTests
     }
 
     [Fact]
-    public async Task A_null_as_of_date_reads_exactly_what_the_live_resolver_reads()
+    public async Task A_null_as_of_date_keeps_the_live_behaviour_members_now_by_the_open_ended_stay_and_an_archived_basket_left_out()
+    {
+        // characterisation of the live read as it was before the as-of overload: the pre-change expected values written out, not the resolver compared with itself
+        var basket = Guid.NewGuid();
+        var archived = Guid.NewGuid();
+        var member = Guid.NewGuid();
+        var stock = Guid.NewGuid();
+        var store = new MemoryScopes();
+        var stored = await store.AppendAsync(AutoScope.Create([basket, archived], [stock]).Value, Owner, DateTimeOffset.UnixEpoch, Ct);
+        var baskets = Substitute.For<IBasketQueries>();
+        baskets.MembersAsync(basket, null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketMembers?>(Members(basket, null, Member(member, null), Member(Guid.NewGuid(), DateTimeOffset.UnixEpoch))));
+        baskets.MembersAsync(archived, null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketMembers?>(Members(archived, DateTimeOffset.UnixEpoch, Member(Guid.NewGuid(), null))));
+
+        var viaOverload = await new AutoScopeResolver(store, baskets).ResolveAsync((DateOnly?)null, Ct);
+
+        viaOverload!.Hash.ShouldBe(stored.Hash);
+        viaOverload.InstrumentIds.ShouldBe([member, stock], ignoreOrder: true);
+        await baskets.DidNotReceive().MembersAsync(Arg.Any<Guid>(), Arg.Is<DateTimeOffset?>(c => c != null), Arg.Any<DateOnly?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task An_as_of_date_leaves_out_a_basket_archived_on_or_before_it()
     {
         var basket = Guid.NewGuid();
-        var member = Guid.NewGuid();
+        var day = new DateOnly(2025, 3, 3);
         var store = new MemoryScopes();
         await store.AppendAsync(AutoScope.Create([basket], []).Value, Owner, DateTimeOffset.UnixEpoch, Ct);
         var baskets = Substitute.For<IBasketQueries>();
-        baskets.MembersAsync(basket, null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketMembers?>(Members(basket, null, Member(member, null), Member(Guid.NewGuid(), DateTimeOffset.UnixEpoch))));
-        var resolver = new AutoScopeResolver(store, baskets);
+        baskets.MembersAsync(basket, BasketMember.CutoffAfter(day), null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketMembers?>(Members(basket, BasketMember.CutoffAfter(day).AddHours(-1), Member(Guid.NewGuid(), null))));
 
-        var live = await resolver.ResolveAsync(Ct);
-        var nullDate = await resolver.ResolveAsync((DateOnly?)null, Ct);
-
-        nullDate!.Hash.ShouldBe(live!.Hash);
-        nullDate.InstrumentIds.ShouldBe(live.InstrumentIds, ignoreOrder: true);
-        await baskets.DidNotReceive().MembersAsync(basket, Arg.Is<DateTimeOffset?>(c => c != null), Arg.Any<DateOnly?>(), Arg.Any<CancellationToken>());
+        (await new AutoScopeResolver(store, baskets).ResolveAsync(day, Ct))!.InstrumentIds.ShouldBeEmpty();
     }
 
     [Fact]

@@ -1,9 +1,8 @@
 using XDrishti.Application.Abstractions.Planning;
+using XDrishti.Application.Abstractions.Replay;
 using XDrishti.Application.Replay;
-using XDrishti.Domain.Market.Bars;
-using XDrishti.Domain.Planning;
 using XDrishti.Domain.Replay;
-using XDrishti.Domain.Research;
+using XDrishti.Infrastructure.Planning;
 using XDrishti.Simulation.Scanning;
 
 namespace XDrishti.Infrastructure.Replay;
@@ -15,7 +14,7 @@ namespace XDrishti.Infrastructure.Replay;
 /// </summary>
 internal sealed class ReplayCandidateSource(IReplayFacts facts) : IReplayCandidates
 {
-    private readonly Dictionary<string, PreparedTicketStrategy> _prepared = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (PreparedTicketStrategy? Strategy, string? Problem)> _prepared = new(StringComparer.Ordinal);
 
     public async ValueTask<ReplayCandidateSet> ReadAsync(ReplayParams parameters, DateOnly session, DateOnly forDate, CancellationToken cancellationToken)
     {
@@ -23,9 +22,9 @@ internal sealed class ReplayCandidateSource(IReplayFacts facts) : IReplayCandida
         var universe = await facts.UniverseAsync(parameters, session, cancellationToken);
         var cells = await facts.CellsAsync(parameters, session, cancellationToken);
         var calendar = await facts.CalendarAsync(cancellationToken);
-        var usable = new List<(ReplayCell Cell, PreparedTicketStrategy Strategy)>();
+        var usable = new List<ClassifiedCell>();
         var noVersion = new List<string>();
-        var unavailable = 0;
+        var tally = new ClassificationTally();
         foreach (var cell in cells.Cells)
         {
             var id = cell.Stored.Row.Cell;
@@ -35,29 +34,22 @@ internal sealed class ReplayCandidateSource(IReplayFacts facts) : IReplayCandida
                 continue;
             }
 
-            if (!Timeframes.TryParse(id.Timeframe, out var timeframe) || !TrySide(id.Side, out var side))
-            {
-                unavailable++;
-                continue;
-            }
-
             var key = id.Key + "|" + version.Hash;
             if (!_prepared.TryGetValue(key, out var prepared))
             {
-                _prepared[key] = prepared = PreparedTicketStrategy.Prepare(version.SourceText, version.Hash, timeframe, side, id.Style, id.Exit);
+                _prepared[key] = prepared = TicketClassification.Prepare(id, version);
             }
 
-            if (prepared.Problem is not null)
+            if (prepared.Strategy is null)
             {
-                unavailable++;
+                tally.Unavailable++;
                 continue;
             }
 
-            usable.Add((cell, prepared));
+            usable.Add(new ClassifiedCell(cell.Stored, cell.State, prepared.Strategy));
         }
 
         var found = new List<TicketCandidate>();
-        var rejected = 0;
         var incomplete = 0;
         foreach (var member in universe.Members)
         {
@@ -69,30 +61,9 @@ internal sealed class ReplayCandidateSource(IReplayFacts facts) : IReplayCandida
                 incomplete++;
             }
 
-            foreach (var (cell, strategy) in usable)
-            {
-                var draft = TicketBuilder.Build(strategy, bars, member.Symbol, session, forDate, calendar);
-                switch (draft.Verdict)
-                {
-                    case TicketVerdict.Conditional:
-                        found.Add(new TicketCandidate(draft, cell.Stored.Row.Cell, cell.Stored.Row, cell.State, member.Id));
-                        break;
-                    case TicketVerdict.Rejected:
-                        rejected++;
-                        break;
-                    default:
-                        unavailable++;
-                        break;
-                }
-            }
+            TicketClassification.Classify(usable, member.Id, member.Symbol, bars, session, forDate, calendar, found, tally, cancellationToken);
         }
 
-        return new ReplayCandidateSet(found, rejected, unavailable, universe.Members.Count, incomplete, noVersion, universe.Survivorship, cells.Notes);
-    }
-
-    private static bool TrySide(string text, out Side side)
-    {
-        side = text == "SELL" ? Side.Sell : Side.Buy;
-        return text is "BUY" or "SELL";
+        return new ReplayCandidateSet(found, tally.Rejected, tally.Unavailable, universe.Members.Count, incomplete, noVersion, universe.Survivorship, cells.Notes);
     }
 }

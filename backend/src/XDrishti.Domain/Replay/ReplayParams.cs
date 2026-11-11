@@ -11,7 +11,9 @@ namespace XDrishti.Domain.Replay;
 /// <param name="CostSheetId">The stored charge sheet to net the trades with; null is gross.</param>
 /// <param name="VersionRule">Start or as-of strategy versions.</param>
 /// <param name="Mode">Frozen or learning.</param>
-public sealed record ReplayParams(DateOnly From, DateOnly To, ReplayScope Scope, decimal Capital, ReplayRiskProfile Profile, string? CostSheetId, ReplayVersionRule VersionRule, ReplayMode Mode)
+/// <param name="FiltersWithoutHistory">Off by default (the live behaviour). On: the event, F&amp;O-ban and surveillance filters, which have no history, do not hold candidates back (label <c>filters_without_history</c>).</param>
+/// <param name="IncludeResearchCells">Off by default. On: a cell in the research state (or with no recorded state) can be a candidate, as the changelog is empty before October 2026 (label <c>research_cells</c>).</param>
+public sealed record ReplayParams(DateOnly From, DateOnly To, ReplayScope Scope, decimal Capital, ReplayRiskProfile Profile, string? CostSheetId, ReplayVersionRule VersionRule, ReplayMode Mode, bool FiltersWithoutHistory = false, bool IncludeResearchCells = false)
 {
     /// <summary>The problems of the values; empty when they are usable (From not after To, a scope, a positive capital, a usable profile).</summary>
     public IReadOnlyList<string> Problems()

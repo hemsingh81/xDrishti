@@ -15,6 +15,7 @@ internal sealed class AutoScopeResolver(IAutoScopeStore store, IBasketQueries ba
     /// </summary>
     public async ValueTask<ResolvedAutoScope?> ResolveAsync(DateOnly? asOf, CancellationToken cancellationToken)
     {
+        // shortcut: the store has no history reader, so on the as-of path the latest scope definition applies (hindsight, under settings_now; part B stores the scope hash); upgrade when the scopes are listable by date.
         var scope = await store.LatestAsync(cancellationToken);
         if (scope is null)
         {
@@ -26,7 +27,7 @@ internal sealed class AutoScopeResolver(IAutoScopeStore store, IBasketQueries ba
         {
             if (asOf is { } day)
             {
-                if (await baskets.MembersAsync(basketId, BasketMember.CutoffAfter(day), null, cancellationToken) is { } past)
+                if (await baskets.MembersAsync(basketId, BasketMember.CutoffAfter(day), null, cancellationToken) is { } past && !(past.ArchivedAt is { } archived && archived <= BasketMember.CutoffAfter(day)))
                 {
                     ids.UnionWith(past.Items.Select(m => m.Instrument.Id));
                 }
