@@ -80,6 +80,14 @@ The owner asked for this on 2026-11-09 in chat: plan [AU-00](../specs/AU-00-auto
 | AU-18 | [Auto and next-day suggestions screen](../specs/AU-18-auto-suggestions-screen.md) | 2 d | AU-16, AU-17 | Built 2026-11-10
 | AU-19 | [AU programme check](../specs/AU-19-programme-check.md) | 1 d | AU-01 to AU-18 | Built 2026-11-10 (ADR 0253); `xd auto check` reads stored facts only, an unreadable or empty fact is NOT EVALUABLE
 
+## SR programme: system replay (approved 2026-11-11)
+
+The owner asked on 2026-11-11 in chat for a replay of the whole system from a chosen date: the plan it would have made each session, what it took and blocked, the fills and a portfolio equity curve, frozen or learning. Research only, fenced from evidence, hindsight-labelled, no orders.
+
+| Id | What | Size | Needs | Status |
+|----|------|------|-------|--------|
+| SR-01 | [Whole-system replay from a chosen date](../specs/SR-01-whole-system-replay-from-a-chosen-date.md) | 13.5 d | built P7 pipeline, CF-08 replayer, P10-02 ledger, AU-11, CF-06; better after CF-04 B/C | Approved 2026-11-11 (all eight questions as recommended); parts A to E to build
+
 ## P3 slices
 
 **P4-01 was built early (2026-10-21).** At the owner's request the exit tape and trades with legs ([P4-01](../specs/P4-01-the-exit-tape-and-trades-with-legs.md), [ADR 0049](../adr/0049-the-exit-tape-trades-with-legs-and-sim-6.md)) were built before the P3 exit check: engine `sim-6`, so a pack drawn under `sim-5` is void and the pack for the gate is drawn from a `sim-6` run. No exit policy was added and no production run makes a leg; see its row.
