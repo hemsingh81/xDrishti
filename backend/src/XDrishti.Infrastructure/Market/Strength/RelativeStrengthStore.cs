@@ -57,6 +57,18 @@ internal sealed class RelativeStrengthStore(XDrishtiDbContext db) : IRelativeStr
         }, cancellationToken);
     }
 
+    public async ValueTask<IReadOnlyList<StrengthRow>> ForInstrumentAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        var rows = await db.RelativeStrengths.AsNoTracking().Where(r => r.InstrumentId == instrumentId && r.AsOf >= from && r.AsOf <= to).OrderBy(r => r.AsOf).ToListAsync(cancellationToken);
+        return [.. rows.Select(r => new StrengthRow(r.AsOf, r.InstrumentId, r.BasketId, r.Lookback, r.Skip, r.Score, r.PctRank, r.NRanked, r.State, r.MembershipBasis))];
+    }
+
+    public async ValueTask<IReadOnlyList<SectorRow>> SectorRowsAsync(string sector, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        var rows = await db.SectorStrengths.AsNoTracking().Where(r => r.Sector == sector && r.AsOf >= from && r.AsOf <= to).OrderBy(r => r.AsOf).ToListAsync(cancellationToken);
+        return [.. rows.Select(r => new SectorRow(r.AsOf, r.Sector, r.WindowSessions, r.Ret, r.Rank, r.NMembers, r.State))];
+    }
+
     public async ValueTask<IReadOnlyList<StrengthRow>> ListAsync(Guid? basketId, DateOnly? asOf, int take, CancellationToken cancellationToken)
     {
         var query = db.RelativeStrengths.AsNoTracking().Where(r => r.BasketId != Guid.Empty);

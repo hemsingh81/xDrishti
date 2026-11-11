@@ -48,6 +48,12 @@ public sealed class ComputeRelativeStrengthTests
             return ValueTask.FromResult(true);
         }
 
+        public ValueTask<IReadOnlyList<StrengthRow>> ForInstrumentAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<StrengthRow>>([.. Days.Values.SelectMany(d => d.Rows).Where(r => r.InstrumentId == instrumentId && r.AsOf >= from && r.AsOf <= to).OrderBy(r => r.AsOf)]);
+
+        public ValueTask<IReadOnlyList<SectorRow>> SectorRowsAsync(string sector, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<SectorRow>>([.. Days.Values.SelectMany(d => d.Sectors).Where(r => r.Sector == sector && r.AsOf >= from && r.AsOf <= to).OrderBy(r => r.AsOf)]);
+
         public ValueTask<IReadOnlyList<StrengthRow>> ListAsync(Guid? basketId, DateOnly? asOf, int take, CancellationToken cancellationToken) =>
             ValueTask.FromResult<IReadOnlyList<StrengthRow>>([.. Days.Values.SelectMany(d => d.Rows).Take(take)]);
     }

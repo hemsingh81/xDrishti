@@ -82,6 +82,7 @@ public static class RunLabels
             .. SellLine(run.Strategy.DefinitionJson),
             .. TargetLine(run),
             .. SurpriseLine(run),
+            .. RelativeStrengthLine(run),
             .. ReferenceLine(run),
             "universe: " + run.Universe.Label + SurvivorshipNote,
             DataLine(run),
@@ -158,6 +159,9 @@ public static class RunLabels
         var counts = string.Create(CultureInfo.InvariantCulture, $"{target} of {run.Trades.Count} trades left by the target ({share * 100:0.0} %)");
         return [share > TargetNegligibleShare ? "target not negligible: FIXED_RR 10 stands in for no target, and " + counts : "target: FIXED_RR 10 stands in for no target; " + counts];
     }
+
+    /// <summary>The line of a run that read the relative-strength rows (BK-09): the baskets, their ids, "members as of", basis and parameter hash. No line for any other run.</summary>
+    private static string[] RelativeStrengthLine(SimulationRun run) => run.RelativeStrength is { } r ? [r.Label()] : [];
 
     /// <summary>
     /// The lines of a run that read a quintile feature (P15-09): the filings whose <c>sue_yoy</c> rests on the synthetic parser (none when none does), the seasons whose breakpoints are NaN for lack of 100 values in the universe of the run, and the filings broadcast before the open of their

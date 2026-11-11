@@ -15,6 +15,12 @@ public interface IRelativeStrengthStore
     /// <summary>Writes the rows of one day in one transaction; false and nothing written when the day already has rows.</summary>
     ValueTask<bool> InsertDayAsync(DateOnly asOf, IReadOnlyList<StrengthRow> rows, IReadOnlyList<SectorRow> sectors, CancellationToken cancellationToken);
 
+    /// <summary>The rows of one instrument (momentum and index-relative) with <c>as_of</c> in the range, oldest first: what a Lab run reads.</summary>
+    ValueTask<IReadOnlyList<StrengthRow>> ForInstrumentAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken);
+
+    /// <summary>The rows of one sector with <c>as_of</c> in the range, oldest first.</summary>
+    ValueTask<IReadOnlyList<SectorRow>> SectorRowsAsync(string sector, DateOnly from, DateOnly to, CancellationToken cancellationToken);
+
     /// <summary>The newest <paramref name="take"/> momentum rows, newest day first, optionally of one basket and one day.</summary>
     ValueTask<IReadOnlyList<StrengthRow>> ListAsync(Guid? basketId, DateOnly? asOf, int take, CancellationToken cancellationToken);
 }

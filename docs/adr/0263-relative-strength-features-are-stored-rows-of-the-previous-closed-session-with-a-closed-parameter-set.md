@@ -16,9 +16,19 @@ Strategies and reports need a share's relative strength inside a basket, against
 6. **`RS_ROTATION` is stored text** (swing, 1D, BUY only, at the close, one `FIXED_RR`, hold 5, stop `swing_low` 5, `mom_rank("Nifty 100", 126, 21) >= 0.67 and sector_rs(63) <= 3`). Seeded as a version like the other built-ins; not Active, not read by selection. The thresholds 0.67 and 3 are fixed; changing either is a new variant.
 7. **Read endpoint** `GET /api/market/relative-strength?basket=&asOf=` (newest 500 rows, tag Market).
 
+## The run (criteria 6, 7 and 11)
+8. **Lab runs read the stored rows.** A strategy that names one of the three features gets, once per instrument, its rows (momentum and index-relative) and its sector's rows with `as_of` from 14 days before the window to the day before the window end (`RelativeStrengthRunReader`), as `FrameOptions.RelativeStrength`. The frame reads the newest row strictly before each date, so a decision on day D sees the previous closed session. A run given none (the engine called without rows) is refused; an instrument whose replay has no rows is skipped with `no_relative_strength`. A comparison run (several exits in one scan) does not read them yet and fails closed.
+9. **The run records what it read.** `SimulationRun.RelativeStrength` holds the hash and count of the rows, the session the members are as of (the window end), and per basket the id, name, the `params_hash` of the newest version of a derived basket (none for an index or manual basket) and the basis (`dated` or `single_snapshot`). The hash and the date are a line of the run key (`rstrength`), so other rows are another run; the run label prints the basket ids, "members as of", the basis, the parameter hash and the `feature_unknown` count. No other run has the line, so every other key is unchanged.
+10. **`feature_unknown` is its own counter** (`ScanCounters.FeatureUnknown`): the steps at which a condition that names one of the features was not true because a feature was unknown. A known low rank is plain false and is not counted. Unknown is never a pass.
+11. **Trials.** A Lab run of `RS_ROTATION` is a ledger row like any other (ADR 0207); a run over another basket has another plan hash and is a `replan` row. The count enters `MultipleTesting.Factor` only when the owner's `CountInFactor` switch is on. Pre-registration of the version stays the owner's act.
+
+## Decisions recorded with the build
+- **"Liquid-100" is the derived basket "Most liquid"** (BK-03, stored as "Derived: Most liquid"); the pre-registered baskets are Nifty 50, Nifty 100, F&O stocks and Most liquid. The spec's open question 1 is answered this way until the owner says otherwise.
+- **`EqualWeightIndex` (BK-06) is not reused for the sector return.** Acceptance criterion 5 states the sector return as the plain mean of the members' window returns (+3.0 % from +4, +2, +6, 0, +3), which is the equal-weight buy-and-hold return over the window. The daily-rebalanced index compounds the daily means and would give another number for the same members; the plain mean is also one pass over the members instead of a daily loop. The profile of BK-06 keeps the rebalanced index for its own figures.
+
 ## Consequences
-- The Lab engine does not feed the stored rows into a run yet: a run that reads one of the three features is refused with the frame's `options.relativeStrength` error (fail closed, never a silent zero-trade run). Feeding `FrameOptions.RelativeStrength` per instrument through the simulation adapter, the run label (basket id, `params_hash`, membership basis) and the ledger count are the next slice.
-- Each Lab run of `RS_ROTATION` on another basket is a `replan` row in the test ledger (ADR 0207); pre-registration of its version is the owner's act.
+- The step is off by default, so until the owner turns it on a run of `RS_ROTATION` finds no rows and trades nothing (every step is a `feature_unknown`).
+- The trade-card and ticket builders (`TicketBuilder`) do not read the rows; a stored strategy that names the features is not explained there.
 
 ## Honest limits
 - Two to three years of history: a 252-session lookback has about one year of valid ranks (`short_history` before that). A basket of today's members flatters momentum (survivorship); the basis says so.

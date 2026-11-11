@@ -33,6 +33,9 @@ public interface IPreparedStrategy
     /// <summary>The strategy names <c>results_sue_q</c> or <c>results_car3_q</c> (P15-09): a run also gives the replay the surprise numbers of the universe, from which the breakpoints of the previous complete season are made; an instrument is skipped with the reason <c>event_calendar_unavailable</c> and the cause <c>no_surprise_inputs</c> when the inputs of the replay carry none. Default: false.</summary>
     bool ReadsSurprise => false;
 
+    /// <summary>The strategy names <c>mom_rank</c>, <c>rs_vs_index</c> or <c>sector_rs</c> (BK-09): the run reads the stored relative-strength rows once per instrument.</summary>
+    bool ReadsRelativeStrength => false;
+
     /// <summary>The warnings of the compile (path in <see cref="FieldError.Field"/>, code in <see cref="FieldError.Code"/>); counted in the log, not stored in the run record.</summary>
     IReadOnlyList<FieldError> Warnings { get; }
 }

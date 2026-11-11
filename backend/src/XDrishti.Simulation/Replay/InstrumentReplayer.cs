@@ -172,6 +172,12 @@ public static class InstrumentReplayer
             return Same(new InstrumentReplay(Record(input, facts, SkipReason.EventCalendarUnavailable, "no_results_days", Scanned.None), [], []), count);
         }
 
+        if (strategy.ReadsRelativeStrength && input.RelativeStrength is null)
+        {
+            // The strategy reads the stored relative-strength rows and the replay was given none (the step is off, or the run was not given them): an empty result with no reason would look like "no signals" (BK-09).
+            return Same(new InstrumentReplay(Record(input, facts, SkipReason.EventCalendarUnavailable, "no_relative_strength", Scanned.None), [], []), count);
+        }
+
         if (strategy.ReadsSurprise && !input.HasSurpriseInputs())
         {
             // The strategy reads a surprise quintile and the replay was given no surprise numbers: every quintile would be NaN and an empty result would look like "no signals" (P15-09).
@@ -406,7 +412,7 @@ public static class InstrumentReplayer
                 : many.Value;
         }
 
-        var run = strategy.Simulator.RunUntilCancelled(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays, input.TierOn, input.TurnoverOn, cancellationToken);
+        var run = strategy.Simulator.RunUntilCancelled(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays, input.TierOn, input.TurnoverOn, cancellationToken, input.RelativeStrength);
         return run.IsFailure
             ? throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + run.Error.Code + ": " + run.Error.Message)
             : new ComparisonResult([run.Value], run.Value.Scans);
