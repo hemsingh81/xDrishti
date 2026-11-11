@@ -63,7 +63,7 @@ internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorpor
             """
             SELECT i.id, i.canonical_symbol, i.sector, i.tick_size, a.ts, a.open, a.high, a.low, a.close, a.volume, i.series
             FROM market.instruments i
-            JOIN market.bars_agg a ON a.instrument_id = i.id AND a.timeframe = '1D' AND a.complete AND a.ts >= @from AND a.ts < @to
+            JOIN market.bars_agg a ON a.instrument_id = i.id AND a.timeframe = '1D' AND a.complete AND a.ts >= market.backfill_cut(a.instrument_id) AND a.ts >= @from AND a.ts < @to
             WHERE i.type = 'share'
             ORDER BY i.id, a.ts
             """);

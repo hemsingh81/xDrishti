@@ -54,7 +54,7 @@ public sealed class BuildTradeCardsHandlerTests
 
         public SimulationRun Run { get; }
 
-        public BuildTradeCardsHandler Handler(IBarStore? store = null) => new(store ?? Fixture.Store, Fixture.BarQueries, Fixture.Factors, Engine);
+        public BuildTradeCardsHandler Handler(IBarStore? store = null) => new(store ?? Fixture.Store, Fixture.BarQueries, Fixture.Factors, Engine, new XDrishti.Application.Tests.Market.History.FakeSeams());
 
         public string[] Keys(params int[] positions) => [.. positions.Select(p => Run.Trades.Single(t => t.Trade.InstrumentId == Ids[p]).Trade.Key)];
 
@@ -117,7 +117,7 @@ public sealed class BuildTradeCardsHandlerTests
         var sell = new RunTrade(FabricatedRun.Trade(world.Ids[0], world.Symbols[0], Side.Sell, D2), []);
         var run = world.Run with { Trades = [.. world.Run.Trades, sell] };
 
-        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine()).HandleAsync(new BuildTradeCardsQuery(run, [.. run.Trades.Select(t => t.Trade.Key)]), Ct);
+        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine(), new XDrishti.Application.Tests.Market.History.FakeSeams()).HandleAsync(new BuildTradeCardsQuery(run, [.. run.Trades.Select(t => t.Trade.Key)]), Ct);
 
         result.Value.Count.ShouldBe(2);
         world.Fixture.Store.Reads.Count.ShouldBe(1);
@@ -256,7 +256,7 @@ public sealed class BuildTradeCardsHandlerTests
         var world = new World();
         var run = world.Run with { Instruments = [.. world.Run.Instruments.Where(i => i.InstrumentId != world.Ids[2])] };
 
-        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine()).HandleAsync(new BuildTradeCardsQuery(run, world.Keys(2)), Ct);
+        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine(), new XDrishti.Application.Tests.Market.History.FakeSeams()).HandleAsync(new BuildTradeCardsQuery(run, world.Keys(2)), Ct);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("simulation.invalid");
@@ -445,7 +445,7 @@ public sealed class BuildTradeCardsHandlerTests
             Trades = [world.Run.Trades[0], new RunTrade(FabricatedRun.Trade(world.Ids[0], world.Symbols[0], Side.Sell, D3), [])],
         };
 
-        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine()).HandleAsync(new BuildTradeCardsQuery(run, [.. run.Trades.Select(t => t.Trade.Key)]), Ct);
+        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine(), new XDrishti.Application.Tests.Market.History.FakeSeams()).HandleAsync(new BuildTradeCardsQuery(run, [.. run.Trades.Select(t => t.Trade.Key)]), Ct);
 
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : string.Empty);
         var (beforeSplit, onSplitDay) = (result.Value[0], result.Value[1]);
@@ -468,7 +468,7 @@ public sealed class BuildTradeCardsHandlerTests
         list.RemoveAll(b => b.EpochSeconds == Day.Epoch(D2, 555));
         var run = world.Run with { Instruments = [.. world.Run.Instruments.Select(i => i.InstrumentId == world.Ids[0] ? i with { BarsSha256 = BarStreamHash.Compute(list) } : i)] };
 
-        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine()).HandleAsync(new BuildTradeCardsQuery(run, [run.Trades[0].Trade.Key]), Ct);
+        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine(), new XDrishti.Application.Tests.Market.History.FakeSeams()).HandleAsync(new BuildTradeCardsQuery(run, [run.Trades[0].Trade.Key]), Ct);
 
         var card = result.Value.Single();
         card.OpeningBar.ShouldBeNull();
@@ -487,7 +487,7 @@ public sealed class BuildTradeCardsHandlerTests
         list.Sort((a, b) => a.EpochSeconds.CompareTo(b.EpochSeconds));
         var run = world.Run with { Instruments = [.. world.Run.Instruments.Select(i => i.InstrumentId == world.Ids[0] ? i with { BarsSha256 = BarStreamHash.Compute(list) } : i)] };
 
-        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine()).HandleAsync(new BuildTradeCardsQuery(run, [run.Trades[0].Trade.Key]), Ct);
+        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine(), new XDrishti.Application.Tests.Market.History.FakeSeams()).HandleAsync(new BuildTradeCardsQuery(run, [run.Trades[0].Trade.Key]), Ct);
 
         result.Value.Single().DayBars.Count.ShouldBe(375);
     }

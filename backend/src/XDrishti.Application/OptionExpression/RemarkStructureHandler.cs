@@ -33,6 +33,7 @@ internal sealed class RemarkStructureHandler(
     ISpreadModelStore spreadModels,
     ISpreadModelSettings spreadSettings,
     IBarStore minuteBars,
+    XDrishti.Application.Abstractions.Market.History.IBackfillSeams seams,
     ITradingCalendar calendars,
     IRemarkSettings settings,
     IRegimeLabels regime,
@@ -239,7 +240,7 @@ internal sealed class RemarkStructureHandler(
                     }
 
                     var grid = BarGrid.Build(bars);
-                    var spot = bars.Count == 0 ? new Dictionary<long, int>() : await RemarkShared.SpotAsync(minuteBars, group.Key, from - SpotWindowPad, to, cancellationToken);
+                    var spot = bars.Count == 0 ? new Dictionary<long, int>() : await RemarkShared.SpotAsync(minuteBars, seams, group.Key, from - SpotWindowPad, to, cancellationToken);
                     var context = new RemarkContext
                     {
                         Calendar = calendar,

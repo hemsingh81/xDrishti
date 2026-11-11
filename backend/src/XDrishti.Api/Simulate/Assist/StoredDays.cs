@@ -12,7 +12,8 @@ namespace XDrishti.Api.Simulate.Assist;
 internal sealed class StoredDays(
     IQueryHandler<ResolveInstrumentsQuery, Result<ResolveResult>> resolve,
     IQueryHandler<GetInstrumentQuery, Result<InstrumentDetail>> details,
-    IBarStore bars) : IStoredDays
+    IBarStore bars,
+    XDrishti.Application.Abstractions.Market.History.IBackfillSeams seams) : IStoredDays
 {
     private static readonly TimeSpan India = TimeSpan.FromMinutes(330);
 
@@ -34,7 +35,7 @@ internal sealed class StoredDays(
         // The database accepts only offset 0, so the India-time bounds are passed as UTC.
         var from = new DateTimeOffset(date.ToDateTime(new TimeOnly(9, 0)), India).ToUniversalTime();
         var to = new DateTimeOffset(date.ToDateTime(new TimeOnly(15, 45)), India).ToUniversalTime();
-        var stored = await bars.ReadAsync(instrument.Id, from, to, cancellationToken);
+        var stored = await XDrishti.Application.Market.History.SeamAwareBars.ReadAsync(bars, seams, instrument.Id, from, to, cancellationToken);
         return new StoredDay(instrument.Tick, [.. stored.Select(b => new ReaderBar(b.EpochSeconds, (decimal)Math.Round(b.Open, 4), (decimal)Math.Round(b.High, 4), (decimal)Math.Round(b.Low, 4), (decimal)Math.Round(b.Close, 4), b.Volume))], instrument.Fallback);
     }
 

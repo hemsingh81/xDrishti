@@ -50,7 +50,7 @@ public sealed class GetTradeReplayHandlerTests
     }
 
     private GetTradeReplayHandler Handler() =>
-        new(_runs, _features, _bars, _queries, _adjustments, _calendar, _confirmations, new FakeTimeProvider(DateTimeOffset.UnixEpoch), NullLogger<GetTradeReplayHandler>.Instance);
+        new(_runs, _features, _bars, new XDrishti.Application.Tests.Market.History.FakeSeams(), _queries, _adjustments, _calendar, _confirmations, new FakeTimeProvider(DateTimeOffset.UnixEpoch), NullLogger<GetTradeReplayHandler>.Instance);
 
     private void Store(SimTrade trade) =>
         _runs.ReadTradeAsync(Run, false, 0, Arg.Any<CancellationToken>()).Returns(new ValueTask<RunTrade?>(new RunTrade(trade, [FabricatedRun.Basket])));

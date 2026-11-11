@@ -178,6 +178,9 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<XDrishti.Application.Market.Eod.PreviewNseActionsCommand, XDrishti.Application.Market.Eod.NseActionsPreview>, XDrishti.Application.Market.Eod.PreviewNseActionsHandler>(); // NSE actions file -> the existing import PREVIEW, never applied
         services.AddScoped<IQueryHandler<XDrishti.Application.Market.Eod.ShowEodUniverseQuery, IReadOnlyList<XDrishti.Application.Abstractions.Market.Eod.EodUniverseRow>>, XDrishti.Application.Market.Eod.ShowEodUniverseHandler>(); // the securities of the daily history on a date: read
         services.AddScoped<IQueryHandler<XDrishti.Application.Market.Eod.CheckDailyAgainstMinuteQuery, Result<IReadOnlyList<XDrishti.Application.Market.Eod.DailyMinuteFinding>>>, XDrishti.Application.Market.Eod.CheckDailyAgainstMinuteHandler>(); // daily vs minute findings: read
+        services.AddScoped<ICommandHandler<XDrishti.Application.Market.History.RunBackfillCommand, XDrishti.Application.Market.History.BackfillSummary>, XDrishti.Application.Market.History.RunBackfillHandler>(); // CF-04 Part B: Dhan 1-minute backfill before the first CSV bar, OFF by default (zero requests while off)
+        services.AddScoped<ICommandHandler<XDrishti.Application.Market.History.ProbeSeamCommand, XDrishti.Application.Market.History.ProbeSeamSummary>, XDrishti.Application.Market.History.ProbeSeamHandler>(); // the overlap probe: in memory, writes only the seam row
+        services.AddScoped<IQueryHandler<XDrishti.Application.Market.History.ShowHistoryQuery, IReadOnlyList<XDrishti.Application.Market.History.HistoryRow>>, XDrishti.Application.Market.History.ShowHistoryHandler>(); // xd data history: read
         services.AddScoped<IQueryHandler<GetFilingFactsQuery, Result<FilingFactsView>>, GetFilingFactsHandler>(); // one filing's parse outcome and facts (P15-03): read
         services.AddScoped<IResultFactsAsOf, ResultFactsAsOf>(); // the result facts as known at an instant (P15-03): a port with no decision caller yet
         services.AddScoped<IQueryHandler<GetFilingCoverageQuery, Result<FilingCoverageView>>, GetFilingCoverageHandler>(); // counts of the filing store (P15-02): read
@@ -413,6 +416,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, OptionArchiveQualityService>(); // the option-archive quality checks (P14-04): daily 16:15, on by default, reads the archive and writes only its own result rows
         services.AddSingleton<IScheduledService, FilingIngestService>(); // the filing ingest (P15-02): daily 17:05, starts paused, reads the local inbox only
         services.AddSingleton<IScheduledService, XDrishti.Application.Market.Eod.HistoryEodService>(); // CF-04 Part A: the NSE daily-file history; starts paused and with Data:History:Nse:Enabled off a run makes no request
+        services.AddSingleton<IScheduledService, XDrishti.Application.Market.History.HistoryBackfillService>(); // CF-04 Part B: the 1-minute backfill (Convergent, ADR 0270); starts paused and with Data:History:Backfill:Enabled off a run makes no request
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
         services.TryAddSingleton(new RecoverySettings()); // the infrastructure replaces it with the validated section; the defaults serve a host that has none

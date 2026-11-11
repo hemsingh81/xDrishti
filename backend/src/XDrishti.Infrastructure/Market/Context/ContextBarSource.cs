@@ -65,7 +65,7 @@ internal sealed class ContextBarSource(NpgsqlDataSource dataSource) : IContextBa
 
     private async ValueTask<List<DailyLeg>> LegsAsync(Guid instrumentId, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("SELECT ts, high, low, close, bars, complete FROM market.bars_agg WHERE instrument_id = @id AND timeframe = '1D' ORDER BY ts");
+        await using var command = dataSource.CreateCommand("SELECT ts, high, low, close, bars, complete FROM market.bars_agg WHERE instrument_id = @id AND timeframe = '1D' AND ts >= market.backfill_cut(instrument_id) ORDER BY ts");
         command.Parameters.AddWithValue("id", instrumentId);
         var legs = new List<DailyLeg>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
