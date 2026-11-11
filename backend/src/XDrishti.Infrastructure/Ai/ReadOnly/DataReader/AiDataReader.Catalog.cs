@@ -37,6 +37,53 @@ internal sealed partial class AiDataReader
             new JsonObject { ["nameText"] = (string?)baskets[0][1], ["purposeText"] = (string?)baskets[0][2], ["memberCount"] = members.Count, ["withDailyBars"] = withBars });
     }
 
+    public async Task<IReadOnlyList<AiBasketRef>> GetBasketRefsAsync(CancellationToken cancellationToken)
+    {
+        var rows = await QueryAsync("SELECT id, name FROM aiv.baskets WHERE archived_at IS NULL ORDER BY position LIMIT 500", cancellationToken);
+        return [.. rows.Select(r => new AiBasketRef(Guid.Parse((string)r[0]!), (string)r[1]!))];
+    }
+
+    public async Task<AiToolData> GetBasketContextAsync(Guid basketId, DateOnly date, CancellationToken cancellationToken)
+    {
+        // the stored row, newest on or before the day; never recomputed (BK-12 Decision 6). The read login has column grants on exactly these columns.
+        var found = await QueryAsync(
+            "SELECT as_of, n_members, n_voters, b20, b50, b200, ad_share, new_high_share, dispersion, rho_bar, state, membership_basis FROM market.basket_context_daily WHERE basket_id = @id AND as_of <= @d ORDER BY as_of DESC LIMIT 1",
+            cancellationToken,
+            ("id", basketId),
+            ("d", date));
+        var limits = new[] { "a stored row of the day is quoted as recorded, never recomputed", "descriptive only: nothing here is a signal" };
+        if (found.Count == 0 || (string)found[0][0]! != Day(date))
+        {
+            var newest = found.Count == 0 ? null : (string)found[0][0]!;
+            return AiToolData.OfData(
+                new JsonObject { ["state"] = "empty", ["newestAvailableDate"] = newest },
+                new ToolEvidence("stored basket context", ["market.basket_context_daily"], null, 0, [.. limits, "no row is stored for that day"], []),
+                [newest is null ? "no context row is stored for this basket" : "no row for that day; the newest earlier row is of the date given"]);
+        }
+
+        var r = found[0];
+        static JsonObject Figure(object? v) => v is double d
+            ? new JsonObject { ["state"] = "value", ["number"] = d }
+            : new JsonObject { ["state"] = "insufficient", ["reason"] = "not enough voting members on that day" };
+        return AiToolData.OfData(
+            new JsonObject
+            {
+                ["state"] = (string?)r[10],
+                ["date"] = (string?)r[0],
+                ["members"] = r[1] is int m ? m : null,
+                ["voters"] = r[2] is int v ? v : null,
+                ["b20"] = Figure(r[3]),
+                ["b50"] = Figure(r[4]),
+                ["b200"] = Figure(r[5]),
+                ["adShare"] = Figure(r[6]),
+                ["newHighShare"] = Figure(r[7]),
+                ["dispersion"] = Figure(r[8]),
+                ["rhoBar"] = Figure(r[9]),
+                ["membershipBasis"] = (string?)r[11],
+            },
+            new ToolEvidence("stored basket context", ["market.basket_context_daily"], (string?)r[0], r[2] is int n ? n : null, limits, []));
+    }
+
     public async Task<AiToolData> GetInstrumentAsync(string symbol, int bars, CancellationToken cancellationToken)
     {
         var found = await QueryAsync("SELECT symbol, exchange, segment, type, name, isin, series, lot_size, sector, fno_eligible, retired_at FROM aiv.instruments WHERE upper(symbol) = upper(@s) ORDER BY retired_at NULLS FIRST LIMIT 1", cancellationToken, ("s", symbol));

@@ -114,6 +114,19 @@ public sealed class McpArchitectureTests
     }
 
     [Fact]
+    public void The_basket_reports_of_get_report_reach_the_application_through_read_ports_only()
+    {
+        // BK-12 AC 8: the basket reader may take a scope factory (the BK-07 query handlers), the read port of the assistant and the clock; it has no store, no DbContext and no command port.
+        var reader = Application.GetType("XDrishti.Application.Ai.BasketReportReader")!;
+        var parameters = reader.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Single().GetParameters();
+
+        parameters.Select(p => p.ParameterType.Name).Order().ShouldBe(["IAiDataReader", "IServiceScopeFactory", "TimeProvider"]);
+        var source = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Application", "Ai", "BasketReportReader.cs"));
+        source.ShouldNotContain("ICommandHandler");
+        source.ShouldNotContain("DbContext");
+    }
+
+    [Fact]
     public void Only_the_read_registration_of_the_assistant_infrastructure_is_public()
     {
         var infrastructure = Infrastructure.GetTypes().Where(t => t.IsPublic && t.Namespace == "XDrishti.Infrastructure.Ai.ReadOnly").Select(t => t.Name).Order().ToList();

@@ -50,6 +50,11 @@ public sealed class McpToolCatalogTests
         }
 
         (await File.ReadAllTextAsync(path, Ct)).ReplaceLineEndings("\n").ShouldBe(golden, "the tool schemas changed: review them, then run once with XD_UPDATE_GOLDEN=1");
+        // BK-12 AC 1 and 9: the same 16 tools, no new name; the report enum gains exactly the three basket values; the budget is 2,300 and the description still at most 40 words
+        var reportSchema = JsonDocument.Parse(snapshot.Tools.Single(t => t.Name == "get_report").InputSchemaJson).RootElement.GetProperty("properties").GetProperty("report").GetProperty("pattern").GetString()!;
+        reportSchema.ShouldBe("^(summary|groups|pivot|what_works|equity|distribution|insights|basket_profile|basket_ranking|basket_context)$");
+        ContextBudget.SchemaTokenLimit.ShouldBe(2300);
+        snapshot.Tools.Single(t => t.Name == "get_report").Description.ShouldContain("basket_profile");
         snapshot.Tools.Single(t => t.Name == "get_report").Description.ShouldContain("gross");
         snapshot.Tools.Single(t => t.Name == "get_report").Description.ShouldContain("state");
         snapshot.Tools.Single(t => t.Name == "get_report").Description.ShouldContain("n,");

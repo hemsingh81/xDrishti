@@ -131,7 +131,7 @@ internal sealed class ToolRunner(IAiContext context, IOptions<McpOptions> option
     private static readonly HashSet<string> StructuralKeys = new(StringComparer.Ordinal)
     {
         "state", "kind", "date", "forDate", "planKey", "isin", "exchange", "segment", "type", "timeframe", "side", "metric", "rowDimension", "columnDimension", "groupBy", "valuationDate",
-        "priceAsOfOldest", "priceAsOfNewest", "retiredAt", "firstDailyBar", "lastDailyBar", "result", "operands", "dimensions", "latestQuality", "elapsedMs", "hash", "code",
+        "priceAsOfOldest", "priceAsOfNewest", "retiredAt", "firstDailyBar", "lastDailyBar", "result", "operands", "dimensions", "latestQuality", "elapsedMs", "hash", "code", "newestAvailableDate", "membershipBasis",
     };
 
     private static JsonObject? CleanData(JsonObject? data, CleanCounters counters) => data is null ? null : (JsonObject)CleanNode(data, null, counters)!;

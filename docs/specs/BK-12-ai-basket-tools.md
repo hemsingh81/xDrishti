@@ -94,3 +94,8 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 - **Gross only (ADR 0139 §2):** the assistant serves gross figures. Profile figures are price returns, so this does not affect them, but the strategy panel's figures are gross.
 - **Grounding (ADR 0139 §12/13):** a derived number must come from `calc` with grounded operands. AC 12's stub ("about 12 % better") is refused by that rule.
 - **Training fence:** the `aiv` views and the report handlers already read research runs only (ADR 0243).
+
+## Build evidence 2026-11-11
+- Built: criteria 1, 5, 6, 8, 9, 13 (tests in `AskYourDataDatabaseTests`, `BasketReportReaderTests`, `McpToolCatalogTests`, `McpArchitectureTests`, `ReadOnlyRolesTests`); ADR 0264.
+- **Partial, pending the owner's decision on MCP host access (ADR 0264): criteria 2, 3, 4, 7.** The shaping is unit-tested with the BK-07 handlers faked; the real tool server answers `tool.unavailable` for `basket_profile` and `basket_ranking`, so no seeded-database golden exists. Criteria 10, 11, 12 are partial: the eight questions are in `eval/sets/basket-questions.jsonl` (honest-state on the current fixture, numeric goldens not claimed).
+- Left out of the model's profile body (on the screen): breadth daily series, correlation matrix, contribution rows, strategy hold-out panel.
