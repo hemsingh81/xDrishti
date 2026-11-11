@@ -36,3 +36,10 @@
 
 ## Consequences
 Parts B to E add the job, tables, API and screen on this core. Reading bars once per run as a rolling window (non-functional) is not done in part A: each session reads its 400-day window; the measured time per session is part B's to report.
+
+## Part D: the frozen-versus-learning comparison
+- **Reused, not new.** `ReplayPairComparison` (Domain, pure) pairs the two runs by session, takes the daily return of each (equity over the day before, the first against the start capital) and the difference learning minus frozen, then calls the existing `PairedDayBootstrap` (CF-10c, ADR 0216) with the loop's settings (`LoopOptions`: draws, level, minimum days, helps-at cut). No new defaults.
+- **Answer rule** (same as `ThreeArmLoopTest`): `learning_better` when P(learning better) is at or above the cut (0.95); else `frozen_better` when the mirrored probability is; else `no_measurable_difference`. Fewer paired days than the minimum (20) is `too_little_history`. It always carries n, the mean daily difference and the cut; the probabilities are absent only for `too_little_history`.
+- **Refused, not thrown:** unequal counts, differing or unordered sessions, or a capital or equity not above 0 return `replay.pair_misaligned`.
+- **Deterministic:** the seed key is the first session, the last session and n.
+- **In memory:** `ReplayPairRunner` runs the part-A driver twice on the same parameters (Frozen, Learning) and compares; part C calls it and stores the result.
