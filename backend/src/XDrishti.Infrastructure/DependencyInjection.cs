@@ -24,6 +24,7 @@ using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Market.Quality;
 using XDrishti.Application.Abstractions.Market.Strength;
+using XDrishti.Application.Abstractions.OpeningBars;
 using XDrishti.Application.Abstractions.OptionBackfill;
 using XDrishti.Application.Abstractions.OptionChain;
 using XDrishti.Application.Abstractions.Paper;
@@ -64,6 +65,7 @@ using XDrishti.Infrastructure.Market.Context;
 using XDrishti.Infrastructure.Market.Live;
 using XDrishti.Infrastructure.Market.Quality;
 using XDrishti.Infrastructure.Market.Strength;
+using XDrishti.Infrastructure.OpeningBars;
 using XDrishti.Infrastructure.OptionBackfill;
 using XDrishti.Infrastructure.OptionChain;
 using XDrishti.Infrastructure.OptionQuality;
@@ -326,6 +328,9 @@ public static class DependencyInjection
         services.AddScoped<IExecutionScreenReader, ExecutionScreenReader>(); // the execution screens' bounded reads, SELECT only (P12-10)
         services.AddScoped<IExecutionFactsReader, ExecutionFactsReader>(); // the execution service's heartbeat and record, read only (P12-01b)
         services.AddScoped<IDepthSwitchStore, DepthSwitchStore>(); // the owner's depth-recorder switch, insert-only; no row = OFF (P7-16)
+        services.AddScoped<IOpeningBarsQueries, OpeningBarsQueries>(); // BK-03b: what the derived job reads of the opening minutes (live rows, history, the day's events)
+        services.AddScoped<IOpeningBarsStore, OpeningBarsStore>(); // BK-03b: insert-only writes of the opening-minute bars and events
+        services.AddScoped<IOpeningBarsSwitchStore, OpeningBarsSwitchStore>(); // BK-03b: the owner's switch baskets.opening_bars, insert-only; no row = OFF
         services.AddScoped<ITickSwitchStore, TickSwitchStore>(); // the owner's tick-recorder switch, insert-only; no row = OFF (P7-16b)
         services.AddScoped<IOptionChainSwitchStore, OptionChainSwitchStore>(); // the owner's option-chain-recorder switch, insert-only; no row = OFF (P14-02)
         services.AddScoped<IOptionBackfillSwitchStore, OptionBackfillSwitchStore>(); // the owner's expired-options-backfill switch, insert-only; no row = OFF (P14-03)
@@ -728,6 +733,13 @@ public static class DependencyInjection
         services.AddSingleton<IDepthFeedConnector, DhanDepthConnector>();
         services.AddScoped<IDepthStore, DepthStore>();
         services.AddScoped<IDepthUniverse, DepthUniverse>();
+        return services;
+    }
+
+    /// <summary>The connector of the opening-minute recorder (BK-03b) - for the <c>xd-feed</c> host: a separate socket to the live feed's allowed host, no new allow-list entry. The stores are registered with the rest of the infrastructure.</summary>
+    public static IServiceCollection AddOpeningBarsRecording(this IServiceCollection services)
+    {
+        services.AddSingleton<IOpeningBarsFeedConnector, OpeningBarsFeedConnector>();
         return services;
     }
 

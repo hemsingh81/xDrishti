@@ -60,12 +60,14 @@ internal static class DerivedComputation
         int scoresKept,
         string provenance,
         DateTimeOffset now,
-        string actor)
+        string actor,
+        DateTimeOffset? formation = null,
+        IReadOnlyList<VersionExclusion>? extraExcluded = null)
     {
         var universe = UniverseOf(all, asOf);
         var symbols = universe.ToDictionary(u => u.InstrumentId, u => u.Bars.Symbol);
         var ids = universe.ToDictionary(u => u.Bars.Symbol, u => u.InstrumentId, StringComparer.Ordinal);
-        var evaluated = DerivedCatalogue.Evaluator(definition.DefinitionNo).Evaluate([.. universe.Select(u => u.Bars)], asOf, parameters, PreviousResult(previous, symbols, parameters.Hash));
+        var evaluated = DerivedCatalogue.Evaluator(definition.DefinitionNo).Evaluate([.. universe.Select(u => u.Bars)], asOf, parameters, PreviousResult(previous, symbols, parameters.Hash), formation);
         if (evaluated.IsFailure)
         {
             return Result.Failure<DerivedVersionWrite>(evaluated.Error);
@@ -84,9 +86,10 @@ internal static class DerivedComputation
         scores.AddRange(result.Scores.Where(s => s.Rank > 0 && !memberSet.Contains(s.Symbol)).OrderBy(s => s.Rank).Take(scoresKept)
             .Select(s => new VersionScore(ids[s.Symbol], s.Score, s.Rank, false, 0)));
         var excluded = result.Excluded.Select(e => new VersionExclusion(ids[e.Symbol], e.Symbol, e.Reason)).ToList();
+        excluded.AddRange(extraExcluded ?? []); // shares left out before the engine (BK-03b): a missing opening minute, not subscribed
         return Result.Success(new DerivedVersionWrite(
-            Guid.CreateVersion7(now), definition.BasketId, definition.BasketName, asOf, effectiveFrom, validTo, null, ParamsJson(parameters), parameters.Hash,
-            universe.Count, result.BelowThreshold.Count, excluded.Count, JsonSerializer.Serialize(excluded), provenance, VersionOutcomes.Applied, scores, now, actor));
+            Guid.CreateVersion7(now), definition.BasketId, definition.BasketName, asOf, effectiveFrom, validTo, formation, ParamsJson(parameters), parameters.Hash,
+            universe.Count + (extraExcluded?.Count ?? 0), result.BelowThreshold.Count, excluded.Count, JsonSerializer.Serialize(excluded), provenance, VersionOutcomes.Applied, scores, now, actor));
     }
 
     // shortcut: basket 14's cluster number is stored in the member's score column (members only), so the next run can rebuild the previous clustering for the stability figure without a column of its own (ADR 0258).

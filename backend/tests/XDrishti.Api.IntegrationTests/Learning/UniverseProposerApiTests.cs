@@ -36,7 +36,7 @@ public sealed class UniverseProposerApiTests(ApiFactory factory) : DataTestBase(
     {
         await base.InitializeAsync();
         await using var connection = await OpenAsync();
-        foreach (var table in new[] { "research.cell_stats", "research.hypotheses", "research.universe_settings_changes" })
+        foreach (var table in new[] { "research.cell_stats", "research.lessons", "research.hypotheses", "research.universe_settings_changes" })
         {
             await ExecuteAsync(connection, "DELETE FROM " + table);
         }

@@ -8,4 +8,6 @@ public static class ExclusionReason
     public const string BadData = "bad_data";
     public const string NotInUniverseFilter = "not_in_universe_filter";
     public const string SmallCluster = "small_cluster";
+    public const string OpeningMinuteMissing = "opening_minute_missing";
+    public const string NotSubscribed = "not_subscribed";
 }

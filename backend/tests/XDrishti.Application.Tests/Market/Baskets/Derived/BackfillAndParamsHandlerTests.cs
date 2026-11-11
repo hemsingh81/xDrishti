@@ -1,5 +1,6 @@
 using XDrishti.Application.Abstractions.Market.Baskets;
 using XDrishti.Application.Market.Baskets;
+using XDrishti.Domain.Baskets.Derived;
 using XDrishti.Domain.Market.Baskets;
 
 namespace XDrishti.Application.Tests.Market.Baskets.Derived;
@@ -107,7 +108,7 @@ public sealed class BackfillAndParamsHandlerTests
     [Theory]
     [InlineData(4)]
     [InlineData(12)]
-    public async Task A_basket_this_build_cannot_form_cannot_be_switched_on(int definitionNo)
+    public async Task The_frozen_intraday_baskets_can_be_switched_on_because_the_opening_minute_freeze_forms_them_but_the_refresh_and_backfill_still_skip_them(int definitionNo)
     {
         var world = DerivedWorld.WithLiquidBasket(1);
         var basket = new DerivedDefinitionRow(Guid.NewGuid(), "x", definitionNo, false, null, new Dictionary<string, double>());
@@ -115,8 +116,9 @@ public sealed class BackfillAndParamsHandlerTests
 
         var result = await world.SetParams().HandleAsync(new SetDerivedParamsCommand(basket.BasketId, null, true, "owner"), TestContext.Current.CancellationToken);
 
-        result.Error.Code.ShouldBe(BasketErrors.InvalidCode);
-        world.Store.Definitions.Single(d => d.BasketId == basket.BasketId).Enabled.ShouldBeFalse();
+        result.IsSuccess.ShouldBeTrue();
+        world.Store.Definitions.Single(d => d.BasketId == basket.BasketId).Enabled.ShouldBeTrue();
+        DerivedSchedule.WhyNotRunnable(DerivedCatalogue.Get(definitionNo)).ShouldBe("intraday_unavailable");
     }
 
     [Fact]

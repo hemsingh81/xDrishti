@@ -12,9 +12,11 @@ export const recorderShapesMatch: [
   Same<RecorderChange, Schemas['OptionChainSwitchRequest']>,
   Same<RecorderChange, Schemas['OptionBackfillSwitchRequest']>,
   Same<RecorderView, Schemas['OptionChainRecorderView']>,
-] = [true, true, true, true, true];
+  Same<RecorderView, Schemas['OpeningBarsRecorderView']>,
+  Same<RecorderChange, Schemas['OpeningBarsSwitchRequest']>,
+] = [true, true, true, true, true, true, true];
 
-export type RecorderKind = 'depth' | 'ticks' | 'chain' | 'backfill';
+export type RecorderKind = 'depth' | 'ticks' | 'chain' | 'backfill' | 'opening';
 
 /** What any recorder card reads: the common switch shape, plus the progress and probe acceptance for the backfill. */
 export type AnyRecorderView = RecorderView | Schemas['OptionChainRecorderView'] | Schemas['OptionBackfillView'];
@@ -38,6 +40,8 @@ export const recorderQuery = (kind: RecorderKind) =>
           return unwrap(await api.GET('/api/options/chain-recorder', { signal }));
         case 'backfill':
           return unwrap(await api.GET('/api/options/backfill', { signal }));
+        case 'opening':
+          return unwrap(await api.GET('/api/opening-bars/recorder', { signal }));
       }
     },
     staleTime: 15_000,
@@ -59,6 +63,8 @@ export function useChangeRecorder(kind: RecorderKind) {
           return unwrap(await api.PUT('/api/options/chain-recorder', { body }));
         case 'backfill':
           return unwrap(await api.PUT('/api/options/backfill', { body }));
+        case 'opening':
+          return unwrap(await api.PUT('/api/opening-bars/recorder', { body }));
       }
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: recorderKeys.one(kind) }),

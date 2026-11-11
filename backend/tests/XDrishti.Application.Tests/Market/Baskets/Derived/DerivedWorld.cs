@@ -90,6 +90,9 @@ internal sealed class FakeVersionStore : IDerivedVersionStore
     public ValueTask<bool> HasOtherRecomputedAsync(Guid basketId, DateOnly from, DateOnly to, string paramsHash, CancellationToken cancellationToken) =>
         ValueTask.FromResult(Versions.Any(v => v.BasketId == basketId && v.Provenance == BasketProvenance.Recomputed && v.AsOf >= from && v.AsOf <= to && v.ParamsHash != paramsHash));
 
+    public ValueTask<bool> FrozenExistsAsync(Guid basketId, DateOnly asOf, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Versions.Any(v => v.BasketId == basketId && v.AsOf == asOf && v.FormedAt != null && v.Provenance == BasketProvenance.Derived));
+
     public ValueTask<bool> ExistsAsync(Guid basketId, DateOnly asOf, string paramsHash, CancellationToken cancellationToken) =>
         ValueTask.FromResult(Versions.Any(v => v.BasketId == basketId && v.AsOf == asOf && v.ParamsHash == paramsHash));
 
