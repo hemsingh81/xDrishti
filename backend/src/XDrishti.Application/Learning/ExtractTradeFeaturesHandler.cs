@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market.Bars;
-using XDrishti.Application.Abstractions.Market.History;
-using XDrishti.Application.Market.History;
 using XDrishti.Application.Abstractions.Market.Calendar;
+using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Market.Actions;
+using XDrishti.Application.Market.History;
 using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;

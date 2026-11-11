@@ -1,10 +1,10 @@
 #pragma warning disable CA2012 // NSubstitute setup on ValueTask members is not awaited
 using NSubstitute;
 using XDrishti.Application.Abstractions.Market.Bars;
-using XDrishti.Application.Tests.Market.History;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Research;
 using XDrishti.Application.Tests.Market.Bars;
+using XDrishti.Application.Tests.Market.History;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;

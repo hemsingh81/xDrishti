@@ -190,7 +190,7 @@ internal sealed class BarQueries(NpgsqlDataSource dataSource) : IBarQueries
 
         // a join of the instants to the primary key (instrument, bar start): one index lookup per instant (measured about 0.03 ms to 0.25 ms each on the local 60 million row table, ADR 0224); ANY(array) was 10 times slower
         await using var command = dataSource.CreateCommand(
-            "SELECT b.ts, b.close, b.volume FROM unnest(@starts) AS u(ts) JOIN market.bars_1m b ON b.instrument_id = @id AND b.ts = u.ts");
+            "SELECT b.ts, b.close, b.volume FROM unnest(@starts) AS u(ts) JOIN market.bars_1m b ON b.instrument_id = @id AND b.ts = u.ts AND b.ts >= market.backfill_cut(b.instrument_id)");
         command.Parameters.AddWithValue("id", instrumentId);
         command.Parameters.Add(new NpgsqlParameter("starts", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.TimestampTz) { Value = minuteStarts.Select(s => s.ToUniversalTime()).ToArray() });
         var rows = new List<MinuteCloseVolume>(minuteStarts.Count);
@@ -206,7 +206,7 @@ internal sealed class BarQueries(NpgsqlDataSource dataSource) : IBarQueries
     public async ValueTask<IReadOnlyList<BarRow>> ReadDailyBarsAsync(Guid instrumentId, DateOnly from, DateOnly toExclusive, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(
-            "SELECT ts, open, high, low, close, volume, bars, complete, NULL::text FROM market.bars_agg WHERE instrument_id = @id AND timeframe = '1D' AND ts >= @from AND ts < @to ORDER BY ts");
+            "SELECT ts, open, high, low, close, volume, bars, complete, NULL::text FROM market.bars_agg WHERE instrument_id = @id AND timeframe = '1D' AND ts >= market.backfill_cut(instrument_id) AND ts >= @from AND ts < @to ORDER BY ts");
         command.Parameters.AddWithValue("id", instrumentId);
         command.Parameters.AddWithValue("from", new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).ToUniversalTime());
         command.Parameters.AddWithValue("to", new DateTimeOffset(toExclusive.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).ToUniversalTime());

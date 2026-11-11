@@ -239,6 +239,44 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
         (await seams.SeamOfAsync(id, Ct)).ShouldBe(Seam.AddDays(10));
     }
 
+    private async Task SetCutAsync(Guid id, DateTimeOffset cut)
+    {
+        using var scope = Factory.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IBackfillStore>().SaveSeamAsync(new SeamRecord(id, cut.ToUniversalTime(), "none", null, null, null, null, false, null), Ct);
+    }
+
+    [Fact]
+    public async Task The_regime_context_the_opening_history_and_the_daily_bars_leave_out_everything_before_the_cut()
+    {
+        // an index with a daily row before and after the cut (the context read)
+        var index = await SeedAsync("NIFTY", type: "index");
+        await using (var connection = await OpenAsync())
+        {
+            await ExecuteAsync(connection, "UPDATE market.instrument_broker_ids SET segment = 'IDX_I' WHERE instrument_id = @id", ("id", index));
+            await ExecuteAsync(connection, "INSERT INTO market.tracked_instruments (instrument_id, active, active_since, tracked_by) VALUES (@id, true, now(), 'probe')", ("id", index));
+            await ExecuteAsync(connection, "UPDATE market.instruments SET display_name = 'Nifty 50' WHERE id = @id", ("id", index));
+            foreach (var day in new[] { new DateTimeOffset(2024, 3, 28, 0, 0, 0, IndiaTime.Offset), new DateTimeOffset(2024, 4, 3, 0, 0, 0, IndiaTime.Offset) })
+            {
+                await ExecuteAsync(connection, "INSERT INTO market.bars_agg (instrument_id, timeframe, ts, open, high, low, close, volume, bars, complete) VALUES (@id, '1D', @ts, 1, 2, 1, 1, 10, 375, true)", ("id", index), ("ts", day.ToUniversalTime()));
+            }
+        }
+
+        await SetCutAsync(index, Seam);
+
+        using var scope = Factory.Services.CreateScope();
+        var legs = await scope.ServiceProvider.GetRequiredService<XDrishti.Application.Abstractions.Market.Context.IContextBarSource>().ReadAsync(["NSE:NIFTY"], [], Ct);
+        legs.IndexLegs.Select(l => l.Date).ShouldBe([new DateOnly(2024, 4, 3)]);
+        var daily = await scope.ServiceProvider.GetRequiredService<IBarQueries>().ReadDailyBarsAsync(index, new DateOnly(2024, 1, 1), new DateOnly(2024, 12, 31), Ct);
+        daily.Count.ShouldBe(1);
+
+        // the opening-minute history reads stored 09:15 bars: the one before the cut is left out
+        var share = await SeedAsync("OPN");
+        await LoadCsvAsync(share, At(new DateTimeOffset(2024, 3, 28, 9, 15, 0, IndiaTime.Offset), 100), At(new DateTimeOffset(2024, 4, 3, 9, 15, 0, IndiaTime.Offset), 100));
+        await SetCutAsync(share, new DateTimeOffset(2024, 4, 1, 0, 0, 0, IndiaTime.Offset));
+        var history = await scope.ServiceProvider.GetRequiredService<XDrishti.Application.Abstractions.OpeningBars.IOpeningBarsQueries>().ReadHistoryAsync([share], new DateOnly(2024, 3, 1), new DateOnly(2024, 4, 30), 15, [], Ct);
+        history.Select(b => b.MinuteStart.Date.Day).ShouldBe([3]);
+    }
+
     [Fact]
     public async Task Down_removes_both_tables_and_up_again_is_clean()
     {

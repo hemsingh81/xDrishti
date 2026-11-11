@@ -224,7 +224,7 @@ internal sealed class OptionArchiveReader(NpgsqlDataSource dataSource) : IOption
             return _closes;
         }
 
-        await using var command = dataSource.CreateCommand("SELECT ts, round(close * 100)::int FROM market.bars_1m WHERE instrument_id = @u AND ts >= @from AND ts < @to");
+        await using var command = dataSource.CreateCommand("SELECT ts, round(close * 100)::int FROM market.bars_1m WHERE instrument_id = @u AND ts >= market.backfill_cut(instrument_id) AND ts >= @from AND ts < @to");
         command.Parameters.AddWithValue("u", underlyingId);
         command.Parameters.AddWithValue("from", Start(from));
         command.Parameters.AddWithValue("to", Start(to));

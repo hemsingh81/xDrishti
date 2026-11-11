@@ -76,4 +76,26 @@ public sealed class HistoryBackfillArchitectureTests
         runner.IndexOf("SeamGuard.Split", StringComparison.Ordinal).ShouldBeLessThan(runner.IndexOf("WriteAsync(target.InstrumentId", StringComparison.Ordinal));
         runner.ShouldNotContain("BarSource.Csv");
     }
+
+    // Files that read market.bars_1m or market.bars_agg for the pipeline itself (writing, aggregating, comparing, counting, quality, the observed calendar), for display, or for a recent window that never reaches a seam (liquidity universe, marks,
+    // live execution, the daily-versus-minute finding); each is listed in ADR 0270 ("not covered"). Every other file that reads those tables must apply market.backfill_cut.
+    private static readonly string[] NotCut =
+    [
+        "BarStore.cs", "BarAggregates.cs", "BarComparer.cs", "BarDayCounts.cs", "BarCoverageSql.cs", "BarRecords.cs", "BarConfigurations.cs", "QualityData.cs", "ObservedDays.cs",
+        "EodStore.cs", "DepthUniverse.cs", "OptionUnderlyingSetting.cs", "PaperLedgerData.cs", "PortfolioPrices.cs", "LiveExecutionMarket.cs", "FixtureSeeder.cs", "BackfillStore.cs",
+    ];
+
+    [Fact]
+    public void Every_raw_sql_reader_of_the_bar_tables_outside_the_listed_ones_applies_the_backfill_cut()
+    {
+        var infrastructure = Path.Combine(Src, "XDrishti.Infrastructure");
+        var offenders = Directory.GetFiles(infrastructure, "*.cs", SearchOption.AllDirectories)
+            .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), @"market\.bars_1m\b(?!_)|market\.bars_agg\b", System.Text.RegularExpressions.RegexOptions.None, ScanRegex.Timeout))
+            .Where(f => !NotCut.Contains(Path.GetFileName(f)) && !File.ReadAllText(f).Contains("backfill_cut", StringComparison.Ordinal))
+            .Select(f => Path.GetRelativePath(Src, f))
+            .ToList();
+
+        offenders.ShouldBeEmpty("a raw SQL reader of bars_1m or bars_agg that feeds research, context or planning must apply market.backfill_cut(instrument_id) (ADR 0270, decision 10), or be listed with its reason");
+    }
 }
