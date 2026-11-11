@@ -59,4 +59,32 @@ public sealed class LotSizeLookupTests
         LotSizeSeed.All.Where(s => s.UnderlyingSymbol == "NSE:NIFTY").Select(s => (s.EffectiveFrom, s.LotSize))
             .ShouldBe([(new DateOnly(2024, 11, 20), 75), (new DateOnly(2025, 12, 30), 65)]);
     }
+
+    [Fact]
+    public void On_one_date_a_confirmed_circular_row_beats_an_nse_row_recorded_later()
+    {
+        LotSizeEntry[] rows =
+        [
+            new(10, Nifty, new DateOnly(2026, 11, 12), 65, LotSizeEntry.Circular, true),
+            new(11, Nifty, new DateOnly(2026, 11, 12), 75, LotSizeEntry.NseMktLots, false),
+        ];
+
+        var lot = LotSizeLookup.InForce(rows, Nifty, new DateOnly(2026, 11, 12));
+
+        (lot.LotSize, lot.Confirmed, lot.Source).ShouldBe((65, true, LotSizeEntry.Circular));
+    }
+
+    [Fact]
+    public void On_one_date_between_unconfirmed_rows_the_one_recorded_last_wins_and_the_result_names_its_source()
+    {
+        LotSizeEntry[] rows =
+        [
+            new(10, Nifty, new DateOnly(2026, 11, 12), 75, LotSizeEntry.ScripMaster, false),
+            new(11, Nifty, new DateOnly(2026, 11, 12), 65, LotSizeEntry.NseMktLots, false),
+        ];
+
+        var lot = LotSizeLookup.InForce(rows, Nifty, new DateOnly(2026, 11, 12));
+
+        (lot.LotSize, lot.Source).ShouldBe((65, LotSizeEntry.NseMktLots));
+    }
 }

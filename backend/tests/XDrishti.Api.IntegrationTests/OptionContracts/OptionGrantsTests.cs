@@ -88,4 +88,18 @@ public sealed class OptionGrantsTests(ResearchGrantsTests.DedicatedServer server
             }
         }
     }
+
+    [Fact]
+    public async Task An_nse_lot_row_is_inserted_by_the_runtime_role_never_confirmed_and_never_updated_or_deleted()
+    {
+        var instrument = Guid.CreateVersion7();
+        await StoreKit.ExecuteAsync(server.Owner, $"INSERT INTO market.instruments (id, canonical_symbol, exchange, exchange_segment, type, name, display_name, lot_size, underlying_symbol, fno_eligible, first_seen_at, last_seen_at) VALUES ('{instrument}', 'NSE:NSEPROBE', 'NSE', 'NSE_EQ', 'share', 'NSEPROBE', 'Probe', 1, 'NSEPROBE', false, now(), now())", Ct);
+
+        (await SqlStateAsync(server.App, $"INSERT INTO options.lot_sizes (underlying_id, effective_from, lot_size, source, source_url, confirmed) VALUES ('{instrument}', '2026-11-12', 500, 'nse_mktlots', 'https://nsearchives.nseindia.com/content/fo/fo_mktlots.csv', false)")).ShouldBeNull();
+        (await SqlStateAsync(server.App, $"INSERT INTO options.lot_sizes (underlying_id, effective_from, lot_size, source, source_url, confirmed) VALUES ('{instrument}', '2026-11-12', 500, 'nse_mktlots', 'https://nsearchives.nseindia.com/content/fo/fo_mktlots.csv', true)")).ShouldBe("23514");
+        (await SqlStateAsync(server.App, "UPDATE options.lot_sizes SET lot_size = 475 WHERE source = 'nse_mktlots'")).ShouldBe("42501");
+        (await SqlStateAsync(server.App, "DELETE FROM options.lot_sizes WHERE source = 'nse_mktlots'")).ShouldBe("42501");
+
+        await StoreKit.ExecuteAsync(server.Owner, $"DELETE FROM options.lot_sizes; DELETE FROM market.instruments WHERE id = '{instrument}'", Ct);
+    }
 }

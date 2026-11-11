@@ -275,7 +275,7 @@ public sealed class ListFileFetchTests
     // ---- the lot sizes ----
 
     [Fact]
-    public async Task The_lot_file_is_recorded_as_a_summary_with_index_rows_skipped_and_counted_and_nothing_else_is_stored()
+    public async Task The_lot_file_is_recorded_as_a_summary_with_index_rows_skipped_and_the_share_lots_handed_to_the_lot_transaction()
     {
         _w.Share("RELIANCE", fno: true, lot: 250);
         _w.Share("SAIL", fno: true, lot: 4700);
@@ -284,11 +284,11 @@ public sealed class ListFileFetchTests
 
         var outcome = await _w.RunOneAsync();
 
-        outcome.Outcome.ShouldBe(FetchOutcomes.Unchanged);
+        outcome.Outcome.ShouldBe(FetchOutcomes.Applied); // two lot rows written (the fake answers the count it was given)
         outcome.Rows.ShouldBe(2);
-        var warnings = _w.Store.Recorded.Single().Fetch.WarningsJson;
-        warnings.ShouldContain("lots_summary:shares=2,nearest=OCT-26,mismatches=0");
-        warnings.ShouldContain("index_rows_skipped:1");
+        var fetch = _w.LotApplier.Applied.Single().Fetch(2);
+        fetch.WarningsJson.ShouldContain("lots_summary:shares=2,nearest=OCT-26,mismatches=0,withoutLot=0,indexUnmatched=1,lotsWritten=2");
+        fetch.WarningsJson.ShouldContain("index_rows_skipped:1");
         _w.Applier.Applied.ShouldBeEmpty();
     }
 
@@ -381,5 +381,129 @@ public sealed class ListFileFetchTests
 
         Problem(outcome).ShouldBe("failed:timeout");
         _w.Store.Recorded.Single().Source.NextAttemptAt.ShouldBe(_w.Clock.GetUtcNow().AddMinutes(5));
+    }
+
+    // ---- BK-05b: the NSE lots into options.lot_sizes (the transaction itself is covered by the database tests) ----
+
+    [Fact]
+    public async Task Each_share_row_matched_in_the_master_becomes_one_lot_for_its_instrument_with_the_file_url_and_the_fetch_day()
+    {
+        var reliance = _w.Share("RELIANCE", fno: true, lot: 250);
+        var sail = _w.Share("SAIL", fno: true, lot: 4700);
+        _w.LotSource();
+        _w.Serve(ListWorld.Lot(("RELIANCE INDUSTRIES", "RELIANCE", "275"), ("SAIL", "SAIL", "4700"), ("UNKNOWN CO", "NOTINMASTER", "10")));
+
+        await _w.RunOneAsync();
+
+        var application = _w.LotApplier.Applied.Single();
+        application.Lots.ShouldBe([new NseLot(reliance, 275), new NseLot(sail, 4700)], ignoreOrder: true); // an unmatched share has no row
+        application.Today.ShouldBe(new DateOnly(2026, 10, 26));
+        application.SourceUrl.ShouldBe("https://nsearchives.nseindia.com/content/fo/fo_mktlots.csv");
+        application.Fetch(2).WarningsJson.ShouldContain("lot_size_mismatch:RELIANCE:master=250:nse=275"); // the mismatch warning stays; the master is only read
+    }
+
+    [Fact]
+    public async Task An_index_row_is_stored_only_when_its_canonical_symbol_names_one_index_of_the_master_otherwise_it_is_counted_unmatched()
+    {
+        _w.Share("A", fno: true, lot: 10);
+        _w.Share("B", fno: true, lot: 10);
+        var nifty = Guid.CreateVersion7();
+        _w.Master.Indices["NSE:NIFTY"] = nifty;
+        _w.LotSource();
+        _w.Serve(ListWorld.Lot(("NIFTY 50", "NIFTY", "65"), ("NIFTY BANK", "BANKNIFTY", "30"), ("NIFTY NEXT 50", "NIFTYNXT50", "25"), ("A", "A", "10"), ("B", "B", "10")));
+
+        await _w.RunOneAsync();
+
+        var application = _w.LotApplier.Applied.Single();
+        application.Lots.ShouldContain(new NseLot(nifty, 65));
+        application.Lots.Count.ShouldBe(3); // A, B and NIFTY: BANKNIFTY is not in the master, NIFTYNXT50 has no mapping
+        application.Fetch(3).WarningsJson.ShouldContain("indexUnmatched=2");
+    }
+
+    [Fact]
+    public async Task When_the_transaction_writes_no_row_the_lots_are_unchanged_and_the_source_is_ok()
+    {
+        _w.Share("A", fno: true, lot: 10);
+        _w.Share("B", fno: true, lot: 10);
+        _w.LotSource();
+        _w.Serve(ListWorld.Lot(("A", "A", "10"), ("B", "B", "10")));
+        _w.LotApplier.Written = 0;
+
+        var outcome = await _w.RunOneAsync();
+
+        outcome.Outcome.ShouldBe(FetchOutcomes.Unchanged);
+        _w.LotApplier.Applied.Single().Fetch(0).WarningsJson.ShouldContain("lotsWritten=0");
+    }
+
+    [Fact]
+    public async Task A_failed_lot_transaction_is_a_failed_fetch_and_the_source_shows_failed()
+    {
+        _w.Share("A", fno: true, lot: 10);
+        _w.Share("B", fno: true, lot: 10);
+        _w.LotSource();
+        _w.Serve(ListWorld.Lot(("A", "A", "10"), ("B", "B", "10")));
+        _w.LotApplier.Fails = true;
+
+        var outcome = await _w.RunOneAsync();
+
+        Problem(outcome).ShouldBe("failed:lot_write_failed");
+        var recorded = _w.Store.Recorded.Single();
+        recorded.Source.State.ShouldBe(BasketSourceStates.Failed);
+        recorded.Source.Sha256.ShouldBeNull(); // the old validators stay, the same file is looked at again
+    }
+
+    [Theory]
+    [InlineData("<html>404</html>")]
+    [InlineData("UNDERLYING,SYMBOL,OCT-26\r\nA,A,many\r\n")]
+    public async Task A_rejected_lot_file_hands_nothing_to_the_lot_transaction(string body)
+    {
+        _w.Share("A", fno: true, lot: 10);
+        _w.LotSource();
+        _w.Serve(body);
+
+        await _w.RunOneAsync();
+
+        _w.LotApplier.Applied.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_share_count_outside_the_bounds_hands_nothing_to_the_lot_transaction()
+    {
+        _w.Share("S", fno: true, lot: 10);
+        _w.LotSource();
+        _w.Serve(ListWorld.Lot(("S", "S", "10")));
+
+        Problem(await _w.RunOneAsync()).ShouldBe("rejected:row_count");
+
+        _w.LotApplier.Applied.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_same_bytes_twice_are_unchanged_and_hand_nothing_to_the_lot_transaction()
+    {
+        _w.Share("A", fno: true, lot: 10);
+        _w.Share("B", fno: true, lot: 10);
+        var body = ListWorld.Lot(("A", "A", "10"), ("B", "B", "10"));
+        _w.LotSource();
+        _w.Store.Sources[0] = _w.Store.Sources[0] with { Sha256 = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(body))) };
+        _w.Serve(body);
+
+        (await _w.RunOneAsync()).Outcome.ShouldBe(FetchOutcomes.Unchanged);
+
+        _w.LotApplier.Applied.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task With_the_lists_setting_off_the_lot_transaction_is_never_reached()
+    {
+        _w.ListSettings.FetchEnabled = false;
+        _w.Share("A", fno: true, lot: 10);
+        _w.LotSource();
+        _w.Serve(ListWorld.Lot(("A", "A", "10")));
+
+        (await _w.RunAsync()).Value.Outcomes.ShouldBeEmpty();
+
+        _w.LotApplier.Applied.ShouldBeEmpty();
+        _w.Fetcher.Calls.ShouldBe(0);
     }
 }

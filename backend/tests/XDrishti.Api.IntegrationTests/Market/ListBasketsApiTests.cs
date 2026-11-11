@@ -281,7 +281,7 @@ public sealed class ListBasketsApiTests(ApiFactory factory) : BasketsTestBase(fa
         (await StaysAsync(ListBaskets.Ban.Id)).ShouldBeEmpty();
     }
 
-    // ---- the lot sizes (AC 7, 8, 9): a fetch record only, no table ----
+    // ---- the lot sizes (BK-05 AC 7, 8, 9; BK-05b): the fetch record and the nse_mktlots rows of options.lot_sizes ----
 
     private static string Lots(params string[] rows) =>
         "UNDERLYING      ,SYMBOL    ,OCT-26   ,NOV-26   ,\r\n" + string.Concat(rows.Select(r => r + "\r\n"));
@@ -296,8 +296,11 @@ public sealed class ListBasketsApiTests(ApiFactory factory) : BasketsTestBase(fa
 
         var outcome = await FetchListAsync(ListBaskets.LotSizes.Id);
 
-        outcome.Outcome.ShouldBe("unchanged"); // nothing is stored but the record
+        outcome.Outcome.ShouldBe("applied"); // the two share lots are new rows of options.lot_sizes (BK-05b)
         var warnings = await WarningsAsync(ListBaskets.LotSizes.Id);
+        warnings.ShouldContain("lotsWritten=2");
+        warnings.ShouldContain("indexUnmatched=1"); // BANKNIFTY is not an index of this master
+        (await LotRowsAsync()).ShouldBe([("L001", 275, "2026-10-26"), ("L002", 100, "2026-10-26")]);
         warnings.ShouldContain("lots_summary:shares=2,nearest=OCT-26,mismatches=1");
         warnings.ShouldContain("lot_size_mismatch:L001:master=250:nse=275");
         warnings.ShouldNotContain("lot_size_mismatch:L002");
@@ -306,6 +309,134 @@ public sealed class ListBasketsApiTests(ApiFactory factory) : BasketsTestBase(fa
         (await Factory.WithDbAsync(db => db.Instruments.AsNoTracking().Where(i => i.Type == "future" && i.UnderlyingSymbol == "L001").Select(i => i.LotSize).SingleAsync(Ct))).ShouldBe(250);
         (await SymbolsAsync(ListBaskets.FnoStocks.Id)).Length.ShouldBe(4); // the membership is not corrected
         (await Factory.WithDbAsync(db => db.Database.SqlQuery<int>($"SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'fo_lot_sizes'").SingleAsync(Ct))).ShouldBe(0);
+    }
+
+    private async Task<List<(string Underlying, int Lot, string From)>> LotRowsAsync(string source = "nse_mktlots") =>
+        [.. (await Factory.WithDbAsync(db => db.Database.SqlQuery<string>(
+            $"SELECT i.underlying_symbol || '|' || l.lot_size || '|' || l.effective_from || '|' || l.confirmed || '|' || l.source || '|' || coalesce(l.source_url, '') AS \"Value\" FROM options.lot_sizes l JOIN market.instruments i ON i.id = l.underlying_id WHERE l.source = {source} ORDER BY i.underlying_symbol, l.id").ToListAsync(Ct)))
+            .Select(r => r.Split('|')).Select(c =>
+            {
+                c[3].ShouldBe("false"); // never confirmed
+                c[4].ShouldBe("nse_mktlots");
+                c[5].ShouldBe("https://nsearchives.nseindia.com/content/fo/fo_mktlots.csv"); // the provenance
+                return (c[0], int.Parse(c[1], System.Globalization.CultureInfo.InvariantCulture), c[2]);
+            })];
+
+    private async Task FetchLotsOnAsync(int day, params string[] rows)
+    {
+        await MoveToAsync(At(10, day, 8, 50));
+        Factory.BasketSources.Serve("fo_mktlots.csv", Lots(rows));
+        (await FetchListAsync(ListBaskets.LotSizes.Id)).Outcome.ShouldNotBe("failed");
+    }
+
+    private static string Row(string symbol, int lot, int next) => $"{symbol} CO         , {symbol,-8}   , {lot,-9}   , {next,-9}   ,";
+
+    [Fact]
+    public async Task A_lot_is_written_again_only_when_it_changes_and_each_row_is_dated_by_its_fetch_day_and_never_updated()
+    {
+        await RefreshListsAsync();
+        Factory.BasketSources.FetchEnabled = true;
+
+        await FetchLotsOnAsync(26, Row("L001", 275, 275), Row("L002", 100, 100));
+        await FetchLotsOnAsync(27, Row("L001", 275, 300), Row("L002", 100, 100)); // the same lots (only a later column moved): no row
+        (await LotRowsAsync()).Count.ShouldBe(2);
+        await FetchLotsOnAsync(28, Row("L001", 475, 475), Row("L002", 100, 100));
+
+        (await LotRowsAsync()).ShouldBe([("L001", 275, "2026-10-26"), ("L001", 475, "2026-10-28"), ("L002", 100, "2026-10-26")]);
+        (await Factory.WithDbAsync(db => db.Database.SqlQuery<string>($"SELECT warnings::text AS \"Value\" FROM market.basket_fetches WHERE basket_id = {ListBaskets.LotSizes.Id} AND outcome = 'unchanged' ORDER BY fetched_at LIMIT 1").SingleAsync(Ct))).ShouldContain("lotsWritten=0");
+    }
+
+    [Fact]
+    public async Task The_same_bytes_twice_are_unchanged_and_write_no_lot_row()
+    {
+        await RefreshListsAsync();
+        Factory.BasketSources.FetchEnabled = true;
+        await FetchLotsOnAsync(26, Row("L001", 275, 275), Row("L002", 100, 100));
+
+        await MoveToAsync(At(10, 27, 8, 50));
+        var second = await FetchListAsync(ListBaskets.LotSizes.Id);
+
+        second.Outcome.ShouldBe("unchanged");
+        (await LotRowsAsync()).Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task An_index_row_is_written_when_its_canonical_symbol_names_one_index_of_the_master()
+    {
+        await RefreshListsAsync();
+        var nifty = Guid.CreateVersion7();
+        await SqlAsync($"""
+            INSERT INTO market.instruments (id, canonical_symbol, exchange, exchange_segment, type, name, display_name, lot_size, underlying_symbol, fno_eligible, first_seen_at, last_seen_at)
+            VALUES ({nifty}, 'NSE:NIFTY', 'NSE', 'IDX_I', 'index', 'NIFTY', 'Nifty 50', 1, 'NIFTY', false, now(), now())
+            """);
+        Factory.BasketSources.FetchEnabled = true;
+
+        await FetchLotsOnAsync(26, Row("NIFTY", 65, 65), Row("BANKNIFTY", 30, 30), Row("L001", 250, 250), Row("L002", 100, 100));
+
+        (await LotRowsAsync()).ShouldBe([("L001", 250, "2026-10-26"), ("L002", 100, "2026-10-26"), ("NIFTY", 65, "2026-10-26")]);
+        (await WarningsAsync(ListBaskets.LotSizes.Id)).ShouldContain("indexUnmatched=1");
+    }
+
+    [Fact]
+    public async Task A_rejected_file_writes_nothing_and_the_earlier_rows_stand()
+    {
+        await RefreshListsAsync();
+        Factory.BasketSources.FetchEnabled = true;
+        await FetchLotsOnAsync(26, Row("L001", 275, 275), Row("L002", 100, 100));
+        await MoveToAsync(At(10, 27, 8, 50));
+        Factory.BasketSources.Serve("fo_mktlots.csv", Lots(Row("L001", 999, 999).Replace("999", "many     "), Row("L002", 101, 101)));
+
+        var outcome = await FetchListAsync(ListBaskets.LotSizes.Id);
+
+        (outcome.Outcome, outcome.Error).ShouldBe(("rejected", "bad_lot"));
+        (await LotRowsAsync()).ShouldBe([("L001", 275, "2026-10-26"), ("L002", 100, "2026-10-26")]);
+    }
+
+    [Fact]
+    public async Task With_the_lists_setting_off_the_lot_file_is_not_requested_and_no_lot_row_is_written()
+    {
+        await RefreshListsAsync();
+        Factory.BasketSources.Serve("fo_mktlots.csv", Lots(Row("L001", 275, 275), Row("L002", 100, 100)));
+        using var on = await Client.PutJsonAsync($"/api/baskets/{ListBaskets.LotSizes.Id}/source", new { enabled = true }, Ct);
+
+        using var response = await Client.PostJsonAsync("/api/baskets/system/fetch", new { basketIds = new[] { ListBaskets.LotSizes.Id } }, Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        Factory.BasketSources.Calls.ShouldBe(0);
+        (await LotRowsAsync()).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_failure_after_the_lot_rows_are_inserted_rolls_back_the_rows_and_the_fetch_record()
+    {
+        await RefreshListsAsync();
+        Factory.BasketSources.FetchEnabled = true;
+        await FetchLotsOnAsync(26, Row("L001", 275, 275), Row("L002", 100, 100));
+        var taken = await Factory.WithDbAsync(db => db.Database.SqlQuery<Guid>($"SELECT id AS \"Value\" FROM market.basket_fetches WHERE basket_id = {ListBaskets.LotSizes.Id} LIMIT 1").SingleAsync(Ct));
+        var fetches = await Factory.WithDbAsync(db => db.BasketFetches.CountAsync(Ct));
+        using var scope = Factory.Services.CreateScope();
+        var applier = scope.ServiceProvider.GetRequiredService<INseLotApplier>();
+        var now = At(10, 29, 8, 50);
+        var source = new SourceUpdate(ListBaskets.LotSizes.Id, true, "ok", now, now, null, null, null, null, 0);
+        var clash = new FetchRecord(taken, ListBaskets.LotSizes.Id, now, 200, null, null, null, 2, "applied", 0, 0, 0, "[]", null, false, "system:test", null); // the id of a stored fetch: the insert of the row fails after the lots
+
+        var written = await applier.ApplyAsync(new NseLotApplication([new NseLot(_shares["L001"], 999), new NseLot(_shares["L002"], 998)], new DateOnly(2026, 10, 29), "https://example.test/f.csv", source, _ => clash), Ct);
+
+        written.ShouldBeNull();
+        (await LotRowsAsync()).Count.ShouldBe(2); // only the two rows of the first day
+        (await Factory.WithDbAsync(db => db.BasketFetches.CountAsync(Ct))).ShouldBe(fetches);
+    }
+
+    [Fact]
+    public async Task A_lot_row_of_nse_is_a_row_beside_the_master_lot_and_never_changes_the_instrument_table()
+    {
+        await RefreshListsAsync();
+        Factory.BasketSources.FetchEnabled = true;
+
+        await FetchLotsOnAsync(26, Row("L001", 275, 275), Row("L002", 100, 100));
+
+        (await Factory.WithDbAsync(db => db.Instruments.AsNoTracking().Where(i => i.Type == "future" && i.UnderlyingSymbol == "L001").Select(i => i.LotSize).SingleAsync(Ct))).ShouldBe(250);
+        (await Factory.WithDbAsync(db => db.Instruments.AsNoTracking().Where(i => i.Type == "share" && i.UnderlyingSymbol == "L001").Select(i => i.LotSize).SingleAsync(Ct))).ShouldBe(1);
     }
 
     [Fact]
