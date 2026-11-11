@@ -286,6 +286,7 @@ public sealed class ReplayRunnerTests
         await runner.TickAsync(Ct);
         rig.Store.Of(id).State.ShouldBe(ReplayRunStates.Running, "one failure does not end the run");
         rig.Store.AfterSave = null;
+        rig.Time.Advance(TimeSpan.FromSeconds(6)); // the wait after a failure
         await runner.TickAsync(Ct);
 
         var run = rig.Store.Of(id);
@@ -296,19 +297,52 @@ public sealed class ReplayRunnerTests
     }
 
     [Fact]
-    public async Task A_store_that_keeps_failing_ends_the_run_failed_with_the_reason_after_a_few_ticks()
+    public async Task A_store_that_keeps_failing_ends_the_run_failed_with_the_reason_after_repeated_failures_each_after_a_wait()
     {
         var (rig, id) = await Queued(r => r.Store.FailSaves = int.MaxValue);
         var runner = rig.Runner();
 
-        for (var i = 0; i < 3; i++)
+        for (var i = 0; i < 8; i++)
         {
+            rig.Time.Advance(TimeSpan.FromMinutes(6)); // past the longest wait
             await runner.TickAsync(Ct);
         }
 
         var run = rig.Store.Of(id);
         run.State.ShouldBe(ReplayRunStates.Failed);
         run.FailReason!.ShouldContain("replay.store_failed");
+    }
+
+    [Fact]
+    public async Task A_short_outage_of_the_store_does_not_fail_the_run_a_failure_waits_before_the_next_try()
+    {
+        var (rig, id) = await Queued(r => r.Store.FailSaves = 2);
+        var runner = rig.Runner();
+
+        await runner.TickAsync(Ct); // fails, waits
+        await runner.TickAsync(Ct); // still waiting: nothing is tried
+        rig.Store.SaveCalls.ShouldBe(1);
+        rig.Time.Advance(TimeSpan.FromSeconds(6));
+        await runner.TickAsync(Ct); // fails again, waits longer
+        rig.Time.Advance(TimeSpan.FromSeconds(11));
+        await runner.TickAsync(Ct);
+
+        rig.Store.Of(id).State.ShouldBe(ReplayRunStates.Completed);
+    }
+
+    [Fact]
+    public async Task A_refresh_of_the_statistics_after_the_start_does_not_fail_a_learning_run()
+    {
+        var rig = new ReplayJobRig(ReplayJobRig.SwingWorld());
+        var started = await rig.StartAsync(ReplayRig.Params(6, mode: ReplayMode.Learning));
+        var id = started.Value.RunIds[0];
+        var stored = rig.Store.Of(id).Created.LearningSources;
+        rig.World.Snapshots.Add((new DateOnly(2026, 10, 11), ReplayWorld.Stats(new DateOnly(2026, 10, 11), snapshot: "weekly") with { Sources = "other:swing:FIXED_RR{rr=2}" }));
+
+        var run = await Finished(rig, id);
+
+        stored.ShouldBe("run:swing:FIXED_RR{rr=2}");
+        run.State.ShouldBe(ReplayRunStates.Completed, "the input hash is taken again from the stored sources, not from today's newest snapshot");
     }
 
     [Fact]
@@ -417,10 +451,18 @@ public sealed class ReplayRunnerTests
         foreach (var record in direct.Value.Sessions)
         {
             var text = ReplayJson.Canonical(record);
-            var reordered = text.Replace("{\"", "{ \"", StringComparison.Ordinal); // jsonb changes spacing and key order; the hash is over the canonical form, which is rebuilt from the value
+            var reordered = Reverse(System.Text.Json.Nodes.JsonNode.Parse(text))!.ToJsonString(); // jsonb changes the order of the keys; the hash is over the canonical form, which is rebuilt from the value
+            reordered.ShouldNotBe(text, "the keys really moved");
             ReplayHashes.Session(ReplayJson.Read<ReplaySessionRecord>(reordered)!).ShouldBe(ReplayHashes.Session(record));
         }
     }
+
+    private static System.Text.Json.Nodes.JsonNode? Reverse(System.Text.Json.Nodes.JsonNode? node) => node switch
+    {
+        System.Text.Json.Nodes.JsonObject o => new System.Text.Json.Nodes.JsonObject(o.Reverse().Select(p => KeyValuePair.Create(p.Key, Reverse(p.Value)))),
+        System.Text.Json.Nodes.JsonArray a => new System.Text.Json.Nodes.JsonArray([.. a.Select(Reverse)]),
+        _ => node?.DeepClone(),
+    };
 }
 
 internal sealed class ThrowingCandidates(XDrishti.Application.Abstractions.Replay.IReplayCandidates inner, DateOnly on) : XDrishti.Application.Abstractions.Replay.IReplayCandidates

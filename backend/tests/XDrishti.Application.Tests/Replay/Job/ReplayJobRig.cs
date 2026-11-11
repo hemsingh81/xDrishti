@@ -36,6 +36,9 @@ internal sealed class ReplayJobRig(ReplayWorld world)
 
     public Func<IReplayFacts, IReplayCandidates>? Candidates { get; set; }
 
+    /// <summary>The options the start handler reads (the memory cap of the window); a test lowers the cap.</summary>
+    public SystemReplayOptions StartOptions { get; set; } = new();
+
     /// <summary>A runner that stands for a process: its own facts, driver and book.</summary>
     public ReplayRunner Runner(SystemReplayOptions? options = null)
     {
@@ -51,7 +54,7 @@ internal sealed class ReplayJobRig(ReplayWorld world)
     public async Task<Result<StartedReplay>> StartAsync(params ReplayParams[] runs)
     {
         var rig = ReplayRig.Create(World, candidates: Candidates);
-        var handler = new StartReplayHandler(rig.Driver, new ReplayInputHasher(rig.Facts, rig.Facts), rig.Facts, Store, Ledger, Time, NullLogger<StartReplayHandler>.Instance);
+        var handler = new StartReplayHandler(rig.Driver, new ReplayInputHasher(rig.Facts, rig.Facts), rig.Facts, Gate, StartOptions, Store, Ledger, Time, NullLogger<StartReplayHandler>.Instance);
         return await handler.HandleAsync(new StartReplayCommand(runs), TestContext.Current.CancellationToken);
     }
 

@@ -33,6 +33,13 @@ public sealed class SystemReplayOptions
     [Range(1, 250)]
     public int ReadAheadSessions { get; set; } = 40;
 
+    /// <summary>
+    /// The most memory, in MiB, the bars of one replay may need (instruments x the lookback and read-ahead sessions x 375 bars x 48 bytes). A start above it is refused with <c>replay.invalid</c> naming the largest scope. The owner raises it together with the <c>mem_limit</c> of <c>xd-api</c>:
+    /// the .NET heap limit in a 1 GiB container is about 768 MiB, and the whole API shares it (the budget of the same kind as <c>Training:MaxRows</c>).
+    /// </summary>
+    [Range(64, 4096)]
+    public int MaxWindowMb { get; set; } = 300;
+
     /// <summary>The disk floor in bytes.</summary>
     public long MinFreeBytes => MinFreeGb * 1024L * 1024 * 1024;
 }

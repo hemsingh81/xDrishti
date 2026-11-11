@@ -121,7 +121,7 @@ public sealed partial class ReplayArchitectureTests
 
     private static readonly string[] ResolvedAllowed = ["IReplayStore", "IReplayReads", "ReplayDriver", "ReplayInputHasher", "IFreeDiskProbe", "ITradingCalendar", "ISimAllBackfillGate", "ISimAllStore"];
 
-    private static readonly string[] ConstructorAllowed = ["IServiceScopeFactory", "SystemReplayOptions", "TimeProvider", "ILogger`1", "ReplayDriver", "ReplayInputHasher", "IReplayInputs", "IReplayStore", "IReplayReads", "ITestLedger"];
+    private static readonly string[] ConstructorAllowed = ["IServiceScopeFactory", "SystemReplayOptions", "TimeProvider", "ILogger`1", "ReplayDriver", "ReplayInputHasher", "IReplayInputs", "IReplayStore", "IReplayReads", "ITestLedger", "ISimAllBackfillGate"];
 
     [GeneratedRegex(@"Get(Required)?Service<(?<t>\w+)>", RegexOptions.CultureInvariant)]
     private static partial Regex ResolvedType();

@@ -42,7 +42,7 @@ public sealed class ReplayStoreTests(ApiFactory factory) : IAsyncLifetime
     }
 
     private static NewReplayRun New(Guid? id = null, DateOnly? to = null, string mode = "frozen", int minutes = 0) => new(
-        id ?? Guid.NewGuid(), D1, to ?? D3, mode, """{"capital":1000000,"mode":"Frozen"}""", """{"fill":{}}""", """{"S1":[]}""", new string('a', 64), new string('b', 64), 3, T0.AddMinutes(minutes));
+        id ?? Guid.NewGuid(), D1, to ?? D3, mode, """{"capital":1000000,"mode":"Frozen"}""", """{"fill":{}}""", """{"S1":[]}""", null, new string('a', 64), new string('b', 64), 3, T0.AddMinutes(minutes));
 
     private static ReplaySessionRow Session(DateOnly day, decimal equity = 1_000_000m) => new(day, "{\"session\":\"" + day.ToString("yyyy-MM-dd") + "\"}", equity, 0.5m, new string('c', 64));
 
@@ -126,6 +126,22 @@ public sealed class ReplayStoreTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_session_record_gives_the_same_hash_after_it_has_been_through_jsonb()
+    {
+        var id = await QueueAsync();
+        await WithAsync((s, _) => s.ClaimAsync(Ct).AsTask());
+        var record = new XDrishti.Domain.Replay.ReplaySessionRecord(D1, [new XDrishti.Domain.Replay.ReplayCandidateRow("AAA", "BUY", "S1|1D|BUY|swing|FIXED_RR", 1)], [], [], [], [], [], 1_000_000.5m, 0.25m, 0.5m, 0, ["settings_now", "before_costs"], []);
+        var text = XDrishti.Application.Replay.ReplayJson.Canonical(record);
+        var hash = XDrishti.Application.Replay.ReplayJson.Sha256(text);
+        await WithAsync((s, _) => s.SaveSessionAsync(id, new ReplaySessionRow(D1, text, record.Equity, record.DrawdownPct, hash), [], Ct).AsTask());
+
+        var back = (await WithAsync((_, r) => r.SessionAsync(id, D1, Ct).AsTask()))!;
+
+        back.RecordJson.ShouldNotBe(text, "jsonb reorders the keys and changes the spacing");
+        XDrishti.Application.Replay.ReplayHashes.Session(XDrishti.Application.Replay.ReplayJson.Read<XDrishti.Domain.Replay.ReplaySessionRecord>(back.RecordJson)!).ShouldBe(hash);
+    }
+
+    [Fact]
     public async Task A_run_left_running_goes_back_to_the_queue_with_its_cursor_and_resumes_where_it_stopped()
     {
         var id = await QueueAsync();
@@ -149,7 +165,8 @@ public sealed class ReplayStoreTests(ApiFactory factory) : IAsyncLifetime
         await WithAsync((s, _) => s.InsertAsync(null, [run], Ct).AsTask());
 
         (await WithAsync((s, _) => s.ClaimAsync(Ct).AsTask())).ShouldBeNull("its ledger rows do not exist yet");
-        (await WithAsync((s, _) => s.RecoverAsync(T0, Ct).AsTask())).ShouldBe(1);
+        (await WithAsync((s, _) => s.RecoverAsync(T0.AddMinutes(2), Ct).AsTask())).ShouldBe(0, "a start that is still writing its ledger rows is given five minutes");
+        (await WithAsync((s, _) => s.RecoverAsync(T0.AddMinutes(10), Ct).AsTask())).ShouldBe(1);
         (await WithAsync((s, _) => s.StateAsync(run.Id, Ct).AsTask())).ShouldBe("cancelled");
         (await WithAsync((_, r) => r.AnyRunningAsync(Ct).AsTask())).ShouldBeFalse();
     }
@@ -229,6 +246,13 @@ public sealed class ReplayStoreTests(ApiFactory factory) : IAsyncLifetime
         var counts = await ledger.CountTrialsAsync("S1", Ct);
         counts.SystemReplays.ShouldBe(2);
         counts.Total.ShouldBe(2);
+
+        // a replay over several versions writes a row for each, and is one look: the rows of one run share the run half of their id
+        var runHalf = Guid.NewGuid().ToString("N")[..16];
+        await ledger.AppendAsync(row with { RunId = new Guid(runHalf + Guid.NewGuid().ToString("N")[..16]), StrategyHash = new string('2', 64), Version = 2 }, Ct);
+        await ledger.AppendAsync(row with { RunId = new Guid(runHalf + Guid.NewGuid().ToString("N")[..16]), StrategyHash = new string('3', 64), Version = 3 }, Ct);
+        (await ledger.CountTrialsAsync("S1", Ct)).SystemReplays.ShouldBe(3, "two earlier replays and one over two versions");
+        counts = await ledger.CountTrialsAsync("S1", Ct);
         counts.DistinctHashes.ShouldBe(0);
         (await ledger.CountVariantsAsync("S1", Ct)).ShouldBe(0);
         (await ledger.HasHashAsync("S1", new string('1', 64), Ct)).ShouldBeFalse();

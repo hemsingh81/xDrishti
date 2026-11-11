@@ -16,13 +16,14 @@ internal static class ReplayHashes
     /// <param name="snapshotKeys">The keys of the frozen cell statistics the run starts from.</param>
     /// <param name="versions">For each strategy the versions the run may use, as "version:hash".</param>
     /// <param name="barHash">The hash of the day bars the run reads (and their seams).</param>
-    public static string Input(ReplayParams parameters, ReplaySettingsSnapshot settings, string scopeHash, string membershipHash, IReadOnlyList<string> snapshotKeys, IReadOnlyDictionary<string, string> versions, string barHash)
+    /// <param name="learningSources">The sources learning mode recomputes from; null in frozen mode.</param>
+    public static string Input(ReplayParams parameters, ReplaySettingsSnapshot settings, string scopeHash, string membershipHash, IReadOnlyList<string> snapshotKeys, IReadOnlyDictionary<string, string> versions, string barHash, string? learningSources = null)
     {
         ArgumentNullException.ThrowIfNull(parameters);
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(snapshotKeys);
         ArgumentNullException.ThrowIfNull(versions);
-        return ReplayJson.Sha256(ReplayJson.Canonical(new { parameters, settings, scopeHash, membershipHash, snapshotKeys = snapshotKeys.Order(StringComparer.Ordinal), versions = versions.OrderBy(v => v.Key, StringComparer.Ordinal).Select(v => v.Key + "=" + v.Value), barHash }));
+        return ReplayJson.Sha256(ReplayJson.Canonical(new { parameters, settings, scopeHash, membershipHash, snapshotKeys = snapshotKeys.Order(StringComparer.Ordinal), versions = versions.OrderBy(v => v.Key, StringComparer.Ordinal).Select(v => v.Key + "=" + v.Value), barHash, learningSources }));
     }
 
     /// <summary>The hash of the members of the universe at each session, in session order: a member that joined or left inside the range changes it.</summary>

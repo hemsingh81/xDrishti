@@ -58,7 +58,7 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger, IUn
                    (SELECT coalesce(sum(extra_trials), 0) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep'),
                    (SELECT count(DISTINCT strategy_hash) FROM lab.test_ledger WHERE trial_kind = 'training_sweep' AND strategy_hash IN (SELECT hash FROM lineage)),
                    (SELECT count(DISTINCT strategy_hash) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep' AND strategy_hash NOT IN (SELECT hash FROM lineage)),
-                   (SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'system_replay')
+                   (SELECT count(DISTINCT substr(lab_run_id::text, 1, 18)) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'system_replay')
             """);
         command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);

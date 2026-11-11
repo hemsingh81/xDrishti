@@ -18,7 +18,7 @@ internal sealed class ReplayDriver(IReplayFacts facts, ReplaySessionRunner runne
     /// The checks of a run and its context: the parameters, the hold-out clamp, frozen cell statistics as of the start, the charge sheet. <paramref name="stored"/> and <paramref name="versions"/> are the settings snapshot and the strategy version map stored with a run that resumes (null for a run that starts: the facts take today's then).
     /// Reads only; the book is empty.
     /// </summary>
-    public async ValueTask<Result<ReplayPrepared>> PrepareAsync(ReplayParams parameters, ReplaySettingsSnapshot? stored, IReadOnlyDictionary<string, IReadOnlyList<Abstractions.Research.StoredVersion>>? versions, CancellationToken cancellationToken)
+    public async ValueTask<Result<ReplayPrepared>> PrepareAsync(ReplayParams parameters, ReplaySettingsSnapshot? stored, IReadOnlyDictionary<string, IReadOnlyList<Abstractions.Research.StoredVersion>>? versions, CancellationToken cancellationToken, string? learningSources = null, bool learningFixed = false)
     {
         ArgumentNullException.ThrowIfNull(parameters);
         var problems = parameters.Problems();
@@ -42,7 +42,7 @@ internal sealed class ReplayDriver(IReplayFacts facts, ReplaySessionRunner runne
             return Result.Failure<ReplayPrepared>(Error.Conflict(HoldOutCode, $"The range reaches the hold-out; the last allowed date is {last:yyyy-MM-dd}."));
         }
 
-        facts.BeginRun(parameters.To, stored, versions);
+        facts.BeginRun(parameters.To, stored, versions, learningSources, learningFixed);
         if ((await facts.CellsAsync(parameters, parameters.From, cancellationToken)).Cells.Count == 0)
         {
             return Result.Failure<ReplayPrepared>(Error.Validation(InvalidCode, "no cell statistics as of " + parameters.From.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ": a replay without them would only draw a flat curve"));

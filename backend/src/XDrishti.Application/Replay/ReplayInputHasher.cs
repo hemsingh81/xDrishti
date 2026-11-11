@@ -10,8 +10,8 @@ namespace XDrishti.Application.Replay;
 /// </summary>
 internal sealed class ReplayInputHasher(IReplayFacts facts, IReplayInputs inputs)
 {
-    /// <summary>The input hash and the scope hash of a run.</summary>
-    public async ValueTask<(string Input, string Scope)> ComputeAsync(ReplayParams parameters, ReplaySettingsSnapshot settings, IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>> versions, IReadOnlyList<DateOnly> sessions, CancellationToken cancellationToken)
+    /// <summary>The input hash, the scope hash and the number of instruments the run reads (every member the universe had at any session, and the explicit instruments).</summary>
+    public async ValueTask<(string Input, string Scope, int Instruments)> ComputeAsync(ReplayParams parameters, ReplaySettingsSnapshot settings, IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>> versions, IReadOnlyList<DateOnly> sessions, string? learningSources, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(parameters);
         var perSession = new List<(DateOnly, IReadOnlyList<Guid>)>();
@@ -28,6 +28,6 @@ internal sealed class ReplayInputHasher(IReplayFacts facts, IReplayInputs inputs
         var keys = (await facts.CellsAsync(parameters, parameters.From, cancellationToken)).Cells.Select(c => c.Stored.SnapshotKey).Distinct(StringComparer.Ordinal).ToList();
         var bars = await inputs.BarHashAsync(all, parameters.From, parameters.To, cancellationToken);
         var hashes = versions.ToDictionary(v => v.Key, v => string.Join(',', v.Value.OrderBy(x => x.Version).Select(x => x.Version + ":" + x.Hash)), StringComparer.Ordinal);
-        return (ReplayHashes.Input(parameters, settings, scope, ReplayHashes.Membership(perSession), keys, hashes, bars), scope);
+        return (ReplayHashes.Input(parameters, settings, scope, ReplayHashes.Membership(perSession), keys, hashes, bars, learningSources), scope, all.Count);
     }
 }

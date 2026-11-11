@@ -13,7 +13,7 @@ namespace XDrishti.Infrastructure.Replay;
 internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, IReplayReads
 {
     private const string RunSelect = """
-        SELECT r.id, r.pair_id, r.range_from, r.range_to, r.mode, r.params::text, r.settings_snapshot::text, r.versions::text, r.input_hash, r.scope_hash, r.result_hash, r.state, r.cursor_session,
+        SELECT r.id, r.pair_id, r.range_from, r.range_to, r.mode, r.params::text, r.settings_snapshot::text, r.versions::text, r.learning_sources, r.input_hash, r.scope_hash, r.result_hash, r.state, r.cursor_session,
                (SELECT count(*)::int FROM research.replay_sessions s WHERE s.run_id = r.id), r.sessions_total,
                (SELECT count(*)::int FROM research.replay_runs o WHERE o.range_from = r.range_from AND o.range_to = r.range_to AND (o.created_at, o.id) <= (r.created_at, r.id)),
                r.created_at, r.finished_at, r.fail_reason
@@ -45,8 +45,8 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
         foreach (var run in runs)
         {
             await using var insert = new NpgsqlCommand("""
-                INSERT INTO research.replay_runs (id, pair_id, range_from, range_to, mode, params, settings_snapshot, versions, input_hash, scope_hash, state, sessions_total, created_at)
-                VALUES (@id, @pair, @from, @to, @mode, @params, @settings, @versions, @input, @scope, 'queued', @total, @at)
+                INSERT INTO research.replay_runs (id, pair_id, range_from, range_to, mode, params, settings_snapshot, versions, learning_sources, input_hash, scope_hash, state, sessions_total, created_at)
+                VALUES (@id, @pair, @from, @to, @mode, @params, @settings, @versions, @learning, @input, @scope, 'queued', @total, @at)
                 """, connection, transaction);
             insert.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, run.Id);
             insert.Parameters.AddWithValue("pair", NpgsqlDbType.Uuid, (object?)pairId ?? DBNull.Value);
@@ -56,6 +56,7 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
             insert.Parameters.AddWithValue("params", NpgsqlDbType.Jsonb, run.ParamsJson);
             insert.Parameters.AddWithValue("settings", NpgsqlDbType.Jsonb, run.SettingsJson);
             insert.Parameters.AddWithValue("versions", NpgsqlDbType.Jsonb, run.VersionsJson);
+            insert.Parameters.AddWithValue("learning", NpgsqlDbType.Text, (object?)run.LearningSources ?? DBNull.Value);
             insert.Parameters.AddWithValue("input", NpgsqlDbType.Char, run.InputHash);
             insert.Parameters.AddWithValue("scope", NpgsqlDbType.Char, run.ScopeHash);
             insert.Parameters.AddWithValue("total", NpgsqlDbType.Integer, run.SessionsTotal);
@@ -99,7 +100,7 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand("""
             WITH requeued AS (UPDATE research.replay_runs SET state = 'queued' WHERE state = 'running' RETURNING 1),
-                 stopped AS (UPDATE research.replay_runs SET state = 'cancelled', finished_at = @now WHERE state = 'cancelling' OR (state = 'queued' AND NOT recorded) RETURNING 1)
+                 stopped AS (UPDATE research.replay_runs SET state = 'cancelled', finished_at = @now WHERE state = 'cancelling' OR (state = 'queued' AND NOT recorded AND created_at < @now - interval '5 minutes') RETURNING 1)
             SELECT (SELECT count(*) FROM requeued)::int + (SELECT count(*) FROM stopped)::int
             """, connection);
         command.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now.ToUniversalTime());
@@ -327,9 +328,9 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
         while (await reader.ReadAsync(cancellationToken))
         {
             rows.Add(new ReplayRunRow(
-                reader.GetGuid(0), reader.IsDBNull(1) ? null : reader.GetGuid(1), Day(reader, 2)!.Value, Day(reader, 3)!.Value, reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetString(9),
-                reader.IsDBNull(10) ? null : reader.GetString(10), reader.GetString(11), Day(reader, 12), reader.GetInt32(13), reader.GetInt32(14), reader.GetInt32(15), reader.GetFieldValue<DateTimeOffset>(16),
-                reader.IsDBNull(17) ? null : reader.GetFieldValue<DateTimeOffset>(17), reader.IsDBNull(18) ? null : reader.GetString(18)));
+                reader.GetGuid(0), reader.IsDBNull(1) ? null : reader.GetGuid(1), Day(reader, 2)!.Value, Day(reader, 3)!.Value, reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.IsDBNull(8) ? null : reader.GetString(8), reader.GetString(9), reader.GetString(10),
+                reader.IsDBNull(11) ? null : reader.GetString(11), reader.GetString(12), Day(reader, 13), reader.GetInt32(14), reader.GetInt32(15), reader.GetInt32(16), reader.GetFieldValue<DateTimeOffset>(17),
+                reader.IsDBNull(18) ? null : reader.GetFieldValue<DateTimeOffset>(18), reader.IsDBNull(19) ? null : reader.GetString(19)));
         }
 
         return rows;

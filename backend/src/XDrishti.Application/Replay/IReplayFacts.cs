@@ -18,10 +18,10 @@ public interface IReplayFacts
     ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Tells the facts of one run the last session it will replay (so the bars of each instrument are read once for the whole run) and, when the run resumes after a restart, the settings snapshot and the strategy versions that were stored with it (so neither is re-read from today's settings and today's active versions). With a version map a strategy that is not in it has no version.
+    /// Tells the facts of one run the last session it will replay (so the bars of each instrument are read once for the whole run) and, when the run resumes after a restart, the settings snapshot and the strategy versions that were stored with it (so neither is re-read from today's settings and today's active versions). With a version map a strategy that is not in it has no version. With <paramref name="learningFixed"/> learning mode recomputes from <paramref name="learningSources"/> (null: the sources of the frozen rows) and never asks for today's newest snapshot.
     /// The default does nothing: a facts source that keeps no window and has no stored snapshot needs neither.
     /// </summary>
-    void BeginRun(DateOnly last, ReplaySettingsSnapshot? stored, IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>>? versions = null) { }
+    void BeginRun(DateOnly last, ReplaySettingsSnapshot? stored, IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>>? versions = null, string? learningSources = null, bool learningFixed = false) { }
 
     /// <summary>The trading calendar.</summary>
     ValueTask<TradingCalendar> CalendarAsync(CancellationToken cancellationToken);

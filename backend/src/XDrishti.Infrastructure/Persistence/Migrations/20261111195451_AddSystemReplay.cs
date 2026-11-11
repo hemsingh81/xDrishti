@@ -34,6 +34,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     params jsonb NOT NULL,
                     settings_snapshot jsonb NOT NULL,
                     versions jsonb NOT NULL,
+                    learning_sources text NULL,
                     input_hash char(64) NOT NULL,
                     scope_hash char(64) NOT NULL,
                     result_hash char(64) NULL,
@@ -107,7 +108,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     END IF;
 
                     IF NEW.id <> OLD.id OR NEW.pair_id IS DISTINCT FROM OLD.pair_id OR NEW.range_from <> OLD.range_from OR NEW.range_to <> OLD.range_to OR NEW.mode <> OLD.mode OR NEW.params <> OLD.params
-                       OR NEW.settings_snapshot <> OLD.settings_snapshot OR NEW.versions <> OLD.versions OR NEW.input_hash <> OLD.input_hash OR NEW.scope_hash <> OLD.scope_hash OR NEW.sessions_total <> OLD.sessions_total OR NEW.created_at <> OLD.created_at THEN
+                       OR NEW.settings_snapshot <> OLD.settings_snapshot OR NEW.versions <> OLD.versions OR NEW.learning_sources IS DISTINCT FROM OLD.learning_sources OR NEW.input_hash <> OLD.input_hash OR NEW.scope_hash <> OLD.scope_hash OR NEW.sessions_total <> OLD.sessions_total OR NEW.created_at <> OLD.created_at THEN
                         RAISE EXCEPTION 'A replay run keeps what it was started with' USING ERRCODE = '23514';
                     END IF;
 

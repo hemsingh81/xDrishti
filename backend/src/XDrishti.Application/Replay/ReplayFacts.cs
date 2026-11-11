@@ -69,7 +69,10 @@ internal sealed class ReplayFacts(
     private readonly Dictionary<string, IReadOnlyList<StoredVersion>> _allVersions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<ChangelogEntry>> _histories = new(StringComparer.Ordinal);
     private readonly Dictionary<DateOnly, IReadOnlyList<StoredCellStats>> _learned = [];
+    private readonly Dictionary<Guid, string?> _symbols = [];
     private bool _versionsFixed;
+    private bool _learningFixed;
+    private string? _learningSources;
     private IReadOnlyList<StoredCellStats>? _frozen;
     private IReadOnlyList<CellInput>? _learningInputs;
     private ReplaySettingsSnapshot? _settings;
@@ -77,9 +80,15 @@ internal sealed class ReplayFacts(
 
     public ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken) => _bars.LastReadableAsync(cancellationToken);
 
-    public void BeginRun(DateOnly last, ReplaySettingsSnapshot? stored, IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>>? versions = null)
+    public void BeginRun(DateOnly last, ReplaySettingsSnapshot? stored, IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>>? versions = null, string? learningSources = null, bool learningFixed = false)
     {
         _bars.PlanRange(last);
+        if (learningFixed)
+        {
+            _learningFixed = true;
+            _learningSources = learningSources;
+        }
+
         _settings = stored ?? _settings;
         if (versions is not null)
         {
@@ -200,9 +209,19 @@ internal sealed class ReplayFacts(
 
         foreach (var id in parameters.Scope.InstrumentIds)
         {
-            if (!members.ContainsKey(id) && await instruments.GetAsync(id, cancellationToken) is { } detail)
+            if (members.ContainsKey(id))
             {
-                members[id] = detail.Symbol;
+                continue;
+            }
+
+            if (!_symbols.TryGetValue(id, out var symbol))
+            {
+                _symbols[id] = symbol = (await instruments.GetAsync(id, cancellationToken))?.Symbol; // once for the run, not once per session
+            }
+
+            if (symbol is not null)
+            {
+                members[id] = symbol;
             }
         }
 
@@ -348,8 +367,7 @@ internal sealed class ReplayFacts(
 
         // The sources of the NEWEST snapshot, not of the frozen one: a run made after the start holds the trades the replay "learns" from, and the calculator's own rule (only trades that exited on or before the as-of date) makes the cut.
         // The strategies were designed on this history, which the data_seen_before label says.
-        var newest = await stats.ListLatestCashAsync(null, CellWindow.All.Code(), cancellationToken);
-        var sourceText = newest.Count > 0 ? newest[0].Sources : first.Sources;
+        var sourceText = _learningFixed ? _learningSources ?? first.Sources : await NewestSourcesAsync(first.Sources, cancellationToken);
         if (CellSource.TryParseList(sourceText) is not { } sources)
         {
             return frozen; // a snapshot whose sources cannot be read keeps its rows: nothing is guessed
@@ -374,6 +392,28 @@ internal sealed class ReplayFacts(
             .Select(r => new StoredCellStats(key, created, first.Options, first.Sources, r))];
         _learned[asOf] = rows;
         return rows;
+    }
+
+    /// <summary>The sources of the newest cash statistics snapshot (today's), or <paramref name="fallback"/> when there is none.</summary>
+    private async ValueTask<string> NewestSourcesAsync(string fallback, CancellationToken cancellationToken)
+    {
+        var newest = await stats.ListLatestCashAsync(null, CellWindow.All.Code(), cancellationToken);
+        return newest.Count > 0 ? newest[0].Sources : fallback;
+    }
+
+    /// <summary>
+    /// The sources learning mode recomputes from, taken once at the start and stored with the run: the sources of the newest snapshot (the closed trades the weekly refresh has by then), or null in frozen mode. A later refresh must not change a run that has started.
+    /// </summary>
+    public async ValueTask<string?> LearningSourcesAsync(ReplayParams parameters, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        if (parameters.Mode != ReplayMode.Learning)
+        {
+            return null;
+        }
+
+        await CellsAsync(parameters, parameters.From, cancellationToken); // takes the frozen rows
+        return _frozen is { Count: > 0 } rows ? await NewestSourcesAsync(rows[0].Sources, cancellationToken) : null;
     }
 
     /// <summary>The Sunday before the week of <paramref name="day"/> (the day the weekly refresh knows trades up to).</summary>

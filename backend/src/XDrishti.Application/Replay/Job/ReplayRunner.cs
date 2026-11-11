@@ -35,8 +35,11 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
     /// <summary>How many sessions pass between two progress log lines.</summary>
     private const int ProgressEvery = 50;
 
-    /// <summary>After this many consecutive failures of the store (or of the preparation) the run ends failed with the reason instead of being tried every poll interval for ever.</summary>
-    private const int MaxConsecutiveFailures = 3;
+    /// <summary>After this many consecutive failures of the store (or of the preparation), each after a longer wait (see <see cref="MaxBackoff"/>: about ten minutes in all), the run ends failed with the reason instead of being tried for ever.</summary>
+    private const int MaxConsecutiveFailures = 8;
+
+    /// <summary>The wait after a failure of the store doubles from the poll interval up to this, so a database outage of some minutes does not fail a run for good.</summary>
+    private static readonly TimeSpan MaxBackoff = TimeSpan.FromMinutes(5);
 
     /// <summary>No run starts a session within this time of the market window opening (the session is short, the margin is as for the simulate-everything chunk).</summary>
     private static readonly TimeSpan WindowMargin = TimeSpan.FromMinutes(30);
@@ -118,6 +121,11 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
         }
 
         var run = _active;
+        if (run.NotBefore > time.GetUtcNow())
+        {
+            return; // backing off after a failure of the store
+        }
+
         var ended = false;
         try
         {
@@ -133,6 +141,7 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
         {
             ReplayLog.SessionCrashed(logger, run.Row.Id, ex);
             run.Reset();
+            run.NotBefore = time.GetUtcNow() + TimeSpan.FromTicks(Math.Min(MaxBackoff.Ticks, options.PollInterval.Ticks << Math.Min(run.Failures, 20)));
             if (++run.Failures >= MaxConsecutiveFailures)
             {
                 ended = await EndAsync(run, run.Scope.ServiceProvider.GetRequiredService<IReplayStore>(), ReplayRunStates.Failed, null, "replay.store_failed: " + ex.GetType().Name + ": " + ex.Message, cancellationToken);
@@ -166,13 +175,13 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
 
             var versions = stored.ToDictionary(p => p.Key, p => (IReadOnlyList<StoredVersion>)p.Value, StringComparer.Ordinal);
             var hasher = services.GetRequiredService<ReplayInputHasher>();
-            var prepared = await services.GetRequiredService<ReplayDriver>().PrepareAsync(parameters, settings, versions, cancellationToken);
+            var prepared = await services.GetRequiredService<ReplayDriver>().PrepareAsync(parameters, settings, versions, cancellationToken, run.Row.LearningSources, parameters.Mode == ReplayMode.Learning);
             if (prepared.IsFailure)
             {
                 return await FailAsync(run, store, null, prepared.Error.Code, prepared.Error.Message, cancellationToken);
             }
 
-            var (input, _) = await hasher.ComputeAsync(parameters, settings, versions, prepared.Value.Sessions, cancellationToken);
+            var (input, _, _) = await hasher.ComputeAsync(parameters, settings, versions, prepared.Value.Sessions, run.Row.LearningSources, cancellationToken);
             if (input != run.Row.InputHash)
             {
                 return await FailAsync(run, store, null, "replay.diverged", "The inputs (bars, members, statistics, versions or settings) have changed since the run was started, so it cannot go on.", cancellationToken);
@@ -249,6 +258,7 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
                 }
 
                 run.Failures = 0;
+                run.NotBefore = null;
                 run.Stored[session] = hash;
                 run.Cursor = session;
                 if (run.Stored.Count % ProgressEvery == 0)
@@ -406,6 +416,8 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
         public int Booked { get; set; }
 
         public int Failures { get; set; }
+
+        public DateTimeOffset? NotBefore { get; set; }
 
         /// <summary>Forgets what was built in memory, so the next tick rebuilds the book from the stored sessions and checks their hashes.</summary>
         public void Reset()

@@ -112,6 +112,47 @@ public sealed class StartReplayHandlerTests
         (await HashOf(w => w.Close["AAA"][new DateOnly(2026, 10, 14)] += 0.01, Six)).ShouldBe(baseline, "a bar after the range is not an input of this run");
     }
 
+    [Fact]
+    public async Task A_scope_whose_bars_need_more_memory_than_the_cap_is_refused_naming_the_largest_scope_allowed()
+    {
+        var rig = new ReplayJobRig(ReplayJobRig.SwingWorld()) { StartOptions = new SystemReplayOptions { MaxWindowMb = 8 } }; // about 5.9 MB per instrument: one instrument fits, two do not
+
+        var refused = await rig.StartAsync(Six);
+
+        refused.Error.Code.ShouldBe("replay.invalid");
+        refused.Error.Message.ShouldContain("largest scope allowed is 1 instruments");
+        rig.Store.Runs.ShouldBeEmpty();
+        (await new ReplayJobRig(ReplayJobRig.SwingWorld()).StartAsync(Six)).IsSuccess.ShouldBeTrue("the default cap fits the invented two-instrument scope");
+    }
+
+    [Fact]
+    public async Task A_start_while_the_history_backfill_is_incomplete_is_refused_as_busy()
+    {
+        var rig = new ReplayJobRig(ReplayJobRig.SwingWorld());
+        rig.Gate.Incomplete = "1 instruments unfinished";
+
+        var refused = await rig.StartAsync(Six);
+
+        refused.Error.Code.ShouldBe("replay.busy");
+        refused.Error.Message.ShouldContain("backfill");
+        rig.Store.Runs.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_ledger_rows_of_one_run_share_the_run_half_of_their_id_so_the_ledger_counts_replays_not_versions()
+    {
+        var world = ReplayJobRig.SwingWorld();
+        world.Versions["S1"].Add(ReplayWorld.Version("S1", 2, new string('3', 64), DateTimeOffset.UnixEpoch.AddYears(10)));
+        var rig = new ReplayJobRig(world);
+
+        var started = await rig.StartAsync(Six with { VersionRule = ReplayVersionRule.AsOf });
+        started.IsSuccess.ShouldBeTrue(started.IsFailure ? started.Error.Message : string.Empty);
+
+        rig.Ledger.Rows.Count.ShouldBe(2, "a row for every version used");
+        rig.Ledger.Rows.Select(r => r.RunId.ToString()[..18]).Distinct().Count().ShouldBe(1);
+        rig.Ledger.Rows.Select(r => r.RunId).Distinct().Count().ShouldBe(2);
+    }
+
     private static async Task<string> HashOf(Action<ReplayWorld> tune, ReplayParams p)
     {
         var world = ReplayJobRig.SwingWorld();

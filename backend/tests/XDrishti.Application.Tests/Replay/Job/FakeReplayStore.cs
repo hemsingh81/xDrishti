@@ -49,7 +49,7 @@ internal sealed class FakeReplayStore : IReplayStore, IReplayReads
     public Run Of(Guid id) => Runs.Single(r => r.Created.Id == id);
 
     private ReplayRunRow Row(Run r) => new(
-        r.Created.Id, r.Pair, r.Created.From, r.Created.To, r.Created.Mode, r.Created.ParamsJson, r.Created.SettingsJson, r.Created.VersionsJson, r.Created.InputHash, r.Created.ScopeHash, r.ResultHash, r.State, r.Cursor, r.Sessions.Count, r.Created.SessionsTotal,
+        r.Created.Id, r.Pair, r.Created.From, r.Created.To, r.Created.Mode, r.Created.ParamsJson, r.Created.SettingsJson, r.Created.VersionsJson, r.Created.LearningSources, r.Created.InputHash, r.Created.ScopeHash, r.ResultHash, r.State, r.Cursor, r.Sessions.Count, r.Created.SessionsTotal,
         Runs.Count(o => o.Created.From == r.Created.From && o.Created.To == r.Created.To && (o.Created.CreatedAt, o.Created.Id).CompareTo((r.Created.CreatedAt, r.Created.Id)) <= 0), r.Created.CreatedAt, r.FinishedAt, r.FailReason);
 
     public ValueTask<ReplayInsert> InsertAsync(Guid? pairId, IReadOnlyList<NewReplayRun> runs, CancellationToken cancellationToken)

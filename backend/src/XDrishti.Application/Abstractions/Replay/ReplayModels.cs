@@ -11,11 +11,12 @@ namespace XDrishti.Application.Abstractions.Replay;
 /// <param name="ParamsJson">The parameters.</param>
 /// <param name="SettingsJson">The one settings snapshot of the run.</param>
 /// <param name="VersionsJson">The strategy versions the run may use (strategy id to versions), stored so a resumed run never reads today's active version.</param>
+/// <param name="LearningSources">The sources learning mode recomputes from, taken at the start; null in frozen mode.</param>
 /// <param name="InputHash">The hash of everything the run reads.</param>
 /// <param name="ScopeHash">The hash of the scope as it stood at the start.</param>
 /// <param name="SessionsTotal">The trading sessions from D to E.</param>
 /// <param name="CreatedAt">When it was stored.</param>
-public sealed record NewReplayRun(Guid Id, DateOnly From, DateOnly To, string Mode, string ParamsJson, string SettingsJson, string VersionsJson, string InputHash, string ScopeHash, int SessionsTotal, DateTimeOffset CreatedAt);
+public sealed record NewReplayRun(Guid Id, DateOnly From, DateOnly To, string Mode, string ParamsJson, string SettingsJson, string VersionsJson, string? LearningSources, string InputHash, string ScopeHash, int SessionsTotal, DateTimeOffset CreatedAt);
 
 /// <summary>One stored run with how far it has got. <see cref="Complete"/> is true only for a run whose every session was replayed.</summary>
 /// <param name="Id">The run id.</param>
@@ -26,6 +27,7 @@ public sealed record NewReplayRun(Guid Id, DateOnly From, DateOnly To, string Mo
 /// <param name="ParamsJson">The parameters.</param>
 /// <param name="SettingsJson">The settings snapshot.</param>
 /// <param name="VersionsJson">The stored strategy version map.</param>
+/// <param name="LearningSources">The stored sources of learning mode; null in frozen mode.</param>
 /// <param name="InputHash">The input hash.</param>
 /// <param name="ScopeHash">The scope hash.</param>
 /// <param name="ResultHash">The result hash; null until the run completes.</param>
@@ -46,6 +48,7 @@ public sealed record ReplayRunRow(
     string ParamsJson,
     string SettingsJson,
     string VersionsJson,
+    string? LearningSources,
     string InputHash,
     string ScopeHash,
     string? ResultHash,

@@ -76,6 +76,9 @@ public interface IReplayInputs
     /// </summary>
     ValueTask<string> BarHashAsync(IReadOnlyList<Guid> instrumentIds, DateOnly from, DateOnly to, CancellationToken cancellationToken);
 
+    /// <summary>The sources of the cell-statistics snapshot learning mode recomputes from (today's newest, as of this call); null in frozen mode. Stored with the run and hashed, so a later refresh cannot change it.</summary>
+    ValueTask<string?> LearningSourcesAsync(ReplayParams parameters, CancellationToken cancellationToken);
+
     /// <summary>The strategy versions the run will use (under the Start rule the active one of each strategy of its cells, under AsOf every version written before the close of the last session), by strategy id.</summary>
     ValueTask<IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>>> VersionsAsync(ReplayParams parameters, CancellationToken cancellationToken);
 }
