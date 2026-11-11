@@ -231,8 +231,8 @@ public sealed partial class SimulateDatabaseTests(ApiFactory factory) : DataTest
         Rows(Path.Combine(temp.Root, "sim", RunId.Of("ORB", D1, D3, basketRun.RunKey))).ShouldAllBe(r => r["basket_ids"] == basket.ToString());
 
         using var json = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(Path.Combine(temp.Root, "sim", RunId.Of("ORB", D1, D3, basketRun.RunKey)), "run.json")));
-        json.RootElement.GetProperty("run").GetProperty("universe").GetProperty("label").GetString().ShouldBe("members as of today");
-        byBasket.Out.ShouldContain("universe: members as of today");
+        json.RootElement.GetProperty("run").GetProperty("universe").GetProperty("label").GetString().ShouldStartWith("members as of the run date (single_snapshot, survivorship applies); basket ");
+        byBasket.Out.ShouldContain("universe: members as of the run date (single_snapshot, survivorship applies); basket ");
         byBasket.Out.ShouldContain("database: " + new Uri("tcp://" + HostOf(Factory.AdminConnectionString)).Host);
         ExportManifest.ParseBytes(File.ReadAllBytes(Path.Combine(Path.Combine(temp.Root, "sim", RunId.Of("ORB", D1, D3, basketRun.RunKey)), "manifest.json"))).Value.BasketId.ShouldBe(basket);
         Directory.EnumerateFiles(symbolsFolder).Select(Path.GetFileName).Order(StringComparer.Ordinal).ShouldBe(["README.txt", "index.html", "manifest.json", "open_at_end.csv", "run.json", "trades.csv"]);
