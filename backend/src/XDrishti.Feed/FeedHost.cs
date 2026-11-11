@@ -27,7 +27,9 @@ internal static class FeedHost
             .AddOptionChainRecording()
             .AddOptionChainRecorder()
             .AddOptionBackfillRecording()
-            .AddOptionBackfill();
+            .AddOptionBackfill()
+            .AddOpeningBarsRecording()
+            .AddOpeningBarsRecorder();
 
         // The feed reads the Data account's token from the vault: it refuses to start without the key.
         builder.Services.RequireBrokerVaultKey();
@@ -51,6 +53,13 @@ internal static class FeedHost
             .ValidateOnStart();
         builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<TickOptions>>().Value.ToSettings(sp.GetRequiredService<IOptions<DepthOptions>>().Value.MinFreeGb));
 
+        // The opening-minute recorder (BK-03b): off by default (OpeningBars:Enabled false), registered paused, behind the owner's stored switch baskets.opening_bars; its own connection; the free floor is the depth recorder's (shared).
+        builder.Services.AddOptions<OpeningBarsOptions>()
+            .Bind(builder.Configuration.GetSection(OpeningBarsOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<OpeningBarsOptions>>().Value.ToSettings(sp.GetRequiredService<IOptions<DepthOptions>>().Value.MinFreeGb));
+
         // The option-chain recorder (P14-02): off by default (Options:Chain:Enabled false), registered paused, behind its own stored switch; REST requests to the two allowed option-chain endpoints, one per 3 seconds at most.
         builder.Services.AddOptions<OptionsOptions>()
             .Bind(builder.Configuration.GetSection(OptionsOptions.SectionName))
@@ -63,5 +72,5 @@ internal static class FeedHost
         return builder;
     }
 
-    public static IServiceCollection AddFeedService(this IServiceCollection services) => services.AddHostedService<FeedService>().AddHostedService<DepthService>().AddHostedService<TickService>().AddHostedService<OptionChainService>().AddHostedService<OptionBackfillService>();
+    public static IServiceCollection AddFeedService(this IServiceCollection services) => services.AddHostedService<FeedService>().AddHostedService<DepthService>().AddHostedService<TickService>().AddHostedService<OptionChainService>().AddHostedService<OptionBackfillService>().AddHostedService<OpeningBarsHostService>();
 }

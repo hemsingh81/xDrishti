@@ -286,6 +286,42 @@ public sealed class DerivedDefinitionTests
     }
 
     [Fact]
+    public void Basket_12_with_a_missing_minute_in_todays_window_is_insufficient_never_a_range_of_what_is_there()
+    {
+        var bars = OpeningRanges(1004, 996, 1010, 995, 15).Where(b => b.Time != At(35, 9, 22)).ToList();
+
+        var r = Eval(12, [Inst("O", Flat(30, 1000), intraday: [.. bars])], Day(34), null, null, At(35, 9, 30));
+
+        r.Excluded.ShouldBe([new DerivedExclusion("O", "insufficient_history")]);
+        r.Members.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Basket_12_prior_sessions_with_a_missing_minute_do_not_vote_so_fourteen_complete_ones_are_too_few()
+    {
+        var bars = OpeningRanges(1004, 996, 1010, 995, 15).Where(b => b.Time != At(20, 9, 20)).ToList();
+
+        var r = Eval(12, [Inst("O", Flat(30, 1000), intraday: [.. bars])], Day(34), null, null, At(35, 9, 30));
+
+        r.Excluded.ShouldBe([new DerivedExclusion("O", "insufficient_history")]);
+    }
+
+    [Fact]
+    public void Basket_4_with_the_0917_minute_missing_today_is_insufficient_and_a_prior_session_with_a_missing_minute_does_not_vote()
+    {
+        var daily = FromCloses(Enumerable.Repeat(100.0, 45).ToList(), 0.7);
+        var prior = Enumerable.Range(43, 2).SelectMany(d => Session(d, 5, volume: 100)).Where(b => b.Time != At(43, 9, 17)).ToList(); // day 43 does not vote: the median is day 44's 500
+        var today = Session(45, 5, open: 103, high: 103, low: 103, volume: 200); // 1,000 >= 500
+        var formation = At(45, 9, 20);
+
+        var voting = Eval(4, [Inst("G", daily, intraday: [.. prior, .. today])], Last(daily), null, null, formation);
+        var gap = Eval(4, [Inst("G", daily, intraday: [.. prior, .. today.Where(b => b.Time != At(45, 9, 17))])], Last(daily), null, null, formation);
+
+        IsMember(voting, "G").ShouldBeTrue();
+        gap.Excluded.ShouldBe([new DerivedExclusion("G", "insufficient_history")]);
+    }
+
+    [Fact]
     public void Basket_12_with_fewer_than_15_prior_sessions_is_insufficient_history()
     {
         var bars = OpeningRanges(1004, 996, 1010, 995, 14);

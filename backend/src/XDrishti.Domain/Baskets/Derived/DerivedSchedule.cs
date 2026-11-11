@@ -9,6 +9,17 @@ namespace XDrishti.Domain.Baskets.Derived;
 /// </summary>
 public static class DerivedSchedule
 {
+    /// <summary>The minutes of the opening window basket 4 reads (09:15 to 09:20).</summary>
+    public const int GapperMinutes = 5;
+
+    /// <summary>How many minutes after the 09:15 open a frozen intraday basket is formed (basket 4: 5, basket 12: its opening-range minutes); null for a basket that is not formed intraday.</summary>
+    public static int? OpeningMinutes(DerivedDefinition definition, DerivedParams parameters)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(parameters);
+        return definition.Cadence != DerivedCadence.FrozenIntraday ? null : definition.Id == 4 ? GapperMinutes : parameters.Whole("Basket12.OrMinutes");
+    }
+
     /// <summary>How far ahead the next session is searched (a calendar full of holidays must not loop for ever).</summary>
     private const int Lookahead = 40;
 

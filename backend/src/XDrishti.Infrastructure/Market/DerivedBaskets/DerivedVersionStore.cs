@@ -55,6 +55,9 @@ internal sealed class DerivedVersionStore(XDrishtiDbContext db, IAccountEventLog
     public async ValueTask<bool> ExistsAsync(Guid basketId, DateOnly asOf, string paramsHash, CancellationToken cancellationToken) =>
         await db.BasketVersions.AsNoTracking().AnyAsync(v => v.BasketId == basketId && v.AsOf == asOf && v.ParamsHash == paramsHash && v.FormedAt == null, cancellationToken);
 
+    public async ValueTask<bool> FrozenExistsAsync(Guid basketId, DateOnly asOf, CancellationToken cancellationToken) =>
+        await db.BasketVersions.AsNoTracking().AnyAsync(v => v.BasketId == basketId && v.AsOf == asOf && v.FormedAt != null && v.Provenance == BasketProvenance.Derived, cancellationToken);
+
     public async ValueTask<DerivedWriteResult> WriteAsync(DerivedVersionWrite version, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(version);
@@ -109,7 +112,7 @@ internal sealed class DerivedVersionStore(XDrishtiDbContext db, IAccountEventLog
             SessionsHeld = s.SessionsHeld,
         }));
 
-        var from = Start(version.EffectiveFrom);
+        var from = version.FormedAt ?? Start(version.EffectiveFrom); // a frozen intraday version counts from its formation time, not from the start of the day (BK-03b: no look-ahead)
         var added = 0;
         var removed = 0;
         try

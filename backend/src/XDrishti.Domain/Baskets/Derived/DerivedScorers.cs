@@ -16,6 +16,8 @@ internal static class DerivedScorers
 {
     private const double Eps = 1e-12;
 
+    private const int FirstMinutes = DerivedSchedule.GapperMinutes;
+
     public static Outcome Score(int id, InstrumentBars i, int n, ScoreContext c)
     {
         var d = i.Daily.AsSpan(0, n);
@@ -83,8 +85,8 @@ internal static class DerivedScorers
         var sessions = IntradaySessions.Build(i.Intraday, c.AsOf, c.Formation);
         var todayDate = IntradaySessions.DateOf(c.Formation!.Value);
         var today = sessions.Find(s => s.Date == todayDate && s.Date > c.AsOf);
-        var prior = sessions.Where(s => s.Date <= c.AsOf).TakeLast(p.Whole("Basket4.VolWindow")).ToList();
-        if (today is null || today.Bars.Length == 0 || prior.Count == 0)
+        var prior = sessions.Where(s => s.Date <= c.AsOf && s.IsComplete(0, FirstMinutes)).TakeLast(p.Whole("Basket4.VolWindow")).ToList(); // a prior session with a missing opening minute does not vote
+        if (today is null || !today.IsComplete(0, FirstMinutes) || prior.Count == 0)
         {
             return Outcome.Insufficient;
         }
@@ -93,8 +95,8 @@ internal static class DerivedScorers
         var gap = (today.Bars[0].Open / previousClose) - 1;
         var atrPct = IndicatorKit.Atr(d, p.Whole("Basket4.AtrWindow")) / previousClose;
         var bar = Math.Max(p["Basket4.GapFloor"], p["Basket4.AtrMult"] * atrPct);
-        var firstFive = today.Between(0, 5).Sum(b => b.Volume);
-        var median = IndicatorKit.Median(prior.Select(s => s.Between(0, 5).Sum(b => b.Volume)).ToArray());
+        var firstFive = today.Between(0, FirstMinutes).Sum(b => b.Volume);
+        var median = IndicatorKit.Median(prior.Select(s => s.Between(0, FirstMinutes).Sum(b => b.Volume)).ToArray());
         return Outcome.Of(Math.Abs(gap), Ge(Math.Abs(gap), bar) && Ge(firstFive, median));
     }
 
@@ -227,6 +229,11 @@ internal static class DerivedScorers
 
     private static double RangePct(Session s, int minutes)
     {
+        if (!s.IsComplete(0, minutes))
+        {
+            return double.NaN; // an incomplete window is Insufficient, never a range of whatever minutes happen to be there
+        }
+
         var bars = s.Between(0, minutes).ToArray();
         return bars.Length == 0 ? double.NaN : (bars.Max(b => b.High) - bars.Min(b => b.Low)) / bars[0].Open;
     }
