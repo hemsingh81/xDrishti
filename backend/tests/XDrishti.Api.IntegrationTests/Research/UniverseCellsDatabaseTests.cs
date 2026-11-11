@@ -102,6 +102,23 @@ public sealed class UniverseCellsDatabaseTests(ApiFactory factory) : DataTestBas
     }
 
     [Fact]
+    public async Task The_decision_readers_get_only_six_part_rows_from_a_snapshot_that_holds_tier_rows()
+    {
+        await StoreAsync(22, 8);
+        using var scope = Factory.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<ICellStatsStore>();
+
+        var before = await store.ListLatestBeforeAsync(Day.AddDays(1), null, null, Ct);
+        var cash = await store.ListLatestCashAsync(null, null, Ct);
+        var shown = XDrishti.Application.Learning.CashCells.Only(await store.ListUniverseLatestAsync(null, null, Ct), "test", null);
+
+        before.Count.ShouldBe(3);
+        before.ShouldAllBe(r => r.Row.Cell.Universe == "*" && r.Row.Cell.Key == "ORB|15m|BUY|intraday|FIXED_RR|*");
+        cash.ShouldAllBe(r => r.Row.Cell.Universe == "*");
+        shown.ShouldAllBe(r => r.Row.Cell.Universe == "*", "even handed tier rows, the decision filter drops them");
+    }
+
+    [Fact]
     public async Task The_links_say_which_cell_a_reader_takes_and_never_apply_anything()
     {
         await StoreAsync(22, 8);

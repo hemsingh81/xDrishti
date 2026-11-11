@@ -11,6 +11,7 @@ namespace XDrishti.Infrastructure.Learning;
 /// </summary>
 internal sealed class UniverseSeriesSource(NpgsqlDataSource dataSource) : IUniverseSeriesSource
 {
+    // shortcut: the set is the tracked, live set now, so a share that was delisted or tracked later is missing from earlier dates (survivorship, stated in ADR 0261)
     public async ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<SessionValue>>> ReadAsync(DateOnly from, DateOnly toExclusive, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(

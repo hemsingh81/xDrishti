@@ -36,14 +36,27 @@ internal sealed class UniverseSettingsStore(NpgsqlDataSource dataSource) : IUniv
             Int(current, UniverseSettingsRules.MinTradesChildKey, defaults.MinTradesChild),
             Int(current, UniverseSettingsRules.LinkMinTradesKey, defaults.LinkMinTrades),
             current.TryGetValue(UniverseSettingsRules.RegisteredBasketsKey, out var list) ? UniverseSettingsRules.ParseList(list) : defaults.RegisteredBaskets);
-        return new UniverseSettingsState(settings, history);
+        return new UniverseSettingsState(settings, history, history.Count == 0 ? 0 : history[0].Id);
     }
 
-    public async ValueTask AppendAsync(IReadOnlyList<UniverseSettingChange> changes, CancellationToken cancellationToken)
+    public async ValueTask<bool> AppendAsync(IReadOnlyList<UniverseSettingChange> changes, long expectedVersion, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(changes);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using (var gate = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtext('research.universe_settings_changes'))", connection, transaction))
+        {
+            await gate.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var newest = new NpgsqlCommand("SELECT coalesce(max(id), 0) FROM research.universe_settings_changes", connection, transaction))
+        {
+            if (Convert.ToInt64(await newest.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture) != expectedVersion)
+            {
+                return false;
+            }
+        }
+
         foreach (var c in changes)
         {
             await using var insert = new NpgsqlCommand("INSERT INTO research.universe_settings_changes (key, old_value, new_value, changed_by, hash) VALUES (@key, @old, @new, @by, @hash)", connection, transaction);
@@ -56,6 +69,7 @@ internal sealed class UniverseSettingsStore(NpgsqlDataSource dataSource) : IUniv
         }
 
         await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     private static int Int(Dictionary<string, string> current, string key, int fallback) =>

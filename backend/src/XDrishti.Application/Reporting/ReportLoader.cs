@@ -1,10 +1,12 @@
 using Microsoft.Extensions.Logging;
+using XDrishti.Application.Abstractions.Learning;
+using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Learning;
 using XDrishti.Domain.Reporting;
-using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Reporting;
 
@@ -13,7 +15,7 @@ namespace XDrishti.Application.Reporting;
 /// A net basis is allowed only by the owner's stored confirmation of the charge sheet (<see cref="IChargeSheetConfirmationSource"/>), read here and nowhere else; nothing in the query can supply it. The load is bounded: the closed trades of the runs, from their stored
 /// headers, may not exceed <see cref="MaxClosedTrades"/> (refused before one trade is read), and one report at a time holds a population in memory (<see cref="ReportGate"/>).
 /// </summary>
-internal sealed class ReportLoader(IReportTradeSource source, ITrainingReportSource trainingSource, ITrainingJobProgress simJobs, IChargeSheetConfirmationSource confirmations, IHoldingClassifications classifications, ReportTrainingOptions trainingSettings, ReportGate gate, TimeProvider time, ILogger<ReportLoader> logger)
+internal sealed class ReportLoader(IReportTradeSource source, ITrainingReportSource trainingSource, ITrainingJobProgress simJobs, IChargeSheetConfirmationSource confirmations, IHoldingClassifications classifications, ReportTrainingOptions trainingSettings, ReportGate gate, TimeProvider time, ILogger<ReportLoader> logger, IUniverseSettingsStore? universeSettings = null, IBasketQueries? baskets = null)
 {
     /// <summary>
     /// The most closed trades (by the run headers, before any filter) one request reads. Chosen from the measured peak of one request (ADR 0100): the population of 500,000 trades takes about the figure the ADR states above the idle process, which, with one report in memory at a
@@ -35,6 +37,43 @@ internal sealed class ReportLoader(IReportTradeSource source, ITrainingReportSou
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// BK-11 (criterion 10): a run on a basket outside the owner's registered list is exploratory and is left out of the What-works ranking (every other report still shows it). Read when the report is built, from the list in force, so the run key never depends
+    /// on it. shortcut: the list holds basket names, compared with the system prefixes ignored (ADR 0261); a renamed basket changes its standing.
+    /// </summary>
+    private async ValueTask<List<ReportRunInfo>> WithoutExploratoryAsync(List<ReportRunInfo> runs, CancellationToken cancellationToken)
+    {
+        if (universeSettings is null || baskets is null)
+        {
+            return runs;
+        }
+
+        var registered = (await universeSettings.CurrentAsync(cancellationToken)).Settings.RegisteredBaskets;
+        var kept = new List<ReportRunInfo>(runs.Count);
+        var standing = new Dictionary<Guid, bool>();
+        foreach (var run in runs)
+        {
+            if (!run.Universe.StartsWith("basket:", StringComparison.Ordinal) || !Guid.TryParse(run.Universe.AsSpan("basket:".Length), out var id))
+            {
+                kept.Add(run);
+                continue;
+            }
+
+            if (!standing.TryGetValue(id, out var ok))
+            {
+                var members = await baskets.MembersAsync(id, null, null, cancellationToken);
+                standing[id] = ok = members is null || UniverseSettingsRules.IsRegistered(members.Name, registered);
+            }
+
+            if (ok)
+            {
+                kept.Add(run);
+            }
+        }
+
+        return kept;
     }
 
     /// <summary>Only the excursion report and a lens by entry hour read the extra columns of a trade.</summary>
@@ -69,8 +108,12 @@ internal sealed class ReportLoader(IReportTradeSource source, ITrainingReportSou
             }
         }
 
-        // BK-11 (criterion 10): a run on a basket outside the registered list is exploratory and is left out of the What-works ranking (every other report still shows it, labelled)
-        var used = chosen.Where(query.Filters.KeepsRun).Where(r => kind != "what-works" || !UniverseLabels.IsExploratory(r.UniverseLabel)).ToList();
+        var used = chosen.Where(query.Filters.KeepsRun).ToList();
+        if (kind == "what-works")
+        {
+            used = await WithoutExploratoryAsync(used, cancellationToken);
+        }
+
         var options = new ReportOptions { Basis = query.Basis };
         if (query.Basis == ReportBasis.Net)
         {

@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Filings;
-using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
@@ -12,7 +11,6 @@ using XDrishti.Application.Market.Actions;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Filings;
-using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
@@ -50,8 +48,7 @@ internal sealed class RunSimulationHandler(
     IPlaceboEngine placeboEngine,
     IEntryTierSource? entryTiers = null,
     ICostStressSettings? costStress = null,
-    IRelativeStrengthRunSource? relativeStrength = null,
-    IUniverseSettingsStore? universeSettings = null) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>
+    IRelativeStrengthRunSource? relativeStrength = null) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>
 {
     private readonly InstrumentInputReader _reader = new(bars, barQueries, adjustments);
 
@@ -487,8 +484,7 @@ internal sealed class RunSimulationHandler(
             known[member.Instrument.Id] = new BarsInstrument(member.Instrument.Id, member.Instrument.Symbol, member.Instrument.Name, member.Instrument.TickSize);
         }
 
-        var registered = universeSettings is null || UniverseSettingsRules.IsRegistered(members.Name, (await universeSettings.CurrentAsync(cancellationToken)).Settings.RegisteredBaskets);
-        return Result.Success(new Universe(UniverseKind.Basket, basketId, members.Name, UniverseLabels.Basket(basketId, registered), [.. ordered.Select(m => m.Instrument.Id)], known));
+        return Result.Success(new Universe(UniverseKind.Basket, basketId, members.Name, UniverseLabels.Basket(basketId), [.. ordered.Select(m => m.Instrument.Id)], known));
     }
 
     /// <summary>

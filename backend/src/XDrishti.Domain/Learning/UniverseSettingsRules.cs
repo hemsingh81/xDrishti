@@ -62,6 +62,7 @@ public static class UniverseSettingsRules
         return names.Any(n => n.Length > MaxNameLength) ? string.Create(CultureInfo.InvariantCulture, $"A basket name is at most {MaxNameLength} characters.") : null;
     }
 
+    // shortcut: baskets are registered by name, not id, because the default list names the research note's baskets before any of them need exist; a renamed basket changes its standing (ADR 0261)
     /// <summary>True when the basket is in the list: the comparison ignores case and the system prefixes <c>NSE </c>, <c>List: </c> and <c>Derived: </c> on either side.</summary>
     public static bool IsRegistered(string? basketName, IReadOnlyList<string> registered)
     {

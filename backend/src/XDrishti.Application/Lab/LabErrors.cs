@@ -51,7 +51,7 @@ public static class LabErrors
 
     /// <summary>The basket is outside the registered list; the message names the list. An unregistered basket can still be simulated alone (the run is labelled exploratory).</summary>
     public static Error UniverseNotRegistered(string basketName, IReadOnlyList<string> registered) =>
-        Error.Validation(UniverseNotRegisteredCode, $"The basket `{basketName}` is not a registered basket, so a full test of a strategy on it is refused. " + XDrishti.Domain.Learning.UniverseSettingsRules.RegisteredMessage(registered) + " The owner changes the list (PUT /api/universe/settings); a simulation of the basket alone is still possible and is labelled exploratory.");
+        Error.Validation(UniverseNotRegisteredCode, $"The basket `{basketName}` is not a registered basket, so a full test of a strategy on it is refused. " + XDrishti.Domain.Learning.UniverseSettingsRules.RegisteredMessage(registered) + " The owner changes the list (PUT /api/universe/settings); a simulation of the basket alone is still possible, and is left out of the What-works ranking.");
 
     /// <summary>True for the codes the API answers with 422.</summary>
     public static bool IsUnprocessable(string code) => code is InvalidInputCode or NotRegisteredCode or HoldOutTouchedCode or UniverseNotRegisteredCode;

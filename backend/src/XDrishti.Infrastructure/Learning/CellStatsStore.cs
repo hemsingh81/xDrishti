@@ -201,7 +201,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
         await using var command = dataSource.CreateCommand($"""
             SELECT {Columns}, cell_key, {DependenceColumns}, {ShrinkageColumns} FROM research.cell_stats
             WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE as_of < @before AND {CashKey} ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)
-              AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
+              AND regime = '*' AND {AllShares} AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
             """);
         command.Parameters.AddWithValue("before", NpgsqlDbType.Date, before);

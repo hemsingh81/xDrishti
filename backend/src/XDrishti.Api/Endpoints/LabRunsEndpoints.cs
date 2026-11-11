@@ -67,7 +67,7 @@ internal sealed class LabRunsEndpoints : IEndpointModule
         api.MapGet("/lab/strategies/{id}/universe-trials", GetUniverseTrialsAsync)
             .WithTags("Lab")
             .WithName("GetUniverseTrials")
-            .WithSummary("The baskets a strategy family was tested on, counted from the stored Lab tests (BK-11): the distinct baskets k, the distinct tests, the k - 1 variants they add and the multiple-testing factor of k variants (k = 8 is three doublings). A repeated test of the same version, basket and window counts once");
+            .WithSummary("The baskets a strategy family was tested on, counted from the stored Lab tests (BK-11): the distinct baskets k, the distinct tests and the k - 1 variants they add. An information breakdown only: it feeds no factor or verdict (the honest count of ADR 0207 does). A repeated test of the same version, basket and window counts once");
 
         runs.MapPost("/{id:guid}/cancel", CancelAsync)
             .WithName("CancelLabRun")

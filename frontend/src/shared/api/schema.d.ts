@@ -2869,7 +2869,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The baskets a strategy family was tested on, counted from the stored Lab tests (BK-11): the distinct baskets k, the distinct tests, the k - 1 variants they add and the multiple-testing factor of k variants (k = 8 is three doublings). A repeated test of the same version, basket and window counts once */
+    /** The baskets a strategy family was tested on, counted from the stored Lab tests (BK-11): the distinct baskets k, the distinct tests and the k - 1 variants they add. An information breakdown only: it feeds no factor or verdict (the honest count of ADR 0207 does). A repeated test of the same version, basket and window counts once */
     get: operations['GetUniverseTrials'];
     put?: never;
     post?: never;
@@ -5705,7 +5705,7 @@ export interface paths {
     };
     /** The universe settings in force (the fewest trades of a tier cell to be read in place of its parent, 30; the fewest trades of a tier to be an observation, 100; the registered basket names a strategy x basket comparison may use) and the latest 50 changes. Read only */
     get: operations['GetUniverseSettings'];
-    /** The owner changes the universe settings (minTradesChild 1 to 1000, linkMinTrades 10 to 10000, registeredBaskets: comma separated names, 1 to 20); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row. 403 learning.owner_only, 422 learning.invalid */
+    /** The owner changes the universe settings (minTradesChild 1 to 1000, linkMinTrades 10 to 10000, registeredBaskets: comma separated names, 1 to 20); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row. expectedVersion (the version of the read) is required. 400 learning.invalid, 403 learning.owner_only, 409 learning.stale */
     put: operations['ChangeUniverseSettings'];
     post?: never;
     delete?: never;
@@ -24521,6 +24521,8 @@ export interface components {
       linkMinTrades: null | number;
       registeredBaskets: null | string;
       password: null | string;
+      /** Format: int64 */
+      expectedVersion?: null | number;
     };
     /** @description The universe settings in force with their history (BK-11). */
     UniverseSettingsView: {
@@ -24538,10 +24540,15 @@ export interface components {
       registeredBaskets: string[];
       /** @description The latest 50 changes, newest first. */
       history: components['schemas']['UniverseSettingChangeView'][];
+      /**
+       * Format: int64
+       * @description The newest change id (0 when none); a change names it as `expectedVersion`.
+       */
+      version: number;
       /** @description What the settings do and do not do. */
       notice: string;
     };
-    /** @description The baskets a strategy was tested on and what they add to the multiple-testing factor (BK-11). */
+    /** @description The baskets a strategy was tested on and how many variants they add (information only, BK-11). */
     UniverseTrialsView: {
       /** @description The strategy family. */
       strategyId: string;
@@ -24560,11 +24567,6 @@ export interface components {
        * @description Baskets minus one.
        */
       extraVariants: number;
-      /**
-       * Format: double
-       * @description The factor of that many variants.
-       */
-      factor: number;
       /** @description Where the number comes from. */
       notice: string;
     };
@@ -38727,6 +38729,15 @@ export interface operations {
           'application/json': components['schemas']['UniverseSettingsView'];
         };
       };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
       /** @description Unauthorized */
       401: {
         headers: {
@@ -38745,8 +38756,8 @@ export interface operations {
           'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
-      /** @description Unprocessable Entity */
-      422: {
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

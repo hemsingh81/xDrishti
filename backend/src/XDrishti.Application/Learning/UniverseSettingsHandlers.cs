@@ -17,8 +17,9 @@ namespace XDrishti.Application.Learning;
 /// <param name="LinkMinTrades"><c>learning.universe_link_min_trades</c>.</param>
 /// <param name="RegisteredBaskets"><c>learning.universe_registered_baskets</c>.</param>
 /// <param name="History">The latest 50 changes, newest first.</param>
+/// <param name="Version">The newest change id (0 when none); a change names it as <c>expectedVersion</c>.</param>
 /// <param name="Notice">What the settings do and do not do.</param>
-public sealed record UniverseSettingsView(int MinTradesChild, int LinkMinTrades, IReadOnlyList<string> RegisteredBaskets, IReadOnlyList<UniverseSettingChangeView> History, string Notice)
+public sealed record UniverseSettingsView(int MinTradesChild, int LinkMinTrades, IReadOnlyList<string> RegisteredBaskets, IReadOnlyList<UniverseSettingChangeView> History, long Version, string Notice)
 {
     /// <summary>Printed with the settings.</summary>
     public const string NoticeText = "These settings decide what the read side calls a tier cell, an observation and a registered basket. None of them applies a restriction, changes a scan scope or places an order.";
@@ -31,13 +32,13 @@ public sealed record UniverseSettingChangeView(long Id, string Key, string OldVa
 public sealed record GetUniverseSettingsQuery : IQuery<UniverseSettingsView>;
 
 /// <summary>The owner's change of the universe settings; a value left null stays. The fresh password is checked for every change.</summary>
-public sealed record ChangeUniverseSettingsCommand(string Actor, Guid SessionId, ClientInfo Client, int? MinTradesChild, int? LinkMinTrades, string? RegisteredBaskets, string? Password) : ICommand;
+public sealed record ChangeUniverseSettingsCommand(string Actor, Guid SessionId, ClientInfo Client, int? MinTradesChild, int? LinkMinTrades, string? RegisteredBaskets, string? Password, long? ExpectedVersion = null) : ICommand;
 
 internal static class UniverseSettingsViews
 {
     public static UniverseSettingsView Of(UniverseSettingsState state) => new(
         state.Settings.MinTradesChild, state.Settings.LinkMinTrades, state.Settings.RegisteredBaskets,
-        [.. state.History.Select(h => new UniverseSettingChangeView(h.Id, h.Key, h.OldValue, h.NewValue, h.Actor, h.ChangedAt, h.Hash))], UniverseSettingsView.NoticeText);
+        [.. state.History.Select(h => new UniverseSettingChangeView(h.Id, h.Key, h.OldValue, h.NewValue, h.Actor, h.ChangedAt, h.Hash))], state.Version, UniverseSettingsView.NoticeText);
 }
 
 internal sealed class GetUniverseSettingsHandler(IUniverseSettingsStore store) : IQueryHandler<GetUniverseSettingsQuery, UniverseSettingsView>
@@ -57,6 +58,8 @@ internal sealed class ChangeUniverseSettingsHandler(IUniverseSettingsStore store
 
     public const string InvalidCode = "learning.invalid";
 
+    public const string StaleCode = "learning.stale";
+
     public async ValueTask<Result<UniverseSettingsView>> HandleAsync(ChangeUniverseSettingsCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -69,6 +72,11 @@ internal sealed class ChangeUniverseSettingsHandler(IUniverseSettingsStore store
         if (checkedPassword.IsFailure)
         {
             return Result.Failure<UniverseSettingsView>(checkedPassword.Error);
+        }
+
+        if (command.ExpectedVersion is not { } expected)
+        {
+            return Result.Failure<UniverseSettingsView>(Error.Validation(InvalidCode, "expectedVersion: name the version of the settings the form was read at."));
         }
 
         var state = await store.CurrentAsync(cancellationToken);
@@ -119,7 +127,11 @@ internal sealed class ChangeUniverseSettingsHandler(IUniverseSettingsStore store
 
         if (rows.Count > 0)
         {
-            await store.AppendAsync(rows, cancellationToken);
+            if (!await store.AppendAsync(rows, expected, cancellationToken))
+            {
+                return Result.Failure<UniverseSettingsView>(Error.Conflict(StaleCode, "The universe settings were changed meanwhile; read them again."));
+            }
+
             foreach (var r in rows)
             {
                 await EssentialAudit.RecordAsync(events, unitOfWork, AccountEventType.EssentialSettingChanged, string.Create(CultureInfo.InvariantCulture, $"{r.Key} hash={r.Hash[..12]}"), command.Actor, clock.GetUtcNow(), logger);

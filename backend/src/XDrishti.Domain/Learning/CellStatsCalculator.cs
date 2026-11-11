@@ -89,6 +89,7 @@ public static class CellStatsCalculator
         if (universeCells is not null)
         {
             var stars = rows.Where(r => r.Cell.Regime == "*" && r.Cell.Universe == CellId.AllUniverses).ToDictionary(r => (r.Cell, r.Window));
+            var starTrades = cells.ToDictionary(c => c.Cell, c => c.Trades);
             foreach (var input in universeCells)
             {
                 foreach (var window in Windows)
@@ -99,7 +100,7 @@ public static class CellStatsCalculator
                     }
 
                     var inWindow = InWindow(input.Trades, asOf, window);
-                    var parentTrades = InWindow(cells.First(c => c.Cell == parent).Trades, asOf, window);
+                    var parentTrades = InWindow(starTrades[parent], asOf, window);
                     var row = Row(input, window, inWindow, asOf, star.WinRatePosterior, options, confidence);
                     rows.Add(row with { UniverseHoldOut = UniverseHoldOuts.Evaluate(inWindow, Remainder(parentTrades, inWindow), star.WinRatePosterior, options) });
                     traded.Add(inWindow);

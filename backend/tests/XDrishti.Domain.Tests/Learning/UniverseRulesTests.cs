@@ -80,23 +80,21 @@ public sealed class UniverseRulesTests
         var count = UniverseTrials.Count([.. trials, trials[0], trials[3]]);
 
         (count.Baskets, count.Tests, count.ExtraVariants).ShouldBe((8, 8, 7));
-        count.Factor.ShouldBe(1 + (0.25 * 3), 1e-12);
         UniverseTrials.Count([]).ExtraVariants.ShouldBe(0);
     }
 
     [Fact]
-    public void A_basket_run_label_says_single_snapshot_and_survivorship_and_an_unregistered_basket_is_exploratory()
+    public void A_basket_run_label_says_single_snapshot_and_survivorship_and_depends_only_on_the_basket()
     {
         var id = Guid.NewGuid();
 
-        var registered = UniverseLabels.Basket(id, registered: true);
-        var exploratory = UniverseLabels.Basket(id, registered: false);
+        var label = UniverseLabels.Basket(id);
 
-        registered.ShouldContain("single_snapshot");
-        registered.ShouldContain("survivorship applies");
-        registered.ShouldContain(id.ToString("D"));
-        UniverseLabels.IsExploratory(registered).ShouldBeFalse();
-        UniverseLabels.IsExploratory(exploratory).ShouldBeTrue();
-        exploratory.Length.ShouldBeLessThan(200);
+        label.ShouldContain("single_snapshot");
+        label.ShouldContain("survivorship applies");
+        label.ShouldContain(id.ToString("D"));
+        label.ShouldNotContain("exploratory");   // registration is read when a report is built; it never enters the run key
+        label.ShouldBe(UniverseLabels.Basket(id));
+        label.Length.ShouldBeLessThan(200);
     }
 }

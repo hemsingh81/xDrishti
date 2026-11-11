@@ -16,7 +16,8 @@ public sealed record StoredUniverseSettingChange(long Id, string Key, string Old
 /// <summary>The settings in force and the latest changes, newest first.</summary>
 /// <param name="Settings">The settings in force (the defaults for a key with no row).</param>
 /// <param name="History">The latest 50 changes.</param>
-public sealed record UniverseSettingsState(UniverseSettings Settings, IReadOnlyList<StoredUniverseSettingChange> History);
+/// <param name="Version">The newest change id (0 when none): a change must name the version it was made from.</param>
+public sealed record UniverseSettingsState(UniverseSettings Settings, IReadOnlyList<StoredUniverseSettingChange> History, long Version = 0);
 
 /// <summary><c>research.universe_settings_changes</c> (BK-11): insert-only history, the newest row per key is current.</summary>
 public interface IUniverseSettingsStore
@@ -24,6 +25,6 @@ public interface IUniverseSettingsStore
     /// <summary>The settings in force and the history.</summary>
     ValueTask<UniverseSettingsState> CurrentAsync(CancellationToken cancellationToken);
 
-    /// <summary>Appends the changes in one transaction.</summary>
-    ValueTask AppendAsync(IReadOnlyList<UniverseSettingChange> changes, CancellationToken cancellationToken);
+    /// <summary>Appends the changes in one transaction if the newest change id is still <paramref name="expectedVersion"/>; false (nothing written) when somebody changed the settings meanwhile.</summary>
+    ValueTask<bool> AppendAsync(IReadOnlyList<UniverseSettingChange> changes, long expectedVersion, CancellationToken cancellationToken);
 }

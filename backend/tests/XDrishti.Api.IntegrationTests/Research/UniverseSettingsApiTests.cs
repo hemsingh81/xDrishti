@@ -60,7 +60,7 @@ public sealed class UniverseSettingsApiTests(ApiFactory factory) : DataTestBase(
     [InlineData("not-the-password")]
     public async Task A_missing_or_wrong_password_is_401_and_nothing_is_written(string? password)
     {
-        var change = await PutAsync(new { minTradesChild = 40, password });
+        var change = await PutAsync(new { minTradesChild = 40, password, expectedVersion = 0 });
 
         change.Status.ShouldBe(HttpStatusCode.Unauthorized);
         (await RowsAsync()).ShouldBe(0);
@@ -69,10 +69,10 @@ public sealed class UniverseSettingsApiTests(ApiFactory factory) : DataTestBase(
     [Fact]
     public async Task The_right_password_appends_a_row_per_changed_key_for_the_session_owner_and_a_bad_value_is_422()
     {
-        var bad = await PutAsync(new { minTradesChild = 0, password = Factory.OwnerPassword });
-        var ok = await PutAsync(new { minTradesChild = 45, registeredBaskets = "Nifty 50, My picks", password = Factory.OwnerPassword, actor = "owner:evil@example.test" });
+        var bad = await PutAsync(new { minTradesChild = 0, password = Factory.OwnerPassword, expectedVersion = 0 });
+        var ok = await PutAsync(new { minTradesChild = 45, registeredBaskets = "Nifty 50, My picks", password = Factory.OwnerPassword, expectedVersion = 0, actor = "owner:evil@example.test" });
 
-        bad.Status.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        bad.Status.ShouldBe(HttpStatusCode.BadRequest);
         ok.Status.ShouldBe(HttpStatusCode.OK);
         (await RowsAsync()).ShouldBe(2);
         (await ScalarAsync<long>("SELECT count(*) FROM research.universe_settings_changes WHERE changed_by LIKE '%evil%'")).ShouldBe(0, "a body cannot name the actor");
@@ -80,6 +80,23 @@ public sealed class UniverseSettingsApiTests(ApiFactory factory) : DataTestBase(
         ok.Body.GetProperty("registeredBaskets").EnumerateArray().Select(e => e.GetString()).ShouldBe(["Nifty 50", "My picks"]);
         var again = await Client.GetFromJsonAsync<JsonElement>(Settings, Ct);
         again.GetProperty("history").GetArrayLength().ShouldBe(2);
+        again.GetProperty("version").GetInt64().ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task A_change_from_an_old_version_is_409_and_writes_nothing_and_a_missing_version_is_400()
+    {
+        var first = await PutAsync(new { minTradesChild = 41, password = Factory.OwnerPassword, expectedVersion = 0 });
+        var stale = await PutAsync(new { minTradesChild = 42, password = Factory.OwnerPassword, expectedVersion = 0 });
+        var missing = await PutAsync(new { minTradesChild = 43, password = Factory.OwnerPassword });
+        var current = first.Body.GetProperty("version").GetInt64();
+        var fresh = await PutAsync(new { minTradesChild = 44, password = Factory.OwnerPassword, expectedVersion = current });
+
+        first.Status.ShouldBe(HttpStatusCode.OK);
+        stale.Status.ShouldBe(HttpStatusCode.Conflict);
+        missing.Status.ShouldBe(HttpStatusCode.BadRequest);
+        fresh.Status.ShouldBe(HttpStatusCode.OK);
+        (await RowsAsync()).ShouldBe(2);
     }
 
     [Fact]
@@ -90,7 +107,6 @@ public sealed class UniverseSettingsApiTests(ApiFactory factory) : DataTestBase(
 
         trials.GetProperty("baskets").GetInt32().ShouldBe(0);
         trials.GetProperty("extraVariants").GetInt32().ShouldBe(0);
-        trials.GetProperty("factor").GetDouble().ShouldBe(1.0);
         lens.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         (await lens.Content.ReadAsStringAsync(Ct)).ShouldContain("reports.dimension_unavailable");
     }

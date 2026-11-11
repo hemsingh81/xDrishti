@@ -9717,7 +9717,7 @@
         "tags": [
           "Lab"
         ],
-        "summary": "The baskets a strategy family was tested on, counted from the stored Lab tests (BK-11): the distinct baskets k, the distinct tests, the k - 1 variants they add and the multiple-testing factor of k variants (k = 8 is three doublings). A repeated test of the same version, basket and window counts once",
+        "summary": "The baskets a strategy family was tested on, counted from the stored Lab tests (BK-11): the distinct baskets k, the distinct tests and the k - 1 variants they add. An information breakdown only: it feeds no factor or verdict (the honest count of ADR 0207 does). A repeated test of the same version, basket and window counts once",
         "operationId": "GetUniverseTrials",
         "parameters": [
           {
@@ -19585,7 +19585,7 @@
         "tags": [
           "Learning"
         ],
-        "summary": "The owner changes the universe settings (minTradesChild 1 to 1000, linkMinTrades 10 to 10000, registeredBaskets: comma separated names, 1 to 20); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row. 403 learning.owner_only, 422 learning.invalid",
+        "summary": "The owner changes the universe settings (minTradesChild 1 to 1000, linkMinTrades 10 to 10000, registeredBaskets: comma separated names, 1 to 20); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row. expectedVersion (the version of the read) is required. 400 learning.invalid, 403 learning.owner_only, 409 learning.stale",
         "operationId": "ChangeUniverseSettings",
         "requestBody": {
           "content": {
@@ -19628,8 +19628,18 @@
               }
             }
           },
-          "422": {
-            "description": "Unprocessable Entity",
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -71753,6 +71763,13 @@
               "null",
               "string"
             ]
+          },
+          "expectedVersion": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
           }
         },
         "description": "The body of a change of the universe settings; a value left out stays."
@@ -71763,6 +71780,7 @@
           "linkMinTrades",
           "registeredBaskets",
           "history",
+          "version",
           "notice"
         ],
         "type": "object",
@@ -71791,6 +71809,11 @@
             },
             "description": "The latest 50 changes, newest first."
           },
+          "version": {
+            "type": "integer",
+            "description": "The newest change id (0 when none); a change names it as `expectedVersion`.",
+            "format": "int64"
+          },
           "notice": {
             "type": "string",
             "description": "What the settings do and do not do."
@@ -71804,7 +71827,6 @@
           "baskets",
           "tests",
           "extraVariants",
-          "factor",
           "notice"
         ],
         "type": "object",
@@ -71828,17 +71850,12 @@
             "description": "Baskets minus one.",
             "format": "int32"
           },
-          "factor": {
-            "type": "number",
-            "description": "The factor of that many variants.",
-            "format": "double"
-          },
           "notice": {
             "type": "string",
             "description": "Where the number comes from."
           }
         },
-        "description": "The baskets a strategy was tested on and what they add to the multiple-testing factor (BK-11)."
+        "description": "The baskets a strategy was tested on and how many variants they add (information only, BK-11)."
       },
       "UnmatchedEntry": {
         "required": [

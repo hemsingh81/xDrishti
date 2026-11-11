@@ -30,15 +30,15 @@ public sealed class UniverseSettingsHandlersTests
         return password;
     }
 
-    private ChangeUniverseSettingsHandler Handler(bool passwordOk = true)
+    private ChangeUniverseSettingsHandler Handler(bool passwordOk = true, bool stale = false)
     {
         _store.CurrentAsync(Arg.Any<CancellationToken>()).Returns(new UniverseSettingsState(UniverseSettings.Defaults, []));
-        _store.AppendAsync(Arg.Do<IReadOnlyList<UniverseSettingChange>>(c => _appended = c), Arg.Any<CancellationToken>()).Returns(ValueTask.CompletedTask);
+        _store.AppendAsync(Arg.Do<IReadOnlyList<UniverseSettingChange>>(c => _appended = c), Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(!stale));
         return new ChangeUniverseSettingsHandler(_store, Password(passwordOk), Substitute.For<IAccountEventLog>(), Substitute.For<IAccountUnitOfWork>(), TimeProvider.System, NullLogger<ChangeUniverseSettingsHandler>.Instance);
     }
 
-    private static ChangeUniverseSettingsCommand Command(string actor, int? child = null, int? link = null, string? baskets = null) =>
-        new(actor, Guid.NewGuid(), new ClientInfo("127.0.0.1", "test"), child, link, baskets, "pw");
+    private static ChangeUniverseSettingsCommand Command(string actor, int? child = null, int? link = null, string? baskets = null, long? expected = 0) =>
+        new(actor, Guid.NewGuid(), new ClientInfo("127.0.0.1", "test"), child, link, baskets, "pw", expected);
 
     [Theory]
     [InlineData("system:nightly")]
@@ -49,7 +49,7 @@ public sealed class UniverseSettingsHandlersTests
         var result = await Handler().HandleAsync(Command(actor, child: 40), Ct);
 
         result.Error.Code.ShouldBe(ChangeUniverseSettingsHandler.OwnerOnlyCode);
-        await _store.DidNotReceive().AppendAsync(Arg.Any<IReadOnlyList<UniverseSettingChange>>(), Arg.Any<CancellationToken>());
+        await _store.DidNotReceive().AppendAsync(Arg.Any<IReadOnlyList<UniverseSettingChange>>(), Arg.Any<long>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public sealed class UniverseSettingsHandlersTests
         var result = await Handler(passwordOk: false).HandleAsync(Command(Owner, child: 40), Ct);
 
         result.IsFailure.ShouldBeTrue();
-        await _store.DidNotReceive().AppendAsync(Arg.Any<IReadOnlyList<UniverseSettingChange>>(), Arg.Any<CancellationToken>());
+        await _store.DidNotReceive().AppendAsync(Arg.Any<IReadOnlyList<UniverseSettingChange>>(), Arg.Any<long>(), Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -70,7 +70,7 @@ public sealed class UniverseSettingsHandlersTests
         var result = await Handler().HandleAsync(Command(Owner, child, link, baskets), Ct);
 
         result.Error.Code.ShouldBe(ChangeUniverseSettingsHandler.InvalidCode);
-        await _store.DidNotReceive().AppendAsync(Arg.Any<IReadOnlyList<UniverseSettingChange>>(), Arg.Any<CancellationToken>());
+        await _store.DidNotReceive().AppendAsync(Arg.Any<IReadOnlyList<UniverseSettingChange>>(), Arg.Any<long>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -85,5 +85,16 @@ public sealed class UniverseSettingsHandlersTests
             (UniverseSettingsRules.RegisteredBasketsKey, UniverseSettings.Defaults.RegisteredText, "Nifty 50,Nifty 100"),
         ]);
         _appended.ShouldAllBe(c => c.Actor == Owner && c.Hash.Length == 64);
+    }
+
+    [Fact]
+    public async Task A_change_made_from_an_old_version_is_a_stale_conflict_and_a_missing_version_is_refused()
+    {
+        var stale = await Handler(stale: true).HandleAsync(Command(Owner, child: 40), Ct);
+        var missing = await Handler().HandleAsync(Command(Owner, child: 40, expected: null), Ct);
+
+        stale.Error.Code.ShouldBe(ChangeUniverseSettingsHandler.StaleCode);
+        stale.Error.Kind.ShouldBe(ErrorKind.Conflict);
+        missing.Error.Code.ShouldBe(ChangeUniverseSettingsHandler.InvalidCode);
     }
 }
