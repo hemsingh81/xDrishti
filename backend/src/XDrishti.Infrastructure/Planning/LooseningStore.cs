@@ -24,6 +24,7 @@ internal sealed class LooseningStore(NpgsqlDataSource dataSource) : ILooseningSt
 
     private const string BasketSelect = "SELECT 'basket', x.id, x.key, NULL::uuid, x.old_value, x.new_value, x.changed_by, x.changed_at, x.direction FROM selection.basket_settings_changes x";
 
+    // shortcut: one UNION ALL query over the three change tables with a NOT EXISTS per row; no timing test (BK-10b AC 11) was added. The tables hold a handful of owner changes; upgrade to an indexed view if they ever grow to thousands.
     public async ValueTask<IReadOnlyList<LooseningNotice>> ListUndismissedAsync(CancellationToken cancellationToken)
     {
         await using var select = dataSource.CreateCommand($"""

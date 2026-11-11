@@ -232,8 +232,8 @@ public sealed class PlanHandlersTests
     [Fact]
     public async Task Listing_refuses_a_bad_limit_and_getting_a_missing_plan_is_not_found()
     {
-        var list = await new ListPlansHandler(_store, new LooseningReader(NullLogger<LooseningReader>.Instance)).HandleAsync(new ListPlansQuery(null, null, 0), Ct);
-        var get = await new GetPlanHandler(_store, new LooseningReader(NullLogger<LooseningReader>.Instance)).HandleAsync(new GetPlanQuery(9), Ct);
+        var list = await new ListPlansHandler(_store, LooseningFakes.Reader()).HandleAsync(new ListPlansQuery(null, null, 0), Ct);
+        var get = await new GetPlanHandler(_store, LooseningFakes.Reader()).HandleAsync(new GetPlanQuery(9), Ct);
 
         list.Error.Code.ShouldBe(PlanErrors.InvalidCode);
         get.Error.Code.ShouldBe(PlanErrors.NotFoundCode);

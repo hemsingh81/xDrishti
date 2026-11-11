@@ -19,7 +19,7 @@ internal sealed class RunNightlyPlanHandler(
     IPlanStore store,
     TimeProvider clock,
     ILogger<RunNightlyPlanHandler> logger,
-    LooseningAutoDismissal? looseningAutoDismissal = null) : ICommandHandler<RunNightlyPlanCommand, NightlyRunView>
+    LooseningAutoDismissal looseningAutoDismissal) : ICommandHandler<RunNightlyPlanCommand, NightlyRunView>
 {
     private const int HistoryRead = 200;
 
@@ -121,7 +121,7 @@ internal sealed class RunNightlyPlanHandler(
         }
 
         // BK-10b: with the setting ON, the loosenings an earlier plan already showed are dismissed as `auto` after the plan is stored (a separate write that never fails the run; with the setting OFF nothing happens).
-        if (looseningAutoDismissal is not null && published.Created)
+        if (published.Created)
         {
             await looseningAutoDismissal.RunAsync(published.Id, cancellationToken);
         }

@@ -74,7 +74,7 @@ public sealed class NightlyPipelineTests
         [.. _ids.Select((id, i) => new FakeGate(id, i == failAt ? status : GateStatus.Pass, i == failAt && throws))];
 
     private RunNightlyPlanHandler Handler(IEnumerable<INightlyGate> gates, IPlanBuilder? builder = null) =>
-        new(_calendar, gates, builder ?? new NullPlanBuilder(), _store, _time, NullLogger<RunNightlyPlanHandler>.Instance);
+        new(_calendar, gates, builder ?? new NullPlanBuilder(), _store, _time, NullLogger<RunNightlyPlanHandler>.Instance, LooseningFakes.Auto(_time));
 
     private static RunNightlyPlanCommand Run(bool dry = false, bool manual = false) => new(null, dry, manual, "test");
 

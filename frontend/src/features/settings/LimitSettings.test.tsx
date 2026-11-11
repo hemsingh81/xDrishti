@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { buildBasket } from '@/test/fixtures';
@@ -316,17 +316,36 @@ describe('Settings → Limits: the automatic dismissal of the banner', () => {
     expect(body).toEqual({ autoDismiss: true, expectedVersion: 3, password: 'pw' });
   });
 
-  it('says a refusal for the missing password and shows a stale version as changed elsewhere', async () => {
-    mount();
+  it('reads the setting again after a 409 and the retry sends the new version and succeeds', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    let current = looseningSetting({ version: 3 });
+    mount({ auto: current });
     server.use(
-      http.put('/api/plans/loosening-settings', () => problemResponse({ title: 'Stale.', code: 'plans.stale' }, 409)),
+      http.get('/api/plans/loosening-settings', () => HttpResponse.json(current)),
+      http.put('/api/plans/loosening-settings', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        if (body.expectedVersion === 3) {
+          current = looseningSetting({ version: 5 }); // someone else changed it
+          return problemResponse({ title: 'Stale.', code: 'plans.stale' }, 409);
+        }
+        return HttpResponse.json(looseningSetting({ autoDismiss: true, version: 6 }));
+      }),
     );
     await screen.findByText(/Automatic dismissal is/);
 
     await userEvent.click(screen.getByRole('checkbox', { name: 'Hide a loosening automatically after one plan' }));
     type(AUTO, /^Your password for this change/, 'pw');
-    await userEvent.click(screen.getByRole('button', { name: 'Change the automatic dismissal' }));
-
+    await userEvent.click(screen.getByRole('button', { name: AUTO }));
     expect(await screen.findByText(/changed elsewhere/)).toBeInTheDocument();
+
+    type(AUTO, /^Your password for this change/, 'pw');
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: AUTO })).toBeEnabled();
+    });
+    await userEvent.click(screen.getByRole('button', { name: AUTO }));
+
+    expect(await screen.findByText(/Changed; the new row is in the history/)).toBeInTheDocument();
+    expect(bodies.map((b) => b.expectedVersion)).toEqual([3, 5]);
   });
 });

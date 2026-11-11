@@ -36,7 +36,7 @@ public sealed class LooseningTests
     private static PlanView View(DateTimeOffset createdAt) =>
         PlanView.Of(new PlanRow(1, new NewPlan("k", new DateOnly(2026, 11, 11), createdAt, 1, new string('b', 64), "cell statistics only", true, "test", createdAt, []), PlanState.Published, 0, 0, 0), [], []);
 
-    private LooseningReader Reader() => new(NullLogger<LooseningReader>.Instance, _store);
+    private LooseningReader Reader() => new(_store, NullLogger<LooseningReader>.Instance);
 
     [Fact]
     public async Task Every_loosening_shows_oldest_first_with_its_sentence_and_a_later_one_waits_for_the_next_plan()

@@ -6,18 +6,13 @@ namespace XDrishti.Application.Planning;
 
 /// <summary>
 /// Reads the loosenings the plan screen shows (BK-10b), on read and never stored: one query for every undismissed loosening, then the pure rule for each plan. A store that cannot be read gives an empty list and
-/// <c>Readable = false</c>, so the screen says so instead of showing nothing (and the plan itself is still returned). A reader built without a store (a test of the plan record alone) reads none.
+/// <c>Readable = false</c>, so the screen says so instead of showing nothing (and the plan itself is still returned).
 /// </summary>
-internal sealed class LooseningReader(ILogger<LooseningReader> logger, ILooseningStore? store = null)
+internal sealed class LooseningReader(ILooseningStore store, ILogger<LooseningReader> logger)
 {
     /// <summary>Every undismissed loosening, oldest first.</summary>
     public async ValueTask<(IReadOnlyList<LooseningNotice> Notices, bool Readable)> ReadAsync(CancellationToken cancellationToken)
     {
-        if (store is null)
-        {
-            return ([], true);
-        }
-
         try
         {
             return (await store.ListUndismissedAsync(cancellationToken), true);

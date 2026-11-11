@@ -1,11 +1,13 @@
 import { Alert, Button, Stack, TextField, Typography } from '@mui/material';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '@/shared/api';
 import { limitsKeys } from '../api/limitsApi';
 import { limitRefusal } from '../lib/limitRefusal';
 
 interface Props {
+  /** The reads to load again after a 409 (the stale version is one of them); defaults to every limit read. */
+  staleKeys?: readonly QueryKey[];
   /** The accessible name of the form. */
   label: string;
   submitLabel: string;
@@ -22,7 +24,15 @@ interface Props {
  * What the three limit forms share (BK-10b, the P8-19 pattern): the fields of the form, the password typed again for THIS change (cleared after every try, right or wrong), the server's refusal in words,
  * and after a change the sentence that says whether the server recorded it as a loosening. A change reloads every limit read.
  */
-export function LimitForm({ label, submitLabel, consequence, fieldsReady, run, children }: Props) {
+export function LimitForm({
+  staleKeys = [limitsKeys.all],
+  label,
+  submitLabel,
+  consequence,
+  fieldsReady,
+  run,
+  children,
+}: Props) {
   const queryClient = useQueryClient();
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -41,7 +51,7 @@ export function LimitForm({ label, submitLabel, consequence, fieldsReady, run, c
     } catch (error) {
       setProblem(limitRefusal(error));
       if (error instanceof ApiError && error.status === 409)
-        void queryClient.invalidateQueries({ queryKey: limitsKeys.all });
+        staleKeys.forEach((queryKey) => void queryClient.invalidateQueries({ queryKey }));
       passwordRef.current?.focus();
     } finally {
       setPassword('');

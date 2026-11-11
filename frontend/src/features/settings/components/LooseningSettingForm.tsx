@@ -15,6 +15,7 @@ export function LooseningSettingForm({ view }: { view: View }) {
 
   return (
     <LimitForm
+      staleKeys={[looseningSettingsQuery.queryKey]}
       label="Change the automatic dismissal"
       submitLabel="Change the automatic dismissal"
       consequence="When on, a loosened limit hides from the plan banner after one plan has shown it; the dismissal is recorded as automatic, never as you. It changes no limit and places no order."
