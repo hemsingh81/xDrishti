@@ -143,6 +143,12 @@ internal sealed class ModelRegistry(NpgsqlDataSource dataSource) : IModelRegistr
         return models;
     }
 
+    public async ValueTask<bool> AnyChampionEverAsync(CancellationToken cancellationToken)
+    {
+        await using var select = dataSource.CreateCommand("SELECT EXISTS (SELECT 1 FROM research.model_designations WHERE role = 'champion')");
+        return (bool)(await select.ExecuteScalarAsync(cancellationToken))!;
+    }
+
     public async ValueTask<IReadOnlyList<StoredDesignation>> DesignationsAsync(long id, CancellationToken cancellationToken)
     {
         await using var select = dataSource.CreateCommand("SELECT id, model_id, role, reason, created_at, created_by FROM research.model_designations WHERE model_id = @id ORDER BY id");
