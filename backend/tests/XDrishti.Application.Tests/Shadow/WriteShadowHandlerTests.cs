@@ -49,7 +49,9 @@ public sealed class WriteShadowHandlerTests
         _plans.ListAsync(Tuesday, null, Arg.Any<int>(), Ct).Returns([Plan(10, Tuesday)]);
     }
 
-    private WriteShadowHandler Handler() => new(_settings, _plans, _store, _paper, _governance, _calendar, ShadowScorerFake.Empty(), _time, NullLogger<WriteShadowHandler>.Instance);
+    private ShadowScorer _scorer = ShadowScorerFake.Empty();
+
+    private WriteShadowHandler Handler() => new(_settings, _plans, _store, _paper, _governance, _calendar, _scorer, new ShadowOptions(), _time, NullLogger<WriteShadowHandler>.Instance);
 
     private void Items(long planId, params NewPlanItem[] items) =>
         _plans.ItemsAsync(planId, Ct).Returns([.. items.Select((item, i) => Row(100 + i, planId, item))]);
@@ -376,5 +378,30 @@ public sealed class WriteShadowHandlerTests
 
         result.IsFailure.ShouldBeTrue();
         _store.WriteCalls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_scorer_that_throws_does_not_cost_the_session()
+    {
+        _scorer = ShadowScorerFake.Throwing();
+        TheNightlyPlan();
+
+        var outcome = await RunAsync(Tuesday);
+
+        outcome.Sessions.ShouldBe(1);
+        outcome.Rows.ShouldBe(7);
+    }
+
+    [Fact]
+    public async Task After_the_scoring_deadline_the_scorer_is_not_asked_and_the_session_is_written_without_scores()
+    {
+        _scorer = ShadowScorerFake.Throwing(); // would fail the run if it were asked; it is not
+        _time.SetUtcNow(new DateTimeOffset(2026, 11, 3, 3, 10, 0, TimeSpan.Zero)); // Tuesday 08:40 India time, after 08:30 and before the 09:00 cut-off
+        TheNightlyPlan();
+
+        var outcome = await RunAsync(Tuesday);
+
+        outcome.Sessions.ShouldBe(1);
+        (_store.Sessions.Single().Scores ?? []).ShouldBeEmpty();
     }
 }

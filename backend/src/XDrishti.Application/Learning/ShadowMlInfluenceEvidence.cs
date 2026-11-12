@@ -51,7 +51,7 @@ internal sealed class ShadowMlInfluenceEvidence(IShadowScoreReader scores, IMlMo
                 }
             }
         }
-        catch (JsonException)
+        catch (Exception failure) when (failure is JsonException or InvalidOperationException)
         {
             return null; // a row that cannot be read is unavailable, never a pass
         }

@@ -11,7 +11,6 @@ using XDrishti.Application.Learning;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.History;
 using XDrishti.Application.Planning;
-using XDrishti.Application.Research;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Bars;
@@ -35,12 +34,19 @@ internal sealed class ShadowScorer(
     IAdjustmentFactors adjustments,
     ITradeFeatureExtractor extractor,
     ICellStatsStore cells,
+    TimeProvider time,
     ILogger<ShadowScorer> logger)
 {
     /// <summary>The most models scored in one night.</summary>
     internal const int MaxModels = 5;
 
     private const int ModelLimit = 200;
+
+    // shortcut: the bars are read from this many calendar days before the decision, not from the start of history as the training extraction does. Two years warm every indicator of the catalog on timeframes up to the weekly one (EMA50 on weekly bars needs about 350 days);
+    // a monthly cell has too few bars, its required features stay unknown and it gets no score (fail closed). The nightly time is logged (shadow.score).
+    private const int LookbackDays = 730;
+
+    private Dictionary<string, Guid>? _instruments;
 
     public async ValueTask<IReadOnlyList<NewShadowScore>> ScoreAsync(DateOnly session, TradingCalendar calendar, IReadOnlyList<ShadowEntry> entries, CancellationToken cancellationToken)
     {
@@ -57,7 +63,9 @@ internal sealed class ShadowScorer(
             return [];
         }
 
-        var instruments = await InstrumentsAsync(cancellationToken);
+        var started = time.GetTimestamp();
+        _instruments ??= await InstrumentsAsync(cancellationToken);
+        var instruments = _instruments;
         var statsRows = CashCells.Only(await cells.ListLatestBeforeAsync(session, null, CellWindow.All.Code(), cancellationToken), "shadow_score", logger); // cash cells only (ADR 0193)
         var stats = new Dictionary<string, double[]>(StringComparer.Ordinal);
         foreach (var s in statsRows.Where(r => r.Row.Window == CellWindow.All))
@@ -88,14 +96,16 @@ internal sealed class ShadowScorer(
                 continue;
             }
 
-            var raw = await SeamAwareBars.ReadAsync(bars, seams, group.Key, SimulationBounds.From, until, cancellationToken);
+            // the read a stored run would make today (admission of verified pre-seam bars and the matching factors), so that serving features match training
+            var read = await SeamAwareBars.ReadForRunAsync(bars, seams, group.Key, await adjustments.GetAsync(group.Key, cancellationToken), await adjustments.CsvAdjustedThroughAsync(group.Key, cancellationToken), until.AddDays(-LookbackDays), until, cancellationToken);
+            var raw = read.Bars;
             if (raw.Count == 0)
             {
                 missing += decisions.Count;
                 continue;
             }
 
-            var values = extractor.Extract(raw, await adjustments.GetAsync(group.Key, cancellationToken), calendar, decisions);
+            var values = extractor.Extract(raw, read.Factors, calendar, decisions);
             foreach (var e in group)
             {
                 if (!values.TryGetValue(e.TradeKey, out var stored) || stored.Length != TradeFeatureCatalog.StoredCount || !stats.TryGetValue(e.CellKey, out var cell))
@@ -126,7 +136,8 @@ internal sealed class ShadowScorer(
             }
         }
 
-        ShadowLog.Scored(logger, scorers.Count, result.Count, missing);
+        var elapsedMs = (int)time.GetElapsedTime(started).TotalMilliseconds;
+        ShadowLog.Scored(logger, scorers.Count, result.Count, missing, elapsedMs);
         return result;
     }
 

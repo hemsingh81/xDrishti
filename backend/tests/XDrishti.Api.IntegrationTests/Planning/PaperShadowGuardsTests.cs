@@ -1,5 +1,10 @@
 using System.Globalization;
 using Npgsql;
+using XDrishti.Application.Abstractions.Learning;
+using XDrishti.Application.Abstractions.Shadow;
+using XDrishti.Domain.Shadow;
+using XDrishti.Infrastructure.Learning;
+using XDrishti.Infrastructure.Paper;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Api.IntegrationTests.Research;
 
@@ -18,7 +23,7 @@ public sealed class PaperShadowGuardsTests(ResearchGrantsTests.DedicatedServer s
 
     public async ValueTask InitializeAsync()
     {
-        await StoreKit.ExecuteAsync(server.Owner, "DELETE FROM paper.shadow_scores; DELETE FROM paper.shadow_grades; DELETE FROM paper.shadow_entries; DELETE FROM paper.shadow_sessions; DELETE FROM paper.shadow_settings", Ct);
+        await StoreKit.ExecuteAsync(server.Owner, "DELETE FROM paper.shadow_scores; DELETE FROM paper.shadow_grades; DELETE FROM paper.shadow_entries; DELETE FROM paper.shadow_sessions; DELETE FROM paper.shadow_settings; DELETE FROM research.ml_monitor_checks", Ct);
         await SetClockAsync(DateTimeOffset.UtcNow);
     }
 
@@ -114,6 +119,73 @@ public sealed class PaperShadowGuardsTests(ResearchGrantsTests.DedicatedServer s
         await StoreKit.ExecuteAsync(server.Owner, "DELETE FROM paper.shadow_scores", Ct);
         await SetClockAsync(Utc(2027, 3, 16, 3, 31)); // 09:01 IST
         (await SqlStateAsync(Score())).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await StoreKit.CountAsync(server.Owner, "SELECT count(*) FROM paper.shadow_scores", Ct)).ShouldBe(0);
+    }
+
+    private async Task<long> ModelAsync()
+    {
+        await StoreKit.ExecuteAsync(
+            server.Owner,
+            "INSERT INTO research.training_sets (set_id, label_set_id, rule_version, feature_version, basis, sources, required_features, half_life_days, prior_strength, min_trades, credible_level, from_date, to_date, labelled, row_count, positives, negatives, unresolved, no_target, dropped_no_features, dropped_unknown, created_at, created_by) VALUES (repeat('a', 64), repeat('a', 64), 'tb-1', 'tf-1', 'Gross', 's', 'cell_n', 180, 20, 30, 0.9, '2026-01-01', '2026-06-01', 10, 10, 6, 4, 0, 0, 0, 0, now(), 'test') ON CONFLICT DO NOTHING", Ct);
+        var key = Guid.NewGuid().ToString("N")[0];
+        return await ScalarAsync<long>(
+            server.Owner,
+            $"INSERT INTO research.model_versions (version_key, sha256, artifact_bytes, trainer, note, training_set_id, feature_version, feature_width, fit_rows, calibration_rows, train_rows, from_date, to_date, hold_out_start, verdict, used_folds, folds_beating_both, folds_needed, pooled_beats_both, pooled_ece_pp, pooled_log_loss, pooled_brier, reasons, report_text, parameters, calibration_scores, calibration_values, importance, trials, purged_rows, created_at, created_by) VALUES (repeat('{key}', 64), repeat('e', 64), 100, 'FastTree', NULL, repeat('a', 64), 'tf-1', 3, 30, 10, 40, '2026-01-01', '2026-04-01', '2026-05-01', 'Eligible', 6, 5, 4, true, 3.5, 0.65, 0.23, '', 'r', 'p', ARRAY[-1.0, 0.0, 1.0], ARRAY[0.3, 0.5, 0.7], ARRAY[0.25, 0.25, 0.25], 1, 4, now(), 'test') RETURNING id");
+    }
+
+    private static ShadowEntry Candidate(DateOnly session, long plan, long item, string key) =>
+        new(session, plan, item, key, "primary", "c", Hash, "s", "BUY", null, null, null, "v", null, null, null, null, null, true, null);
+
+    [Fact]
+    public async Task The_store_writes_the_scores_with_the_session_resolving_each_entry_by_its_trade_key_and_the_reader_returns_only_graded_ones()
+    {
+        // CF-10e part 10e-1: the store, the reader and the monitor-row reader against the real database
+        var model = await ModelAsync();
+        var session = new DateOnly(2027, 4, 6);
+        var (plan, items) = await PlanAsync(session, Utc(2027, 4, 5, 15, 40), 2);
+        await SetClockAsync(Utc(2027, 4, 6, 3, 0));
+        await using var source = NpgsqlDataSource.Create(server.App);
+        var entries = new[] { Candidate(session, plan, items[0], "k-a"), Candidate(session, plan, items[1], "k-b") };
+        var scores = new[] { new NewShadowScore("k-a", model, new string('e', 64), "tf-1", 0.7, new string('d', 64)), new NewShadowScore("k-b", model, new string('e', 64), "tf-1", 0.4, new string('d', 64)) };
+
+        (await new ShadowStore(source).WriteSessionAsync(new NewShadowSession(session, "ok", null, ShadowDigest.Next(null, session, "ok", entries.Select(e => e.RowHash)), entries, scores), Ct)).ShouldBeTrue();
+
+        (await StoreKit.CountAsync(server.Owner, "SELECT count(*) FROM paper.shadow_scores", Ct)).ShouldBe(2);
+        (await ScalarAsync<double>(server.Owner, "SELECT s.p_win FROM paper.shadow_scores s JOIN paper.shadow_entries e ON e.id = s.entry_id WHERE e.trade_key = 'k-b'")).ShouldBe(0.4);
+        var reader = new ShadowScoreReader(source);
+        (await reader.OutcomesAsync(model, Ct)).ShouldBeEmpty("no grade yet");
+
+        await SetClockAsync(Utc(2027, 4, 6, 11, 0));
+        await StoreKit.ExecuteAsync(server.Owner, "INSERT INTO paper.shadow_grades (entry_id, status, r_sim, r_basis, r_gross, engine_version) SELECT id, 'graded', 1.5, 'gross', 1.5, 'e1' FROM paper.shadow_entries WHERE trade_key = 'k-a'", Ct);
+        await StoreKit.ExecuteAsync(server.Owner, "INSERT INTO paper.shadow_grades (entry_id, status, engine_version) SELECT id, 'not_triggered', 'e1' FROM paper.shadow_entries WHERE trade_key = 'k-b'", Ct);
+        var outcomes = await reader.OutcomesAsync(model, Ct);
+        outcomes.Count.ShouldBe(1);
+        outcomes[0].ShouldBe(new XDrishti.Domain.Learning.ScoredOutcome(session, "k-a", 0.7, 1.5));
+
+        var checks = new MlMonitorChecks(source);
+        (await checks.LatestAsync(model, Ct)).ShouldBeNull();
+        (await checks.InsertAsync(new NewMlMonitorCheck(model, new string('f', 64), "[{\"Kind\":\"calibration\",\"State\":\"Quiet\"}]"), new DateOnly(2027, 4, 6), Ct)).ShouldBeTrue();
+        (await checks.InsertAsync(new NewMlMonitorCheck(model, new string('f', 64), "[{\"Kind\":\"calibration\",\"State\":\"Fires\"}]"), new DateOnly(2027, 4, 7), Ct)).ShouldBeTrue();
+        var latest = await checks.LatestAsync(model, Ct);
+        latest!.CheckedOn.ShouldBe(new DateOnly(2027, 4, 7));
+        latest.Verdicts.ShouldContain("Fires");
+    }
+
+    [Fact]
+    public async Task A_refused_score_row_rolls_back_to_the_savepoint_and_the_session_and_its_entries_are_still_committed()
+    {
+        var model = await ModelAsync();
+        var session = new DateOnly(2027, 4, 13);
+        var (plan, items) = await PlanAsync(session, Utc(2027, 4, 12, 15, 40));
+        await SetClockAsync(Utc(2027, 4, 13, 3, 0));
+        await using var source = NpgsqlDataSource.Create(server.App);
+        var entries = new[] { Candidate(session, plan, items[0], "k-z") };
+        var refused = new NewShadowScore("k-z", model, new string('e', 64), "tf-1", 1.5, new string('d', 64)); // p_win outside [0, 1]: the CHECK refuses it
+
+        (await new ShadowStore(source).WriteSessionAsync(new NewShadowSession(session, "ok", null, ShadowDigest.Next(null, session, "ok", entries.Select(e => e.RowHash)), entries, [refused]), Ct)).ShouldBeTrue();
+
+        (await StoreKit.CountAsync(server.Owner, "SELECT count(*) FROM paper.shadow_entries WHERE session_date = '2027-04-13'", Ct)).ShouldBe(1);
+        (await StoreKit.CountAsync(server.Owner, "SELECT count(*) FROM paper.shadow_sessions WHERE session_date = '2027-04-13'", Ct)).ShouldBe(1);
         (await StoreKit.CountAsync(server.Owner, "SELECT count(*) FROM paper.shadow_scores", Ct)).ShouldBe(0);
     }
 

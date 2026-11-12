@@ -67,13 +67,14 @@ public sealed class ShadowScorerTests
         });
         _seams.SeamOfAsync(Instrument, Ct).Returns((DateTimeOffset?)null);
         _adjustments.GetAsync(Instrument, Ct).Returns(AdjustmentFactors.None);
+        _adjustments.CsvAdjustedThroughAsync(Instrument, Ct).Returns((DateOnly?)null);
         var member = new BasketMemberView(Guid.NewGuid(), new InstrumentSummary(Instrument, "NSE:P1", "n", "n", "EQ", null, null, null, 1, null, null, false, false, false, null!), 1, DateTimeOffset.UnixEpoch, null, null, "t", null, null);
         _baskets.ListAsync(false, Ct).Returns((IReadOnlyList<BasketView>)[new BasketView(Guid.NewGuid(), "b", "c", "p", null, 1, 1, DateTimeOffset.UnixEpoch, null, "manual", false, null, null)]);
         _baskets.MembersAsync(Arg.Any<Guid>(), null, null, Ct).Returns(new BasketMembers(Guid.NewGuid(), "b", null, null, 1, [member]));
         var row = new CellStatsRow(CellId.TryParse(ShadowFixture.Intraday)!, CellWindow.All, new DateOnly(2026, 10, 30), true, 40, 20, 40, 0.5, 0.5, 0.55, 0.5, 0.6, 2, -1, 0.5, 1.5, 3, 0.3, 0.8, 0.5, 1.5, true);
         _cells.ListLatestBeforeAsync(Session, null, "all", Ct).Returns((IReadOnlyList<StoredCellStats>)[new StoredCellStats("k", DateTimeOffset.UnixEpoch, new CellStatsOptions(), "", row)]);
         _files.ReadAsync(Arg.Any<string>(), Ct).Returns(call => Result.Success(new byte[] { 1 }));
-        return new ShadowScorer(_registry, _files, _loader, _baskets, _bars, _seams, _adjustments, extractor, _cells, NullLogger<ShadowScorer>.Instance);
+        return new ShadowScorer(_registry, _files, _loader, _baskets, _bars, _seams, _adjustments, extractor, _cells, TimeProvider.System, NullLogger<ShadowScorer>.Instance);
     }
 
     private void Models(params StoredModel[] models)
@@ -129,7 +130,7 @@ public sealed class ShadowScorerTests
 
         second.ShouldBe(first);
         first.Single().PWin.ShouldBe(0.4);
-        _reads.ShouldAllBe(r => r.To < Decision);
+        _reads.ShouldAllBe(r => r.To < Decision && r.From >= Decision - (800L * 86_400)); // bounded read: nothing after the decision and about two years back
     }
 
     [Fact]

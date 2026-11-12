@@ -12,12 +12,24 @@ namespace XDrishti.Application.Tests.Shadow;
 /// <summary>A <see cref="ShadowScorer"/> over fake ports; <see cref="Empty"/> has no model, so it scores nothing.</summary>
 internal static class ShadowScorerFake
 {
-    public static ShadowScorer Empty()
+    public static ShadowScorer Empty() => Build(Substitute.For<IModelRegistry>(), throws: false);
+
+    /// <summary>A scorer whose model registry throws, as a failing store would.</summary>
+    public static ShadowScorer Throwing() => Build(Substitute.For<IModelRegistry>(), throws: true);
+
+    private static ShadowScorer Build(IModelRegistry registry, bool throws)
     {
-        var registry = Substitute.For<IModelRegistry>();
-        registry.ListAsync(Arg.Any<XDrishti.Domain.Learning.ModelRole?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns((IReadOnlyList<StoredModel>)[]);
+        if (throws)
+        {
+            registry.ListAsync(Arg.Any<XDrishti.Domain.Learning.ModelRole?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns<IReadOnlyList<StoredModel>>(_ => throw new InvalidOperationException("registry down"));
+        }
+        else
+        {
+            registry.ListAsync(Arg.Any<XDrishti.Domain.Learning.ModelRole?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns((IReadOnlyList<StoredModel>)[]);
+        }
+
         return new ShadowScorer(
             registry, Substitute.For<IModelFiles>(), Substitute.For<IModelScorerLoader>(), Substitute.For<IBasketQueries>(), Substitute.For<IBarStore>(), Substitute.For<IBackfillSeams>(),
-            Substitute.For<IAdjustmentFactors>(), Substitute.For<ITradeFeatureExtractor>(), Substitute.For<ICellStatsStore>(), NullLogger<ShadowScorer>.Instance);
+            Substitute.For<IAdjustmentFactors>(), Substitute.For<ITradeFeatureExtractor>(), Substitute.For<ICellStatsStore>(), TimeProvider.System, NullLogger<ShadowScorer>.Instance);
     }
 }

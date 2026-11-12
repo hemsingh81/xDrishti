@@ -66,10 +66,13 @@ public sealed class ShadowEvidenceTests
         (await AlarmAsync(Verdict("Quiet"), new DateOnly(2026, 11, 3))).ShouldBeNull();
     }
 
-    [Fact]
-    public async Task A_row_that_cannot_be_read_is_unavailable()
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("{}")]
+    [InlineData("[{\"Kind\":5,\"State\":\"Quiet\"}]")]
+    public async Task A_row_that_cannot_be_read_is_unavailable(string verdicts)
     {
-        (await AlarmAsync("not json", Thursday)).ShouldBeNull();
+        (await AlarmAsync(verdicts, Thursday)).ShouldBeNull();
     }
 
     [Fact]
@@ -110,5 +113,33 @@ public sealed class ShadowEvidenceTests
 
         inputs.Calibration!.Select(o => (o.Predicted, o.Label)).ShouldBe([(0.7, 1), (0.4, 0)]);
         inputs.Cells.ShouldBeNull();
+    }
+
+    /// <summary>The whole chain: graded scores, the real rollback policy and daily handler, the stored row, and the alarm the gate reads.</summary>
+    private async Task<bool?> EndToEndAlarmAsync(int outcomes, double predicted, int winEvery)
+    {
+        var f = new MlRollbackFixture();
+        f.Add(17, ModelRole.Champion);
+        var scored = Enumerable.Range(0, outcomes).Select(i => new ScoredOutcome(new DateOnly(2026, 10, 1).AddDays(i / 5), "k" + i.ToString("D4", System.Globalization.CultureInfo.InvariantCulture), predicted, i % winEvery == 0 ? 1 : -1)).ToList();
+        _scores.OutcomesAsync(17, Ct).Returns((IReadOnlyList<ScoredOutcome>)scored);
+        f.Inputs = await new ShadowRollbackEvidence(_scores).ReadAsync(Model, Ct);
+        await f.ProposeAsync(17);
+        var stored = f.Checks.ReceivedCalls().Select(c => c.GetArguments()[0]).OfType<NewMlMonitorCheck>().Single();
+        _calendar.GetAsync(Ct).Returns(new TradingCalendar());
+        _checks.LatestAsync(17, Ct).Returns(new StoredMlMonitorCheck(new DateOnly(2026, 11, 6), stored.Verdicts));
+        var evidence = new ShadowMlInfluenceEvidence(_scores, _checks, _calendar, f.Time);
+        return (await evidence.ReadAsync(Model, Ct)).CalibrationAlarm;
+    }
+
+    [Fact]
+    public async Task Sixty_four_real_observations_end_to_end_leave_the_alarm_unavailable_not_false()
+    {
+        (await EndToEndAlarmAsync(64, 0.5, 2)).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_hundred_and_twenty_real_well_calibrated_observations_end_to_end_give_a_real_quiet_verdict()
+    {
+        (await EndToEndAlarmAsync(120, 0.5, 2)).ShouldBe(false);
     }
 }

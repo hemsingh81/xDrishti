@@ -111,4 +111,19 @@ public sealed class OwnerDesignateModelHandlerTests
         result.IsSuccess.ShouldBeTrue();
         result.Value.Changed.ShouldBeFalse();
     }
+
+    [Fact]
+    public async Task After_the_only_champion_was_retired_naming_another_champion_still_goes_through_promotion()
+    {
+        var f = new MlRollbackFixture();
+        f.Add(7, ModelRole.Challenger);
+        f.Add(8, ModelRole.Challenger, 'b');
+        (await Handler(f).HandleAsync(new OwnerDesignateModelCommand(7, ModelRole.Champion, "first", "cli:xd"), Ct)).IsSuccess.ShouldBeTrue();
+        (await Handler(f).HandleAsync(new OwnerDesignateModelCommand(7, ModelRole.Retired, "set aside", "cli:xd"), Ct)).IsSuccess.ShouldBeTrue();
+
+        var result = await Handler(f).HandleAsync(new OwnerDesignateModelCommand(8, ModelRole.Champion, "next", "cli:xd"), Ct);
+
+        result.Error.Code.ShouldBe(MlSafetyErrors.PromotionRefusedCode);
+        f.Registry.Models[8].Role.ShouldBe(ModelRole.Challenger);
+    }
 }
