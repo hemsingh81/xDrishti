@@ -6,8 +6,18 @@ import { TimeSeriesChart, type ChartSeries } from '@/shared/ui/chart';
 import { replayEquityQuery } from '../../api/replayApi';
 
 /** Equity against the benchmark and the cash line, and a drawdown strip below it. */
-export function ReplayCharts({ runId, active }: { runId: string; active: boolean }) {
+export function ReplayCharts({
+  runId,
+  active,
+  other,
+}: {
+  runId: string;
+  active: boolean;
+  /** The other arm of a baseline pair: its equity is drawn as one more line. */
+  other?: { id: string; name: string };
+}) {
   const equity = useQuery(replayEquityQuery(runId, active));
+  const otherEquity = useQuery({ ...replayEquityQuery(other?.id ?? '', active), enabled: other !== undefined });
   if (equity.isPending) return <LoadingState label="Loading the equity curve…" />;
   if (equity.isError) return <ErrorState error={equity.error} />;
   const { points, benchmarkSymbol, benchmarkReason } = equity.data;
@@ -22,6 +32,15 @@ export function ReplayCharts({ runId, active }: { runId: string; active: boolean
     },
     { id: 'cash', name: 'Cash', color: 'info', dash: 'dotted', data: points.map((p) => [p.session, p.cash] as const) },
   ];
+  if (other && otherEquity.data) {
+    series.push({
+      id: 'other-arm',
+      name: other.name,
+      color: 'warn',
+      dash: 'dashed',
+      data: otherEquity.data.points.map((p) => [p.session, p.equity] as const),
+    });
+  }
   const drawdown: ChartSeries[] = [
     { id: 'drawdown', name: 'Drawdown', color: 'bad', data: points.map((p) => [p.session, p.drawdownPct] as const) },
   ];
@@ -32,6 +51,7 @@ export function ReplayCharts({ runId, active }: { runId: string; active: boolean
           Equity
         </Typography>
         {benchmarkReason && <Alert severity="info">{`No benchmark line: ${benchmarkReason}`}</Alert>}
+        {other && otherEquity.isError && <ErrorState error={otherEquity.error} />}
         {!equity.data.cashComplete && (
           <Typography variant="body2" color="text.secondary">
             The cash line is not complete until the run ends.

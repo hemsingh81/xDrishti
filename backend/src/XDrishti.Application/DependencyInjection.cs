@@ -202,6 +202,9 @@ public static class DependencyInjection
         services.AddScoped<IResultsCalendar, ResultsCalendar>(); // days_to_results as known at an instant (P15-04): named by PlanEventFilter and the switch view since P15-06, by no other decision code
         services.AddScoped<IEventCalendarSnapshots, EventCalendarSnapshots>(); // the results-calendar snapshot of a run that names not_event_day: one read before the walk (P15-06, ADR 0182)
         services.AddScoped<IEventFilterSwitch, EventFilterSwitch>(); // the effective event-risk switch: the newest decision row, OFF when none or unreadable (P15-06)
+        services.AddScoped<PlanListFilter>(); // DATA-01: the plan's and the replay's ban and surveillance answers from the dated lists, only while Selection:ListFilters:Enabled is ON
+        services.AddScoped<ICommandHandler<XDrishti.Application.Market.Lists.ListsProbeCommand, XDrishti.Application.Market.Lists.ListsProbeReport>, XDrishti.Application.Market.Lists.ListsProbeHandler>(); // xd data lists-probe: at most five dated ban files, stores nothing
+        services.AddScoped<ICommandHandler<XDrishti.Application.Market.Lists.ListsBackfillCommand, XDrishti.Application.Market.Lists.ListsBackfillSummary>, XDrishti.Application.Market.Lists.ListsBackfillHandler>(); // xd data lists-backfill: OFF by default (zero requests while off)
         services.AddScoped<PlanEventFilter>(); // the plan's exclusion by event and its checklist days from the results calendar, only while the switch is ON (P15-06)
         services.AddScoped<IQueryHandler<GetEventFilterQuery, EventFilterView>, GetEventFilterHandler>(); // GET /api/selection/event-filter (P15-06): read
         services.AddScoped<ICommandHandler<ChangeEventFilterCommand, EventFilterView>, ChangeEventFilterHandler>(); // the owner's switch change: fresh password on every change, recorded as owner (P15-06)
@@ -875,6 +878,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<LoadCostSheetCommand, LoadedCostSheet>, LoadCostSheetHandler>();
         services.AddScoped<IQueryHandler<ShowCostSheetQuery, Result<ShownCostSheet>>, ShowCostSheetHandler>();
         services.AddScoped<IQueryHandler<CheckCostSheetQuery, Result<CostCheckReport>>, CheckCostSheetHandler>();
+        services.AddScoped<IQueryHandler<DeriveCostSheetQuery, Result<CostDerivation>>, DeriveCostSheetHandler>();
         services.AddScoped<ICommandHandler<StoreRunCommand, StoreOutcome>, StoreRunHandler>(); // the result store (P3-10)
         services.AddScoped<ICommandHandler<StoreComparisonCommand, StoreOutcome>, StoreComparisonHandler>(); // a comparison of exits (P4-05)
         services.AddScoped<ICommandHandler<StoreExitSelectionCommand, StoreOutcome>, StoreExitSelectionHandler>(); // an exit choice (P4-06)
@@ -1104,6 +1108,7 @@ public static class DependencyInjection
         // The system replay (SR-01 part A, ADR 0272): research only, in memory, no order. One scope serves one run (the facts remember what they read).
         services.TryAddSingleton(new XDrishti.Application.Replay.SystemReplayOptions()); // the host replaces it with its configuration (section Replay)
         services.AddScoped<XDrishti.Application.Replay.IReplayFacts, XDrishti.Application.Replay.ReplayFacts>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.Evidence.GetEvidencePreflightQuery, XDrishti.Application.Evidence.EvidencePreflightView>, XDrishti.Application.Evidence.GetEvidencePreflightHandler>(); // xd evidence preflight (EV-01): read only
         services.AddScoped<XDrishti.Application.Replay.ReplaySessionRunner>();
         services.AddScoped<XDrishti.Application.Replay.ReplayDriver>();
         services.AddScoped<XDrishti.Application.Replay.ReplayInputHasher>();
@@ -1118,6 +1123,10 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Reads.GetReplaySessionQuery, Result<XDrishti.Application.Replay.Reads.ReplaySessionView>>, XDrishti.Application.Replay.Reads.GetReplaySessionHandler>();
         services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Reads.ListReplayTradesQuery, Result<XDrishti.Application.Replay.Reads.ReplayTradeListView>>, XDrishti.Application.Replay.Reads.ListReplayTradesHandler>();
         services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Reads.GetReplayPairQuery, Result<XDrishti.Application.Replay.Reads.ReplayPairView>>, XDrishti.Application.Replay.Reads.GetReplayPairHandler>(); // the frozen-versus-learning comparison, computed on read from the two stored runs (part D's ReplayPairComparison)
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sweeps.StartReplaySweepRequest, XDrishti.Application.Replay.Job.StartedReplay>, XDrishti.Application.Replay.Sweeps.StartReplaySweepRequestHandler>(); // a start-date sweep: one queued run per start, one look each (SR-02 part B)
+        services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Sweeps.GetReplaySweepQuery, Result<XDrishti.Application.Replay.Sweeps.ReplaySweepView>>, XDrishti.Application.Replay.Sweeps.GetReplaySweepHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sweeps.CancelReplaySweepCommand, int>, XDrishti.Application.Replay.Sweeps.CancelReplaySweepHandler>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Reads.GetReplayTradeChartQuery, Result<XDrishti.Application.Replay.Reads.ReplayTradeChartView>>, XDrishti.Application.Replay.Reads.GetReplayTradeChartHandler>(); // a replay trade on its bars through the hold-out clamp (SR-02 part C)
         services.AddScoped<IEpochGate, FingerprintEpochGate>(); // the configuration fingerprint decides the epoch (P10-05, ADR 0119): detects, labels and records; applies and blocks nothing
         services.AddScoped<IConfigSnapshotSource, ConfigSnapshotSource>();
         services.AddScoped<IQueryHandler<GetEpochsQuery, Result<EpochList>>, GetEpochsHandler>();

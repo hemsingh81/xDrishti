@@ -1,6 +1,6 @@
 # EV-01 — `xd evidence preflight`: the first-evidence prerequisites in one read
 
-- **Status:** Approved (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended). Not built.
+- **Status:** Built 2026-11-12, not deployed (approved on the coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended).
 - **Phase / roadmap row:** EV — evidence, row EV-01 (new; GAP-06). The runbook half of GAP-06 is written: docs/engineering/first-evidence-runbook.md.
 - **Size:** about 1 agent-day (estimate) · **Needs:** nothing new; reads stores and settings that exist
 - **Safety:** not a SAFETY slice. Read only: it stores, switches, moves and orders nothing.
@@ -48,4 +48,12 @@ The compose file can differ from what is running (edited but not redeployed); th
 
 ## Done when
 - [ ] ACs 1–7 have evidence; `scripts/check.sh` green; reviewer: no blockers
-- [ ] The runbook's step 0 names the verb as built
+- [x] The runbook's step 0 names the verb as built
+
+## As built (2026-11-12)
+- **Verb:** `xd evidence preflight [--json]` (`Api/Cli/EvidencePreflightCommand.cs`, dispatched in `XdCommand.cs`); exit 0 whatever the states, 2 wrong line, 3 failure, 130 cancelled. Text: one line per item, the fix on the next line unless it is MET; JSON: array of `{item, state, reason, fix}` from the same items.
+- **Use case:** `GetEvidencePreflightQuery` / `GetEvidencePreflightHandler` in `Application/Evidence`, composing the existing handlers (system status, charge-sheet status, context coverage, hold-out, shadow summary, Auto, `ShowHistory`) and ports (`ICellStatsStore`, `ITradingCalendar`, `IModelRegistry`, `IServiceScheduleReader`, `IBackfillSettings`). Each read runs in a guard: any exception other than cancellation becomes `UNAVAILABLE` with the exception type only.
+- **New port:** `IEvidencePreflightHost` (compiled migration list, `mem_limit` of `xd-api` from `deploy/compose.yaml`, `Data:History:Nse:Enabled`), implemented in `Infrastructure/Evidence` (`ComposeMemLimit` is a small text reader, no YAML package; the file is found by walking up from the working folder and the program folder). `SystemReplayOptions.BytesPerInstrument` (moved out of `StartReplayHandler`) is shared by the start check and the memory line, so the 53-instrument figure has one formula. The memory line prints the compose file path it read and says `Replay:MaxWindowMb` comes from this host's configuration. The NSE switch is read by its key (`EvidencePreflightHost.NseKey`), with a test that `HistoryOptions` binds the same key.
+- **Rules chosen where the spec left room:** backfill is MET exactly when `ISimAllBackfillGate.IncompleteReasonAsync` says complete (the gate a replay start uses), and the line prints its reason; the verified / pending / failed-chunk counts and the instruments with an unresolved seam or a seam jump are information only (a `none` row or a seam state does not hold the line at NOT MET); paper-capture is MET when the service is on, NOT MET when paused, UNAVAILABLE when not registered; Auto is MET only when ON and the chain complete; the history line is MET only when both `Data:History:Nse:Enabled` and `Data:History:Replay:AdmitVerified` are on, read from the host's configuration; no tracked instrument is NOT MET.
+- **Not done:** AC 7 (p95 under 5 s on the owner's database) is not measured: the verb is a dozen indexed reads and one read of each store; measure once on the owner's database after deploy. No API route, no ADR (no design decision beyond the spec).
+- **Tests:** Application `GetEvidencePreflightHandlerTests` (41 cases: every item's rules, each read forced to throw, cancellation not swallowed), Infrastructure `ComposeMemLimitTests` (13) and `EvidencePreflightHostTests` (4), Api.IntegrationTests `EvidencePreflightCommandTests` (golden text, JSON, usage, failure; 8) and `EvidencePreflightWriteTests` (twelve items over the real database with a hold-out block and a paper-capture schedule seeded, read as MET, and an md5 plus count of every table unchanged; 1). Not done: the "all MET on a seeded database" integration case (it would need a confirmed sheet, context days, cell statistics and a champion seeded); all-MET is covered at unit level, and the seeded run proves the reads work on data..

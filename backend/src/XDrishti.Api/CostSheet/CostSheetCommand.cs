@@ -10,7 +10,7 @@ using XDrishti.Domain.Research;
 namespace XDrishti.Api.CostSheets;
 
 /// <summary>
-/// The <c>cost-sheet</c> verb (spec P3-03f, F4, F5): <c>load</c>, <c>show</c> and <c>check</c> a charge sheet. A host step that reads files and calls handlers, on the precedent of the <c>simulate</c> verb (ADR 0041); no decision lives here. Exit
+/// The <c>cost-sheet</c> verb (spec P3-03f, F4, F5): <c>load</c>, <c>show</c>, <c>check</c> and <c>derive</c> a charge sheet. A host step that reads files and calls handlers, on the precedent of the <c>simulate</c> verb (ADR 0041); no decision lives here. Exit
 /// codes as the other verb: 0 done (a <c>check</c> with rows beyond the tolerance is still 0: it reports, it does not judge), 1 refused with nothing written, 2 the command line is wrong, 3 an unexpected failure or a concurrent write, 130 cancelled.
 /// </summary>
 internal static class CostSheetCommand
@@ -53,6 +53,7 @@ internal static class CostSheetCommand
             {
                 CostSheetAction.Load => await LoadAsync(options, scope.ServiceProvider, console, logger, cancellationToken),
                 CostSheetAction.Show => await ShowAsync(options, scope.ServiceProvider, console, logger, cancellationToken),
+                CostSheetAction.Derive => await DeriveAsync(options, scope.ServiceProvider, console, logger, cancellationToken),
                 _ => await CheckAsync(options, scope.ServiceProvider, console, logger, cancellationToken),
             };
         }
@@ -114,30 +115,42 @@ internal static class CostSheetCommand
         return SimulateCommand.Done;
     }
 
-    private static async Task<int> CheckAsync(CostSheetOptions options, IServiceProvider provider, SimulateConsole console, ILogger logger, CancellationToken cancellationToken)
+    /// <summary>Reads the report files named on the command line, bounded; the problem is the refusal to print.</summary>
+    private static async Task<(List<TradeFileContent>? Files, string? Problem)> ReadReportsAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken)
     {
-        if (options.Files.Count > MaxReportFiles)
+        if (paths.Count > MaxReportFiles)
         {
-            return await RefuseAsync(console, [$"at most {MaxReportFiles} report files are read at once; {options.Files.Count} were given. Nothing was read."]);
+            return (null, $"at most {MaxReportFiles} report files are read at once; {paths.Count} were given. Nothing was read.");
         }
 
-        var files = new List<TradeFileContent>(options.Files.Count);
+        var files = new List<TradeFileContent>(paths.Count);
         long total = 0;
-        foreach (var path in options.Files)
+        foreach (var path in paths)
         {
             var read = await ReadBoundedAsync(path, TradeCsvLimits.MaxBytes, "a report file", cancellationToken);
             if (read.Problem is not null)
             {
-                return await RefuseAsync(console, [read.Problem]);
+                return (null, read.Problem);
             }
 
             total += read.Bytes!.Length;
             if (total > MaxTotalReportBytes)
             {
-                return await RefuseAsync(console, [$"the report files together are more than {MaxTotalReportBytes / (1024 * 1024)} MB; the rest was not read."]);
+                return (null, $"the report files together are more than {MaxTotalReportBytes / (1024 * 1024)} MB; the rest was not read.");
             }
 
             files.Add(new TradeFileContent(read.Bytes));
+        }
+
+        return (files, null);
+    }
+
+    private static async Task<int> CheckAsync(CostSheetOptions options, IServiceProvider provider, SimulateConsole console, ILogger logger, CancellationToken cancellationToken)
+    {
+        var (files, problem) = await ReadReportsAsync(options.Files, cancellationToken);
+        if (files is null)
+        {
+            return await RefuseAsync(console, [problem!]);
         }
 
         var handler = provider.GetRequiredService<IQueryHandler<CheckCostSheetQuery, Result<CostCheckReport>>>();
@@ -153,6 +166,77 @@ internal static class CostSheetCommand
         CostSheetLog.Checked(logger, report.SheetId, report.RatesSha256, report.Files, compared, beyond);
         await console.Out.WriteAsync(CostCheckText.Text(report));
         return SimulateCommand.Done;
+    }
+
+    /// <summary>
+    /// <c>derive</c> (spec CS-01): proposes a sheet from the report files and writes it, mode 0600, with its residuals next to it; refuses to overwrite. The only write of the verb; no database row is touched.
+    /// </summary>
+    private static async Task<int> DeriveAsync(CostSheetOptions options, IServiceProvider provider, SimulateConsole console, ILogger logger, CancellationToken cancellationToken)
+    {
+        var (files, problem) = await ReadReportsAsync(options.Files, cancellationToken);
+        if (files is null)
+        {
+            return await RefuseAsync(console, [problem!]);
+        }
+
+        var handler = provider.GetRequiredService<IQueryHandler<DeriveCostSheetQuery, Result<CostDerivation>>>();
+        var result = await handler.HandleAsync(new DeriveCostSheetQuery(files, options.Split), cancellationToken);
+        if (result.IsFailure)
+        {
+            return await FailAsync(console, result.Error);
+        }
+
+        var derivation = result.Value;
+        var path = Path.GetFullPath(options.Out ?? Path.Combine("data", "cost-sheets", derivation.SheetId + ".json"));
+        var residuals = path + ".residuals.csv";
+        if (File.Exists(path) || File.Exists(residuals))
+        {
+            return await RefuseAsync(console, ["the output already exists; it is never overwritten: choose another --out. Nothing was written."]);
+        }
+
+        try
+        {
+            ExportFolderWriter.CreateDirectory(Path.GetDirectoryName(path)!);
+            await WriteOwnerOnlyAsync(path, derivation.Json, cancellationToken);
+            try
+            {
+                await WriteOwnerOnlyAsync(residuals, derivation.ResidualsCsv, cancellationToken);
+            }
+            catch (Exception failure) when (failure is IOException or UnauthorizedAccessException or OperationCanceledException)
+            {
+                // never leave a sheet without its residuals: the sheet is ours (we created it just now); the residuals file is dealt with by its own writer
+                File.Delete(path);
+                throw;
+            }
+        }
+        catch (Exception failure) when (failure is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return await RefuseAsync(console, ["the output cannot be written: " + SimulateCommand.Describe(failure)]);
+        }
+
+        CostSheetLog.Derived(logger, derivation.SheetId, derivation.Files, derivation.DeriveSet.Bills, derivation.CheckSet.Bills, derivation.DeriveSet.Passes, derivation.CheckSet.Passes);
+        await console.Out.WriteAsync(CostDeriveText.Text(derivation, path, residuals));
+        return SimulateCommand.Done;
+    }
+
+    /// <summary>
+    /// Writes a new owner-only file. If the path is already there nothing is touched (the open fails first); once our own open has succeeded a failed or cancelled write deletes the partly written file.
+    /// </summary>
+    internal static async Task WriteOwnerOnlyAsync(string path, string text, CancellationToken cancellationToken)
+    {
+        var stream = ExportFolderWriter.OpenNew(path);
+        try
+        {
+            await using (stream)
+            {
+                await stream.WriteAsync(Encoding.UTF8.GetBytes(text), cancellationToken);
+            }
+        }
+        catch (Exception failure) when (failure is not OutOfMemoryException)
+        {
+            File.Delete(path);
+            throw;
+        }
     }
 
     /// <summary>

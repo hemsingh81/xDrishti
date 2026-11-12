@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { BaselineToggle } from './BaselineToggle';
 import { useBasketNames } from '@/features/reports';
 import { replayChargeSheetQuery, replayProfilesQuery, useStartReplay } from '../../api/replayApi';
 import { formProblem, initialForm, refusalText, toBody, type ReplayForm, type ReplayModes } from '../../lib/replayForm';
@@ -191,6 +192,14 @@ export function ReplayStartForm({ onStarted }: { onStarted: (runId: string) => v
           <FormControlLabel value="both" control={<Radio />} label="Both (compared)" />
         </RadioGroup>
       </FormControl>
+      {form.modes === 'frozen' && (
+        <BaselineToggle
+          checked={form.baseline}
+          onChange={(baseline) => {
+            set({ baseline });
+          }}
+        />
+      )}
       <FormGroup>
         <FormControlLabel
           control={

@@ -2,7 +2,7 @@ using XDrishti.Api.Simulate;
 
 namespace XDrishti.Api.CostSheets;
 
-/// <summary>Which of the three actions of the <c>cost-sheet</c> verb.</summary>
+/// <summary>Which of the four actions of the <c>cost-sheet</c> verb.</summary>
 internal enum CostSheetAction
 {
     /// <summary><c>load &lt;file.json&gt; [--replace]</c></summary>
@@ -13,6 +13,9 @@ internal enum CostSheetAction
 
     /// <summary><c>check &lt;id&gt; &lt;report&gt;...</c></summary>
     Check,
+
+    /// <summary><c>derive &lt;report&gt;... [--out PATH] [--split FRACTION]</c> (CS-01)</summary>
+    Derive,
 }
 
 /// <summary>The outcome of parsing the command line: the options, or the usage errors (never both, never neither).</summary>
@@ -24,12 +27,22 @@ internal sealed record CostSheetParse(CostSheetOptions? Options, IReadOnlyList<s
 /// </summary>
 internal sealed record CostSheetOptions(CostSheetAction Action, string? SheetId, IReadOnlyList<string> Files, bool Replace)
 {
+    /// <summary>The default share of bills the rates of <c>derive</c> come from.</summary>
+    public const decimal DefaultSplit = 0.7m;
+
+    /// <summary>Where <c>derive</c> writes (null: <c>data/cost-sheets/derived-yyyy-MM-dd.json</c> under the current directory).</summary>
+    public string? Out { get; init; }
+
+    /// <summary>The share of bills, oldest first, <c>derive</c> takes the rates from.</summary>
+    public decimal Split { get; init; } = DefaultSplit;
+
     /// <summary>The usage text (stderr on a usage error).</summary>
     public const string Usage =
         "usage:\n"
         + "  cost-sheet load <file.json> [--replace]   store a charge sheet (a new id, or the same rates; --replace overwrites other rates under an id)\n"
         + "  cost-sheet show <id>                      print a stored sheet, its rates hash and its label\n"
-        + "  cost-sheet check <id> <report.csv>...     compare the sheet with your original global transaction report files (nothing is written)\n";
+        + "  cost-sheet check <id> <report.csv>...     compare the sheet with your original global transaction report files (nothing is written)\n"
+        + "  cost-sheet derive <report.csv>... [--out PATH] [--split 0.7]   propose a sheet from your reports (writes one 0600 file and its residuals; nothing is stored)\n";
 
     /// <summary>Parses the arguments after the verb name.</summary>
     public static CostSheetParse Parse(IReadOnlyList<string> args)
@@ -38,7 +51,7 @@ internal sealed record CostSheetOptions(CostSheetAction Action, string? SheetId,
         var errors = new List<string>();
         if (args.Count == 0)
         {
-            return Fail(errors, "name an action: load, show or check");
+            return Fail(errors, "name an action: load, show, check or derive");
         }
 
         CostSheetAction? action = args[0] switch
@@ -46,18 +59,58 @@ internal sealed record CostSheetOptions(CostSheetAction Action, string? SheetId,
             "load" => CostSheetAction.Load,
             "show" => CostSheetAction.Show,
             "check" => CostSheetAction.Check,
+            "derive" => CostSheetAction.Derive,
             _ => null,
         };
         if (action is null)
         {
-            return Fail(errors, "unknown action '" + SimulateOptions.Show(args[0]) + "': use load, show or check");
+            return Fail(errors, "unknown action '" + SimulateOptions.Show(args[0]) + "': use load, show, check or derive");
         }
 
         var replace = false;
         var positional = new List<string>();
-        foreach (var token in args.Skip(1))
+        string? outPath = null;
+        var split = DefaultSplit;
+        var splitSeen = false;
+        var rest = args.Skip(1).ToList();
+        for (var i = 0; i < rest.Count; i++)
         {
-            if (token == "--replace")
+            var token = rest[i];
+            if (token is "--out" or "--split")
+            {
+                if (action != CostSheetAction.Derive)
+                {
+                    errors.Add("'" + token + "' belongs to derive only");
+                }
+                else if (i + 1 >= rest.Count)
+                {
+                    errors.Add("'" + token + "' needs a value");
+                }
+                else if (token == "--out")
+                {
+                    if (outPath is not null)
+                    {
+                        errors.Add("'--out' is given more than once");
+                    }
+
+                    outPath = rest[++i];
+                }
+                else
+                {
+                    if (splitSeen)
+                    {
+                        errors.Add("'--split' is given more than once");
+                    }
+
+                    splitSeen = true;
+                    var value = rest[++i];
+                    if (!decimal.TryParse(value, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out split) || split is < 0.5m or > 0.9m)
+                    {
+                        errors.Add("'--split' must be a number from 0.5 to 0.9");
+                    }
+                }
+            }
+            else if (token == "--replace")
             {
                 if (replace)
                 {
@@ -101,6 +154,13 @@ internal sealed record CostSheetOptions(CostSheetAction Action, string? SheetId,
                 }
 
                 break;
+            case CostSheetAction.Derive:
+                if (positional.Count < 1)
+                {
+                    errors.Add("derive takes at least one report file");
+                }
+
+                break;
             default:
                 if (positional.Count < 2)
                 {
@@ -113,6 +173,11 @@ internal sealed record CostSheetOptions(CostSheetAction Action, string? SheetId,
         if (errors.Count > 0)
         {
             return new CostSheetParse(null, errors);
+        }
+
+        if (action == CostSheetAction.Derive)
+        {
+            return new CostSheetParse(new CostSheetOptions(action.Value, null, positional, false) { Out = outPath, Split = split }, []);
         }
 
         return action == CostSheetAction.Load
