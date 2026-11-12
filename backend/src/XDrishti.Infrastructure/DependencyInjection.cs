@@ -656,6 +656,13 @@ public static class DependencyInjection
             .ConfigurePrimaryHttpMessageHandler(MasterDataHttp.CreatePrimaryHandler)
             .AddHttpMessageHandler<MasterDataEndpointGuard>()
             .RemoveAllLoggers();
+        // DATA-01 (ADR 0274): dated ban-list archive (Data:History:Lists:Enabled, OFF) and the as-of filters (Selection:ListFilters:Enabled, OFF). Same allow-list guard; the pattern list stays the owner's.
+        services.AddOptions<XDrishti.Infrastructure.Market.Lists.ListFilterOptions>().Bind(configuration.GetSection(XDrishti.Infrastructure.Market.Lists.ListFilterOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
+        services.AddSingleton<XDrishti.Application.Abstractions.Market.Lists.IListFilterSettings, XDrishti.Infrastructure.Market.Lists.ListFilterSettings>();
+        services.AddSingleton<XDrishti.Application.Abstractions.Market.Lists.IListHistorySettings, XDrishti.Infrastructure.Market.Eod.ListHistorySettings>();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Lists.IListArchiveSource, XDrishti.Infrastructure.Market.Lists.NseListArchiveSource>();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Lists.IListDayStore, XDrishti.Infrastructure.Market.Lists.ListDayStore>();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Lists.IListFlagsAsOf, XDrishti.Infrastructure.Market.Lists.ListFlagsAsOfReader>();
         services.AddScoped<XDrishti.Application.Abstractions.Market.Eod.IEodSource, XDrishti.Infrastructure.Market.Eod.NseEodSource>();
         services.AddScoped<XDrishti.Application.Abstractions.Market.Eod.IEodStore, XDrishti.Infrastructure.Market.Eod.EodStore>();
         services.AddScoped<XDrishti.Application.Abstractions.Market.History.IBackfillCalendar, XDrishti.Infrastructure.Market.Eod.EodStore>(); // the days Part A has a verdict for: the calendar before the 1-minute backfill

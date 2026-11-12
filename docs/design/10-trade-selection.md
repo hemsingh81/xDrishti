@@ -143,3 +143,7 @@ The portfolio fill's limits (section 5: the sizing scale, the basket budgets, th
 ## Auto (planned, AU-16 to AU-18, [ADR 0244](../adr/0244-one-auto-switch-runs-the-chain-and-only-suggests.md))
 
 One password-protected switch, default OFF, runs the chain and shows next-day suggestions for chosen baskets or stocks with reason and evidence. It places no order, approves nothing and does not change the autonomy level.
+
+## As built (DATA-01, [ADR 0274](../adr/0274-the-live-plan-and-the-replay-read-the-fno-ban-and-surveillance-filters-from-dated-list-rows-through-an-as-of-port-and-a-dated-ban-file-backfill-is-an-off-by-default-guarded-fetch.md))
+
+The F&O-ban and surveillance filters read stored dated rows through one as-of port, only while `Selection:ListFilters:Enabled` is on (default off; off is the plan as it was). The ban list is covered on a date only where a dated day row exists (the daily fetch of that trade date's file or the owner's backfill); ASM/GSM only on a date a good master refresh was recorded for. A date without a row is `unavailable` and holds the candidate (never "not banned"); a `fail` rejects. The replay clears `filters_without_history` only when every session is covered for both lists, and says `event_filter_without_history` because the event filter still has no history.
