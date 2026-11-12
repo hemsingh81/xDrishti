@@ -6,6 +6,7 @@ import { TrainingBanner, TrainingReport, type ReportQuery } from '@/features/rep
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
 import { simJobQuery } from '../api/simulationApi';
 import { SimJobPanel } from './SimJobPanel';
+import { SimulationTabs } from './SimulationTabs';
 import { choiceProblem, type SimChoice } from '../lib/choice';
 import { SimReportPicker } from './SimReportPicker';
 
@@ -28,12 +29,15 @@ export function SimulationReportPage() {
   const queryClient = useQueryClient();
   const [choice, setChoice] = useState(initial);
   const header = (
-    <PageHeader
-      title="Simulation reports"
-      icon={BiotechIcon}
-      hue="reports"
-      description="Reports over the simulate-everything job."
-    />
+    <>
+      <PageHeader
+        title="Simulation reports"
+        icon={BiotechIcon}
+        hue="reports"
+        description="Reports over the simulate-everything job."
+      />
+      <SimulationTabs current="/reports/simulation" />
+    </>
   );
   const notice = (
     <Alert severity="warning" sx={{ mb: 2 }}>
