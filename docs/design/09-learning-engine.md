@@ -15,6 +15,8 @@ flowchart TB
     L4 -- graded outcomes --> L1
 ```
 
+**What feeds Layer 1 today.** The arrow is the design; as built, cell statistics are computed from stored **research runs** by the owner's CLI (`xd learn cells`, no scheduled job until LC-01, [doc 18](18-roadmap.md)). Forward shadow and paper grades (CF-08, P10) do **not** feed the cells: no selection rule reads the shadow outcomes of the current epoch (CF-08 D6), and the graded paper trades count toward the P10 exit only.
+
 **Layer 1 — Cell statistics.** For each cell `(strategy, tf, side, style, exit_policy, regime)` and windows
 (all / 250 days / 60 days): n, win rate, avg win/loss R, expectancy, profit factor, max drawdown, MAE/MFE
 quantiles. Win rate uses a Beta prior **shrunk toward the parent group** when n is small; confidence = lower
@@ -351,6 +353,17 @@ the last 100 trades, is flagged for review instead of being trusted blindly.
 ## 15. As built: the weekly digest (P7-15, [ADR 0094](../adr/0094-the-weekly-digest-lists-stored-proposals-in-one-insert-only-record-per-iso-week-and-the-weekly-service-applies-nothing.md))
 The weekly learning digest (section 10, row 10) exists as a list of stored proposals, built by `xd plan digest --store` (it prints without `--store`; storing only for the current week from Saturday 10:00 IST or the last completed week) or by the `weekly` service (Saturday 10:00, paused until the owner starts it) and stored once per ISO week in `research.digests`. It reads the cell, changelog, lesson, hypothesis, experiment, model and grade records and the phase check; it applies, approves and orders nothing, and says so in every section. The service does not run cell statistics, drift replay or hypothesis triggers (they write records); the progress line against the frozen-model counterfactual, the in-app notification and "focus for next week" are not built. `GET /api/learning/digest`, `GET /api/learning/digests`.
 
-## Learned tightening and training simulation (planned, AU-10, AU-11 to AU-13)
+## 16. Learned tightening and training simulation (AU-10, AU-11 to AU-13; built 2026-11-10)
 
 Allow-listed thresholds may tighten automatically with Auto ON; loosening, and undoing an automatic tightening, needs a fresh password ([ADR 0242](../adr/0242-few-visible-settings-and-learned-changes-tighten-automatically-while-loosening-needs-the-owners-password.md)). The bulk simulation is training data only, stops before the hold-out and is not evidence ([ADR 0243](../adr/0243-simulate-everything-is-training-data-fenced-from-the-hold-out-and-from-scorecard-evidence.md)).
+
+## 17. System replay: frozen versus learning (SR-01, [ADR 0272](../adr/0272-the-system-replay-is-research-only-fenced-from-evidence-and-hindsight-labelled-and-runs-the-live-pieces-over-as-of-facts-in-memory.md))
+
+The replay (doc 13, screen `/simulation/replay`) runs the live plan builder over as-of facts, one session at a time, with the replay book and equity from `PaperLedger`. It has two learning modes:
+
+- **Frozen:** cell statistics and cell state as of the start date, for the whole run.
+- **Learning:** the P6-01 calculator is run **in memory** each Monday over the closed trades of the stored source runs, as of the Sunday before; nothing is written to `learning.cell_stats`. The lifecycle is read from the changelog as recorded (it cannot run by itself), so before October 2026 every cell is in its initial state.
+
+When both modes are chosen, two linked runs share the range, scope and settings, and (SR-01d) `ReplayPairComparison` pairs their daily returns and calls the CF-10c paired day bootstrap. The answer is one of `learning_better`, `frozen_better`, `no_measurable_difference` or `too_little_history`, always with n and the probabilities. Fewer than 20 days on which the two runs differ is `too_little_history`, however many sessions were paired. Equity is realised-only, so a day without an exit shows no difference.
+
+Limits, shown on every run as hindsight labels: the strategy versions are today's (`versions_start`), settings and sector are today's (`settings_now`), membership is bounded (`survivorship`), and the strategies were designed on this history (`data_seen_before`); learning reads the trades of the newest snapshot, which include the sessions it replays, cut by the as-of date. No ML model influences a replay (ADR 0217 gate), and costs are gross until the charge sheet is filled in (ISS-25). A replay is research only: the fence keeps its results out of cell statistics, the Lab, the readiness scorecard and training, and each replay counts as a look of kind `system_replay` in the CF-06 trial ledger.
