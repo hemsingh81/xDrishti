@@ -69,6 +69,9 @@ Findings left (screen and check), after the follow-up:
 - `width: 1` (MUI: 100 %) is still in `TokenStatus.tsx` and `CategoryLegend.tsx`; not reported by the runner, not changed.
 - Coverage limits: C7 met a chart canvas in only 8 cells (na elsewhere); C16 Back runs at 1440 only; not in the matrix: bell and drawer, Escape-closes-and-returns-focus.
 
+## Amendment 2026-11-12: C14 under 4x CPU only, no network profile (owner decision REVIEW-2026-11-10 Q14, standing instruction of 2026-11-11)
+The app is served on 127.0.0.1, so Fast 4G measured a network the product never meets; 69 of 70 cells sat at 4.1 to 5.7 s only because of it (about 50 shell chunks, bandwidth bound). C14 now throttles the CPU 4x through CDP and sets no network conditions; the budgets (interaction-ready 2 s, CLS 0.1; fail above 2x) are unchanged and the CLS work is kept. Spec criterion 13 is amended. Result on the built app with fixtures (110 cells): ready 0.63 to 1.23 s, none above 2 s; CLS above 0.2 in 0 cells (15 before), above 0.1 in 8 cells (worst 0.169). The cause of the large shifts was a loading placeholder of another height than the settled panel (and, on Execution and Readiness, a 124 px page-level spinner that vanished); the fix is a measured reserved height per panel, or a visually hidden status where the spinner sat above content. The runner's C14 note now names the shifting elements. Still open: Settings tab strip at 360, replay third-party markup, the 8 cells above, criterion 15.
+
 ## Consequences
 - The honest limits of the spec stand: fixtures not owner data; Chrome only; a phone is emulated; no screen reader run.
 - A screen added later adds one entry to `e2e/matrix.ts`.
