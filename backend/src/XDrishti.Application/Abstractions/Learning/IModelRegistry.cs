@@ -17,6 +17,9 @@ public interface IModelRegistry
     /// <summary>The newest models first, optionally only those whose current role is <paramref name="role"/>. The report, parameters and arrays are left empty.</summary>
     ValueTask<IReadOnlyList<StoredModel>> ListAsync(ModelRole? role, int limit, CancellationToken cancellationToken);
 
+    /// <summary>Whether any model has ever been designated champion (one existence query over the designations; CF-10e D6).</summary>
+    ValueTask<bool> AnyChampionEverAsync(CancellationToken cancellationToken);
+
     /// <summary>The designations of a model, oldest first.</summary>
     ValueTask<IReadOnlyList<StoredDesignation>> DesignationsAsync(long id, CancellationToken cancellationToken);
 

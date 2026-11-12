@@ -63,6 +63,16 @@ public sealed class ShadowArchitectureTests
     }
 
     [Fact]
+    public void Only_the_two_learning_evidence_sources_read_the_scores_and_only_the_writer_scores()
+    {
+        // CF-10e (ADR 0281): the scores are read by the influence evidence and the rollback evidence alone (never by Planning, Selection or Autonomy), and the nightly scorer is asked by the writer alone
+        List<string> Users(string fullName) => [.. Types.InAssembly(Application).That().HaveDependencyOn(fullName).GetTypes().Select(t => t.Name.Split('`')[0]).Where(n => !n.StartsWith('<')).Distinct().Order(StringComparer.Ordinal)];
+
+        Users(typeof(IShadowScoreReader).FullName!).ShouldBe(["ShadowMlInfluenceEvidence", "ShadowRollbackEvidence"]);
+        Users("XDrishti.Application.Shadow.ShadowScorer").ShouldBe(["DependencyInjection", "ShadowScorer", "WriteShadowHandler"]);
+    }
+
+    [Fact]
     public void The_chain_check_only_reads_the_store()
     {
         Source("XDrishti.Application", "Shadow", "VerifyShadowChainHandler.cs").ShouldNotContain("WriteSessionAsync");

@@ -3,6 +3,7 @@ using XDrishti.Api.Auth;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Replay.Job;
 using XDrishti.Application.Replay.Reads;
+using XDrishti.Application.Replay.Sweeps;
 using XDrishti.Domain.Common;
 
 namespace XDrishti.Api.Endpoints;
@@ -19,7 +20,7 @@ internal sealed class ReplayEndpoints : IEndpointModule
 
         group.MapPost("/runs", StartAsync)
             .WithName("StartReplay")
-            .WithSummary("Start a replay of the whole system from a chosen date: body from, to (default the last readable session before the hold-out and its embargo), scope {basketIds, instrumentIds} (empty: the stored auto scope, its baskets read as of each session; at most 200 baskets and 2000 instruments), capital (default 1000000), riskProfileId (default the seeded standard profile), costs (null or gross, else the id of a stored charge sheet), versions (start or asOf, default start: today's active versions, labelled hindsight), modes (frozen and/or learning, default frozen; both give two linked runs and a pairId), filtersWithoutHistory and includeResearchCells (both default false; each is a labelled hindsight). 202 with runIds and pairId. 422 replay.invalid (bad input, an empty snapshot, the memory cap); 409 replay.busy (a replay is active, or the 1-minute backfill is incomplete), replay.holdout (to reaches the hold-out; the last allowed date is in the message)")
+            .WithSummary("Start a replay of the whole system from a chosen date: body from, to (default the last readable session before the hold-out and its embargo), scope {basketIds, instrumentIds} (empty: the stored auto scope, its baskets read as of each session; at most 200 baskets and 2000 instruments), capital (default 1000000), riskProfileId (default the seeded standard profile), costs (null or gross, else the id of a stored charge sheet), versions (start or asOf, default start: today's active versions, labelled hindsight), modes (frozen and/or learning, default frozen; both give two linked runs and a pairId), filtersWithoutHistory and includeResearchCells (both default false; each is a labelled hindsight), baseline (default false; frozen mode only: also runs the no-selection baseline, one request and one pairId, compared by GET /pairs/{pairId} as selectionVsBaseline). 202 with runIds and pairId. 422 replay.invalid (bad input, an empty snapshot, the memory cap); 409 replay.busy (a replay is active, or the 1-minute backfill is incomplete), replay.holdout (to reaches the hold-out; the last allowed date is in the message)")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
@@ -62,6 +63,29 @@ internal sealed class ReplayEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
+        group.MapGet("/runs/{id:guid}/trades/{tradeNo:long}/chart", TradeChartAsync)
+            .WithName("GetReplayTradeChart")
+            .WithSummary("One replay trade on its bars (query timeframe 1m, 5m, 15m, 1h or 1D, default 5m; before and after in sessions): the P8-11 chart block (bars, coherence) and the markers of entry, stop and exit, from the session before the entry to the session after the exit through the hold-out clamp (a window past it is cut and says so in limits). The exit price is derived from the gross result. At most 5,000 bars. 404 replay.not_found; 422 bad query or too many bars. Read only.")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapPost("/sweeps", StartSweepAsync)
+            .WithName("StartReplaySweep")
+            .WithSummary("Start a start-date sweep: body starts (2 to 12 distinct dates), to (the shared end, default the last readable session), scope, capital, riskProfileId, costs, versions, filtersWithoutHistory, includeResearchCells as for a start; frozen mode, selection arm. One queued run per start, run one at a time in date order; each is one trial-ledger look (\"this sweep adds N replay looks\"). 202 with sweepId and runIds. 422 replay.invalid (count, duplicates, a start within 126 sessions of the end or without cell statistics as of it: each bad date is named); 409 replay.busy (any replay is active), replay.holdout")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapGet("/sweeps/{id:guid}", SweepAsync)
+            .WithName("GetReplaySweep")
+            .WithSummary("A sweep: hindsight labels, looks added, one row per start in date order (run id, state, CAGR, max drawdown, final equity, trades, beats the benchmark) and the spread over the completed starts (min, median and max of CAGR and of max drawdown, the share with CAGR above 0, the share beating the benchmark), and complete. Read only.")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/sweeps/{id:guid}/cancel", CancelSweepAsync)
+            .WithName("CancelReplaySweep")
+            .WithSummary("Stop a sweep: the run in flight after its session and every queued run. The trial-ledger rows stay. 202 with how many runs were stopped. 404 replay.sweep_not_found; 409 replay.not_active when it has finished.")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         group.MapPost("/runs/{id:guid}/cancel", CancelAsync)
             .WithName("CancelReplay")
             .WithSummary("Stop a queued or running replay after the session in flight; the finished sessions are kept and the run reads cancelled. 202 with the new state (cancelled or cancelling). 404 replay.not_found; 409 replay.not_active when it has finished.")
@@ -78,7 +102,7 @@ internal sealed class ReplayEndpoints : IEndpointModule
         }
 
         var costs = string.IsNullOrWhiteSpace(body.Costs) || string.Equals(body.Costs, "gross", StringComparison.OrdinalIgnoreCase) ? null : body.Costs;
-        var result = await handler.HandleAsync(new StartReplayRequest(body.From, body.To, body.Scope?.BasketIds, body.Scope?.InstrumentIds, body.Capital, body.RiskProfileId, costs, body.Versions, body.Modes, body.FiltersWithoutHistory, body.IncludeResearchCells), cancellationToken);
+        var result = await handler.HandleAsync(new StartReplayRequest(body.From, body.To, body.Scope?.BasketIds, body.Scope?.InstrumentIds, body.Capital, body.RiskProfileId, costs, body.Versions, body.Modes, body.FiltersWithoutHistory, body.IncludeResearchCells, body.Baseline), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Accepted("/api/replay/runs/" + result.Value.RunIds[0].ToString("D"), result.Value);
     }
 
@@ -102,6 +126,37 @@ internal sealed class ReplayEndpoints : IEndpointModule
 
     private static Task<Results<Ok<ReplayPairView>, ProblemHttpResult>> PairAsync(Guid pairId, HttpContext http, IQueryHandler<GetReplayPairQuery, Result<ReplayPairView>> handler, CancellationToken cancellationToken) =>
         ReadAsync(http, handler.HandleAsync(new GetReplayPairQuery(pairId), cancellationToken));
+
+    private static Task<Results<Ok<ReplayTradeChartView>, ProblemHttpResult>> TradeChartAsync(Guid id, long tradeNo, string? timeframe, int? before, int? after, HttpContext http, IQueryHandler<GetReplayTradeChartQuery, Result<ReplayTradeChartView>> handler, CancellationToken cancellationToken) =>
+        ReadAsync(http, handler.HandleAsync(new GetReplayTradeChartQuery(id, tradeNo, timeframe, before, after), cancellationToken));
+
+    private static Task<Results<Ok<ReplaySweepView>, ProblemHttpResult>> SweepAsync(Guid id, HttpContext http, IQueryHandler<GetReplaySweepQuery, Result<ReplaySweepView>> handler, CancellationToken cancellationToken) =>
+        ReadAsync(http, handler.HandleAsync(new GetReplaySweepQuery(id), cancellationToken));
+
+    private static async Task<Results<Accepted<StartedReplay>, ProblemHttpResult>> StartSweepAsync(ReplaySweepStartBody body, HttpContext http, ICommandHandler<StartReplaySweepRequest, StartedReplay> handler, CancellationToken cancellationToken)
+    {
+        var owner = OwnerAct.SessionOwner(http);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var costs = string.IsNullOrWhiteSpace(body.Costs) || string.Equals(body.Costs, "gross", StringComparison.OrdinalIgnoreCase) ? null : body.Costs;
+        var result = await handler.HandleAsync(new StartReplaySweepRequest(body.Starts ?? [], body.To, body.Scope?.BasketIds, body.Scope?.InstrumentIds, body.Capital, body.RiskProfileId, costs, body.Versions, body.FiltersWithoutHistory, body.IncludeResearchCells), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Accepted("/api/replay/sweeps/" + result.Value.SweepId!.Value.ToString("D"), result.Value);
+    }
+
+    private static async Task<Results<Accepted<ReplaySweepCancelView>, ProblemHttpResult>> CancelSweepAsync(Guid id, HttpContext http, ICommandHandler<CancelReplaySweepCommand, int> handler, CancellationToken cancellationToken)
+    {
+        var owner = OwnerAct.SessionOwner(http);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new CancelReplaySweepCommand(id), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Accepted("/api/replay/sweeps/" + id.ToString("D"), new ReplaySweepCancelView(result.Value));
+    }
 
     private static async Task<Results<Accepted<ReplayCancelView>, ProblemHttpResult>> CancelAsync(Guid id, HttpContext http, ICommandHandler<CancelReplayCommand, string> handler, CancellationToken cancellationToken)
     {

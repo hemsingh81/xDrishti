@@ -16,7 +16,7 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
         SELECT r.id, r.pair_id, r.range_from, r.range_to, r.mode, r.params::text, r.settings_snapshot::text, r.versions::text, r.learning_sources, r.input_hash, r.scope_hash, r.result_hash, r.state, r.cursor_session,
                (SELECT count(*)::int FROM research.replay_sessions s WHERE s.run_id = r.id), r.sessions_total,
                (SELECT count(*)::int FROM research.replay_runs o WHERE o.range_from = r.range_from AND o.range_to = r.range_to AND (o.created_at, o.id) <= (r.created_at, r.id)),
-               r.created_at, r.finished_at, r.fail_reason, l.equity, l.drawdown
+               r.created_at, r.finished_at, r.fail_reason, l.equity, l.drawdown, r.arm, r.sweep_id
         FROM research.replay_runs r
         LEFT JOIN LATERAL (SELECT s.equity, s.drawdown FROM research.replay_sessions s WHERE s.run_id = r.id AND s.session = r.cursor_session) l ON true
         """;
@@ -27,7 +27,7 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
         ON CONFLICT (run_id, trade_no) DO NOTHING
         """;
 
-    public async ValueTask<ReplayInsert> InsertAsync(Guid? pairId, IReadOnlyList<NewReplayRun> runs, CancellationToken cancellationToken)
+    public async ValueTask<ReplayInsert> InsertAsync(Guid? pairId, IReadOnlyList<NewReplayRun> runs, CancellationToken cancellationToken, NewReplaySweep? sweep = null)
     {
         ArgumentNullException.ThrowIfNull(runs);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -49,12 +49,24 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
             return new ReplayInsert(false, active);
         }
 
+        if (sweep is not null)
+        {
+            await using var insertSweep = new NpgsqlCommand("INSERT INTO research.replay_sweeps (id, params, starts, created_at) VALUES (@id, @params, @starts, @at)", connection, transaction);
+            insertSweep.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, sweep.Id);
+            insertSweep.Parameters.AddWithValue("params", NpgsqlDbType.Jsonb, sweep.ParamsJson);
+            insertSweep.Parameters.AddWithValue("starts", NpgsqlDbType.Array | NpgsqlDbType.Date, sweep.Starts.ToArray());
+            insertSweep.Parameters.AddWithValue("at", NpgsqlDbType.TimestampTz, sweep.CreatedAt.ToUniversalTime());
+            await insertSweep.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         foreach (var run in runs)
         {
             await using var insert = new NpgsqlCommand("""
-                INSERT INTO research.replay_runs (id, pair_id, range_from, range_to, mode, params, settings_snapshot, versions, learning_sources, input_hash, scope_hash, state, sessions_total, created_at)
-                VALUES (@id, @pair, @from, @to, @mode, @params, @settings, @versions, @learning, @input, @scope, 'queued', @total, @at)
+                INSERT INTO research.replay_runs (id, pair_id, range_from, range_to, mode, params, settings_snapshot, versions, learning_sources, input_hash, scope_hash, state, sessions_total, created_at, arm, sweep_id)
+                VALUES (@id, @pair, @from, @to, @mode, @params, @settings, @versions, @learning, @input, @scope, 'queued', @total, @at, @arm, @sweep)
                 """, connection, transaction);
+            insert.Parameters.AddWithValue("arm", NpgsqlDbType.Text, run.Arm);
+            insert.Parameters.AddWithValue("sweep", NpgsqlDbType.Uuid, (object?)run.SweepId ?? DBNull.Value);
             insert.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, run.Id);
             insert.Parameters.AddWithValue("pair", NpgsqlDbType.Uuid, (object?)pairId ?? DBNull.Value);
             insert.Parameters.AddWithValue("from", NpgsqlDbType.Date, run.From);
@@ -201,6 +213,20 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
         return true;
     }
 
+    public async ValueTask<int> CancelSweepAsync(Guid sweepId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("""
+            WITH touched AS (
+                UPDATE research.replay_runs SET state = CASE state WHEN 'queued' THEN 'cancelled' ELSE 'cancelling' END, finished_at = CASE state WHEN 'queued' THEN @now ELSE NULL END
+                WHERE sweep_id = @id AND state IN ('queued', 'running', 'cancelling')
+                RETURNING 1)
+            SELECT count(*)::int FROM touched
+            """);
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, sweepId);
+        command.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now.ToUniversalTime());
+        return (int)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
     public async ValueTask<string?> CancelAsync(Guid runId, DateTimeOffset now, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand("""
@@ -239,6 +265,22 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         return await ReadRunsAsync(connection, null, RunSelect + " WHERE r.pair_id = @pair ORDER BY r.created_at, r.id", c => c.Parameters.AddWithValue("pair", NpgsqlDbType.Uuid, pairId), cancellationToken);
+    }
+
+    public async ValueTask<ReplaySweepRow?> GetSweepAsync(Guid sweepId, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT id, params::text, starts, created_at FROM research.replay_sweeps WHERE id = @id");
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, sweepId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? new ReplaySweepRow(reader.GetGuid(0), reader.GetString(1), [.. reader.GetFieldValue<DateOnly[]>(2)], reader.GetFieldValue<DateTimeOffset>(3))
+            : null;
+    }
+
+    public async ValueTask<IReadOnlyList<ReplayRunRow>> GetSweepRunsAsync(Guid sweepId, CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        return await ReadRunsAsync(connection, null, RunSelect + " WHERE r.sweep_id = @sweep ORDER BY r.created_at, r.id", c => c.Parameters.AddWithValue("sweep", NpgsqlDbType.Uuid, sweepId), cancellationToken);
     }
 
     public async ValueTask<IReadOnlyList<ReplaySessionRow>> SessionsAsync(Guid runId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
@@ -370,7 +412,7 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
             rows.Add(new ReplayRunRow(
                 reader.GetGuid(0), reader.IsDBNull(1) ? null : reader.GetGuid(1), Day(reader, 2)!.Value, Day(reader, 3)!.Value, reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.IsDBNull(8) ? null : reader.GetString(8), reader.GetString(9), reader.GetString(10),
                 reader.IsDBNull(11) ? null : reader.GetString(11), reader.GetString(12), Day(reader, 13), reader.GetInt32(14), reader.GetInt32(15), reader.GetInt32(16), reader.GetFieldValue<DateTimeOffset>(17),
-                reader.IsDBNull(18) ? null : reader.GetFieldValue<DateTimeOffset>(18), reader.IsDBNull(19) ? null : reader.GetString(19), Money(reader, 20), Money(reader, 21)));
+                reader.IsDBNull(18) ? null : reader.GetFieldValue<DateTimeOffset>(18), reader.IsDBNull(19) ? null : reader.GetString(19), Money(reader, 20), Money(reader, 21), reader.GetString(22), reader.IsDBNull(23) ? null : reader.GetGuid(23)));
         }
 
         return rows;

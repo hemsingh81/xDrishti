@@ -475,7 +475,7 @@ public sealed class MlRollbackArchitectureTests
         Dependents(Application, typeof(IMlSwitchStore).FullName!).ShouldBe(["XDrishti.Application.Learning.ChangeMlSettingsHandler"]);
         Callers(Production(), IsSwitchAppend).ShouldBe(["XDrishti.Application.Learning.ChangeMlSettingsHandler"]);
         Dependents(Application, typeof(IRollbackProposalStore).FullName!).ShouldBe(["XDrishti.Application.Learning.ApplyRollbackHandler", "XDrishti.Application.Learning.ProposeRollbackHandler"]);
-        Dependents(Application, typeof(IMlMonitorChecks).FullName!).ShouldBe(["XDrishti.Application.Learning.ProposeRollbackHandler"]);
+        Dependents(Application, typeof(IMlMonitorChecks).FullName!).ShouldBe(["XDrishti.Application.Learning.ProposeRollbackHandler", "XDrishti.Application.Learning.ShadowMlInfluenceEvidence"]); // the second only reads the newest row (CF-10e part 10e-2)
         Dependents(Application, typeof(IMlSwitchSettings).FullName!).ShouldBe(
         [
             "XDrishti.Application.Learning.ApplyRollbackHandler", "XDrishti.Application.Learning.ChangeMlSettingsHandler", "XDrishti.Application.Learning.EvaluateMlModelsHandler", "XDrishti.Application.Learning.GetRollbackProposalsHandler",
@@ -486,7 +486,7 @@ public sealed class MlRollbackArchitectureTests
             "XDrishti.Application.Learning.ApplyRollbackHandler", "XDrishti.Application.Learning.GetRollbackProposalsHandler", "XDrishti.Application.Learning.OwnerDesignateModelHandler", "XDrishti.Application.Learning.PromoteChallengerHandler",
             "XDrishti.Application.Learning.ProposeRollbackHandler", "XDrishti.Application.Learning.RollbackProposalNotices",
         ]);
-        Dependents(Application, typeof(IRollbackEvidence).FullName!).ShouldBe(["XDrishti.Application.DependencyInjection", "XDrishti.Application.Learning.NoRollbackEvidence", "XDrishti.Application.Learning.ProposeRollbackHandler"]);
+        Dependents(Application, typeof(IRollbackEvidence).FullName!).ShouldBe(["XDrishti.Application.DependencyInjection", "XDrishti.Application.Learning.ProposeRollbackHandler", "XDrishti.Application.Learning.ShadowRollbackEvidence"]);
         Dependents(Application, typeof(IChallengerEvidence).FullName!).ShouldBe(["XDrishti.Application.DependencyInjection", "XDrishti.Application.Learning.NoChallengerEvidence", "XDrishti.Application.Learning.PromoteChallengerHandler"]);
 
         foreach (var (contract, namespaceName) in new[]
@@ -500,7 +500,7 @@ public sealed class MlRollbackArchitectureTests
         }
 
         // the evidence ports have exactly one implementation each, and it says that nothing is available
-        foreach (var (contract, implementation) in new[] { (typeof(IRollbackEvidence), "NoRollbackEvidence"), (typeof(IChallengerEvidence), "NoChallengerEvidence") })
+        foreach (var (contract, implementation) in new[] { (typeof(IRollbackEvidence), "ShadowRollbackEvidence"), (typeof(IChallengerEvidence), "NoChallengerEvidence") })
         {
             ProductionNames.SelectMany(n => Assembly.Load(new AssemblyName(n)).GetTypes()).Where(t => t is { IsClass: true, IsAbstract: false } && contract.IsAssignableFrom(t)).Select(t => t.Name).ShouldBe([implementation], contract.Name);
         }
@@ -533,7 +533,7 @@ public sealed class MlRollbackArchitectureTests
     {
         var production = Production();
 
-        Builders(production, PromoteCommand, PromoteSetters).ShouldBe(["XDrishti.Api.Endpoints.MlSafetyEndpoints", "XDrishti.Application.Learning.EvaluateMlModelsHandler"]);
+        Builders(production, PromoteCommand, PromoteSetters).ShouldBe(["XDrishti.Api.Endpoints.MlSafetyEndpoints", "XDrishti.Application.Learning.EvaluateMlModelsHandler", "XDrishti.Application.Learning.OwnerDesignateModelHandler"]); // the designate verb asks for a promotion when a champion exists (CF-10e D6, ADR 0281)
         Builders([.. production, Name(typeof(PromotionBuilderSentinel))], PromoteCommand, PromoteSetters).ShouldContain(Name(typeof(PromotionBuilderSentinel))); // control
         Builders([.. production, Name(typeof(PromotionWithSentinel))], PromoteCommand, PromoteSetters).ShouldContain(Name(typeof(PromotionWithSentinel))); // control: a `with` expression
 

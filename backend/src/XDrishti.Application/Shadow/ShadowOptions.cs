@@ -23,4 +23,11 @@ public sealed class ShadowOptions
     /// </summary>
     [Range(0, 60)]
     public int MaxResumeGapSessions { get; set; }
+
+    /// <summary>
+    /// Scoring of the candidates (CF-10e) starts only this many minutes before the 09:00 India cut-off of the session; later, the session is written without scores so that the chain never depends on the models (the database refuses a score from 09:00 on). Default 30, so scoring
+    /// must start before 08:30.
+    /// </summary>
+    [Range(1, 600)]
+    public int ScoringDeadlineMinutesBeforeCutoff { get; set; } = 30;
 }

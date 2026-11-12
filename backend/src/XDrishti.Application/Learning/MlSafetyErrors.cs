@@ -9,6 +9,9 @@ public static class MlActors
     /// <summary>The actor of an automatic promotion or rollback.</summary>
     public const string Auto = "auto";
 
+    /// <summary>The prefix of an owner actor.</summary>
+    public const string OwnerPrefix = "owner:";
+
     /// <summary>Whether the actor is an owner (<c>owner:</c> and something after it, at most 100 characters).</summary>
     public static bool IsOwner(string? actor) => actor is { } a && a.StartsWith("owner:", StringComparison.Ordinal) && a.Length > "owner:".Length && a.Length <= 100;
 }

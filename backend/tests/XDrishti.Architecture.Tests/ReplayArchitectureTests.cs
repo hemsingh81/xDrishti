@@ -154,10 +154,10 @@ public sealed partial class ReplayArchitectureTests
     }
 
     [Fact]
-    public void The_replay_may_write_only_its_three_tables_and_only_the_one_store_names_them()
+    public void The_replay_may_write_only_its_four_tables_and_only_the_one_store_names_them()
     {
         // AC 11 (ADR 0272): the whole list of what a replay writes. Planning, paper, shadow, learning, model and settings tables are not on it; the trial-ledger row goes through the ledger port, which is the ledger's own writer.
-        string[] allowed = ["research.replay_runs", "research.replay_sessions", "research.replay_trades"];
+        string[] allowed = ["research.replay_runs", "research.replay_sessions", "research.replay_sweeps", "research.replay_trades"]; // SR-02 added the insert-only sweep table
         var store = File.ReadAllText(Path.Combine(Src(), "XDrishti.Infrastructure", "Replay", "ReplayStore.cs"));
         var written = SqlWrite().Matches(store).Select(m => m.Groups["table"].Value.ToLowerInvariant()).Distinct().Order(StringComparer.Ordinal).ToList();
 
@@ -169,7 +169,7 @@ public sealed partial class ReplayArchitectureTests
         }
 
         var namers = Directory.EnumerateFiles(Src(), "*.cs", SearchOption.AllDirectories)
-            .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal) && Regex.IsMatch(string.Join("\n", File.ReadAllLines(f).Where(l => !l.TrimStart().StartsWith("//", StringComparison.Ordinal))), @"replay_(runs|sessions|trades)\b"))
+            .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal) && Regex.IsMatch(string.Join("\n", File.ReadAllLines(f).Where(l => !l.TrimStart().StartsWith("//", StringComparison.Ordinal))), @"replay_(runs|sessions|sweeps|trades)\b"))
             .Select(f => Path.GetRelativePath(Src(), f).Replace('\\', '/')).ToList();
         // AI-01 (ADR 0280), the one named exemption: the eval fixture seeder writes the synthetic replay run of the eval database (owner connection, one transaction, only the database xdrishti_eval, never a service); it may INSERT into the three tables and do nothing else to them.
         namers.ShouldBe(["XDrishti.Infrastructure/Ai/Evaluation/FixtureSeeder.cs", "XDrishti.Infrastructure/Replay/ReplayStore.cs"], ignoreOrder: true);

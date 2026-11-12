@@ -24,8 +24,14 @@ public static class HindsightLabels
     /// <summary>The event, F&amp;O-ban and surveillance filters were not required: they have no history.</summary>
     public const string FiltersWithoutHistory = "filters_without_history";
 
+    /// <summary>The event filter was not required: it has no history. Added by the runner (not by <c>For</c>) when the dated lists feed the ban and surveillance filters, so that clearing <c>filters_without_history</c> does not hide it (DATA-01).</summary>
+    public const string EventFilterWithoutHistory = "event_filter_without_history";
+
     /// <summary>Research-state cells were allowed to be candidates.</summary>
     public const string ResearchCells = "research_cells";
+
+    /// <summary>The run is the no-selection baseline (SR-02): every candidate of the system's own cells at equal risk, so it says "no choosing among the system's candidates", not "random stocks".</summary>
+    public const string BaselineArm = "baseline_no_selection";
 
     /// <summary>The labels that always apply, plus those the parameters add; the survivorship label is added per session by the facts.</summary>
     public static IReadOnlyList<string> For(ReplayParams p)
@@ -57,6 +63,11 @@ public static class HindsightLabels
         if (p.IncludeResearchCells)
         {
             labels.Add(ResearchCells);
+        }
+
+        if (p.Arm == ReplayArm.Baseline)
+        {
+            labels.Add(BaselineArm);
         }
 
         return labels;

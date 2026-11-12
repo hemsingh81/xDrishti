@@ -26,6 +26,8 @@ public sealed class PlanBuilderChoiceTests
         services.AddScoped<ITradingCalendar, PlainCalendar>();
         services.AddSingleton<IFilingSettings, NoSettings>();
         services.AddScoped<XDrishti.Application.Abstractions.Planning.ISizingInputs, NoSizing>(); // the down-only sizing (BK-10) reads the stores and the bars
+        services.AddSingleton<XDrishti.Application.Abstractions.Market.Lists.IListFilterSettings, ListsOff>(); // the dated-list filter (DATA-01) needs its switch and the as-of port
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Lists.IListFlagsAsOf, NoLists>();
         services.AddScoped<IAutoScopeSource, NoScope>(); // the owner's scope (AU-16) reads the scope store and the baskets
         if (flag is { } value)
         {
@@ -57,6 +59,17 @@ public sealed class PlanBuilderChoiceTests
     private sealed class AutoSwitch : XDrishti.Application.Abstractions.LearnedSettings.IAutoSwitch
     {
         public ValueTask<bool> IsOnAsync(CancellationToken cancellationToken) => ValueTask.FromResult(false);
+    }
+
+    private sealed class ListsOff : XDrishti.Application.Abstractions.Market.Lists.IListFilterSettings
+    {
+        public bool Enabled => false;
+    }
+
+    private sealed class NoLists : XDrishti.Application.Abstractions.Market.Lists.IListFlagsAsOf
+    {
+        public ValueTask<XDrishti.Application.Abstractions.Market.Lists.ListFlags> ForAsync(IReadOnlyCollection<Guid> instrumentIds, DateOnly banDate, DateOnly surveillanceDate, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(XDrishti.Application.Abstractions.Market.Lists.ListFlags.None);
     }
 
     private sealed class NoSizing : XDrishti.Application.Abstractions.Planning.ISizingInputs

@@ -16,7 +16,9 @@ namespace XDrishti.Application.Abstractions.Replay;
 /// <param name="ScopeHash">The hash of the scope as it stood at the start.</param>
 /// <param name="SessionsTotal">The trading sessions from D to E.</param>
 /// <param name="CreatedAt">When it was stored.</param>
-public sealed record NewReplayRun(Guid Id, DateOnly From, DateOnly To, string Mode, string ParamsJson, string SettingsJson, string VersionsJson, string? LearningSources, string InputHash, string ScopeHash, int SessionsTotal, DateTimeOffset CreatedAt);
+/// <param name="Arm">selection or baseline (SR-02).</param>
+/// <param name="SweepId">The sweep the run belongs to; null for a run of its own.</param>
+public sealed record NewReplayRun(Guid Id, DateOnly From, DateOnly To, string Mode, string ParamsJson, string SettingsJson, string VersionsJson, string? LearningSources, string InputHash, string ScopeHash, int SessionsTotal, DateTimeOffset CreatedAt, string Arm = "selection", Guid? SweepId = null);
 
 /// <summary>One stored run with how far it has got. <see cref="Complete"/> is true only for a run whose every session was replayed.</summary>
 /// <param name="Id">The run id.</param>
@@ -41,6 +43,8 @@ public sealed record NewReplayRun(Guid Id, DateOnly From, DateOnly To, string Mo
 /// <param name="FailReason">Why a failed run failed (the session and the reason); null otherwise.</param>
 /// <param name="LastEquity">The equity at the close of the cursor session, read with the run (no second read); null before the first session.</param>
 /// <param name="LastDrawdown">The stored drawdown of the cursor session; null before the first session or without a basis.</param>
+/// <param name="Arm">selection or baseline (SR-02).</param>
+/// <param name="SweepId">The sweep the run belongs to; null for a run of its own.</param>
 public sealed record ReplayRunRow(
     Guid Id,
     Guid? PairId,
@@ -63,11 +67,19 @@ public sealed record ReplayRunRow(
     DateTimeOffset? FinishedAt,
     string? FailReason,
     decimal? LastEquity = null,
-    decimal? LastDrawdown = null)
+    decimal? LastDrawdown = null,
+    string Arm = "selection",
+    Guid? SweepId = null)
 {
     /// <summary>Every session was replayed (AC 14: <c>complete: false</c> while the job runs, and for a cancelled or failed run).</summary>
     public bool Complete => State == ReplayRunStates.Completed;
 }
+
+/// <summary>A start-date sweep to store (SR-02): the shared parameters (canonical JSON) and the start dates, in order.</summary>
+public sealed record NewReplaySweep(Guid Id, string ParamsJson, IReadOnlyList<DateOnly> Starts, DateTimeOffset CreatedAt);
+
+/// <summary>One stored sweep.</summary>
+public sealed record ReplaySweepRow(Guid Id, string ParamsJson, IReadOnlyList<DateOnly> Starts, DateTimeOffset CreatedAt);
 
 /// <summary>The outcome of storing runs: started, or refused because a replay is active (the active runs are returned).</summary>
 /// <param name="Started">Whether the runs were stored.</param>

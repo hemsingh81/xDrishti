@@ -10,6 +10,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router';
 import { formatDate, formatInr, formatPercent, formatPrice } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { replayTradesQuery } from '../../api/replayApi';
@@ -45,7 +46,14 @@ export function ReplayTrades({ runId, active }: { runId: string; active: boolean
                 <TableBody>
                   {trades.data.trades.map((t) => (
                     <TableRow key={t.tradeNo}>
-                      <TableCell>{t.symbol}</TableCell>
+                      <TableCell>
+                        <Link
+                          to={`/simulation/replay/${runId}/trades/${String(t.tradeNo)}`}
+                          aria-label={`Chart of ${t.symbol} ${t.side}, trade ${String(t.tradeNo)}`}
+                        >
+                          {t.symbol}
+                        </Link>
+                      </TableCell>
                       <TableCell>{t.side}</TableCell>
                       <TableCell>{t.strategy}</TableCell>
                       <TableCell>{`${formatDate(t.entrySession)} at ${formatPrice(t.entryPrice)}`}</TableCell>

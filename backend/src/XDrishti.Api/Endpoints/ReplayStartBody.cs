@@ -14,6 +14,19 @@ internal sealed record ReplayStartBody(
     string? Versions,
     IReadOnlyList<string>? Modes,
     bool FiltersWithoutHistory = false,
+    bool IncludeResearchCells = false,
+    bool Baseline = false);
+
+/// <summary>The body of the start of a start-date sweep (SR-02): 2 to 12 start dates that share the end date <c>to</c> (default the last readable session) and every other parameter of a start (frozen mode, selection arm).</summary>
+internal sealed record ReplaySweepStartBody(
+    IReadOnlyList<DateOnly> Starts,
+    DateOnly? To,
+    ReplayScopeBody? Scope,
+    decimal? Capital,
+    Guid? RiskProfileId,
+    string? Costs,
+    string? Versions,
+    bool FiltersWithoutHistory = false,
     bool IncludeResearchCells = false);
 
 /// <summary>The answer of a cancel: the new state, cancelled for a run that had not started and cancelling for one that is running.</summary>

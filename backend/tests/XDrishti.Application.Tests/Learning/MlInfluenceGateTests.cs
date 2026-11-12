@@ -29,7 +29,7 @@ public sealed class MlInfluenceGateTests
 
     private IMlInfluenceSwitch _switch = new OffSwitch();
 
-    private IMlInfluenceEvidence _evidence = new NoMlInfluenceEvidence();
+    private IMlInfluenceEvidence _evidence = new NoEvidence();
 
     private MlInfluenceEvaluator Evaluator() => new(_registry, new ModelHoldOutLooks(_holdOuts, _time), _evidence, _switch, _options);
 
@@ -176,6 +176,12 @@ public sealed class MlInfluenceGateTests
         var result = await new GetMlInfluenceHandler(Evaluator(), _options).HandleAsync(new GetMlInfluenceQuery(99), Ct);
 
         result.Error.Code.ShouldBe(ModelErrors.NotFoundCode);
+    }
+
+    /// <summary>A source with nothing available (what the production source answers for a model with no scores and no monitor row).</summary>
+    private sealed class NoEvidence : IMlInfluenceEvidence
+    {
+        public ValueTask<MlInfluenceEvidence> ReadAsync(StoredModel model, CancellationToken cancellationToken) => ValueTask.FromResult(MlInfluenceEvidence.None);
     }
 
     /// <summary>The switch as it stands with no row stored: off. (The stored switch is tested against the real database; the gate only asks.)</summary>

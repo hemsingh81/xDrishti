@@ -114,7 +114,7 @@ public static class SettingsRegistry
             "Ticks", "OpeningBars", "Depth", "Options", "Options:Liquidity", "Options:Costs", "Options:PhaseCheck", "Options:Remark", "Options:Quality",
             "Pairs", "Models", "Filings", "StrategyLab", "Experiments", "Recovery", "Shadow", "Heartbeat", "Exports", "Mcp", "Eval",
             "Learned", "Simulate", "Training", "Replay", "Planning:TicketAlerts", "Reports:PlanVsActual", "Reports:Benchmark", "Reports:BasketProfile", "Reports:Training", "Market:RelativeStrength",
-            "Portfolio:Heal", "Portfolio:BrokerHistory", "Portfolio:AutoRefresh", "Instruments:AutoRefresh", "Data", "Data:History", "Baskets:System:Fetch", "Baskets:System:Lists", "Baskets:System:Derived",
+            "Portfolio:Heal", "Portfolio:BrokerHistory", "Portfolio:AutoRefresh", "Instruments:AutoRefresh", "Data", "Data:History", "Baskets:System:Fetch", "Baskets:System:Lists", "Baskets:System:Derived", "Selection:ListFilters",
             "Assistant:Mcp", "Assistant:Llm", "Assistant:Briefing", "Assistant:Turn", "Assistant:Proposals", "Assistant:Drafts", "AiRoles",
             "Brokers", "BrokerVault", "ExecHandover", "ExecRole", "Execution", "Execution:Sandbox", "Database", "Auth:Owner", "Api",
         }.Select(Section),

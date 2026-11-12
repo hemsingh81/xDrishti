@@ -266,6 +266,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM research.rollback_proposals;
                 DELETE FROM research.ml_monitor_checks;
                 DELETE FROM research.ml_switch_settings;
+                DELETE FROM paper.shadow_scores;
                 DELETE FROM paper.shadow_grades;
                 DELETE FROM paper.shadow_entries;
                 DELETE FROM paper.shadow_sessions;
@@ -491,6 +492,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.basket_versions;
                 DELETE FROM market.basket_fetches;
                 DELETE FROM market.basket_sources;
+                DELETE FROM market.list_day_members;
+                DELETE FROM market.list_day_coverage;
                 DELETE FROM market.basket_members;
                 DELETE FROM market.baskets;
                 DELETE FROM market.tracked_instruments;

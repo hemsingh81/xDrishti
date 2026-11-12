@@ -181,4 +181,33 @@ public sealed class RollbackPolicyTests
         new DriftOptions(CalibrationZ: 3).KeyText().ShouldNotBe(new DriftOptions().KeyText());
         new DriftOptions().KeyText().ShouldContain("calZ=2.5");
     }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(64)]
+    [InlineData(99)]
+    public void Below_the_calibration_window_the_trigger_is_unavailable_not_quiet(int outcomes)
+    {
+        // CF-10e review: the detector makes no check below its window, and "no event" must not read as a pass
+        var decision = RollbackPolicy.Evaluate(new RollbackInputs(Gap12(outcomes), null), new DriftOptions());
+
+        decision.Triggers[0].State.ShouldBe(RollbackTriggerState.Unavailable);
+        decision.ShouldRollback.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void With_a_full_window_of_well_calibrated_outcomes_the_trigger_is_quiet()
+    {
+        var calibrated = Enumerable.Range(0, 100).Select(i => new CalibrationObservation(Key("c", i), i, 0.5, i % 2)).ToList();
+
+        RollbackPolicy.Evaluate(new RollbackInputs(calibrated, null), new DriftOptions()).Triggers[0].State.ShouldBe(RollbackTriggerState.Quiet);
+    }
+
+    [Fact]
+    public void With_a_check_interval_longer_than_the_window_the_first_check_waits_for_it_so_120_outcomes_are_unavailable()
+    {
+        var decision = RollbackPolicy.Evaluate(new RollbackInputs(Gap12(120), null), new DriftOptions(CalibrationCheckEvery: 150));
+
+        decision.Triggers[0].State.ShouldBe(RollbackTriggerState.Unavailable);
+    }
 }
