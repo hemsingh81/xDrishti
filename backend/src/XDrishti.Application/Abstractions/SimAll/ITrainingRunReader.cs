@@ -19,6 +19,9 @@ public interface ITrainingRunReader
     /// <summary>The header of a training run by key, or null (also null for a research run: this reader does not see them).</summary>
     ValueTask<TrainingRunHeader?> FindAsync(string runKey, CancellationToken cancellationToken);
 
+    /// <summary>The record text of a training run (null when there is none); the feature extraction reads which instruments the run admitted pre-seam bars for (CF-04d). The default answers null: no instrument admitted.</summary>
+    ValueTask<string?> ReadRecordTextAsync(string runKey, CancellationToken cancellationToken) => ValueTask.FromResult<string?>(null);
+
     /// <summary>The closed trades of a training run in stored order (cash trades; none for a research run or an unknown key). Memory-bounded: streamed, one row at a time.</summary>
     IAsyncEnumerable<RunTrade> StreamTradesAsync(string runKey, CancellationToken cancellationToken);
 

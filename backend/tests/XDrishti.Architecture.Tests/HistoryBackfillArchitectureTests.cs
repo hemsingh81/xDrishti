@@ -88,7 +88,7 @@ public sealed class HistoryBackfillArchitectureTests
                 root = root.DeclaringType;
             }
 
-            if (type.Methods.Where(m => m.HasBody).SelectMany(m => m.Body.Instructions).Any(i => i.Operand is Mono.Cecil.MethodReference call && call.Name == "ReadForRunAsync" && call.DeclaringType.FullName == "XDrishti.Application.Market.History.SeamAwareBars"))
+            if (type.Methods.Where(m => m.HasBody).SelectMany(m => m.Body.Instructions).Any(i => i.Operand is Mono.Cecil.MethodReference call && (call.Name is "ReadForRunAsync" or "ReadRecordedAsync") && call.DeclaringType.FullName == "XDrishti.Application.Market.History.SeamAwareBars"))
             {
                 callers.Add(root.FullName);
             }

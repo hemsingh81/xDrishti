@@ -117,7 +117,12 @@ internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQuer
             return Stale(record, SimulationErrors.StaleInstrumentMissing, "the instrument is no longer in the master");
         }
 
-        var read = await _reader.ReadAsync(record.InstrumentId, run.To, basis is not null && basis.CsvThrough.TryGetValue(record.InstrumentId, out var through) ? through : null, cancellationToken);
+        var read = await _reader.ReadRecordedAsync(record.InstrumentId, run.To, basis is not null && basis.CsvThrough.TryGetValue(record.InstrumentId, out var through) ? through : null, record.PreSeam, cancellationToken);
+        if (read is null)
+        {
+            return Stale(record, SimulationErrors.StaleAdmission, "the pre-seam bars the run admitted are no longer admitted on the same basis (switch, probe, check or corporate actions changed)");
+        }
+
         var (raw, factors) = (read.Bars, read.Factors);
 
         if (!string.Equals(BarStreamHash.Compute(raw), record.BarsSha256, StringComparison.Ordinal))

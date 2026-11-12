@@ -55,7 +55,7 @@ internal sealed class ExtractTradeFeaturesHandler(
         var runKey = command.RunKey;
         try
         {
-            var outcome = await ExtractAsync(runs.StreamTradesAsync(runKey, false, cancellationToken), runKey, bars, seams, adjustments, calendars, extractor, store, time, cancellationToken);
+            var outcome = await ExtractAsync(runs.StreamTradesAsync(runKey, false, cancellationToken), runKey, RunPreSeam.Parse(await runs.ReadRecordTextAsync(runKey, cancellationToken)), bars, seams, adjustments, calendars, extractor, store, time, cancellationToken);
             var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
             FeatureLog.Extracted(logger, runKey[..12], outcome.Trades, outcome.Stored, outcome.NoBars, elapsedMs);
             return Result.Success(outcome);
@@ -70,7 +70,7 @@ internal sealed class ExtractTradeFeaturesHandler(
     /// <summary>
     /// The extraction itself, shared with the training from the simulation (AU-13): the trades of one run come from the caller (evidence or training reader), and a trade is described to the extractor by its decision instant, side, stop and target only.
     /// </summary>
-    internal static async ValueTask<TradeFeaturesOutcome> ExtractAsync(IAsyncEnumerable<RunTrade> runTrades, string runKey, IBarStore bars, IBackfillSeams seams, IAdjustmentFactors adjustments, ITradingCalendar calendars, ITradeFeatureExtractor extractor, ITradeFeatureStore store, TimeProvider time, CancellationToken cancellationToken)
+    internal static async ValueTask<TradeFeaturesOutcome> ExtractAsync(IAsyncEnumerable<RunTrade> runTrades, string runKey, IReadOnlyDictionary<Guid, PreSeamRecord> recorded, IBarStore bars, IBackfillSeams seams, IAdjustmentFactors adjustments, ITradingCalendar calendars, ITradeFeatureExtractor extractor, ITradeFeatureStore store, TimeProvider time, CancellationToken cancellationToken)
     {
         var trades = new List<SimTradeView>();
         await foreach (var runTrade in runTrades.WithCancellation(cancellationToken))
@@ -82,19 +82,26 @@ internal sealed class ExtractTradeFeaturesHandler(
         var calendar = await calendars.GetAsync(cancellationToken);
         var rows = new List<TradeFeatureRow>(trades.Count);
         var noBars = 0;
+        var stale = 0;
         foreach (var group in trades.GroupBy(t => t.InstrumentId))
         {
             var last = group.Max(t => SessionClock.DateOf(t.DecisionEpochSeconds));
-            // the training sees the bars the run saw: an instrument admitted by the run's rule gets its pre-seam bars here too (CF-04d)
-            var read = await SeamAwareBars.ReadForRunAsync(bars, seams, group.Key, await adjustments.GetAsync(group.Key, cancellationToken), await adjustments.CsvAdjustedThroughAsync(group.Key, cancellationToken), SimulationBounds.From, SimulationBounds.Until(last), cancellationToken);
+            // the features follow what the stored run did (CF-04d): an instrument the run admitted must still be admitted on the same basis, else its trades are stale and skipped; any other instrument is read cut with the plain factors whatever the switch says now
+            var read = await SeamAwareBars.ReadRecordedAsync(bars, seams, group.Key, await adjustments.GetAsync(group.Key, cancellationToken), await adjustments.CsvAdjustedThroughAsync(group.Key, cancellationToken), recorded.GetValueOrDefault(group.Key), SimulationBounds.From, SimulationBounds.Until(last), cancellationToken);
+            if (read is null)
+            {
+                stale += group.Count();
+                continue;
+            }
+
             var raw = read.Bars;
+            var factors = read.Factors;
             if (raw.Count == 0)
             {
                 noBars += group.Count();
                 continue;
             }
 
-            var factors = read.Factors;
             var decisions = group.Select(t => new TradeFeatureDecision(t.Key, t.Timeframe, t.DecisionEpochSeconds, t.Side, t.StopPrice, t.TargetPrice)).ToList();
             var values = extractor.Extract(raw, factors, calendar, decisions);
             foreach (var t in group)
@@ -107,7 +114,7 @@ internal sealed class ExtractTradeFeaturesHandler(
         }
 
         var stored = await store.StoreAsync(rows, time.GetUtcNow(), cancellationToken);
-        return new TradeFeaturesOutcome(trades.Count, stored, noBars);
+        return new TradeFeaturesOutcome(trades.Count, stored, noBars, stale);
     }
 
     private sealed record SimTradeView(Guid InstrumentId, string Key, string Strategy, Timeframe Timeframe, Domain.Research.Side Side, DateOnly TradeDate, long DecisionEpochSeconds, double StopPrice, double? TargetPrice);

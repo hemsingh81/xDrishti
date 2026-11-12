@@ -48,11 +48,11 @@ public interface IBackfillSeams
 {
     ValueTask<DateTimeOffset?> SeamOfAsync(Guid instrumentId, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// The facts of the admission rule. With the switch off and <paramref name="forReport"/> false (a run) it reads nothing; <paramref name="forReport"/> (<c>xd data history</c>) reads them and reports the switch as on, so the report says what the instrument would be.
-    /// The default answers <see cref="SeamAdmissionFacts.Off"/>: a port that does not implement it admits nothing.
-    /// </summary>
-    ValueTask<SeamAdmissionFacts?> AdmissionFactsAsync(Guid instrumentId, bool forReport, CancellationToken cancellationToken) => ValueTask.FromResult<SeamAdmissionFacts?>(SeamAdmissionFacts.Off);
+    /// <summary><c>Data:History:Replay:AdmitVerified</c>. The policy of what the switch does lives in <c>PreSeamAdmission</c>; the port only says it. The default is off: a port that does not implement it admits nothing.</summary>
+    bool AdmitVerified => false;
+
+    /// <summary>The stored facts of the admission rule, read whatever the switch says (the policy is <c>PreSeamAdmission</c>'s). The default answers <see cref="SeamAdmissionFacts.Off"/>: a port that does not implement it admits nothing.</summary>
+    ValueTask<SeamAdmissionFacts?> AdmissionFactsAsync(Guid instrumentId, CancellationToken cancellationToken) => ValueTask.FromResult<SeamAdmissionFacts?>(SeamAdmissionFacts.Off);
 
     /// <summary>Whether a <c>dhan</c> bar is stored in <c>[from, to)</c>. The default answers true (fail closed).</summary>
     ValueTask<bool> HasDhanBarsAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) => ValueTask.FromResult(true);

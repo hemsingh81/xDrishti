@@ -1,6 +1,6 @@
 # CF-04d — Source-aware replay of backfilled bars
 
-- **Status:** Approved (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended). Written 2026-11-12. Not built.
+- **Status:** Approved (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended). Written 2026-11-12. **Built 2026-11-12** (see "As built"; [ADR 0273](../adr/0273-pre-seam-bars-enter-a-run-only-for-an-instrument-proven-verified-through-a-stored-basis-with-the-switch-off-by-default-and-the-seam-by-date.md)); not deployed.
 - **Phase / roadmap row:** CF programme, row CF-04d (P1 data / ISS-19); follows [CF-04](CF-04-history-backfill-to-five-years-daily-bhavcopy-and-corporate-actions.md) Part B ("Part B as built" items 6a, 8, 9).
 - **Design refs:** docs/design/05-data-and-brokers.md §4.2 · ADR 0017 §5 · [ADR 0270](../adr/0270-the-dhan-one-minute-backfill-writes-only-before-each-instruments-first-csv-bar-through-a-resumable-chunk-ledger-and-pre-seam-bars-stay-out-of-every-run.md) decisions 7 to 10 · [ADR 0271](../adr/0271-the-run-record-states-depth-per-instrument-and-the-survivorship-limit-from-its-own-stored-bars-and-only-for-a-run-that-rests-on-backfilled-history.md) · ADR 0263 (omit when empty)
 - **Needs:** CF-04 Part B (built). Independent of CF-04e.
@@ -81,3 +81,14 @@ Domain: `SeamVerification.Decide` (each reason and the order of precedence), the
 - [ ] AC 1-9 have evidence; `scripts/check.sh` green; reviewer (Opus): no blockers or majors
 - [ ] Migration added; ADR written; doc 05 §4.2, the CF-04 spec and ADR 0270 "not met" lines updated
 - [ ] Owner act stated: run `probe-seam`, then `backfill`, then set `AdmitVerified`
+
+## As built (2026-11-12)
+Decisions 1 to 10 and acceptance criteria 1 to 9 are built as written, with these differences.
+1. **Run-level `backfill_admission`.** The label is built from the run record, so the counts (admitted, excluded by reason) are a run-level optional record `BackfillAdmissionRecord` on `SimulationRun` and `RunHeader`, omitted when null; per-instrument reasons are not in `run.json`. `shortcut:` it is **not keyed**: the key has only the `seam=` lines, so two runs that differ only in their counts share a key and the store's `ON CONFLICT DO NOTHING` keeps the older record. Acceptable because the counts follow from the same stored facts and the `seam=` lines.
+2. **The continuity re-check runs with nothing to fetch.** `xd data backfill` runs the check also when no chunk is pending (it is local); without this the re-check after a re-probe could never fire. It still needs `Data:History:Backfill:Enabled` on (the handler refuses with `history.disabled` otherwise), but no Dhan connection when nothing is fetched.
+3. **Later readers follow the stored run, not today's switch.** The feature extraction (and training through it), the trade replay and the trade cards read an instrument as its run did: no `pre_seam` in the record means the cut bars with the plain factors whatever the switch says now; a `pre_seam` must still be admitted on the same seam date and basis, else the instrument's trades are counted stale (extraction), the cards refuse (`simulation.cards_stale`, `admission_changed`) and the trade replay refuses (`reports.admission_changed`). Only the run reader decides afresh.
+4. **Switch policy** lives in `PreSeamAdmission` (the port says `AdmitVerified`; the store reads facts whatever the switch says). `xd data history` prints an `admission switch: on/off` line, and `verified=` is what the instrument would be.
+5. **Midnight cut changes behaviour with the switch off too** (a Dhan repair minute on the seam date before the first CSV minute is now kept; the seam-day bucket is no longer dropped by the daily readers): see ADR 0273, which also gives the one-off check for the owner.
+6. Acceptance 1's fixture BUY is checked as an entry at the adjusted raw price equal to a direct run on hand-scaled bars (raw 2,512.50 x 0.1 = 251.25, from the existing ORB fixture), not as a scripted 09:16 fill at 2,500.00; the hand prices 250.00 and 10,000 are asserted on the fed bars.
+7. Acceptance 2 is a real-TimescaleDB run test (X, Y, Z, W in one run, the key of a run that admits nothing equal to Part B's). Scan cost, measured on 700,000 minutes of one instrument: `CurrentSeamAsync` 36 ms, the `dhan` window scan 14 ms, all four fact reads 22 ms warm: under the 100 ms budget, so no partial index.
+

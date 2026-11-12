@@ -164,14 +164,11 @@ internal sealed class BackfillStore(NpgsqlDataSource dataSource, IBackfillSettin
         return await reader.ReadAsync(cancellationToken) ? reader.GetFieldValue<DateTimeOffset>(0) : null;
     }
 
-    // CF-04d: the stored facts of the admission rule. With the switch off a run reads nothing (no scan, byte-equal behaviour); a report (xd data history) reads them and treats the switch as on.
-    public async ValueTask<SeamAdmissionFacts?> AdmissionFactsAsync(Guid instrumentId, bool forReport, CancellationToken cancellationToken)
-    {
-        if (!settings.AdmitVerified && !forReport)
-        {
-            return SeamAdmissionFacts.Off;
-        }
+    public bool AdmitVerified => settings.AdmitVerified;
 
+    // CF-04d: the stored facts of the admission rule, read whatever the switch says; PreSeamAdmission decides whether to ask (a run with the switch off asks for nothing).
+    public async ValueTask<SeamAdmissionFacts?> AdmissionFactsAsync(Guid instrumentId, CancellationToken cancellationToken)
+    {
         var record = (await ListSeamsAsync([instrumentId], cancellationToken)).GetValueOrDefault(instrumentId);
         if (record is null)
         {

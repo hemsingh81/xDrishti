@@ -196,15 +196,32 @@ public sealed class BuildTradeCardsHandlerTests
     [Fact]
     public async Task The_cards_of_an_admitted_run_reproduce_it_and_refuse_once_the_admission_is_revoked()
     {
-        var (admitted, world, _) = AdmittedWorld(true);
-        var ok = await admitted.HandleAsync(new BuildTradeCardsQuery(world.Run, world.Keys(0)), Ct);
+        var (admitted, world, seams) = AdmittedWorld(true);
+        var recorded = new PreSeamRecord(new DateOnly(D2.Year, D2.Month, D2.Day), XDrishti.Domain.Market.History.SeamBasis.Of(seams.Cuts[world.Ids[0]], [], null));
+        var admittedRun = world.Run with { Instruments = [.. world.Run.Instruments.Select(i => i.InstrumentId == world.Ids[0] ? i with { PreSeam = recorded } : i)] };
+        var ok = await admitted.HandleAsync(new BuildTradeCardsQuery(admittedRun, world.Keys(0)), Ct);
         var (revoked, world2, _) = AdmittedWorld(false);
 
-        var stale = await revoked.HandleAsync(new BuildTradeCardsQuery(world2.Run, world2.Keys(0)), Ct);
+        var stale = await revoked.HandleAsync(new BuildTradeCardsQuery(world2.Run with { Instruments = [.. world2.Run.Instruments.Select(i => i.InstrumentId == world2.Ids[0] ? i with { PreSeam = recorded } : i)] }, world2.Keys(0)), Ct);
 
         ok.IsSuccess.ShouldBeTrue();
         stale.IsFailure.ShouldBeTrue();
         stale.Error.Code.ShouldBe("simulation.cards_stale");
+        stale.Error.Fields!.Single().Code.ShouldBe("admission_changed");
+    }
+
+    [Fact]
+    public async Task A_run_that_did_not_admit_is_read_cut_by_the_cards_even_when_the_instrument_is_admitted_now()
+    {
+        var (handler, world, _) = AdmittedWorld(true);
+        // the stored run read the instrument cut: its hash is that of the bars from D2 on
+        var id = world.Ids[0];
+        var cutHash = BarStreamHash.Compute([.. world.Fixture.Store.Stored[id].Where(b => SessionClock.DateOf(b.EpochSeconds) >= D2)]);
+        var run = world.Run with { Instruments = [.. world.Run.Instruments.Select(i => i.InstrumentId == id ? i with { BarsSha256 = cutHash } : i)] };
+
+        var result = await handler.HandleAsync(new BuildTradeCardsQuery(run, world.Keys(0)), Ct);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
     }
 
     [Fact]

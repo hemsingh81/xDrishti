@@ -69,6 +69,22 @@ public sealed class PreSeamAdmissionTests
     }
 
     [Fact]
+    public async Task The_switch_policy_is_PreSeamAdmissions_a_switch_that_is_off_reads_no_fact_and_a_report_reads_them_anyway()
+    {
+        var id = Guid.NewGuid();
+        var factors = X();
+        var seams = new FakeSeams { AdmitVerified = false };
+        seams.Facts[id] = Facts(Record(id, factors));
+
+        var run = await PreSeamAdmission.DecideAsync(seams, id, factors, Through, false, Ct);
+        var report = await PreSeamAdmission.DecideAsync(seams, id, factors, Through, true, Ct);
+
+        run.Reason.ShouldBe(SeamVerification.SwitchOff);
+        run.HasSeamRow.ShouldBeFalse();
+        report.Reason.ShouldBeNull("what the instrument would be");
+    }
+
+    [Fact]
     public async Task An_instrument_without_a_seam_row_is_not_applicable_and_not_counted()
     {
         var id = Guid.NewGuid();

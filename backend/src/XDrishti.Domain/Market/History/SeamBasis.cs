@@ -16,7 +16,7 @@ public static class SeamBasis
         ArgumentNullException.ThrowIfNull(actions);
         var text = new StringBuilder();
         text.Append(seam.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture));
-        foreach (var action in actions.OrderBy(a => a.ExDate).ThenBy(a => a.Kind))
+        foreach (var action in actions.OrderBy(a => a.ExDate).ThenBy(a => a.Kind).ThenBy(a => a.Numerator).ThenBy(a => a.Denominator))
         {
             var onCsv = csvAdjustedThrough is { } through && action.ExDate <= through;
             text.Append('|')

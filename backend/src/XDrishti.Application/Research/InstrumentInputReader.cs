@@ -31,6 +31,10 @@ internal sealed class InstrumentInputReader(IBarStore bars, IBarQueries barQueri
         return await SeamAwareBars.ReadForRunAsync(bars, seams, id, factors, csvThrough, SimulationBounds.From, SimulationBounds.Until(to), cancellationToken);
     }
 
+    /// <summary>The second read of the trade cards: follows the run's record (<paramref name="recorded"/>) and not today's switch; null when an admitted instrument is no longer admitted on the same basis (stale).</summary>
+    public async ValueTask<RunBars?> ReadRecordedAsync(Guid id, DateOnly to, DateOnly? csvThrough, PreSeamRecord? recorded, CancellationToken cancellationToken) =>
+        await SeamAwareBars.ReadRecordedAsync(bars, seams, id, await adjustments.GetAsync(id, cancellationToken), csvThrough, recorded, SimulationBounds.From, SimulationBounds.Until(to), cancellationToken);
+
     /// <summary>Builds the engine input from what was read; the tick and the CSV guard decide a preset skip (both can apply: the precedence keeps <c>csv_adjusted_twice</c>).</summary>
     public static InstrumentReplayInput Build(
         Guid id,

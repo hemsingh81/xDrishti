@@ -137,7 +137,9 @@ internal sealed class FakeSeams : IBackfillSeams
     public ValueTask<DateTimeOffset?> SeamOfAsync(Guid instrumentId, CancellationToken cancellationToken) =>
         ValueTask.FromResult<DateTimeOffset?>(Cuts.TryGetValue(instrumentId, out var cut) ? cut : null);
 
-    public ValueTask<SeamAdmissionFacts?> AdmissionFactsAsync(Guid instrumentId, bool forReport, CancellationToken cancellationToken) =>
+    public bool AdmitVerified { get; set; } = true;
+
+    public ValueTask<SeamAdmissionFacts?> AdmissionFactsAsync(Guid instrumentId, CancellationToken cancellationToken) =>
         ValueTask.FromResult<SeamAdmissionFacts?>(Facts.TryGetValue(instrumentId, out var facts) ? facts : SeamAdmissionFacts.Off);
 
     public ValueTask<bool> HasDhanBarsAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) =>

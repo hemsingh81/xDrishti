@@ -1,5 +1,6 @@
 using System.Globalization;
 using XDrishti.Api.Simulate;
+using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.History;
 using XDrishti.Domain.Common;
@@ -51,6 +52,8 @@ internal static class DataBackfillCommand
                     return await Report(await sp.GetRequiredService<ICommandHandler<ProbeSeamCommand, ProbeSeamSummary>>().HandleAsync(new ProbeSeamCommand(parsed.InstrumentId), cancellationToken), r => [.. r.Lines, r.Text], console);
                 default:
                     var rows = await sp.GetRequiredService<IQueryHandler<ShowHistoryQuery, IReadOnlyList<HistoryRow>>>().HandleAsync(new ShowHistoryQuery(), cancellationToken);
+                    var admit = sp.GetRequiredService<IBackfillSettings>().AdmitVerified;
+                    await console.Out.WriteLineAsync($"admission switch: {(admit ? "on" : "off")} (Data:History:Replay:AdmitVerified)" + (admit ? string.Empty : "; verified= shows what each instrument would be, nothing is admitted"));
                     await console.Out.WriteLineAsync($"{rows.Count} instruments (symbol, first CSV bar, status, chunks done/failed/total, probe, verified: yes or the first reason pre-seam bars would not be admitted)");
                     foreach (var row in rows)
                     {

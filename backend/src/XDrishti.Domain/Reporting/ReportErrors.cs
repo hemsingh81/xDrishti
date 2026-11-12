@@ -14,6 +14,9 @@ public static class ReportErrors
     /// <summary>The run or the trade of a replay is not stored.</summary>
     public static Error TradeNotFound() => Error.NotFound("reports.not_found", "No stored trade has this run key and ordinal.");
 
+    /// <summary>The run admitted pre-seam bars for the trade's instrument (CF-04d) and the admission no longer holds on the same basis: the picture would not be the bars the run saw.</summary>
+    public static Error AdmissionChanged() => Error.Conflict("reports.admission_changed", "The run used pre-seam bars of this instrument and they are no longer admitted on the same basis (switch, probe, check or corporate actions changed); the replay would not show the bars the run saw.");
+
     /// <summary>A replay window holds more bars than one answer may carry (P8-11, D5): refused, never thinned.</summary>
     public static Error WindowTooLarge(int bars, int ceiling) =>
         Error.Validation("reports.window_too_large", string.Create(System.Globalization.CultureInfo.InvariantCulture, $"The window holds {bars} bars; at most {ceiling} are returned. Choose a larger timeframe or fewer sessions."));

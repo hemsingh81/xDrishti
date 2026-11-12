@@ -4,6 +4,7 @@ using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.History;
+using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Market.History;
 
@@ -56,5 +57,23 @@ public static class SeamAwareBars
         }
 
         return new RunBars(await CutAsync(seams, instrumentId, raw, cancellationToken), factors, decision);
+    }
+
+    /// <summary>
+    /// The read of a reader that follows a <b>stored run</b> (the trade cards, the feature extraction, the trade replay; CF-04d): the run's record decides, not today's switch. An instrument the run did not admit (<paramref name="recorded"/> null) is read as <see cref="ReadAsync"/> with the plain
+    /// factors, whatever the switch says now. An instrument it admitted must still be admitted on the same seam date and basis; if not, the answer is null (stale) and the caller skips or refuses.
+    /// </summary>
+    public static async ValueTask<RunBars?> ReadRecordedAsync(IBarStore bars, IBackfillSeams seams, Guid instrumentId, AdjustmentFactors factors, DateOnly? csvAdjustedThrough, PreSeamRecord? recorded, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(bars);
+        ArgumentNullException.ThrowIfNull(seams);
+        ArgumentNullException.ThrowIfNull(factors);
+        if (recorded is null)
+        {
+            return new RunBars(await ReadAsync(bars, seams, instrumentId, from, to, cancellationToken), factors, PreSeamDecision.NotApplicable("not_admitted_by_the_run"));
+        }
+
+        var read = await ReadForRunAsync(bars, seams, instrumentId, factors, csvAdjustedThrough, from, to, cancellationToken);
+        return read.Decision.Admitted == recorded ? read : null;
     }
 }

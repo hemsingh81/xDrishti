@@ -355,7 +355,7 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
         await store.SaveSeamAsync(new SeamRecord(id, XSeam.ToUniversalTime(), "passed", null, 1, 100, null, false, 0.8, new string('a', 64), new string('b', 64)), Ct);
         await store.PlanChunksAsync(id, [(new DateOnly(2024, 1, 2), new DateOnly(2024, 4, 2))], Ct);
 
-        var facts = (await store.AdmissionFactsAsync(id, false, Ct)).ShouldNotBeNull();
+        var facts = (await store.AdmissionFactsAsync(id, Ct)).ShouldNotBeNull();
 
         facts.SwitchOn.ShouldBeTrue();
         facts.Record.ShouldNotBeNull().ProbeBasis.ShouldBe(new string('a', 64));
@@ -364,9 +364,10 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
         facts.HighWater.ShouldBe(XSeam);
         facts.UnfinishedChunks.ShouldBeTrue("a planned chunk");
         await store.SaveChunkAsync(new ChunkRecord(id, new DateOnly(2024, 1, 2), new DateOnly(2024, 4, 2), "done", 1, 1, null), Ct);
-        (await store.AdmissionFactsAsync(id, false, Ct))!.UnfinishedChunks.ShouldBeFalse();
-        (await off.AdmissionFactsAsync(id, false, Ct)).ShouldBe(SeamAdmissionFacts.Off, "a run with the switch off reads nothing");
-        (await off.AdmissionFactsAsync(id, true, Ct))!.Record.ShouldNotBeNull();   // a report reads them anyway
+        (await store.AdmissionFactsAsync(id, Ct))!.UnfinishedChunks.ShouldBeFalse();
+        off.AdmitVerified.ShouldBeFalse();
+        (await PreSeamAdmission.DecideAsync(off, id, AdjustmentFactors.None, null, false, Ct)).Reason.ShouldBe(SeamVerification.SwitchOff, "a run with the switch off reads nothing");
+        (await PreSeamAdmission.DecideAsync(off, id, AdjustmentFactors.None, null, true, Ct)).HasSeamRow.ShouldBeTrue();   // a report reads them anyway
 
         var from = new DateTimeOffset(2024, 4, 2, 0, 0, 0, IndiaTime.Offset);
         var to = new DateTimeOffset(2024, 6, 1, 0, 0, 0, IndiaTime.Offset);
@@ -434,5 +435,40 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
             await using var command = data.CreateCommand("SELECT count(*) FROM information_schema.columns WHERE table_schema = 'market' AND table_name = 'backfill_seams' AND column_name IN ('probe_basis', 'continuity_basis')");
             return Convert.ToInt64(await command.ExecuteScalarAsync(Ct), System.Globalization.CultureInfo.InvariantCulture);
         }
+    }
+
+    /// <summary>
+    /// CF-04d risk 1: the two scans that each admission candidate costs per run (<c>CurrentSeamAsync</c>, the oldest csv bar, and <c>HasDhanBarsAsync</c>, a dhan bar in a window) on about 700,000 stored minutes of one instrument (450,000 dhan before the seam, 250,000 csv from it). The number is sent
+    /// as a diagnostic message and never asserted: a wall-clock assertion is not part of the gate. Budget: 100 ms per instrument; over it, add a partial index on (instrument_id, ts) WHERE source = 'csv' and update DataTableGrantsTests.
+    /// </summary>
+    [Fact(Explicit = true)]
+    public async Task Timing_of_the_two_admission_scans_on_700000_minutes()
+    {
+        var id = await SeedAsync("TIMING");
+        var seam = new DateTimeOffset(2024, 4, 2, 9, 15, 0, TimeSpan.Zero);
+        await using (var connection = await OpenAsync())
+        {
+            const string Insert = "INSERT INTO market.bars_1m (instrument_id, ts, open, high, low, close, volume, source) SELECT @id, t, 100, 101, 99, 100, 10, @source FROM generate_series(@from::timestamptz, @to::timestamptz, interval '1 minute') t";
+            await ExecuteAsync(connection, Insert, ("id", id), ("source", "dhan"), ("from", seam.AddMinutes(-450_000)), ("to", seam.AddMinutes(-1)));
+            await ExecuteAsync(connection, Insert, ("id", id), ("source", "csv"), ("from", seam), ("to", seam.AddMinutes(249_999)));
+        }
+
+        using var scope = Factory.Services.CreateScope();
+        var store = SwitchedOn(scope);
+        var from = seam;
+        await store.CurrentSeamAsync(id, Ct);   // warm up
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var current = await store.CurrentSeamAsync(id, Ct);
+        var seamMs = clock.Elapsed.TotalMilliseconds;
+        clock.Restart();
+        var found = await store.HasDhanBarsAsync(id, from, from.AddDays(120), Ct);
+        var dhanMs = clock.Elapsed.TotalMilliseconds;
+        clock.Restart();
+        await store.AdmissionFactsAsync(id, Ct);
+        var factsMs = clock.Elapsed.TotalMilliseconds;
+
+        current.ShouldBe(seam);
+        found.ShouldBeFalse();
+        TestContext.Current.SendDiagnosticMessage(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"CF-04d scans on 700,000 minutes: CurrentSeamAsync {seamMs:F1} ms, HasDhanBarsAsync (empty 120-day window) {dhanMs:F1} ms, AdmissionFactsAsync {factsMs:F1} ms"));
     }
 }

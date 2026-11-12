@@ -120,14 +120,24 @@ public sealed class GetTradeReplayHandlerTests
         var basis = XDrishti.Domain.Market.History.SeamBasis.Of(seam, [split], null);
         _seams.Facts[Id] = new XDrishti.Application.Abstractions.Market.History.SeamAdmissionFacts(true, new XDrishti.Application.Abstractions.Market.History.SeamRecord(Id, seam, XDrishti.Domain.Market.History.ProbeStatus.Passed, null, 1, 100, null, false, 0, basis, basis), seam, seam, false);
 
+        _runs.ReadRecordTextAsync(Run, Arg.Any<CancellationToken>()).Returns(new ValueTask<string?>("{\"instruments\":[{\"instrument_id\":\"" + Id.ToString("D") + "\",\"pre_seam\":{\"seam_date\":\"" + IndiaDate(seam) + "\",\"basis_sha256\":\"" + basis + "\"}}]}"));
+
         var admitted = await OkAsync("1m");
+        var facts = _seams.Facts[Id];
         _seams.Facts.Clear();
+        var lost = await Handler().HandleAsync(new GetTradeReplayQuery(Run, 0, false, "1m", null, null), Ct);
+        _runs.ReadRecordTextAsync(Run, Arg.Any<CancellationToken>()).Returns(new ValueTask<string?>("{\"instruments\":[{\"instrument_id\":\"" + Id.ToString("D") + "\"}]}"));
+        _seams.Facts[Id] = facts;   // the switch is on and the instrument is admitted now, but the run did not admit it
         var cut = await OkAsync("1m");
 
         admitted.Chart.Bars[0].O.ShouldBe(100.5);
         admitted.Chart.Coherence.State.ShouldBe("ok");
-        cut.Chart.Bars.ShouldBeEmpty("the plain read leaves out every bar before the seam date");
+        lost.IsFailure.ShouldBeTrue("the run admitted the pre-seam bars and the admission is gone");
+        lost.Error.Code.ShouldBe("reports.admission_changed");
+        cut.Chart.Bars.ShouldBeEmpty("the plain read leaves out every bar before the seam date, as the run did");
     }
+
+    private static string IndiaDate(DateTimeOffset at) => XDrishti.Domain.Market.IndiaTime.Today(at).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
     [Fact]
     public async Task Bars_that_no_longer_match_the_stored_entry_are_still_returned_with_both_prices()

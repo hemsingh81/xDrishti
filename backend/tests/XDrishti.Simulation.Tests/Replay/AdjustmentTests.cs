@@ -150,4 +150,21 @@ public sealed class AdjustmentTests
         replay.Record.PreSeam.ShouldBe(preSeam);
         replay.Record.BarsSha256.ShouldBe(BarStreamHash.Compute(bars), "the hash covers the raw pre-seam bars");
     }
+
+    // CF-04d acceptance criterion 1, the trade: a BUY on a raw Dhan day (before the seam) with the hand instrument's two actions (factor 0.2 x 0.5 = 0.1) enters at the adjusted price, equal to a direct run on bars scaled by hand
+    [Fact]
+    public void A_buy_on_a_raw_pre_seam_day_enters_at_the_price_adjusted_by_both_actions_and_equals_a_direct_run_on_the_scaled_bars()
+    {
+        var bars = ReplayDays.Scaled(ReplayDays.Join(ReplayDays.Flat(ReplayDays.D1, 99.00), ReplayDays.F1(ReplayDays.D2), ReplayDays.Flat(ReplayDays.D3, 105.00)), 25);
+        var plain = AdjustmentFactors.From([new AppliedAction(ReplayDays.D4, CorporateActionKind.Split, 1, 5, 0.2m), new AppliedAction(ReplayDays.D4.AddDays(1), CorporateActionKind.Bonus, 1, 1, 0.5m)]);
+        var aware = plain.SourceAware(ReplayDays.D3, ReplayDays.D3);
+        var scaled = ReplayDays.Scaled(bars, 0.1, volumeFactor: 10);
+
+        var replay = Rep.Replay(Bare, bars, ReplayDays.D1, ReplayDays.D3, factors: aware, csvAdjustedThrough: ReplayDays.D3);
+        var direct = Sim.Run(OrbV1.Create(), scaled, fills: Cand.NoSlippage, instrument: new InstrumentRef(Rep.Id, "TEST"));
+
+        var trade = replay.Trades.ShouldHaveSingleItem();
+        trade.EntryPrice.ShouldBe(251.25, "raw 2,512.50 x 0.1");
+        RunText.Trade(trade).ShouldBe(RunText.Trade(direct.Trades.ShouldHaveSingleItem()));
+    }
 }

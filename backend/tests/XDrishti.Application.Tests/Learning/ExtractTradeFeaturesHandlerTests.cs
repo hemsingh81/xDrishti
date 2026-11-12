@@ -112,32 +112,79 @@ public sealed class ExtractTradeFeaturesHandlerTests
         seen.ShouldNotBeNull().Select(b => b.EpochSeconds).ShouldBe([seam.ToUnixTimeSeconds(), seam.ToUnixTimeSeconds() + 60]);
     }
 
-    [Fact]
-    public async Task An_admitted_instrument_gives_the_extractor_its_pre_seam_bars_and_the_source_aware_factors_as_the_run_saw_them_CF_04d()
+    private static readonly DateTimeOffset XSeam = new(2024, 4, 2, 9, 15, 0, TimeSpan.FromMinutes(330));
+
+    private static readonly DateOnly XThrough = new(2026, 4, 30);
+
+    private static readonly AppliedAction XBonus = new(new DateOnly(2024, 8, 1), CorporateActionKind.Bonus, 1, 1, 0.5m);
+
+    private ExtractTradeFeaturesHandler WorldOf(SimTrade trade, bool admittedNow, bool recordSaysAdmitted, out Func<(IReadOnlyList<Bar>? Bars, AdjustmentFactors? Factors)> seen)
     {
-        var trade = FabricatedRun.Trade(FabricatedRun.IdA, "NSE:A", Side.Buy, Day);
         Run(trade);
         var handler = Handler();   // sets the defaults of the fakes; the setup below follows it
-        var seam = new DateTimeOffset(2024, 4, 2, 9, 15, 0, TimeSpan.FromMinutes(330));
-        var split = new AppliedAction(new DateOnly(2024, 8, 1), CorporateActionKind.Bonus, 1, 1, 0.5m);
-        var through = new DateOnly(2026, 4, 30);
-        var basis = SeamBasis.Of(seam, [split], through);
-        _seams.Cuts[FabricatedRun.IdA] = seam;
-        _seams.Facts[FabricatedRun.IdA] = new SeamAdmissionFacts(true, new SeamRecord(FabricatedRun.IdA, seam, ProbeStatus.Passed, null, 1, 100, null, false, 0, basis, basis), seam, seam, false);
-        _factors.GetAsync(FabricatedRun.IdA, Ct).Returns(AdjustmentFactors.From([split]));
-        _factors.CsvAdjustedThroughAsync(FabricatedRun.IdA, Ct).Returns(through);
-        var before = seam.AddDays(-1).ToUnixTimeSeconds();
-        _bars.ReadAsync(FabricatedRun.IdA, Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Ct).Returns(new[] { new Bar(before, 1, 1, 1, 1, 1), new Bar(seam.ToUnixTimeSeconds(), 1, 1, 1, 1, 1) });
-        IReadOnlyList<Bar>? seen = null;
-        AdjustmentFactors? factorsSeen = null;
-        _extractor.Extract(Arg.Do<IReadOnlyList<Bar>>(b => seen = b), Arg.Do<AdjustmentFactors>(f => factorsSeen = f), Arg.Any<TradingCalendar>(), Arg.Any<IReadOnlyList<TradeFeatureDecision>>())
+        var basis = SeamBasis.Of(XSeam, [XBonus], XThrough);
+        _seams.Cuts[FabricatedRun.IdA] = XSeam;
+        if (admittedNow)
+        {
+            _seams.Facts[FabricatedRun.IdA] = new SeamAdmissionFacts(true, new SeamRecord(FabricatedRun.IdA, XSeam, ProbeStatus.Passed, null, 1, 100, null, false, 0, basis, basis), XSeam, XSeam, false);
+        }
+
+        _factors.GetAsync(FabricatedRun.IdA, Ct).Returns(AdjustmentFactors.From([XBonus]));
+        _factors.CsvAdjustedThroughAsync(FabricatedRun.IdA, Ct).Returns(XThrough);
+        var record = recordSaysAdmitted
+            ? "{\"instruments\":[{\"instrument_id\":\"" + FabricatedRun.IdA.ToString("D") + "\",\"pre_seam\":{\"seam_date\":\"2024-04-02\",\"basis_sha256\":\"" + basis + "\"}}]}"
+            : "{\"instruments\":[{\"instrument_id\":\"" + FabricatedRun.IdA.ToString("D") + "\"}]}";
+        _runs.ReadRecordTextAsync(Key, Ct).Returns(record);
+        var before = XSeam.AddDays(-1).ToUnixTimeSeconds();
+        _bars.ReadAsync(FabricatedRun.IdA, Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Ct).Returns(new[] { new Bar(before, 1, 1, 1, 1, 1), new Bar(XSeam.ToUnixTimeSeconds(), 1, 1, 1, 1, 1) });
+        IReadOnlyList<Bar>? bars = null;
+        AdjustmentFactors? factors = null;
+        _extractor.Extract(Arg.Do<IReadOnlyList<Bar>>(b => bars = b), Arg.Do<AdjustmentFactors>(f => factors = f), Arg.Any<TradingCalendar>(), Arg.Any<IReadOnlyList<TradeFeatureDecision>>())
             .Returns(new Dictionary<string, double[]> { [trade.Key] = Values() });
+        seen = () => (bars, factors);
+        return handler;
+    }
 
-        await handler.HandleAsync(new ExtractTradeFeaturesCommand(Key), Ct);
+    [Fact]
+    public async Task A_run_that_admitted_the_instrument_is_extracted_on_its_pre_seam_bars_and_the_source_aware_factors_CF_04d()
+    {
+        var trade = FabricatedRun.Trade(FabricatedRun.IdA, "NSE:A", Side.Buy, Day);
+        var handler = WorldOf(trade, admittedNow: true, recordSaysAdmitted: true, out var seen);
 
-        seen.ShouldNotBeNull().Select(b => b.EpochSeconds).ShouldBe([before, seam.ToUnixTimeSeconds()]);
-        factorsSeen.ShouldNotBeNull().FactorAt(new DateOnly(2024, 4, 1)).ShouldBe(0.5);
-        factorsSeen.FactorAt(new DateOnly(2024, 5, 2)).ShouldBe(1.0, "a CSV bar inside the span is not adjusted again");
+        var result = await handler.HandleAsync(new ExtractTradeFeaturesCommand(Key), Ct);
+
+        result.Value.Stale.ShouldBe(0);
+        var (bars, factors) = seen();
+        bars.ShouldNotBeNull().Count.ShouldBe(2);
+        factors.ShouldNotBeNull().FactorAt(new DateOnly(2024, 4, 1)).ShouldBe(0.5);
+        factors.FactorAt(new DateOnly(2024, 5, 2)).ShouldBe(1.0, "a CSV bar inside the span is not adjusted again");
+    }
+
+    [Fact]
+    public async Task An_admitted_run_whose_admission_was_lost_skips_and_counts_the_trades_as_stale_instead_of_double_adjusting_CF_04d()
+    {
+        var trade = FabricatedRun.Trade(FabricatedRun.IdA, "NSE:A", Side.Buy, Day);
+        var handler = WorldOf(trade, admittedNow: false, recordSaysAdmitted: true, out var seen);
+
+        var result = await handler.HandleAsync(new ExtractTradeFeaturesCommand(Key), Ct);
+
+        result.Value.Stale.ShouldBe(1);
+        result.Value.Stored.ShouldBe(0);
+        seen().Bars.ShouldBeNull("the extractor was never called");
+    }
+
+    [Fact]
+    public async Task A_run_that_did_not_admit_is_extracted_cut_with_the_plain_factors_even_when_the_switch_is_on_now_CF_04d()
+    {
+        var trade = FabricatedRun.Trade(FabricatedRun.IdA, "NSE:A", Side.Buy, Day);
+        var handler = WorldOf(trade, admittedNow: true, recordSaysAdmitted: false, out var seen);
+
+        var result = await handler.HandleAsync(new ExtractTradeFeaturesCommand(Key), Ct);
+
+        result.Value.Stale.ShouldBe(0);
+        var (bars, factors) = seen();
+        bars.ShouldNotBeNull().Select(b => b.EpochSeconds).ShouldBe([XSeam.ToUnixTimeSeconds()], "the pre-seam bar the engine never saw is not in the lookback");
+        factors.ShouldNotBeNull().FactorAt(new DateOnly(2024, 5, 2)).ShouldBe(0.5, "the plain factors, as the run had them");
     }
 
     [Fact]

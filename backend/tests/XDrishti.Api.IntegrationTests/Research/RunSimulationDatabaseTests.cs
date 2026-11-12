@@ -6,6 +6,7 @@ using XDrishti.Api.IntegrationTests.Data;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
+using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Baskets;
@@ -13,6 +14,7 @@ using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Market.History;
 using XDrishti.Domain.Research;
 using XDrishti.Simulation;
 using XDrishti.Simulation.Replay;
@@ -401,5 +403,80 @@ public sealed class RunSimulationDatabaseTests(ApiFactory factory) : DataTestBas
         using var added = await Client.PostJsonAsync($"/api/baskets/{basket}/members", new { instrumentIds = members }, Ct);
         added.StatusCode.ShouldBe(HttpStatusCode.OK, await added.Content.ReadAsStringAsync(Ct));
         return basket;
+    }
+
+    // CF-04d acceptance criterion 2 on a real TimescaleDB: X admitted, Y not_probed, Z seam_jump, W seam_unresolved, in one run, and the switch-off golden
+
+    private static async Task<Result<SimulationRun>> RunWithAsync(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> host, SimulationRequest request, CancellationToken ct)
+    {
+        using var scope = host.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>().HandleAsync(new RunSimulationQuery(request), ct);
+    }
+
+    private async Task<Guid> SeamedAsync(string ticker, string probe, bool jump, bool basisCurrent = true)
+    {
+        // Dhan bars on D1 (before the seam), CSV bars from D2 (the seam day) on: the seam is D2 09:15
+        var id = await InstrumentAsync(ticker, ReplayDays.F2(D1), 5m, BarSource.Dhan);
+        await LoadAsync(id, ReplayDays.Join(ReplayDays.F1(D2), ReplayDays.Flat(D3, 105.00)), BarSource.Csv, ticker + ".csv");
+        using var scope = Factory.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IBackfillStore>();
+        var seam = (await store.CurrentSeamAsync(id, Ct)).ShouldNotBeNull();
+        var through = await scope.ServiceProvider.GetRequiredService<IAdjustmentFactors>().CsvAdjustedThroughAsync(id, Ct);
+        var basis = SeamBasis.Of(seam, [], through);
+        await store.SaveSeamAsync(new SeamRecord(id, seam, probe, null, 1, 100, null, jump, jump ? 32.0 : 0.8, probe == ProbeStatus.Passed ? basis : null, basisCurrent ? basis : null), Ct);
+        return id;
+    }
+
+    [Fact]
+    public async Task One_run_admits_the_verified_instrument_and_excludes_the_others_each_with_its_reason_and_the_switch_off_run_is_the_part_b_run()
+    {
+        var x = await SeamedAsync("XADM", ProbeStatus.Passed, false);
+        var y = await SeamedAsync("YNOP", ProbeStatus.None, false);
+        var z = await SeamedAsync("ZJMP", ProbeStatus.Passed, true);
+        var w = await SeamedAsync("WUNR", ProbeStatus.Unresolved, false);
+        using var on = Factory.WithWebHostBuilder(b => b.UseSetting("Data:History:Replay:AdmitVerified", "true"));
+        var request = Request([x, y, z, w]);
+
+        var admitted = (await RunWithAsync(on, request, Ct)).ShouldNotBeNull();
+        var off = await RunAsync(request);
+        var others = await RunWithAsync(on, Request([y, z, w]), Ct);
+        var othersOff = await RunAsync(Request([y, z, w]));
+
+        admitted.IsSuccess.ShouldBeTrue(admitted.IsFailure ? admitted.Error.Message : string.Empty);
+        off.IsSuccess.ShouldBeTrue();
+        var run = admitted.Value;
+        run.BackfillAdmission.ShouldNotBeNull().Admitted.ShouldBe(1);
+        run.BackfillAdmission.Excluded.ShouldBe([new BackfillExclusion("not_probed", 1), new BackfillExclusion("seam_jump", 1), new BackfillExclusion("seam_unresolved", 1)]);
+        RunLabels.Of(run, FillRules.Create(0.1, SlippageConfig.None).Value).Lines.ShouldContain("backfill: pre-seam bars admitted for 1 instruments (source-aware); excluded for 3 (not_probed 1, seam_jump 1, seam_unresolved 1)");
+        var byId = run.Instruments.ToDictionary(i => i.InstrumentId);
+        byId[x].PreSeam.ShouldNotBeNull().SeamDate.ShouldBe(D2);
+        byId[x].FirstBar.ShouldBe(D1, "the admitted instrument is fed from its first Dhan bar");
+        foreach (var id in new[] { y, z, w })
+        {
+            byId[id].PreSeam.ShouldBeNull();
+            byId[id].FirstBar.ShouldBe(D2, "an instrument that is not admitted starts at its seam");
+        }
+
+        // switch off: every record, key and label is Part B's: no admission record, no pre_seam, and the run of the non-admitted three equals the same run with the switch on
+        off.Value.BackfillAdmission.ShouldBeNull();
+        off.Value.Instruments.ShouldAllBe(i => i.PreSeam == null);
+        off.Value.Instruments.Single(i => i.InstrumentId == x).FirstBar.ShouldBe(D2);
+        others.Value.RunKey.ShouldBe(othersOff.Value.RunKey, "no admitted instrument: the key has no seam= line and equals Part B's");
+        run.RunKey.ShouldNotBe(off.Value.RunKey, "the key gains the seam= line and X's bars hash");
+        foreach (var id in new[] { y, z, w })
+        {
+            byId[id].BarsSha256.ShouldBe(off.Value.Instruments.Single(i => i.InstrumentId == id).BarsSha256);
+        }
+
+        others.Value.BackfillAdmission.ShouldNotBeNull().Admitted.ShouldBe(0, "the switch is on and the three have seam rows: the label says nothing was admitted");
+        Sinks(others.Value with { BackfillAdmission = null }).ShouldBe(Sinks(othersOff.Value), "but for the admission counts, the record text of a run that admits nothing is Part B's, byte for byte");
+        RunLabels.Of(off.Value, FillRules.Create(0.1, SlippageConfig.None).Value).Lines.ShouldNotContain(l => l.StartsWith("backfill:", StringComparison.Ordinal));
+    }
+
+    private static string Sinks(SimulationRun run)
+    {
+        var buffer = new System.Buffers.ArrayBufferWriter<byte>();
+        XDrishti.SimExport.Json.SimExportJson.WriteRecord(buffer, run);
+        return System.Text.Encoding.UTF8.GetString(buffer.WrittenSpan);
     }
 }

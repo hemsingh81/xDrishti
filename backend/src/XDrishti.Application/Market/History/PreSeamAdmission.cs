@@ -35,7 +35,12 @@ internal static class PreSeamAdmission
     {
         ArgumentNullException.ThrowIfNull(seams);
         ArgumentNullException.ThrowIfNull(factors);
-        var facts = await seams.AdmissionFactsAsync(instrumentId, forReport, cancellationToken) ?? SeamAdmissionFacts.Off;
+        if (!forReport && !seams.AdmitVerified)
+        {
+            return PreSeamDecision.NotApplicable(SeamVerification.SwitchOff);   // the policy of the switch: a run with it off reads no fact at all
+        }
+
+        var facts = await seams.AdmissionFactsAsync(instrumentId, cancellationToken) ?? SeamAdmissionFacts.Off;
         if (!facts.SwitchOn)
         {
             return PreSeamDecision.NotApplicable(SeamVerification.SwitchOff);

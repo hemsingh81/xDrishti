@@ -69,6 +69,9 @@ public static class SimulationErrors
     /// <summary>The applied corporate actions that change the bars differ from the ones the run recorded.</summary>
     public const string StaleAdjustments = "adjustments_changed";
 
+    /// <summary>The run admitted pre-seam bars for the instrument (CF-04d) and the admission no longer holds on the same seam date and basis.</summary>
+    public const string StaleAdmission = "admission_changed";
+
     /// <summary>The tick of the instrument master differs from the one the run used.</summary>
     public const string StaleTick = "tick_changed";
 
