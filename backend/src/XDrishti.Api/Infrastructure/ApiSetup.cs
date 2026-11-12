@@ -106,6 +106,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, HoldingsEndpoints>();
         services.AddSingleton<IEndpointModule, PortfolioHistoryEndpoints>();
         services.AddSingleton<IEndpointModule, DataEndpoints>();
+        services.AddSingleton<IEndpointModule, HistoryEndpoints>(); // CF-04e: the history card and its two owner acts (switch read-only, fresh password per act)
         services.AddSingleton<IEndpointModule, DataQualityEndpoints>();
         services.AddSingleton<IEndpointModule, DataCsvEndpoints>();
         services.AddSingleton<IEndpointModule, CorporateActionEndpoints>();
