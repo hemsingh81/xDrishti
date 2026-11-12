@@ -6,6 +6,7 @@ import type { Schemas } from '@/shared/api';
 import { formatDate, formatInr, formatPrice } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { replaySessionQuery } from '../../api/replayApi';
+import { HindsightBanner } from './HindsightBanner';
 
 type Candidate = Schemas['ReplayCandidateView'];
 
@@ -63,7 +64,8 @@ export function SessionDrawer({
       {query.isError && <ErrorState error={query.error} />}
       {day && (
         <Box>
-          <Typography variant="body2" sx={{ mb: 1.5 }}>
+          <HindsightBanner run={day} />
+          <Typography variant="body2" sx={{ my: 1.5 }}>
             {`Equity ${formatInr(day.equity)} · ${day.costsLabel}`}
           </Typography>
           <Section title="Candidates" count={day.candidates.length}>

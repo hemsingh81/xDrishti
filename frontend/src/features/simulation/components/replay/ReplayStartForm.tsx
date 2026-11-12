@@ -169,7 +169,7 @@ export function ReplayStartForm({ onStarted }: { onStarted: (runId: string) => v
           }}
         >
           <MenuItem value="" sx={{ minHeight: 44 }}>
-            The default
+            Today&apos;s versions (hindsight)
           </MenuItem>
           <MenuItem value="asOf" sx={{ minHeight: 44 }}>
             As of each day

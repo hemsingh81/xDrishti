@@ -1,5 +1,4 @@
 import {
-  Button,
   Card,
   CardContent,
   Table,
@@ -11,19 +10,13 @@ import {
   Typography,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
-import type { Schemas } from '@/shared/api';
 import { formatDate, formatInr, formatPercent, formatPrice } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { replayTradesQuery } from '../../api/replayApi';
-import { TradeBarsDrawer } from './TradeBarsDrawer';
 
-type Trade = Schemas['ReplayBookTradeView'];
-
-/** The trades in booking order; a trade whose symbol names one instrument opens that instrument's day bars. */
+/** The trades in booking order. */
 export function ReplayTrades({ runId, active }: { runId: string; active: boolean }) {
   const trades = useQuery(replayTradesQuery(runId, active));
-  const [open, setOpen] = useState<Trade | null>(null);
   return (
     <Card component="section" aria-labelledby="replay-trades-title">
       <CardContent sx={{ minWidth: 0 }}>
@@ -47,7 +40,6 @@ export function ReplayTrades({ runId, active }: { runId: string; active: boolean
                     <TableCell>Exit</TableCell>
                     <TableCell align="right">Net P&amp;L</TableCell>
                     <TableCell align="right">R</TableCell>
-                    <TableCell>Bars</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -66,34 +58,12 @@ export function ReplayTrades({ runId, active }: { runId: string; active: boolean
                           : formatInr(t.netPnl)}
                       </TableCell>
                       <TableCell align="right">{t.r === null ? 'n/a' : formatPercent(t.r)}</TableCell>
-                      <TableCell>
-                        {t.barsRoute ? (
-                          <Button
-                            size="small"
-                            onClick={() => {
-                              setOpen(t);
-                            }}
-                            aria-label={`Day bars of ${t.symbol}, trade ${t.tradeNo}`}
-                            sx={{ minHeight: 44 }}
-                          >
-                            Day bars
-                          </Button>
-                        ) : (
-                          'n/a'
-                        )}
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </TableContainer>
           ))}
-        <TradeBarsDrawer
-          trade={open}
-          onClose={() => {
-            setOpen(null);
-          }}
-        />
       </CardContent>
     </Card>
   );

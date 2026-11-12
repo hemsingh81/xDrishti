@@ -70,11 +70,96 @@ const mountSimulation = (withJob: boolean) => () => {
   );
 };
 
+const replayId = '22222222-2222-2222-2222-222222222222';
+const replayLabels = [
+  { code: 'settings_now', text: 'Settings are as of today.' },
+  { code: 'costs_gross', text: 'before costs (charge sheet not filled, ISS-25)' },
+];
+const replayDone = { complete: true, sessionsDone: 2, sessionsTotal: 2, asOfSession: '2024-01-03' };
+
+/** The SR-01 system replay screen: one finished run, or none. */
+const mountReplay = (withRun: boolean) => () => {
+  const head = { hindsight: replayLabels, costsLabel: replayLabels[1]?.text ?? '' };
+  server.use(
+    http.get('/api/baskets', () => HttpResponse.json([])),
+    http.get('/api/risk-profiles', () => HttpResponse.json([])),
+    http.get('/api/charge-sheet/confirmation', () => HttpResponse.json({}, { status: 404 })),
+    http.get('/api/replay/runs', () =>
+      HttpResponse.json(
+        withRun
+          ? [
+              {
+                ...head,
+                id: replayId,
+                pairId: null,
+                createdAt: '2026-11-12T03:00:00Z',
+                from: '2024-01-01',
+                to: '2024-01-03',
+                mode: 'frozen',
+                state: 'completed',
+                completeness: replayDone,
+                finalEquity: 1_001_000,
+                maxDrawdownPct: 0.1,
+                trialNumber: 1,
+              },
+            ]
+          : [],
+      ),
+    ),
+    http.get('/api/replay/runs/:id', () =>
+      HttpResponse.json({
+        ...head,
+        id: replayId,
+        pairId: null,
+        createdAt: '2026-11-12T03:00:00Z',
+        finishedAt: '2026-11-12T03:05:00Z',
+        from: '2024-01-01',
+        to: '2024-01-03',
+        mode: 'frozen',
+        state: 'completed',
+        failReason: null,
+        completeness: replayDone,
+        basis: 'gross',
+        trialNumber: 1,
+        inputHash: 'a',
+        resultHash: 'b',
+        parameters: {},
+        settingsSnapshot: {},
+        figures: null,
+        contribution: [],
+      }),
+    ),
+    http.get('/api/replay/runs/:id/equity', () =>
+      HttpResponse.json({
+        ...head,
+        runId: replayId,
+        completeness: replayDone,
+        capital: 1_000_000,
+        benchmarkSymbol: null,
+        benchmarkReason: 'No benchmark index is stored.',
+        cashComplete: true,
+        points: [],
+      }),
+    ),
+    http.get('/api/replay/runs/:id/sessions', () =>
+      HttpResponse.json({ ...head, runId: replayId, completeness: replayDone, sessions: [] }),
+    ),
+    http.get('/api/replay/runs/:id/trades', () =>
+      HttpResponse.json({ ...head, runId: replayId, completeness: replayDone, trades: [] }),
+    ),
+  );
+};
+
 /** The AU-15 simulation report screen: a running job with a partial report, and the state before any job. */
 export const simulationScreens: Screen[] = [
   {
     id: 'AU-15-simulation',
     route: '/reports/simulation',
     mounts: { full: mountSimulation(true), empty: mountSimulation(false) },
+  },
+  {
+    id: 'SR-01-system-replay',
+    route: '/simulation/replay',
+    mounts: { full: mountReplay(true), empty: mountReplay(false) },
   },
 ];

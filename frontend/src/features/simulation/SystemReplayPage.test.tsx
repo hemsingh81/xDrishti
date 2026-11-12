@@ -92,11 +92,12 @@ const session = (over: Partial<Schemas['ReplaySessionListItem']> = {}): Schemas[
   equity: 1_001_200,
   drawdownPct: 0,
   openPositions: 1,
-  labels: [],
+  labels: [{ code: 'survivorship', text: 'Only stocks listed today.' }],
   ...over,
 });
 
 const pairView = (over: Partial<Schemas['ReplayPairView']> = {}): Schemas['ReplayPairView'] => ({
+  hindsight: [{ code: 'settings_now', text: 'Settings are as of today.' }],
   pairId: PAIR,
   frozen: item(),
   learning: item({ id: LEARN, mode: 'learning' }),
@@ -177,7 +178,7 @@ function setup(options: Options = {}) {
         drawdownPct: 0,
         openRiskPct: 0.5,
         openPositions: 1,
-        labels: [],
+        hindsight: [{ code: 'settings_now', text: 'Settings are as of today.' }],
         notes: [],
         openBookComplete: true,
         openBook: [
@@ -215,7 +216,6 @@ function setup(options: Options = {}) {
             charges: null,
             netPnl: null,
             r: 0.5,
-            barsRoute: '/api/data/instruments/44444444-4444-4444-4444-444444444444/bars?timeframe=1D',
           },
           {
             tradeNo: 2,
@@ -233,7 +233,6 @@ function setup(options: Options = {}) {
             charges: null,
             netPnl: null,
             r: null,
-            barsRoute: null,
           },
         ],
       }),
@@ -286,15 +285,9 @@ describe('system replay screen', () => {
     const user = userEvent.setup();
     open();
     await user.click(await screen.findByRole('button', { name: /Open the plan of/ }));
+    expect(await screen.findAllByText('Settings are as of today.')).toHaveLength(2);
     expect(await screen.findByText('BBB: sector_cap — Two in the sector already')).toBeInTheDocument();
     expect(screen.getByText(/CCC BUY/)).toBeInTheDocument();
-  });
-
-  it('offers the day bars only for a trade that has a route', async () => {
-    setup();
-    open();
-    expect(await screen.findByRole('button', { name: /Day bars of AAA/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Day bars of ZZZ/ })).not.toBeInTheDocument();
   });
 
   it('shows the pair answer, even when it is too little history', async () => {
