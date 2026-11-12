@@ -126,4 +126,21 @@ public sealed class OwnerDesignateModelHandlerTests
         result.Error.Code.ShouldBe(MlSafetyErrors.PromotionRefusedCode);
         f.Registry.Models[8].Role.ShouldBe(ModelRole.Challenger);
     }
+
+    [Fact]
+    public async Task A_champion_in_the_history_older_than_the_newest_two_hundred_models_still_sends_the_designation_through_promotion()
+    {
+        var f = new MlRollbackFixture();
+        f.Add(1, ModelRole.Retired);
+        f.Registry.Designations.Add((1, ModelRole.Champion, "cli:xd", "long ago", []));
+        for (var id = 100; id < 350; id++)
+        {
+            f.Add(id, ModelRole.Challenger, 'b');
+        }
+
+        var result = await Handler(f).HandleAsync(new OwnerDesignateModelCommand(349, ModelRole.Champion, "next", "cli:xd"), Ct);
+
+        result.Error.Code.ShouldBe(MlSafetyErrors.PromotionRefusedCode);
+        f.Registry.Models[349].Role.ShouldBe(ModelRole.Challenger);
+    }
 }

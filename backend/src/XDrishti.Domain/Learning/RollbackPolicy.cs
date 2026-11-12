@@ -78,10 +78,10 @@ public static class RollbackPolicy
             return new RollbackTrigger(Calibration, RollbackTriggerState.Unavailable, null, null, "No scored outcomes of the champion are available.", []);
         }
 
-        if (outcomes.Count < options.CalibrationWindow)
+        if (outcomes.Count < Math.Max(options.CalibrationWindow, options.CalibrationCheckEvery))
         {
             // below the window the detector makes no check at all; "no event" would then read as quiet, which is a pass: it is unavailable instead (CF-10e review)
-            return new RollbackTrigger(Calibration, RollbackTriggerState.Unavailable, null, null, string.Create(CultureInfo.InvariantCulture, $"Only {outcomes.Count} scored outcomes; the calibration check needs {options.CalibrationWindow}."), []);
+            return new RollbackTrigger(Calibration, RollbackTriggerState.Unavailable, null, null, string.Create(CultureInfo.InvariantCulture, $"Only {outcomes.Count} scored outcomes; the first calibration check needs {Math.Max(options.CalibrationWindow, options.CalibrationCheckEvery)}."), []);
         }
 
         var run = CalibrationDriftDetector.Run("champion", outcomes, options);

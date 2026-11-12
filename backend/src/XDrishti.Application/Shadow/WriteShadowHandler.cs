@@ -192,12 +192,15 @@ internal sealed class WriteShadowHandler(
         }
         else
         {
+            // scoring runs against the deadline itself, not only against its start: a slow night is cut off at the deadline and the session is written without scores
+            using var deadline = new CancellationTokenSource(ShadowCutoff.For(date).AddMinutes(-options.ScoringDeadlineMinutesBeforeCutoff) - time.GetUtcNow(), time);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
             try
             {
-                scores = await scorer.ScoreAsync(date, calendar, entries, cancellationToken);
+                scores = await scorer.ScoreAsync(date, calendar, entries, linked.Token);
             }
-#pragma warning disable CA1031 // The scores are extra evidence; the session itself must still be written before the open. Cancellation is rethrown by the filter. Only a count-free event is logged (the shadow log carries counts only).
-            catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
+#pragma warning disable CA1031 // The scores are extra evidence; the session itself must still be written before the open. A real shutdown (the caller's token) is rethrown by the filter; the deadline and any other failure leave the session without scores. Only a count-free event is logged (the shadow log carries counts only).
+            catch (Exception failure) when (failure is not OutOfMemoryException && !cancellationToken.IsCancellationRequested)
 #pragma warning restore CA1031
             {
                 ShadowLog.ScoringFailed(logger);

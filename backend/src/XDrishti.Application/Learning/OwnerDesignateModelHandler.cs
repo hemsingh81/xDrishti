@@ -18,8 +18,6 @@ internal sealed class OwnerDesignateModelHandler(
     ICommandHandler<DesignateModelCommand, DesignationOutcome> designate,
     ILogger<OwnerDesignateModelHandler> logger) : ICommandHandler<OwnerDesignateModelCommand, DesignationOutcome>
 {
-    private const int AnyChampionScanLimit = 200;
-
     public async ValueTask<Result<DesignationOutcome>> HandleAsync(OwnerDesignateModelCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -32,7 +30,7 @@ internal sealed class OwnerDesignateModelHandler(
         if (command.Role == ModelRole.Champion)
         {
             // the first champion ever is named on the champion rule alone; once any model has been champion (a current one, or one retired or demoted since) a champion is named only through promotion (CF-10e D6, ADR 0281)
-            if (await registry.FindAsync(command.ModelId, cancellationToken) is { Role: not ModelRole.Champion } && await AnyChampionEverAsync(cancellationToken))
+            if (await registry.FindAsync(command.ModelId, cancellationToken) is { Role: not ModelRole.Champion } && await registry.AnyChampionEverAsync(cancellationToken))
             {
                 var promoted = await promote.HandleAsync(new PromoteChallengerCommand(command.ModelId, MlActors.OwnerPrefix + command.Actor, command.Reason), cancellationToken);
                 return promoted.IsFailure
@@ -42,18 +40,5 @@ internal sealed class OwnerDesignateModelHandler(
         }
 
         return await designate.HandleAsync(new DesignateModelCommand(command.ModelId, command.Role, command.Reason, command.Actor), cancellationToken);
-    }
-
-    private async ValueTask<bool> AnyChampionEverAsync(CancellationToken cancellationToken)
-    {
-        foreach (var model in await registry.ListAsync(null, AnyChampionScanLimit, cancellationToken))
-        {
-            if (model.Role == ModelRole.Champion || (await registry.DesignationsAsync(model.Id, cancellationToken)).Any(d => d.Role == ModelRole.Champion))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

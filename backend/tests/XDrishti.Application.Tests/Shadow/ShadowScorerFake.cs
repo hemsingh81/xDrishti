@@ -17,9 +17,29 @@ internal static class ShadowScorerFake
     /// <summary>A scorer whose model registry throws, as a failing store would.</summary>
     public static ShadowScorer Throwing() => Build(Substitute.For<IModelRegistry>(), throws: true);
 
-    private static ShadowScorer Build(IModelRegistry registry, bool throws)
+    /// <summary>A scorer that signals <paramref name="started"/> and then waits until the token it is given is cancelled.</summary>
+    public static ShadowScorer Blocking(TaskCompletionSource started)
     {
-        if (throws)
+        var registry = Substitute.For<IModelRegistry>();
+#pragma warning disable CA2012 // NSubstitute configures the substitute with the ValueTask-returning call; it is never awaited as a result
+        registry.ListAsync(Arg.Any<XDrishti.Domain.Learning.ModelRole?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(call => WaitAsync(started, call.ArgAt<CancellationToken>(2)));
+#pragma warning restore CA2012
+        return Build(registry, throws: null);
+    }
+
+    private static async ValueTask<IReadOnlyList<StoredModel>> WaitAsync(TaskCompletionSource started, CancellationToken token)
+    {
+        started.TrySetResult();
+        await Task.Delay(Timeout.Infinite, token);
+        return [];
+    }
+
+    private static ShadowScorer Build(IModelRegistry registry, bool? throws)
+    {
+        if (throws is null)
+        {
+        }
+        else if (throws is true)
         {
             registry.ListAsync(Arg.Any<XDrishti.Domain.Learning.ModelRole?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns<IReadOnlyList<StoredModel>>(_ => throw new InvalidOperationException("registry down"));
         }

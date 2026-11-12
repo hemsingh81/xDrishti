@@ -202,4 +202,12 @@ public sealed class RollbackPolicyTests
 
         RollbackPolicy.Evaluate(new RollbackInputs(calibrated, null), new DriftOptions()).Triggers[0].State.ShouldBe(RollbackTriggerState.Quiet);
     }
+
+    [Fact]
+    public void With_a_check_interval_longer_than_the_window_the_first_check_waits_for_it_so_120_outcomes_are_unavailable()
+    {
+        var decision = RollbackPolicy.Evaluate(new RollbackInputs(Gap12(120), null), new DriftOptions(CalibrationCheckEvery: 150));
+
+        decision.Triggers[0].State.ShouldBe(RollbackTriggerState.Unavailable);
+    }
 }

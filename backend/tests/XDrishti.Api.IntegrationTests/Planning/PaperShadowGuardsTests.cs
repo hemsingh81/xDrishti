@@ -172,6 +172,21 @@ public sealed class PaperShadowGuardsTests(ResearchGrantsTests.DedicatedServer s
     }
 
     [Fact]
+    public async Task The_registry_answers_with_one_existence_query_whether_any_model_was_ever_champion()
+    {
+        var model = await ModelAsync();
+        await using var source = NpgsqlDataSource.Create(server.App);
+        var registry = new ModelRegistry(source);
+
+        (await registry.AnyChampionEverAsync(Ct)).ShouldBeFalse();
+
+        await StoreKit.ExecuteAsync(server.Owner, $"INSERT INTO research.model_designations (model_id, role, reason, created_at, created_by) VALUES ({model}, 'champion', 'r', now(), 'test')", Ct);
+        await StoreKit.ExecuteAsync(server.Owner, $"INSERT INTO research.model_designations (model_id, role, reason, created_at, created_by) VALUES ({model}, 'retired', 'r', now(), 'test')", Ct);
+
+        (await registry.AnyChampionEverAsync(Ct)).ShouldBeTrue("a retired champion still counts");
+    }
+
+    [Fact]
     public async Task A_refused_score_row_rolls_back_to_the_savepoint_and_the_session_and_its_entries_are_still_committed()
     {
         var model = await ModelAsync();

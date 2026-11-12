@@ -156,4 +156,21 @@ public sealed class ShadowScorerTests
 
         scores.Select(s => s.ModelId).Order().ShouldBe([1L, 2L, 3L, 4L, 5L]);
     }
+
+    [Fact]
+    public async Task An_instrument_with_a_seam_inside_the_window_gets_no_score_and_one_with_an_older_seam_is_scored()
+    {
+        Models(Wide(17, ModelRole.Champion, 'a'));
+        Bars(400, 900);
+        var scorer = Scorer(new CloseExtractor());
+        _seams.SeamOfAsync(Instrument, Ct).Returns((DateTimeOffset?)DateTimeOffset.FromUnixTimeSeconds(Decision - (100L * 86_400)));
+
+        var inside = await scorer.ScoreAsync(Session, new TradingCalendar(), [Entry("NSE:P1", "k1")], Ct);
+
+        inside.ShouldBeEmpty();
+
+        _seams.SeamOfAsync(Instrument, Ct).Returns((DateTimeOffset?)DateTimeOffset.FromUnixTimeSeconds(Decision - (900L * 86_400)));
+
+        (await scorer.ScoreAsync(Session, new TradingCalendar(), [Entry("NSE:P1", "k1")], Ct)).Count.ShouldBe(1);
+    }
 }

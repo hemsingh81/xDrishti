@@ -96,6 +96,13 @@ internal sealed class ShadowScorer(
                 continue;
             }
 
+            // An instrument whose seam lies inside the 730-day window would be read from the seam on, which is shorter than the history a run (or the training) may admit for it: its candidates get no score, so serving never differs from training.
+            if (await seams.SeamOfAsync(group.Key, cancellationToken) is { } seam && seam > until.AddDays(-LookbackDays))
+            {
+                missing += decisions.Count;
+                continue;
+            }
+
             // shortcut: the plain read with the high-water cut and the plain factors (ADR 0273 decision 6 lets only the run reader admit fresh pre-seam bars, and an architecture test pins it). It matches training for every instrument whose run did not admit pre-seam bars;
             // for an admitted one the 730-day window lies after the seam in practice, so the bars are the same.
             var raw = await SeamAwareBars.ReadAsync(bars, seams, group.Key, until.AddDays(-LookbackDays), until, cancellationToken);

@@ -404,4 +404,49 @@ public sealed class WriteShadowHandlerTests
         outcome.Sessions.ShouldBe(1);
         (_store.Sessions.Single().Scores ?? []).ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task A_scoring_that_runs_past_the_deadline_is_cut_off_and_the_session_is_still_written_without_scores()
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _scorer = ShadowScorerFake.Blocking(started);
+        TheNightlyPlan();
+
+        var run = RunAsync(Tuesday);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct);
+        _time.Advance(TimeSpan.FromHours(12)); // past 08:30 India time of the session
+        var outcome = await run;
+
+        outcome.Sessions.ShouldBe(1);
+        (_store.Sessions.Single().Scores ?? []).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_real_shutdown_during_scoring_is_not_swallowed()
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _scorer = ShadowScorerFake.Blocking(started);
+        TheNightlyPlan();
+        using var shutdown = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        // the run is given its own token, so the fakes must accept any
+        _settings.IsEnabledAsync(Arg.Any<CancellationToken>()).Returns(true);
+        _calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new TradingCalendar());
+        _paper.CurrentEpochAsync(Arg.Any<CancellationToken>()).Returns(new EpochRow(3, new DateOnly(2026, 10, 1), DateTimeOffset.UnixEpoch, "first", "default", "system"));
+        _governance.LatestSnapshotAsync(true, Arg.Any<CancellationToken>()).Returns(new StoredSnapshot(1, DateTimeOffset.UnixEpoch, Monday, new string('f', 64), "{}", false));
+        _plans.ListAsync(null, null, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([Plan(10, Tuesday)]);
+        _plans.ListAsync(Tuesday, null, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([Plan(10, Tuesday)]);
+        _plans.ItemsAsync(10, Arg.Any<CancellationToken>()).Returns([.. new[] { Item(1, TicketGroup.Primary, "NSE:P1") }.Select((item, i) => Row(100 + i, 10, item))]);
+
+        var run = Handler().HandleAsync(new WriteShadowCommand(Tuesday), shutdown.Token).AsTask();
+        var first = await Task.WhenAny(started.Task, run);
+        if (first == run)
+        {
+            var ended = await run;
+            ended.IsSuccess.ShouldBeFalse("the run ended before scoring started: " + ended.Value);
+        }
+        await shutdown.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(run);
+        _store.Sessions.ShouldBeEmpty();
+    }
 }
