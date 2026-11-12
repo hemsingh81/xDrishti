@@ -1497,6 +1497,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/data/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The history card: the switch Data:History:Backfill:Enabled (read-only: no route turns it on) with the reason it is off, the run window and whether it is open now, whether the history-backfill service runs, the span of the daily files, totals (instruments by backfill status, chunks, buckets by years of stored bars) and per instrument (symbol order) the first stored bar, the first CSV bar (the seam), the backfill status, chunks, the seam probe and the seam jump. Reads only: no request to Dhan. No password */
+    get: operations['GetDataHistory'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/data/history/backfill': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Owner act: start the 1-minute backfill of the whole tracked set as a run of the service history-backfill. Needs a session, the CSRF token and the password in the body, checked on EVERY call. Order: session (401), switch (422 history.disabled), password (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked, 429), run active (409 history.run_active), run window (422 history.outside_window), dry run (422 history.calendar_missing, history.disk_low), Dhan (409 data.dhan_not_available, data.dhan_not_connected). 202 with the run when work is pending, 200 started=false when nothing is. Audited with counts only */
+    post: operations['StartHistoryBackfill'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/data/history/probe': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Owner act: probe the seam of the first tracked instruments (every instrument with an applied action first, then others up to Data:History:Probe:Instruments) in this request: one Dhan request each, compared with the CSV bars in memory; nothing is stored but the seam rows. Same checks and order as the backfill less the dry run (422 history.disabled, 409 history.run_active also while the service runs or another probe does, 422 history.outside_window, 409 data.dhan_not_available, data.dhan_not_connected). Needs a session, the CSRF token and the password in the body. Audited with counts only */
+    post: operations['ProbeHistorySeam'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/data/quality/overview': {
     parameters: {
       query?: never;
@@ -14084,6 +14135,26 @@ export interface components {
       /** Format: double */
       max: null | number;
     };
+    /** @description The body of a history owner act (CF-04e). The owner is never part of it: the actor comes from the signed-in session. */
+    HistoryActRequest: {
+      /** @description The owner's password, re-entered for THIS act. It is checked on every request after the switch (an earlier step-up window does not count and is not used up); wrong ones count toward the sign-in lockout. */
+      password: null | string;
+    };
+    /** @description The answer: bool HistoryBackfillStarted.Started false when nothing is pending (no run); else the service run that carries the work. */
+    HistoryBackfillStarted: {
+      started: boolean;
+      /** Format: uuid */
+      runId: null | string;
+      /** Format: int32 */
+      chunksPending: number;
+      /** Format: int64 */
+      estimatedRows: number;
+      /** Format: int64 */
+      estimatedRequests: number;
+      /** Format: double */
+      estimatedMinutes: number;
+      text: string;
+    };
     /**
      * @description The benchmark of a history. `State` is `ok` (the benchmark lines are filled) or `unavailable` with the `Reason` in words. `Symbol` is the canonical symbol and `Name` the display name of the index (null when the master list has
      *     no such index). `Tracked`: tracking is on; `HasBars`: 1-minute bars are stored (the day bars follow when the aggregates are built). A screen offers "Track the benchmark" when it is unavailable and not tracked.
@@ -14101,6 +14172,28 @@ export interface components {
       /** Format: date */
       asOf: null | string;
     };
+    HistoryByStatusView: {
+      /** Format: int32 */
+      none: number;
+      /** Format: int32 */
+      planned: number;
+      /** Format: int32 */
+      partial: number;
+      /** Format: int32 */
+      done: number;
+      /** Format: int32 */
+      seam_unresolved: number;
+      /** Format: int32 */
+      seam_jump: number;
+    };
+    HistoryChunksView: {
+      /** Format: int32 */
+      done: number;
+      /** Format: int32 */
+      failed: number;
+      /** Format: int32 */
+      total: number;
+    };
     /**
      * @description How much of the open holdings the history covers: `Holdings` open holdings, `Covered` of them have stored day bars, `Unpriced` have none (not tracked, not in the instrument master, or bars not fetched yet:
      *     they are left out and never valued at zero). `LateStart` counts covered holdings whose bars begin after their earliest lot, so part of their history is missing.
@@ -14114,6 +14207,36 @@ export interface components {
       unpriced: number;
       /** Format: int32 */
       lateStart: number;
+    };
+    HistoryDailyView: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+    };
+    HistoryInstrumentView: {
+      /** Format: uuid */
+      instrumentId: string;
+      symbol: string;
+      /** Format: date-time */
+      historyFrom: null | string;
+      /** Format: date-time */
+      firstCsvBar: null | string;
+      backfillStatus: string;
+      chunks: components['schemas']['HistoryChunksView'];
+      probe: components['schemas']['HistoryProbeView'];
+      /** Format: double */
+      seamJumpPct: null | number;
+    };
+    HistoryOverview: {
+      switch: components['schemas']['HistorySwitchView'];
+      runWindow: string;
+      inWindow: boolean;
+      running: boolean;
+      serviceId: string;
+      daily: null | components['schemas']['HistoryDailyView'];
+      totals: components['schemas']['HistoryTotalsView'];
+      instruments: components['schemas']['HistoryInstrumentView'][];
     };
     /**
      * @description One day of the portfolio history (rupees; `Nav` and `BenchmarkNav` start at 100). `Value` is what the lots held that day were worth at the day's close (adjusted prices), `Invested` what
@@ -14132,6 +14255,38 @@ export interface components {
       nav: number;
       /** Format: double */
       benchmarkNav: null | number;
+    };
+    HistoryProbeView: {
+      status: string;
+      /** Format: date-time */
+      at: null | string;
+      /** Format: double */
+      medianBps: null | number;
+      /** Format: double */
+      withinMaxPct: null | number;
+    };
+    /** @description The switch, read-only: the owner cannot turn it on from the web (CF-04e decision D1). */
+    HistorySwitchView: {
+      enabled: boolean;
+      editable: boolean;
+      reason: null | string;
+    };
+    HistoryTotalsView: {
+      /** Format: int32 */
+      instruments: number;
+      byStatus: components['schemas']['HistoryByStatusView'];
+      chunks: components['schemas']['HistoryChunksView'];
+      years: components['schemas']['HistoryYearsView'];
+    };
+    HistoryYearsView: {
+      /** Format: int32 */
+      under2: number;
+      /** Format: int32 */
+      from2to3: number;
+      /** Format: int32 */
+      from3to5: number;
+      /** Format: int32 */
+      from5: number;
     };
     /** @description The locked block as served. */
     HoldOutBlockView: {
@@ -14427,7 +14582,7 @@ export interface components {
       errors?: {
         [key: string]: string[];
       };
-      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, portfolio.lot_from_trade (409), portfolio.preview_stale (409, with report), services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409). */
+      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, portfolio.lot_from_trade (409), portfolio.preview_stale (409, with report), services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409), history.disabled, history.disk_low, history.calendar_missing, history.outside_window (422), history.run_active (409), history.no_target (404). */
       code?: string;
       /**
        * Format: int32
@@ -19812,6 +19967,23 @@ export interface components {
         source: string;
       }[];
     };
+    /** @description One line per probed instrument; IReadOnlyList&lt;string&gt; ProbeSeamSummary.Lines is the text for the owner. */
+    ProbeSeamSummary: {
+      /** Format: int32 */
+      probed: number;
+      /** Format: int32 */
+      passed: number;
+      /** Format: int32 */
+      unresolved: number;
+      /** Format: int32 */
+      noOverlap: number;
+      /** Format: int32 */
+      failed: number;
+      /** Format: int32 */
+      requests: number;
+      lines: string[];
+      text?: null | string;
+    };
     ProblemDetails: {
       type?: null | string;
       title?: null | string;
@@ -19819,7 +19991,7 @@ export interface components {
       status?: null | number;
       detail?: null | string;
       instance?: null | string;
-      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, portfolio.lot_from_trade (409), portfolio.preview_stale (409, with report), services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409). */
+      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, portfolio.lot_from_trade (409), portfolio.preview_stale (409, with report), services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409), history.disabled, history.disk_low, history.calendar_missing, history.outside_window (422), history.run_active (409), history.no_target (404). */
       code?: string;
       /**
        * Format: int32
@@ -21483,7 +21655,7 @@ export interface components {
       figures: null | components['schemas']['ReplayFigures'];
       contribution: components['schemas']['ReplayStrategyContribution'][];
     };
-    /** @description The baskets and instruments a replay covers; both empty means the owner's stored auto scope, its baskets read as of the start date. */
+    /** @description The baskets and instruments a replay covers; both empty means the owner's stored auto scope, its baskets' members read as of each session. */
     ReplayScopeBody: {
       basketIds: null | string[];
       instrumentIds: null | string[];
@@ -29339,6 +29511,191 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetDataHistory: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HistoryOverview'];
+        };
+      };
+    };
+  };
+  StartHistoryBackfill: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['HistoryActRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HistoryBackfillStarted'];
+        };
+      };
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HistoryBackfillStarted'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ProbeHistorySeam: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['HistoryActRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProbeSeamSummary'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
         headers: {
           [name: string]: unknown;
         };

@@ -98,6 +98,8 @@ public enum AccountEventType
     LabHoldOutUnlocked,
     ShadowRecordSwitched,
     BarHolesRepaired,
+    HistoryBackfillStarted,
+    HistorySeamProbed,
     LearnedSettingDecided,
     EssentialSettingReset,
     EssentialSettingChanged,

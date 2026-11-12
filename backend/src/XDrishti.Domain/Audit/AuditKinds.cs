@@ -49,7 +49,7 @@ public static class AuditKinds
         [
             AccountEventType.BasketCreated, AccountEventType.BasketRenamed, AccountEventType.BasketUpdated, AccountEventType.BasketArchived, AccountEventType.BasketsReordered, AccountEventType.BasketMembersAdded, AccountEventType.BasketMembersRemoved, AccountEventType.BasketMembersReordered,
             AccountEventType.BasketMembersTransferred, AccountEventType.BasketMembershipChanged, AccountEventType.BasketSourceSwitched, AccountEventType.DerivedBasketChanged,AccountEventType.InstrumentsTracked, AccountEventType.InstrumentsUntracked, AccountEventType.CalendarDayAdded, AccountEventType.CalendarDayConfirmed, AccountEventType.CalendarDayRemoved, AccountEventType.CalendarRefreshedFromNse,
-            AccountEventType.CorporateActionAdded, AccountEventType.CorporateActionConfirmed, AccountEventType.CorporateActionEdited, AccountEventType.CorporateActionIgnored, AccountEventType.CorporateActionsImported, AccountEventType.CsvLoadUndone, AccountEventType.BarHolesRepaired,
+            AccountEventType.CorporateActionAdded, AccountEventType.CorporateActionConfirmed, AccountEventType.CorporateActionEdited, AccountEventType.CorporateActionIgnored, AccountEventType.CorporateActionsImported, AccountEventType.CsvLoadUndone, AccountEventType.BarHolesRepaired, AccountEventType.HistoryBackfillStarted, AccountEventType.HistorySeamProbed,
         ]),
         (PortfolioData,
         [

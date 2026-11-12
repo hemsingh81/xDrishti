@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using XDrishti.Application.Market.History;
 using XDrishti.Domain.Common;
 
 namespace XDrishti.Api.Auth;
@@ -26,6 +27,7 @@ internal static class ProblemResults
             ErrorKind.Unauthorized => StatusCodes.Status401Unauthorized,
             ErrorKind.Forbidden => StatusCodes.Status403Forbidden,
             ErrorKind.Locked => StatusCodes.Status423Locked,
+            ErrorKind.Conflict when error.Code is BackfillErrors.DisabledCode or BackfillErrors.DiskLowCode or BackfillErrors.CalendarMissingCode or HistoryActErrors.OutsideWindowCode => StatusCodes.Status422UnprocessableEntity, // CF-04e: a refusal with its reason (the handlers and the CLI keep their Conflict)
             ErrorKind.Validation when error.Code == "accounts.live_not_ready" => StatusCodes.Status422UnprocessableEntity, // the live-ready gate names every failing item (spec P11-04)
             ErrorKind.Validation when error.Code is "simulation.members_not_dated" or "learning.not_an_observation" or "learning.knob_not_runnable" => StatusCodes.Status422UnprocessableEntity, // BK-11b: a refusal with its reason, not a malformed request
             ErrorKind.Validation => StatusCodes.Status400BadRequest,
