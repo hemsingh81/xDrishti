@@ -154,7 +154,8 @@ public sealed class GetEvidencePreflightHandlerTests
     }
 
     [Theory]
-    [InlineData(2026, 11, 5, true)]    [InlineData(2026, 11, 4, false)]
+    [InlineData(2026, 11, 5, true)]
+    [InlineData(2026, 11, 4, false)]
     public async Task The_cell_snapshot_is_met_up_to_five_sessions_old(int year, int month, int day, bool met)
     {
         _cells.NewestAsOfAsync(Arg.Any<CancellationToken>()).ReturnsForAnyArgs(new DateOnly(year, month, day));
