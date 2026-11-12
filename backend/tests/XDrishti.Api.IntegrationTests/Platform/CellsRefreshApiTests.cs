@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using XDrishti.Api.IntegrationTests.Data;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Domain.Auth;
 
 namespace XDrishti.Api.IntegrationTests.Platform;
 
@@ -37,11 +38,14 @@ public sealed class CellsRefreshApiTests(ApiFactory factory) : DataTestBase(fact
     public async Task A_missing_password_is_403_counting_nothing_and_a_wrong_one_is_401_and_the_service_stays_paused()
     {
         var none = await ResumeAsync("cells-refresh", null);
+        var countedAfterNone = await Factory.WithDbAsync(db => db.AuditEvents.AsNoTracking().CountAsync(e => e.Event == AuditEventType.StepUpFailed, Ct));
         var wrong = await ResumeAsync("cells-refresh", new { password = "not-the-password" });
 
         none.Status.ShouldBe(HttpStatusCode.Forbidden);
         none.Body.GetProperty("code").GetString().ShouldBe("auth.step_up_required");
+        countedAfterNone.ShouldBe(0); // nothing counted toward the lockout
         wrong.Status.ShouldBe(HttpStatusCode.Unauthorized);
+        (await Factory.WithDbAsync(db => db.AuditEvents.AsNoTracking().CountAsync(e => e.Event == AuditEventType.StepUpFailed, Ct))).ShouldBe(1);
         (await ServiceAsync("cells-refresh")).GetProperty("enabled").GetBoolean().ShouldBeFalse();
     }
 

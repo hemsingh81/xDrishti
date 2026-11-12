@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createServicesFake } from '@/test/servicesFake';
 import { buildMasterService, buildServiceView } from '@/test/servicesFixtures';
-import { chooseAction, renderServices } from './testing';
+import { chooseAction, renderServices, serviceCard } from './testing';
 
 vi.mock('./lib/polling', () => ({ servicesRunningPollMs: 25, servicesIdlePollMs: 60_000 }));
 
@@ -31,6 +31,15 @@ describe('Services: resuming a service that needs the owner’s password', () =>
     expect(await screen.findByText(`${eod} resumed.`)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(fake.calls.resumePasswords).toEqual([]);
+  });
+
+  it('says on the paused row that it needs the password, and not on an ordinary row', async () => {
+    renderServices({ fake: createServicesFake({ services: services() }) });
+
+    const row = await serviceCard(refresh);
+
+    expect(within(row).getByText('Needs your password to resume.')).toBeInTheDocument();
+    expect(within(await serviceCard(eod)).queryByText(/needs your password/i)).not.toBeInTheDocument();
   });
 
   it('asks for the password in a dialog with no reason and sends it in the body', async () => {
