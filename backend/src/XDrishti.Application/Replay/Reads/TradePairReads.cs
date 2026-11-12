@@ -5,7 +5,7 @@ using XDrishti.Domain.Replay.Comparison;
 
 namespace XDrishti.Application.Replay.Reads;
 
-/// <summary>The trades of a run in booking order, each with a link to the instrument's day bars where the symbol names one instrument.</summary>
+/// <summary>The trades of a run in booking order (no bar link: P8-11 addresses only simulation-run trades; ADR 0272 Part C).</summary>
 public sealed record ListReplayTradesQuery(Guid RunId) : IQuery<Result<ReplayTradeListView>>;
 
 internal sealed class ListReplayTradesHandler(IReplayReads reads) : IQueryHandler<ListReplayTradesQuery, Result<ReplayTradeListView>>

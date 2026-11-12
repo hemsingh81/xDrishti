@@ -1,6 +1,6 @@
 # SR-01 — Whole-system replay from a chosen date
 
-- **Status:** Approved (owner, 2026-11-11, in chat: "Approve all", every open question as recommended). Written 2026-11-11 after the owner asked for it in chat.
+- **Status:** Built 2026-11-12 (parts A to E, ADR 0272; not deployed). Approved (owner, 2026-11-11, in chat: "Approve all", every open question as recommended).
 - **Phase / roadmap row:** SR — System replay, row SR-01 (new; see docs/design/18-roadmap.md)
 - **Size:** about 13.5 agent-days in five parts (an estimate, not calibrated) · **Needs:** built P7 pipeline, P3-04a ports, CF-08 `TicketReplayer` path, P10-02 `PaperLedger`, AU-11 fence, CF-06 hold-out and trial ledger; better with CF-04 B/C (five years of history)
 - **Decisions:** ADR 0272 (to be written at build: the replay is research, fenced from evidence, hindsight-labelled)

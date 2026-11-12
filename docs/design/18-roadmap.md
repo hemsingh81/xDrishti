@@ -32,6 +32,8 @@ gantt
     P15 Fundamentals and events          :p15, after p14, 4w
     section Automation
     AU Automation and simplicity         :done, au, 2026-11-09, 2d
+    section Replay
+    SR System replay from a date         :done, sr, 2026-11-11, 2d
 ```
 
 | Phase | Deliverables | Exit criterion |
@@ -80,13 +82,18 @@ The owner asked for this on 2026-11-09 in chat: plan [AU-00](../specs/AU-00-auto
 | AU-18 | [Auto and next-day suggestions screen](../specs/AU-18-auto-suggestions-screen.md) | 2 d | AU-16, AU-17 | Built 2026-11-10
 | AU-19 | [AU programme check](../specs/AU-19-programme-check.md) | 1 d | AU-01 to AU-18 | Built 2026-11-10 (ADR 0253); `xd auto check` reads stored facts only, an unreadable or empty fact is NOT EVALUABLE
 
-## SR programme: system replay (approved 2026-11-11)
+## SR programme: system replay (built 2026-11-11/12)
 
 The owner asked on 2026-11-11 in chat for a replay of the whole system from a chosen date: the plan it would have made each session, what it took and blocked, the fills and a portfolio equity curve, frozen or learning. Research only, fenced from evidence, hindsight-labelled, no orders.
 
 | Id | What | Size | Needs | Status |
 |----|------|------|-------|--------|
-| SR-01 | [Whole-system replay from a chosen date](../specs/SR-01-whole-system-replay-from-a-chosen-date.md) | 13.5 d | built P7 pipeline, CF-08 replayer, P10-02 ledger, AU-11, CF-06; better after CF-04 B/C | Approved 2026-11-11 (all eight questions as recommended); parts A to E to build
+| SR-01 | [Whole-system replay from a chosen date](../specs/SR-01-whole-system-replay-from-a-chosen-date.md) | 13.5 d | built P7 pipeline, CF-08 replayer, P10-02 ledger, AU-11, CF-06; better after CF-04 B/C | Built 2026-11-12 (ADR 0272), all eight questions as recommended; not deployed (the owner deploys)
+| SR-01a | As-of facts and the in-memory session step | 4.5 d | SR-01 | Built 2026-11-12, merged dd472414
+| SR-01b | Replay tables, resumable job, trial ledger, bounded bar window, memory cap (`Replay:MaxWindowMb` 300 = 53 instruments under xd-api's 1 GiB) | 3 d | SR-01a | Built 2026-11-12, merged c459674d
+| SR-01c | The `/api/replay` API | 2 d | SR-01b | Built 2026-11-12, merged 9098bb43
+| SR-01d | Frozen-versus-learning paired comparison | 1.5 d | SR-01a | Built 2026-11-12, merged 5ef8766b
+| SR-01e | System replay screen (`/simulation/replay`) | 2.5 d | SR-01c | Built 2026-11-12
 
 ## P3 slices
 

@@ -75,6 +75,7 @@ export const navigation: NavSection[] = [
       { path: '/readiness', label: 'Readiness', icon: FactCheckIcon },
       { path: '/reports', label: 'Reports', icon: BarChartIcon },
       { path: '/reports/simulation', label: 'Simulation reports', icon: BiotechIcon },
+      { path: '/simulation/replay', label: 'System replay', icon: BiotechIcon },
       { path: '/lab', label: 'Strategy Lab', icon: ScienceIcon },
       { path: '/assistant', label: 'Assistant', icon: ChatIcon },
     ],
