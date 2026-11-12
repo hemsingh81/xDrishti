@@ -1,10 +1,10 @@
 using System.Globalization;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Messaging;
-using XDrishti.Domain.Market.Bars;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Market.Bars;
 
 namespace XDrishti.Application.Market.History;
 
