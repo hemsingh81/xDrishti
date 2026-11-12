@@ -24,11 +24,29 @@ export function installProbes(): void {
   };
   w.__live = [];
   w.__cls = 0;
+  w.__shifts = [];
   try {
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
-        const shift = entry as unknown as { hadRecentInput: boolean; value: number };
-        if (!shift.hadRecentInput) w.__cls += shift.value;
+        const shift = entry as unknown as {
+          hadRecentInput: boolean;
+          value: number;
+          sources: { node: Node | null; previousRect: DOMRect; currentRect: DOMRect }[];
+        };
+        if (shift.hadRecentInput) continue;
+        w.__cls += shift.value;
+        // Where the shift came from (the largest sources), so a finding names the elements, not just the figure.
+        if (shift.value >= 0.02)
+          w.__shifts.push(
+            `${shift.value.toFixed(2)} ` +
+              shift.sources
+                .slice(0, 3)
+                .map((source) => {
+                  const node = source.node instanceof Element ? source.node : (source.node?.parentElement ?? null);
+                  return `${node ? w.__sel(node) : 'removed node'} y ${Math.round(source.previousRect.y)}->${Math.round(source.currentRect.y)} h ${Math.round(source.previousRect.height)}->${Math.round(source.currentRect.height)}`;
+                })
+                .join(' ; '),
+          );
       }
     }).observe({ type: 'layout-shift', buffered: true });
   } catch {

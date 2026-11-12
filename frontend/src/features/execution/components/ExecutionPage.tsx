@@ -1,5 +1,6 @@
 import ChecklistIcon from '@mui/icons-material/ChecklistOutlined';
 import { Box, Tab, Tabs } from '@mui/material';
+import { visuallyHidden } from '@mui/utils';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useUrlState } from '@/shared/analytics';
@@ -50,7 +51,12 @@ export function ExecutionPage() {
         hue="system"
         description="Whether execution can act today, what it did, and what is waiting for you. Nothing is ready until a check says so."
       />
-      {status.isPending && <LoadingState label="Loading execution status" />}
+      {/* Visually hidden: a 124 px spinner here pushed every tab down when the status arrived (layout shift 0.51 at 360). */}
+      {status.isPending && (
+        <Box sx={visuallyHidden}>
+          <LoadingState label="Loading execution status" />
+        </Box>
+      )}
       {status.error && <ErrorState error={status.error} />}
       <ProtectionBanner />
       <CanaryBanner pending={overview.data?.canaryPending} />

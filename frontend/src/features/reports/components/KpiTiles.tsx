@@ -18,7 +18,7 @@ interface Tile {
 export function KpiTiles({ query, min }: ReportPanelProps) {
   const result = useQuery(summaryQuery(query));
   return (
-    <QueryPanel title="Key figures" query={result}>
+    <QueryPanel title="Key figures" query={result} reserve={{ xs: 747, md: 319 }}>
       {({ all: g, evidence }) => {
         const tiles: Tile[] = [
           {

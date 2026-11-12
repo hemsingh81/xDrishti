@@ -16,7 +16,11 @@ interface WhatWorksCardProps {
 export function WhatWorksCard({ query, onOpen }: WhatWorksCardProps) {
   const result = useQuery(whatWorksQuery(query));
   return (
-    <Card component="section" aria-label="What works" sx={{ minWidth: 0 }}>
+    <Card
+      component="section"
+      aria-label="What works"
+      sx={{ minWidth: 0, minHeight: result.isPending ? { xs: 202, md: 162 } : undefined }}
+    >
       <CardContent>
         <Typography variant="h2" component="h2" sx={{ mb: 1 }}>
           What works

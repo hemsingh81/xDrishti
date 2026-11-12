@@ -30,7 +30,7 @@ export function SideReport({ query, min }: ReportPanelProps) {
   });
   return (
     <Box sx={{ display: 'grid', gap: 2 }}>
-      <QueryPanel title="Long against short" query={result}>
+      <QueryPanel title="Long against short" query={result} reserve={{ xs: 274, md: 0 }}>
         {({ groups, evidence }) => (
           <Box sx={{ display: 'grid', gap: 1.5 }}>
             <DataTable

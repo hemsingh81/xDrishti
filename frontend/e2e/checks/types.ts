@@ -25,4 +25,5 @@ export interface XdWindow extends Window {
   __sel: (element: Element) => string;
   __live: string[];
   __cls: number;
+  __shifts: string[];
 }

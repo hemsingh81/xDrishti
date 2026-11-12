@@ -116,7 +116,12 @@ export function ReadinessPage() {
         description="Is the evidence strong enough to move on? Each score is the minimum of six sub-scores; an input that is not available counts as a fail. Derived from stored results on every read."
       />
       <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 2 }}>
-        {query.isPending && <LoadingState label="Loading the scorecards…" />}
+        {/* Holds about one screen where the scorecards land, so the enforce card below does not jump (layout shift). */}
+        {query.isPending && (
+          <Box sx={{ minHeight: { xs: 1000, md: 800 } }}>
+            <LoadingState label="Loading the scorecards…" />
+          </Box>
+        )}
         {query.isError && <ErrorState error={query.error} />}
         {query.data && <Loaded data={query.data} />}
         <EnforceCard />

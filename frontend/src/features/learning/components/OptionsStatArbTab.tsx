@@ -16,7 +16,7 @@ function Family({ family }: { family: string }) {
   const records = query.data ? latestPerKey(query.data.items) : [];
   const holdOutRead = records.some((r) => r.holdOutRead);
   return (
-    <Panel title={family}>
+    <Panel title={family} reserve={query.isPending ? { xs: 113, md: 113 } : undefined}>
       {query.isPending && <LoadingState label={`Loading ${family}`} />}
       {query.isError && <ErrorState error={query.error} />}
       {query.data && records.length === 0 && (
