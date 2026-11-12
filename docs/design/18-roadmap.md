@@ -108,16 +108,16 @@ A due-diligence review on 2026-11-12 compared what is built with the owner's goa
 
 | Id | What | Size | Needs | Status |
 |----|------|------|-------|--------|
-| LC-01 | [Scheduled cell-statistics refresh](../specs/LC-01-scheduled-cell-statistics-refresh.md) | 2.5 d | nothing unbuilt | Built 2026-11-12, not deployed (ADR 0277); decision 9 still open |
+| LC-01 | [Scheduled cell-statistics refresh](../specs/LC-01-scheduled-cell-statistics-refresh.md) | 2.5 d | nothing unbuilt | Built 2026-11-12, merged and deployed 2026-11-13 (ADR 0277); decision 9 still open |
 | HO-01 | [Hold-out epochs](../specs/HO-01-hold-out-epochs.md) | 3.5 d | CF-06 | Draft, owner decision (changes the CF-06 evidence rule) |
-| CS-01 | [Cost sheet derived from Dhan reports](../specs/CS-01-cost-sheet-derive-from-dhan-reports.md) | 2 d | P2-17 | Built 2026-11-12, not deployed (`scripts/cost-sheet.sh derive`) |
-| CF-10e | [ML influence evidence sources](../specs/CF-10e-ml-influence-evidence-sources.md) | 6.5 d | CF-10; part a needs HO-01 | Parts 1–2 built 2026-11-12 (shadow scores, forward figures, calibration alarm, designate through promotion; ADR 0281), part 3 waits for HO-01, not deployed |
-| OPS-01 | [Evidence switches reachable](../specs/OPS-01-evidence-switches-reachable.md) | 1.5 d | CF-08, CF-04d | Built 2026-11-12, not deployed |
-| EV-01 | [Evidence preflight and first-evidence runbook](../specs/EV-01-evidence-preflight.md) | 1.5 d (runbook written) | none | Built 2026-11-12, not deployed |
-| SR-02 | [Replay baseline arm, start-date sweep, chart link](../specs/SR-02-replay-baseline-arm-start-date-sweep-and-chart-link.md) | 4.5 d | SR-01 | Built 2026-11-12 (ADR 0279; backend and screens), not deployed |
+| CS-01 | [Cost sheet derived from Dhan reports](../specs/CS-01-cost-sheet-derive-from-dhan-reports.md) | 2 d | P2-17 | Built 2026-11-12, merged and deployed 2026-11-13 (`scripts/cost-sheet.sh derive`) |
+| CF-10e | [ML influence evidence sources](../specs/CF-10e-ml-influence-evidence-sources.md) | 6.5 d | CF-10; part a needs HO-01 | Parts 1–2 built 2026-11-12, merged and deployed 2026-11-13 (shadow scores, forward figures, calibration alarm, designate through promotion; ADR 0281), part 3 waits for HO-01 |
+| OPS-01 | [Evidence switches reachable](../specs/OPS-01-evidence-switches-reachable.md) | 1.5 d | CF-08, CF-04d | Built 2026-11-12, merged and deployed 2026-11-13 |
+| EV-01 | [Evidence preflight and first-evidence runbook](../specs/EV-01-evidence-preflight.md) | 1.5 d (runbook written) | none | Built 2026-11-12, merged and deployed 2026-11-13 |
+| SR-02 | [Replay baseline arm, start-date sweep, chart link](../specs/SR-02-replay-baseline-arm-start-date-sweep-and-chart-link.md) | 4.5 d | SR-01 | Built 2026-11-12, merged and deployed 2026-11-13 (ADR 0279; backend and screens) |
 | SR-03 | [Pre-registered system replay over a hold-out block](../specs/SR-03-pre-registered-system-replay-over-a-hold-out-block.md) | 3 d | HO-01 and ISS-25 | Draft, owner decision |
-| DATA-01 | [Dated NSE ban and surveillance lists](../specs/DATA-01-dated-nse-ban-and-surveillance-lists.md) | 3 d | BK-01 pattern; the owner's NSE terms | Built 2026-11-12 (ADR 0274), not deployed |
-| AI-01 | [Assistant reads replay and readiness](../specs/AI-01-assistant-reads-replay-and-readiness.md) | 2 d | BK-12b | Built 2026-11-12, not deployed; the owner re-accepts the eval baseline |
+| DATA-01 | [Dated NSE ban and surveillance lists](../specs/DATA-01-dated-nse-ban-and-surveillance-lists.md) | 3 d | BK-01 pattern; the owner's NSE terms | Built 2026-11-12, merged and deployed 2026-11-13 (ADR 0274) |
+| AI-01 | [Assistant reads replay and readiness](../specs/AI-01-assistant-reads-replay-and-readiness.md) | 2 d | BK-12b | Built 2026-11-12, merged and deployed 2026-11-13; the owner re-accepts the eval baseline |
 | GAP-09 | (no story) the owner chooses and pre-registers the frozen "evidence set" of strategy versions before switching shadow on | none | none | Owner decision, see Open owner decisions 8 |
 
 ## P3 slices
