@@ -50,7 +50,7 @@ internal sealed class FakeReplayStore : IReplayStore, IReplayReads
 
     private ReplayRunRow Row(Run r) => new(
         r.Created.Id, r.Pair, r.Created.From, r.Created.To, r.Created.Mode, r.Created.ParamsJson, r.Created.SettingsJson, r.Created.VersionsJson, r.Created.LearningSources, r.Created.InputHash, r.Created.ScopeHash, r.ResultHash, r.State, r.Cursor, r.Sessions.Count, r.Created.SessionsTotal,
-        Runs.Count(o => o.Created.From == r.Created.From && o.Created.To == r.Created.To && (o.Created.CreatedAt, o.Created.Id).CompareTo((r.Created.CreatedAt, r.Created.Id)) <= 0), r.Created.CreatedAt, r.FinishedAt, r.FailReason);
+        Runs.Count(o => o.Created.From == r.Created.From && o.Created.To == r.Created.To && (o.Created.CreatedAt, o.Created.Id).CompareTo((r.Created.CreatedAt, r.Created.Id)) <= 0), r.Created.CreatedAt, r.FinishedAt, r.FailReason, r.Cursor is { } c && r.Sessions.TryGetValue(c, out var last) ? last.Equity : null, r.Cursor is { } c2 && r.Sessions.TryGetValue(c2, out var last2) ? last2.Drawdown : null);
 
     public ValueTask<ReplayInsert> InsertAsync(Guid? pairId, IReadOnlyList<NewReplayRun> runs, CancellationToken cancellationToken)
     {
@@ -212,5 +212,25 @@ internal sealed class FakeReplayStore : IReplayStore, IReplayReads
 
     public ValueTask<IReadOnlyList<ReplayTradeRow>> TradesAsync(Guid runId, CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<ReplayTradeRow>>([.. Of(runId).Trades.OrderBy(t => t.TradeNo)]);
 
-    public ValueTask<ReplaySummary?> SummaryAsync(Guid runId, CancellationToken cancellationToken) => throw new NotSupportedException("covered by the database test of the store");
+    public ValueTask<IReadOnlyList<ReplayEquityRow>> EquityAsync(Guid runId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<ReplayEquityRow>>([.. Of(runId).Sessions.Values.Where(s => (from is null || s.Session >= from) && (to is null || s.Session <= to))
+            .Select(s => new ReplayEquityRow(s.Session, s.Equity, s.Drawdown, XDrishti.Application.Replay.ReplayJson.Read<XDrishti.Domain.Replay.ReplaySessionRecord>(s.RecordJson)?.OpenPositions ?? 0))]);
+
+    public ValueTask<IReadOnlyList<string>> LabelsAsync(Guid runId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<string>>([.. Of(runId).Sessions.Values.SelectMany(s => XDrishti.Application.Replay.ReplayJson.Read<XDrishti.Domain.Replay.ReplaySessionRecord>(s.RecordJson)?.Labels ?? []).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)]);
+
+    public async ValueTask<ReplaySummary?> SummaryAsync(Guid runId, CancellationToken cancellationToken)
+    {
+        if (await GetRunAsync(runId, cancellationToken) is not { CursorSession: { } asOf } run)
+        {
+            return null;
+        }
+
+        var capital = XDrishti.Application.Replay.ReplayJson.Read<XDrishti.Domain.Replay.ReplayParams>(run.ParamsJson)!.Capital;
+        var trades = Of(runId).Trades;
+        var book = trades.Where(t => t.EntrySession <= asOf).Select(t => new XDrishti.Domain.Paper.LedgerTrade(
+            t.TradeNo, Guid.Empty, t.Symbol, t.Side, t.Qty, t.EntryAt, t.EntryPrice, t.StopPrice, t.Swing, "primary", t.TradeKey,
+            t.ExitAt is { } at && t.ExitSession <= asOf ? new XDrishti.Domain.Paper.LedgerExit(at, t.GrossPnl ?? 0m, t.Charges, t.NetPnl, t.ChargeSheetId, t.RSim ?? 0) : null)).ToList();
+        return new ReplaySummary(run, XDrishti.Domain.Paper.PaperLedger.Compute(capital, book, asOf), trades.Count);
+    }
 }

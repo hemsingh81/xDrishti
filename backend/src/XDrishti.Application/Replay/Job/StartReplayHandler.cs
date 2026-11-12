@@ -28,21 +28,24 @@ internal sealed class StartReplayHandler(ReplayDriver driver, ReplayInputHasher 
             return Result.Failure<StartedReplay>(Error.Validation(ReplayDriver.InvalidCode, "one run, or a frozen and a learning run, can be started at once"));
         }
 
-        if (await backfill.IncompleteReasonAsync(cancellationToken) is { } incomplete)
-        {
-            return Result.Failure<StartedReplay>(Error.Conflict(BusyCode, "The 1-minute history backfill is not complete (" + incomplete + "); a replay over half-loaded bars would change when it finishes. Start again when it is done."));
-        }
-
         var now = time.GetUtcNow();
         var rows = new List<NewReplayRun>();
         var uses = new List<(Guid RunId, ReplayParams Parameters, IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>> Versions, string InputHash)>();
+        var backfillChecked = false;
         foreach (var p in command.Runs)
         {
             var prepared = await driver.PrepareAsync(p, null, null, cancellationToken);
             if (prepared.IsFailure)
             {
-                return Result.Failure<StartedReplay>(prepared.Error);
+                return Result.Failure<StartedReplay>(prepared.Error); // a request that cannot be used is refused (422, 409 hold-out) whatever the backfill is doing
             }
+
+            if (!backfillChecked && await backfill.IncompleteReasonAsync(cancellationToken) is { } incomplete)
+            {
+                return Result.Failure<StartedReplay>(Error.Conflict(BusyCode, "The 1-minute history backfill is not complete (" + incomplete + "); a replay over half-loaded bars would change when it finishes. Start again when it is done."));
+            }
+
+            backfillChecked = true;
 
             var versions = await inputs.VersionsAsync(p, cancellationToken);
             var learning = await inputs.LearningSourcesAsync(p, cancellationToken);

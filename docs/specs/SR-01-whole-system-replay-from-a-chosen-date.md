@@ -232,6 +232,11 @@ All eight answered by the owner on 2026-11-11 as recommended ("Approve all"); th
 - **AC 17 (no orders).** The job and the store are in the scan for execution, broker and order names.
 - **Speed (non-functional).** The bars are loaded once per run as a rolling window. Measured with the explicit `ReplayBenchmarks` (one year, 100 instruments, in-memory stores, Release): 0.88 s per session, 227.9 s for 259 sessions, live managed memory 609 MiB and peak working set 968 MiB for 100 instruments (bounded chunked window; a 1 GiB container is at its edge, see the ADR); the database read of the bars and a held trade's simulation are not in the figure (ADR 0272). The 8-hour target is not threatened by the engine; the figure on the owner's database is still to be measured.
 
+## Evidence notes (part C, 2026-11-12; ADR 0272, "Part C: the API")
+- The API contract is built as specified, with one deviation: a replay trade has **no link to the P8-11 trade replay**. P8-11 addresses simulation-run trades by run key and the bars endpoint has no date window, so no link can open the trade's own dates; the trade list carries the stored entry, exit, prices and R instead. A later slice can add a windowed bars read or a replay-trade reader.
+- Defaults: versions `start` (Q1), frozen only, capital Rs 10,00,000, the standard profile, gross; an empty scope is the stored auto scope's baskets and instruments, read as of each session.
+- Hindsight labels come first on every run read, and `before_costs` is stated on every gross run.
+
 ## Done when
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors (Opus for parts A and B)

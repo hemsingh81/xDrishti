@@ -4888,6 +4888,143 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/replay/runs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The replay runs, newest first (skip, take 1 to 200, default 50): id, created, range, mode, state, completeness, final equity, max drawdown, trial number, costs label, hindsight labels. Read only. */
+    get: operations['ListReplayRuns'];
+    put?: never;
+    /** Start a replay of the whole system from a chosen date: body from, to (default the last readable session before the hold-out and its embargo), scope {basketIds, instrumentIds} (empty: the stored auto scope, its baskets read as of each session; at most 200 baskets and 2000 instruments), capital (default 1000000), riskProfileId (default the seeded standard profile), costs (null or gross, else the id of a stored charge sheet), versions (start or asOf, default start: today's active versions, labelled hindsight), modes (frozen and/or learning, default frozen; both give two linked runs and a pairId), filtersWithoutHistory and includeResearchCells (both default false; each is a labelled hindsight). 202 with runIds and pairId. 422 replay.invalid (bad input, an empty snapshot, the memory cap); 409 replay.busy (a replay is active, or the 1-minute backfill is incomplete), replay.holdout (to reaches the hold-out; the last allowed date is in the message) */
+    post: operations['StartReplay'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/runs/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One replay run, readable while it runs: the hindsight labels first, completeness (complete, sessions done of total, the as-of session), the costs label ("before costs (charge sheet not filled, ISS-25)" when gross), trial number, input and result hashes, the settings snapshot, and the figures so far (return, CAGR, max drawdown, Sharpe of daily returns, exposure, trades, hit rate, mean R, contribution per strategy). Read only. */
+    get: operations['GetReplayRun'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/runs/{id}/equity': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The daily equity, drawdown, cash line and the benchmark (Nifty 500, or the index chosen for the basket reports) rebased to the capital, between from and to (dates, optional). Read only. */
+    get: operations['GetReplayEquity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/runs/{id}/sessions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One row per stored session between from and to (dates, optional): candidates, taken, blocked by reason, the day's result, equity. Read only. */
+    get: operations['ListReplaySessions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/runs/{id}/sessions/{session}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The full record of one session (yyyy-MM-dd): candidates, ranked list, taken, blocked with reasons, fills, the book open at the close. 404 replay.session_not_found while it is not stored. Read only. */
+    get: operations['GetReplaySession'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/runs/{id}/trades': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The trades of the replay book in booking order, with the strategy, entry, exit, costs and R of each. Read only. */
+    get: operations['ListReplayTrades'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/pairs/{pairId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The frozen-versus-learning comparison of two linked runs, computed on read from their stored equity (paired day bootstrap): learning_better, frozen_better, no_measurable_difference or too_little_history, with n and the probabilities. No answer (with the reason) while a run is not complete. Read only. */
+    get: operations['GetReplayPair'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/runs/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Stop a queued or running replay after the session in flight; the finished sessions are kept and the run reads cancelled. 202 with the new state (cancelled or cancelling). 404 replay.not_found; 409 replay.not_active when it has finished. */
+    post: operations['CancelReplay'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/reports/basket-benchmark': {
     parameters: {
       query?: never;
@@ -21038,6 +21175,53 @@ export interface components {
       /** Format: int64 */
       v: number;
     };
+    /** @description A candidate that was not taken, with its one reason. */
+    ReplayBlockedView: {
+      symbol: string;
+      cellKey: string;
+      reason: string;
+      detail: string;
+    };
+    /** @description One trade of the replay book. */
+    ReplayBookTradeView: {
+      /** Format: int64 */
+      tradeNo: number;
+      symbol: string;
+      side: string;
+      strategy: string;
+      cellKey: string;
+      /** Format: int32 */
+      qty: number;
+      /** Format: date */
+      entrySession: string;
+      /** Format: double */
+      entryPrice: number;
+      /** Format: double */
+      stopPrice: number;
+      swing: boolean;
+      /** Format: date */
+      exitSession: null | string;
+      /** Format: double */
+      grossPnl: null | number;
+      /** Format: double */
+      charges: null | number;
+      /** Format: double */
+      netPnl: null | number;
+      /** Format: double */
+      r: null | number;
+    };
+    /** @description The answer of a cancel: the new state, cancelled for a run that had not started and cancelling for one that is running. */
+    ReplayCancelView: {
+      state: string;
+    };
+    /** @description A candidate of a session. */
+    ReplayCandidateView: {
+      symbol: string;
+      side: string;
+      cellKey: string;
+      /** Format: int32 */
+      rank: number;
+    };
     /** @description The bars of the replay window at one timeframe, adjusted for the corporate actions applied now, with the coherence of the stored entry against them. */
     ReplayChartView: {
       /** @description 1m, 5m, 15m, 1h or 1D. */
@@ -21078,6 +21262,16 @@ export interface components {
       entryOnBars: null | number;
       detail: string;
     };
+    /** @description How far a run has got (AC 14): bool ReplayCompleteness.Complete is true only for a run whose every session was replayed. */
+    ReplayCompleteness: {
+      complete: boolean;
+      /** Format: int32 */
+      sessionsDone: number;
+      /** Format: int32 */
+      sessionsTotal: number;
+      /** Format: date */
+      asOfSession: null | string;
+    };
     /** @description What the run charged the trade. The figures are present only when the owner confirmed this very charge sheet (`confirmed`); otherwise only the sheet id is, and the screen says "costed on sheet X, not confirmed as yours" beside the gross figures. */
     ReplayCostingView: {
       sheetId: string;
@@ -21090,6 +21284,33 @@ export interface components {
       costR: null | number;
       /** Format: double */
       rNet: null | number;
+    };
+    /** @description One day of the equity curve: the equity, the drawdown from the peak so far, the cash (equity less the cost of the positions open at the close) and the benchmark rebased to the capital. */
+    ReplayEquityPoint: {
+      /** Format: date */
+      session: string;
+      /** Format: double */
+      equity: number;
+      /** Format: double */
+      drawdownPct: number;
+      /** Format: double */
+      cash: number;
+      /** Format: double */
+      benchmark: null | number;
+    };
+    /** @description The equity curve of a run against its benchmark (Nifty 500 unless the owner chose another index for the basket reports). */
+    ReplayEquityView: {
+      hindsight: components['schemas']['ReplayLabelView'][];
+      /** Format: uuid */
+      runId: string;
+      completeness: components['schemas']['ReplayCompleteness'];
+      costsLabel: string;
+      /** Format: double */
+      capital: number;
+      benchmarkSymbol: null | string;
+      benchmarkReason: null | string;
+      cashComplete: boolean;
+      points: components['schemas']['ReplayEquityPoint'][];
     };
     /** @description One stored feature: its group (`bars`, `context`, `plan`), and a number only when `state` is value. */
     ReplayFeatureItemView: {
@@ -21107,6 +21328,50 @@ export interface components {
       reason: null | string;
       items: components['schemas']['ReplayFeatureItemView'][];
     };
+    /** @description The figures of a run over the sessions stored so far; each is null where it cannot be told (too few sessions, no trades). */
+    ReplayFigures: {
+      /** Format: double */
+      capital: number;
+      /** Format: double */
+      finalEquity: number;
+      /** Format: double */
+      returnPct: number;
+      /** Format: double */
+      cagr: null | number;
+      /** Format: double */
+      maxDrawdownPct: null | number;
+      /** Format: double */
+      sharpe: null | number;
+      /** Format: double */
+      exposure: null | number;
+      /** Format: int32 */
+      trades: number;
+      /** Format: int32 */
+      closedTrades: number;
+      /** Format: double */
+      hitRate: null | number;
+      /** Format: double */
+      meanR: null | number;
+    };
+    /** @description An entry replayed on the next session. */
+    ReplayFillView: {
+      symbol: string;
+      side: string;
+      cellKey: string;
+      /** Format: date */
+      session: string;
+      status: string;
+      /** Format: int32 */
+      qty: number;
+      /** Format: double */
+      entryPrice: null | number;
+      detail: string;
+    };
+    /** @description One hindsight label: its code and the plain sentence the screen shows first (SR-01, AC 10). */
+    ReplayLabelView: {
+      code: string;
+      text: string;
+    };
     /** @description One fill of a trade with legs: `kind` is entry, add or exit; `share` the fraction of the maximum quantity; `reason` empty for an entry or an add. */
     ReplayLegView: {
       /** Format: date-time */
@@ -21119,6 +21384,203 @@ export interface components {
       /** Format: double */
       share: number;
       reason: string;
+    };
+    /** @description A position open at the close of the session. */
+    ReplayOpenPositionView: {
+      symbol: string;
+      side: string;
+      /** Format: int32 */
+      qty: number;
+      /** Format: date */
+      entrySession: string;
+      /** Format: double */
+      entryPrice: number;
+      /** Format: double */
+      stopPrice: number;
+      swing: boolean;
+    };
+    /** @description The frozen-versus-learning comparison of a pair (AC 9), computed on read from the two stored runs. string? ReplayPairView.Answer is null while a run is not complete, with the reason. */
+    ReplayPairView: {
+      hindsight: components['schemas']['ReplayLabelView'][];
+      /** Format: uuid */
+      pairId: string;
+      frozen: components['schemas']['ReplayRunListItem'];
+      learning: components['schemas']['ReplayRunListItem'];
+      answer: null | string;
+      reason: null | string;
+      /** Format: int32 */
+      days: null | number;
+      /** Format: int32 */
+      informativeDays: null | number;
+      /** Format: double */
+      meanDailyDifference: null | number;
+      /** Format: double */
+      probabilityLearningBetter: null | number;
+      /** Format: double */
+      probabilityFrozenBetter: null | number;
+      /** Format: double */
+      low: null | number;
+      /** Format: double */
+      high: null | number;
+      /** Format: double */
+      cut: null | number;
+      /** Format: double */
+      hurtsBar: null | number;
+      /** Format: int32 */
+      minDays: null | number;
+    };
+    /** @description One row of the list of runs. */
+    ReplayRunListItem: {
+      hindsight: components['schemas']['ReplayLabelView'][];
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      pairId: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      mode: string;
+      state: string;
+      completeness: components['schemas']['ReplayCompleteness'];
+      /** Format: double */
+      finalEquity: null | number;
+      /** Format: double */
+      maxDrawdownPct: null | number;
+      /** Format: int32 */
+      trialNumber: number;
+      costsLabel: string;
+    };
+    /** @description The summary of one run: settings snapshot, hashes, hindsight labels first, completeness, figures and the costs label. */
+    ReplayRunView: {
+      hindsight: components['schemas']['ReplayLabelView'][];
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      pairId: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      mode: string;
+      state: string;
+      failReason: null | string;
+      completeness: components['schemas']['ReplayCompleteness'];
+      costsLabel: string;
+      basis: string;
+      /** Format: int32 */
+      trialNumber: number;
+      inputHash: string;
+      resultHash: null | string;
+      parameters: components['schemas']['JsonElement'];
+      settingsSnapshot: components['schemas']['JsonElement'];
+      figures: null | components['schemas']['ReplayFigures'];
+      contribution: components['schemas']['ReplayStrategyContribution'][];
+    };
+    /** @description The baskets and instruments a replay covers; both empty means the owner's stored auto scope, its baskets read as of the start date. */
+    ReplayScopeBody: {
+      basketIds: null | string[];
+      instrumentIds: null | string[];
+    };
+    /** @description One session of the list: what was taken, what was blocked by reason, the day's result and the equity. */
+    ReplaySessionListItem: {
+      /** Format: date */
+      session: string;
+      /** Format: int32 */
+      candidates: number;
+      /** Format: int32 */
+      taken: number;
+      blockedByReason: {
+        [key: string]: number;
+      };
+      /** Format: double */
+      pnl: number;
+      /** Format: double */
+      equity: number;
+      /** Format: double */
+      drawdownPct: null | number;
+      /** Format: int32 */
+      openPositions: number;
+      labels: components['schemas']['ReplayLabelView'][];
+    };
+    /** @description The sessions of a run, one row each. */
+    ReplaySessionListView: {
+      hindsight: components['schemas']['ReplayLabelView'][];
+      /** Format: uuid */
+      runId: string;
+      completeness: components['schemas']['ReplayCompleteness'];
+      costsLabel: string;
+      sessions: components['schemas']['ReplaySessionListItem'][];
+    };
+    /** @description The full record of one session. */
+    ReplaySessionView: {
+      hindsight: components['schemas']['ReplayLabelView'][];
+      /** Format: uuid */
+      runId: string;
+      /** Format: date */
+      session: string;
+      costsLabel: string;
+      candidates: components['schemas']['ReplayCandidateView'][];
+      ranked: components['schemas']['ReplayCandidateView'][];
+      taken: components['schemas']['ReplayCandidateView'][];
+      blocked: components['schemas']['ReplayBlockedView'][];
+      fills: components['schemas']['ReplayFillView'][];
+      exits: string[];
+      /** Format: double */
+      equity: number;
+      /** Format: double */
+      drawdownPct: null | number;
+      /** Format: double */
+      openRiskPct: null | number;
+      /** Format: int32 */
+      openPositions: number;
+      notes: string[];
+      openBookComplete: boolean;
+      openBook: components['schemas']['ReplayOpenPositionView'][];
+    };
+    /** @description The body of the start of a replay (SR-01 part C). Defaults: to is the last readable session before the hold-out and its embargo, capital 1000000, the seeded standard profile, gross costs (costs null or "gross"; otherwise the id of a stored charge sheet), versions start (the version active today, a labelled hindsight), modes frozen. */
+    ReplayStartBody: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: null | string;
+      scope: null | components['schemas']['ReplayScopeBody'];
+      /** Format: double */
+      capital: null | number;
+      /** Format: uuid */
+      riskProfileId: null | string;
+      costs: null | string;
+      versions: null | string;
+      modes: null | string[];
+      /** @default false */
+      filtersWithoutHistory: boolean;
+      /** @default false */
+      includeResearchCells: boolean;
+    };
+    /** @description What one strategy contributed: closed trades, result in rupees (net, or gross when the run is) and the sum of R. */
+    ReplayStrategyContribution: {
+      strategy: string;
+      /** Format: int32 */
+      trades: number;
+      /** Format: double */
+      result: number;
+      /** Format: double */
+      sumR: number;
+    };
+    /** @description The trades of a run. */
+    ReplayTradeListView: {
+      hindsight: components['schemas']['ReplayLabelView'][];
+      /** Format: uuid */
+      runId: string;
+      completeness: components['schemas']['ReplayCompleteness'];
+      costsLabel: string;
+      trades: components['schemas']['ReplayBookTradeView'][];
     };
     /** @description The stored facts of a replayed trade, in adjusted prices. Times are instants (the screen shows India time); a target is null without a fixed reward-to-risk, never zero. */
     ReplayTradeView: {
@@ -23380,6 +23842,21 @@ export interface components {
     StartRefreshRequest: {
       /** @default false */
       force: boolean;
+    };
+    /** @description The runs that were stored. */
+    StartedReplay: {
+      /** @description The ids, in the order of the request. */
+      runIds: string[];
+      /**
+       * Format: uuid
+       * @description The id the two runs of a pair share; null for one run.
+       */
+      pairId: null | string;
+      /**
+       * Format: int32
+       * @description How many replays have looked at this range, this one included (AC 12): "the 7th replay of this range".
+       */
+      trialNumber: number;
     };
     /** @description Body of `POST /api/auth/step-up`. */
     StepUpRequest: {
@@ -36824,6 +37301,349 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListReplayRuns: {
+    parameters: {
+      query?: {
+        skip?: number;
+        take?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReplayRunListItem'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  StartReplay: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReplayStartBody'];
+      };
+    };
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StartedReplay'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReplayRun: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReplayRunView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReplayEquity: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReplayEquityView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListReplaySessions: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReplaySessionListView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReplaySession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        session: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReplaySessionView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListReplayTrades: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReplayTradeListView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReplayPair: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        pairId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReplayPairView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  CancelReplay: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReplayCancelView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

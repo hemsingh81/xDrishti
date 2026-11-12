@@ -288,6 +288,11 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
             "XDrishti.Application/Replay/Job/CancelReplayHandler.cs",
             "XDrishti.Application/Replay/Job/ReplayRunner.cs",
             "XDrishti.Application/Replay/Job/StartReplayHandler.cs",
+            "XDrishti.Application/Replay/Reads/ReplayReadSupport.cs", // part C: the replay's own read side, behind the owner-only /api/replay routes; never an evidence reader
+            "XDrishti.Application/Replay/Reads/RunReads.cs",
+            "XDrishti.Application/Replay/Reads/SeriesReads.cs",
+            "XDrishti.Application/Replay/Reads/StartReplayRequestHandler.cs",
+            "XDrishti.Application/Replay/Reads/TradePairReads.cs",
             "XDrishti.Application/SimAll/SimAllRunner.cs",
             "XDrishti.Infrastructure/DependencyInjection.cs",
             "XDrishti.Infrastructure/Replay/ReplayStore.cs",
