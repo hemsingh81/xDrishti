@@ -204,9 +204,8 @@ internal static class CostSheetCommand
             }
             catch (Exception failure) when (failure is IOException or UnauthorizedAccessException or OperationCanceledException)
             {
-                // never leave a sheet without its residuals
+                // never leave a sheet without its residuals: the sheet is ours (we created it just now); the residuals file is dealt with by its own writer
                 File.Delete(path);
-                File.Delete(residuals);
                 throw;
             }
         }
@@ -220,10 +219,24 @@ internal static class CostSheetCommand
         return SimulateCommand.Done;
     }
 
-    private static async Task WriteOwnerOnlyAsync(string path, string text, CancellationToken cancellationToken)
+    /// <summary>
+    /// Writes a new owner-only file. If the path is already there nothing is touched (the open fails first); once our own open has succeeded a failed or cancelled write deletes the partly written file.
+    /// </summary>
+    internal static async Task WriteOwnerOnlyAsync(string path, string text, CancellationToken cancellationToken)
     {
-        await using var stream = ExportFolderWriter.OpenNew(path);
-        await stream.WriteAsync(Encoding.UTF8.GetBytes(text), cancellationToken);
+        var stream = ExportFolderWriter.OpenNew(path);
+        try
+        {
+            await using (stream)
+            {
+                await stream.WriteAsync(Encoding.UTF8.GetBytes(text), cancellationToken);
+            }
+        }
+        catch (Exception failure) when (failure is not OutOfMemoryException)
+        {
+            File.Delete(path);
+            throw;
+        }
     }
 
     /// <summary>

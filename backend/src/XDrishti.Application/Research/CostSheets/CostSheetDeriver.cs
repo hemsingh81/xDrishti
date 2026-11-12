@@ -15,7 +15,7 @@ namespace XDrishti.Application.Research.CostSheets;
 /// </summary>
 /// <remarks>
 /// The rule: a derived sheet never understates a cost. What the bills prove is written; what they cannot prove is null (<c>unavailable</c>, "fill from your tariff") so the sheet cannot be loaded until the owner fills it. Proven: the brokerage rate (from the bills
-/// below the per-leg cap only, null when it moves by more than 5 %), the per-leg brokerage cap (only when bills of different turnover show the same largest brokerage, all bigger than every other bill), the other rates. Null: the cap without that proof, the delivery DP
+/// below the per-leg cap only) and the STT, SEBI, stamp, transaction and other rates (each null when it moves by more than 5 %, so a rise inside the window cannot give a sheet that understates later trades), the per-leg brokerage cap (only when bills of different turnover show the same largest brokerage, all bigger than every other bill), the other rates. Null: the cap without that proof, the delivery DP
 /// charge, the delivery brokerage when a one-sided NSE bill has brokerage. Assumed and printed one by one: the brokerage minimum 0, the intraday buy-side STT 0, the delivery STT on both sides, the intraday DP charge 0 and the rounding rule.
 /// </remarks>
 internal static class CostSheetDeriver
@@ -161,7 +161,7 @@ internal static class CostSheetDeriver
 
     /// <summary>
     /// The implied rate of one line over the members, added to the lines with its instability (and, when unstable, the dates the rate moved: those of the bills whose rate is farthest from the median). With <paramref name="nullIfUnstable"/> an unstable rate is
-    /// written as unavailable and null is returned. With <paramref name="weighted"/> the written rate is the sum of the line over the sum of its bases, not the median of the per-bill rates (GST).
+    /// written as unavailable and null is returned. With <paramref name="weighted"/> the written rate is the sum of the line over the sum of its bases, rounded up at six decimals so it is never under the true rate (GST), not the median of the per-bill rates.
     /// </summary>
     private static CostCheckImplied? Line(List<DerivedLine> lines, string cls, int index, List<CostBillCheck.Compared> members, bool nullIfUnstable = false, bool weighted = false)
     {
@@ -182,7 +182,7 @@ internal static class CostSheetDeriver
         {
             var sum = rates.Sum(r => r.Member.Billed[index]);
             var bases = rates.Sum(r => r.Member.Billed[0] + r.Member.Billed[3] + r.Member.Billed[5]);
-            implied = implied with { Median = Math.Round(sum * 100m / bases, 6, MidpointRounding.AwayFromZero) };
+            implied = implied with { Median = Math.Ceiling(sum * 100m / bases * 1_000_000m) / 1_000_000m };
         }
 
         if (unstable && nullIfUnstable)
@@ -247,24 +247,24 @@ internal static class CostSheetDeriver
             var (cap, largest, atLargest) = CapProof(members);
             var rated = cap is null ? members : members.Where(m => m.Billed[0] < largest).ToList();
             var brokerage = Line(lines, cls, 0, rated, nullIfUnstable: true);
+            values[1] = cap;
             if (brokerage is not null)
             {
                 values[0] = brokerage.Median;
-                values[1] = cap;
                 values[2] = 0m;
                 assumed.Add(cls + " brokerage_min 0 (the bills cannot show a minimum per leg; a tariff with a minimum charges small trades more)");
             }
 
             lines.Add(new DerivedLine(cls, "brokerage cap", cap, null, false, null, null, cap is null
                 ? "no proof of a cap (needs bills of different sizes at the same largest brokerage, all bigger than the others)"
-                : N(atLargest) + " bills show the same largest brokerage; per leg it is half of it"));
+                : N(atLargest) + " bills show the same largest brokerage; per leg it is half of it (written to the file even when the rate is not)"));
         }
 
-        var stt = Line(lines, cls, 2, members);
-        var sebi = Line(lines, cls, 3, members);
-        var stamp = Line(lines, cls, 4, members);
-        var txn = Line(lines, cls, 5, members);
-        var other = Line(lines, cls, 6, members);
+        var stt = Line(lines, cls, 2, members, nullIfUnstable: true);
+        var sebi = Line(lines, cls, 3, members, nullIfUnstable: true);
+        var stamp = Line(lines, cls, 4, members, nullIfUnstable: true);
+        var txn = Line(lines, cls, 5, members, nullIfUnstable: true);
+        var other = Line(lines, cls, 6, members, nullIfUnstable: true);
         values[3] = delivery ? stt?.Median : (stt is null ? null : 0m);
         values[4] = stt?.Median;
         values[5] = txn?.Median;
@@ -319,21 +319,11 @@ internal static class CostSheetDeriver
         text.Append(last ? "      }\n" : "      },\n");
     }
 
-    /// <summary>The sheet the residuals price with: a null line counts as 0 (no derive bill has it above 0).</summary>
-    private static Result<CostSheet> Working(string id, string source, DateOnly from, decimal? gst, decimal?[] intraday, decimal?[] delivery)
-    {
-        var a = Rates(Priced(intraday));
-        var b = Rates(Priced(delivery));
-        if (a.IsFailure || b.IsFailure)
-        {
-            return Result.Failure<CostSheet>((a.IsFailure ? a : b).Error);
-        }
+    /// <summary>The sheet the residuals price with, read from the sheet text by the one parser (a null line counts as 0: no derive bill has it above 0).</summary>
+    private static Result<CostSheet> Working(string id, string source, DateOnly from, decimal? gst, decimal?[] intraday, decimal?[] delivery) =>
+        CostSheetJson.Parse(Json(id, source, from, gst ?? 0m, Priced(intraday), Priced(delivery)));
 
-        var schedule = ChargeSchedule.Create(from, gst ?? 0m, ChargeRounding.HalfAwayFromZero, a.Value, b.Value);
-        return schedule.IsFailure ? Result.Failure<CostSheet>(schedule.Error) : CostSheet.Create(id, "derived (unchecked)", source, null, [schedule.Value]);
-    }
-
-    /// <summary>For the residuals only: a brokerage rate without a proven cap is priced uncapped (the bills show no cap binding).</summary>
+    /// <summary>For the residuals only: a brokerage rate without a proven cap is priced uncapped (the bills show no cap binding), and a null is a 0.</summary>
     private static decimal?[] Priced(decimal?[] values)
     {
         var priced = (decimal?[])values.Clone();
@@ -342,11 +332,8 @@ internal static class CostSheetDeriver
             priced[1] = PricingCap;
         }
 
-        return priced;
+        return [.. priced.Select(v => v ?? 0m)];
     }
-
-    private static Result<ChargeRates> Rates(decimal?[] v) =>
-        ChargeRates.Create(v[0] ?? 0m, v[1] ?? 0m, v[2] ?? 0m, v[3] ?? 0m, v[4] ?? 0m, v[5] ?? 0m, v[6] ?? 0m, v[7] ?? 0m, v[8] ?? 0m, v[9] ?? 0m);
 
     private static (List<DerivedResidual> Residuals, DerivedSet Derive, DerivedSet Check) Residuals(CostSheet sheet, List<CostBillCheck.Compared> ordered, int deriveCount)
     {

@@ -45,6 +45,11 @@ internal static class CostDeriveText
             Line(text, "  unavailable lines are null in the file: fill them from your tariff before loading (the loader refuses a null).");
         }
 
+        if (d.Lines.Any(l => l.Line == "sebi" && l.Rate is null))
+        {
+            Line(text, "  sebi may often be unavailable on small accounts: its cell is a few paise, so rounding alone moves the implied rate by more than 5 %; fill it from your tariff.");
+        }
+
         foreach (var note in d.Assumed)
         {
             Line(text, "assumed, not derived: " + note);

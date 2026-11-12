@@ -139,9 +139,37 @@ public sealed class DeriveCostSheetTests
         var stt = derived.Lines.Single(l => l.Line == "stt");
         stt.Unstable.ShouldBeTrue();
         (stt.From, stt.To).ShouldBe((new DateOnly(2026, 4, 2), new DateOnly(2026, 4, 3)), "where the rate moved: the two bills with STT 12.00");
-        stt.Rate.ShouldBe(0.1m, "the median, not the mean");
+        stt.Rate.ShouldBeNull("a rate that moved gives no single figure: a median below the later rate would understate");
+        stt.Implied.ShouldNotBeNull().Median.ShouldBe(0.1m);
+        derived.Json.ShouldContain("\"stt_sell_pct\": null");
+        derived.Json.ShouldContain("\"stt_buy_pct\": null");
         derived.Lines.Where(l => l.Line != "stt").ShouldAllBe(l => !l.Unstable);
         derived.DeriveSet.Passes.ShouldBeFalse("two of the seven bills are 2.00 off");
+    }
+
+    [Fact]
+    public async Task Every_rate_that_moves_more_than_5_percent_is_null_not_only_stt()
+    {
+        // txn charges 0.30 on the early bills and 0.36 on days 2 and 3 (a 20 % rise); the median would hide it
+        var rows = Enumerable.Range(1, 10).Select(d => GtrRow(Day(d), "ZZ SCRIP ONE", "NSE", "ZZBILL-D" + d, 100, "10000.00", 0, "0.00", gst: "0.07", stt: "10.00", sebi: "0.10", stamp: "1.50", txn: d is 2 or 3 ? "0.36" : "0.30", other: "0.10"));
+
+        var derived = await OkAsync(rows);
+
+        derived.Lines.Single(l => l.Line == "txn charges").Rate.ShouldBeNull();
+        derived.Json.ShouldContain("\"exchange_txn_pct\": null");
+        derived.Lines.Single(l => l.Line == "stt").Rate.ShouldBe(0.1m, "a stable line is still written");
+    }
+
+    [Fact]
+    public async Task The_weighted_gst_rate_is_rounded_up_at_six_decimals_never_under_the_true_rate()
+    {
+        // GST 0.04 on a base of 0.20 + 0.10 = 0.30 is 13.3333333...: the nearest six-decimal figure is 13.333333, the one that never understates is 13.333334
+        var rows = Enumerable.Range(1, 10).Select(d => GtrRow(Day(d), "ZZ SCRIP ONE", "NSE", "ZZBILL-D" + d, 100, "10000.00", 0, "0.00", gst: "0.04", stt: "10.00", sebi: "0.10", stamp: "1.50", txn: "0.20", other: "0.10"));
+
+        var derived = await OkAsync(rows);
+
+        derived.Lines.Single(l => l.Line == "gst").Rate.ShouldBe(13.333334m);
+        derived.Json.ShouldContain("\"gst_pct\": 13.333334");
     }
 
     [Fact]

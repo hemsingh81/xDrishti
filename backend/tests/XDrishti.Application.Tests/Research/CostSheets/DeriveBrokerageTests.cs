@@ -139,6 +139,20 @@ public sealed class DeriveBrokerageTests
     }
 
     [Fact]
+    public async Task A_proven_cap_is_written_even_when_the_rate_is_null_and_the_printout_says_so()
+    {
+        // capped bills of three sizes prove the cap; the small bills at the minimum make the rate unstable
+        var derived = await DeriveAsync(ChargeRounding.HalfAwayFromZero, 5_000m, 5_000m, 5_000m, 20_000m, 20_000m, 20_000m, 100_000m, 200_000m, 500_000m, 20_000m);
+
+        Of(derived, "brokerage").ShouldBeNull();
+        Of(derived, "brokerage cap").ShouldBe(TrueCap);
+        derived.Json.ShouldContain("\"brokerage_pct\": null");
+        derived.Json.ShouldContain("\"brokerage_cap\": 20");
+        derived.Lines.Single(l => l.Line == "brokerage cap").Note.ShouldNotBeNull().ShouldContain("written to the file even when the rate is not");
+        NeverUnderstates(derived);
+    }
+
+    [Fact]
     public async Task Bills_that_all_pay_the_minimum_are_not_read_as_a_cap()
     {
         var derived = await DeriveAsync(ChargeRounding.HalfAwayFromZero, 2_000m, 4_000m, 2_000m, 4_000m, 2_000m, 4_000m, 2_000m, 4_000m, 2_000m, 4_000m);

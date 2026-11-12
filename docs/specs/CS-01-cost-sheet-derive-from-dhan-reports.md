@@ -32,7 +32,7 @@ The owner runs one verb over his original Dhan global transaction report files a
 2. The JSON round-trips through `CostSheetJson.Parse` when every line has rows; with a line without rows the file holds `null` there and the printout names the line `unavailable`.
 3. Re-pricing the **derive set** with the proposed sheet reproduces each bill's billed total within ₹1 on ≥ 95 % of bills; the printout gives the share for the derive set and, separately, for the check set.
 4. The residual table lists per bill: date, class, billed total, modelled total, difference; the ten largest are printed and all rows go to `<out>.residuals.csv`.
-5. A line whose implied rate has (max − min) / median > 5 % over the derive set is flagged `unstable` with its date range.
+5. A line whose implied rate has (max − min) / median > 5 % over the derive set is flagged `unstable` with the dates where the rate moved, and (brokerage, STT, SEBI, stamp duty, transaction charges, other) is written `null` / `unavailable: fill from your tariff`, never as a median, so a rise inside the window cannot give a loadable sheet that understates later trades (review 2026-11-12). SEBI may often be null on small accounts: its cell is a few paise, so rounding alone moves the implied rate.
 6. No personal line (order id, client id) is printed or written; only date, class and amounts (same rule as `check`).
 7. Exit codes match `cost-sheet`: 0 done, 1 refused (no readable row), 2 wrong command line, 3 failure.
 
@@ -58,10 +58,12 @@ Bills without intraday rows (ISS-05) give an intraday sheet of `unavailable` lin
   - *Brokerage rate*: the median over the bills below the cap only (all bills when no cap is proven); null (and flagged unstable, with the dates where the rate moved) when it moves by more than 5 %, for instance when a minimum binds on small bills.
   - *Delivery brokerage*: 0 only when no one-sided NSE bill has brokerage above 0; otherwise null, and the count is printed on its own line (not among "rows not used"). *Delivery DP charge*: null always (not a report column). Intraday DP charge 0.
   - *Assumed, not derived* (one printed line each, the owner checks them against the tariff): the brokerage minimum 0, the intraday buy-side STT 0, the delivery buy STT equal to its sell STT, the intraday DP charge 0, the rounding rule half-away-from-zero.
-  - GST is one rate, weighted: the sum of the GST cells over the sum of their bases (brokerage, SEBI, transaction), over the bills of both classes.
+  - GST is one rate, weighted: the sum of the GST cells over the sum of their bases (brokerage, SEBI, transaction), over the bills of both classes, rounded up at six decimals so it is never under the true rate.
+  - A proven brokerage cap is written even when the brokerage rate is null (the printout says so).
+  - The working sheet the residuals price with is read from the sheet text by `CostSheetJson` (the architecture rule: no other source file builds `ChargeRates`).
   - The residuals price a null line as 0 (and a rate without a proven cap as uncapped), and the printout says so; a sheet with null lines is never presented as ready.
 - **Other deviations from the text above, each deliberate:**
-  1. Two files are written, both 0600 (the sheet and `<out>.residuals.csv`, which AC 4 requires), through `ExportFolderWriter.OpenNew`/`CreateDirectory`; an existing output refuses (exit 1); if the residuals cannot be written the sheet is deleted.
+  1. Two files are written, both 0600 (the sheet and `<out>.residuals.csv`, which AC 4 requires), through `ExportFolderWriter.OpenNew`/`CreateDirectory`; an existing output refuses (exit 1); if the residuals cannot be written the sheet is deleted, and a file that was not created by this run is never deleted (a partly written file is, once our own open succeeded).
   2. A one-sided NSE row with brokerage above 0 fits no class (counted separately, see above); a row with a negative Oth. cell is an adjustment and is not used, as in `check`.
   3. The split is by date: the cut moves forward so a day is never split; the check set may be empty (then the verdict does not pass).
   4. The verdict MEETS needs at least 95 % on both sets; it never changes the sheet's `unchecked` state, and a sheet with null lines is reported as not loadable.
