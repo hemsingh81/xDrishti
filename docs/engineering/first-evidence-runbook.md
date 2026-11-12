@@ -9,8 +9,12 @@ Conventions: `xd …` means `scripts/xd.sh …` (it runs the `xd` verb on the ho
 from the Keychain [scripts/xd.sh]). The stack must be up for every verb. Screens are in the web app at
 `http://127.0.0.1:8080` [deploy/xd-up.sh: `XD_HTTP_PORT`].
 
-**Step 0 — readout (not built yet).** `xd evidence preflight` will print MET / NOT MET / UNAVAILABLE for each
-prerequisite below (spec [EV-01](../specs/EV-01-evidence-preflight.md)). Until it is built, use the per-step checks.
+**Step 0 — readout.** `xd evidence preflight [--json]` prints MET / NOT MET / UNAVAILABLE with the reason and the fix for each of 12
+prerequisites below: deployed version (migrations), charge sheet, context probe, hold-out, newest cell snapshot age, champion,
+shadow switch, paper-capture service, Auto, backfill, replay memory headroom and the NSE history / admit-verified switches
+(spec [EV-01](../specs/EV-01-evidence-preflight.md), built 2026-11-12, not deployed until you deploy; read only, exit 0
+whatever it says). Run it before step 1 and again after each step; an item it cannot read says UNAVAILABLE, never MET.
+The per-step checks below remain the way to see the detail.
 
 ## 1. Deploy
 - `deploy/xd-up.sh` (options `--no-dev`, `--no-build`, `--owner-reset`; never `--exec` for this runbook) [deploy/xd-up.sh:11].
