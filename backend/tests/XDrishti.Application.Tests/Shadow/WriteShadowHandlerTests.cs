@@ -49,7 +49,7 @@ public sealed class WriteShadowHandlerTests
         _plans.ListAsync(Tuesday, null, Arg.Any<int>(), Ct).Returns([Plan(10, Tuesday)]);
     }
 
-    private WriteShadowHandler Handler() => new(_settings, _plans, _store, _paper, _governance, _calendar, _time, NullLogger<WriteShadowHandler>.Instance);
+    private WriteShadowHandler Handler() => new(_settings, _plans, _store, _paper, _governance, _calendar, ShadowScorerFake.Empty(), _time, NullLogger<WriteShadowHandler>.Instance);
 
     private void Items(long planId, params NewPlanItem[] items) =>
         _plans.ItemsAsync(planId, Ct).Returns([.. items.Select((item, i) => Row(100 + i, planId, item))]);

@@ -267,11 +267,11 @@ public sealed class MlInfluenceArchitectureTests
     }
 
     [Fact]
-    public void The_only_evidence_in_this_version_is_none_and_only_the_evaluator_reads_it_in_any_project()
+    public void The_only_evidence_source_is_the_shadow_one_and_only_the_evaluator_reads_it_in_any_project()
     {
-        Implementations(Production, typeof(IMlInfluenceEvidence)).ShouldBe(["XDrishti.Application.Learning.NoMlInfluenceEvidence"], "no source of hold-out, forward or calibration figures exists yet, so no model can pass");
+        Implementations(Production, typeof(IMlInfluenceEvidence)).ShouldBe(["XDrishti.Application.Learning.ShadowMlInfluenceEvidence"], "the one source: forward figures from the shadow scores, the calibration alarm from the stored monitor row; the hold-out figures stay unavailable until HO-01 (CF-10e, ADR 0281)");
         Dependents(Production, typeof(IMlInfluenceEvidence))
-            .ShouldBe(["XDrishti.Application.DependencyInjection", "XDrishti.Application.Learning.MlInfluenceEvaluator", "XDrishti.Application.Learning.NoMlInfluenceEvidence"]);
+            .ShouldBe(["XDrishti.Application.DependencyInjection", "XDrishti.Application.Learning.MlInfluenceEvaluator", "XDrishti.Application.Learning.ShadowMlInfluenceEvidence"]);
         Implementations([typeof(MlInfluenceEvidenceSentinel).Assembly], typeof(IMlInfluenceEvidence)).ShouldContain(typeof(MlInfluenceEvidenceSentinel).FullName!);
     }
 

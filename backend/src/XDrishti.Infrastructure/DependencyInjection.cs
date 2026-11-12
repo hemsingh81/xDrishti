@@ -245,6 +245,7 @@ public static class DependencyInjection
         services.AddSingleton<IShadowDigestSink, ShadowDigestFile>(); // the weekly digest log outside the database (CF-08 review fix 4)
         services.AddScoped<IShadowSettings, ShadowSettings>(); // paper.shadow.enabled: the newest row of paper.shadow_settings, OFF when none (CF-08)
         services.AddScoped<IShadowGradeStore, ShadowGradeStore>(); // insert-only grades of the shadow record, one per entry (CF-08 part B, ADR 0212)
+        services.AddScoped<IShadowScoreReader, ShadowScoreReader>(); // a model's graded shadow scores, for the learning evidence sources only (CF-10e part 10e-1)
         services.AddScoped<IShadowResultReader, ShadowResultReader>(); // the one read of shadow outcomes, for the summary only; no Planning, Selection or Autonomy type may name it (CF-08 part B)
         services.AddScoped<IShadowSwitchStore, ShadowSettings>(); // the owner's switch history and append, insert-only (CF-08 part B)
         services.AddScoped<KillProposals>(); // confidence.kill_proposals: insert, and one conditional update of the decision columns (CF-12 part 12b, ADR 0219)

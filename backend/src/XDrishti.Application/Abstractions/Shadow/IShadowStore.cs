@@ -13,7 +13,8 @@ public sealed record ShadowHead(DateOnly SessionDate, string Digest);
 /// <param name="PrevDigest">The digest of the newest stored session, null for the first.</param>
 /// <param name="Digest">The digest of this session (<see cref="ShadowDigest.Next"/>).</param>
 /// <param name="Entries">The rows.</param>
-public sealed record NewShadowSession(DateOnly SessionDate, string Status, string? PrevDigest, string Digest, IReadOnlyList<ShadowEntry> Entries);
+/// <param name="Scores">The models' scores of the rows (CF-10e part 10e-1), stored in the same transaction; none by default.</param>
+public sealed record NewShadowSession(DateOnly SessionDate, string Status, string? PrevDigest, string Digest, IReadOnlyList<ShadowEntry> Entries, IReadOnlyList<NewShadowScore>? Scores = null);
 
 /// <summary>
 /// The shadow record (<c>paper.shadow_entries</c>, <c>shadow_sessions</c>; spec CF-08, ADR 0211) behind a port. Forward-only and insert-only: the only write stores a whole session in one transaction, and the database refuses a session that is opened,

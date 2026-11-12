@@ -62,6 +62,11 @@ public interface IRollbackProposalStore
 /// <param name="Verdicts">The two trigger readings as JSON.</param>
 public sealed record NewMlMonitorCheck(long ModelId, string SettingsHash, string Verdicts);
 
+/// <summary>A stored daily evaluation of a model.</summary>
+/// <param name="CheckedOn">The India day it was made for.</param>
+/// <param name="Verdicts">The trigger readings as JSON (an array of kind and state).</param>
+public sealed record StoredMlMonitorCheck(DateOnly CheckedOn, string Verdicts);
+
 /// <summary>The daily evaluations of the ML monitor (<c>research.ml_monitor_checks</c>): one per model and India day.</summary>
 public interface IMlMonitorChecks
 {
@@ -70,4 +75,7 @@ public interface IMlMonitorChecks
 
     /// <summary>Stores the evaluation; false when one exists for the day.</summary>
     ValueTask<bool> InsertAsync(NewMlMonitorCheck check, DateOnly day, CancellationToken cancellationToken);
+
+    /// <summary>The newest stored evaluation of the model (its India day and the trigger readings as JSON), or null when none (CF-10e part 10e-2).</summary>
+    ValueTask<StoredMlMonitorCheck?> LatestAsync(long modelId, CancellationToken cancellationToken);
 }

@@ -20,6 +20,15 @@ internal static partial class ShadowLog
     [LoggerMessage(EventId = 5404, Level = LogLevel.Information, Message = "shadow.switch: row {Row} appended, enabled {Enabled} (1 = on)")]
     public static partial void SwitchChanged(ILogger logger, int row, int enabled);
 
-    [LoggerMessage(EventId = 5405, Level = LogLevel.Warning, Message = "shadow.switch: the row stands but its audit event could not be recorded")]
+    [LoggerMessage(EventId = 5406, Level = LogLevel.Information, Message = "shadow.score: {Models} model(s) scored, {Scores} score(s), {Missing} candidate(s) without features")]
+    public static partial void Scored(ILogger logger, int models, int scores, int missing);
+
+    [LoggerMessage(EventId = 5407, Level = LogLevel.Warning, Message = "shadow.score: {Skipped} model(s) skipped, at most five are scored in a night")]
+    public static partial void ModelsSkipped(ILogger logger, int skipped);
+
+    [LoggerMessage(EventId = 5408, Level = LogLevel.Warning, Message = "shadow.score: scoring failed, the session is written without scores")]
+    public static partial void ScoringFailed(ILogger logger);
+
+    [LoggerMessage(EventId = 5405,Level = LogLevel.Warning, Message = "shadow.switch: the row stands but its audit event could not be recorded")]
     public static partial void AuditFailed(ILogger logger);
 }

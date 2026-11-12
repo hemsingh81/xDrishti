@@ -27,6 +27,7 @@ internal sealed class WriteShadowHandler(
     IPaperStore paper,
     IGovernanceStore governance,
     ITradingCalendar calendars,
+    ShadowScorer scorer,
     TimeProvider time,
     ILogger<WriteShadowHandler> logger) : ICommandHandler<WriteShadowCommand, ShadowWriteOutcome>
 {
@@ -182,7 +183,20 @@ internal sealed class WriteShadowHandler(
                 ShadowPlanFacts.CountsForEdge(item), context.EdgeEpoch));
         }
 
-        return new NewShadowSession(date, "ok", previous, ShadowDigest.Next(previous, date, "ok", entries.Select(e => e.RowHash)), entries);
+        // CF-10e: the models' scores of the rows go in the same transaction; a scoring that fails must not cost the session (the chain cannot be back-filled), so the session is then written without scores
+        IReadOnlyList<NewShadowScore> scores = [];
+        try
+        {
+            scores = await scorer.ScoreAsync(date, calendar, entries, cancellationToken);
+        }
+#pragma warning disable CA1031 // The scores are extra evidence; the session itself must still be written before the open. Cancellation is rethrown by the filter.
+        catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
+#pragma warning restore CA1031
+        {
+            ShadowLog.ScoringFailed(logger);
+        }
+
+        return new NewShadowSession(date, "ok", previous, ShadowDigest.Next(previous, date, "ok", entries.Select(e => e.RowHash)), entries, scores);
     }
 
     private sealed record Context(long? EdgeEpoch, string? ConfigHash);

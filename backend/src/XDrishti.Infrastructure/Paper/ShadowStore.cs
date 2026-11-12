@@ -69,6 +69,24 @@ internal sealed class ShadowStore(NpgsqlDataSource dataSource) : IShadowStore
                 await insert.ExecuteNonQueryAsync(cancellationToken);
             }
 
+            foreach (var score in session.Scores ?? [])
+            {
+                // the entry is found by its key in this session, inside the transaction; the database stamps the time and refuses a score at or after 09:00 India time of the session
+                await using var insert = new NpgsqlCommand("""
+                    INSERT INTO paper.shadow_scores (entry_id, model_id, model_sha256, feature_version, p_win, features_hash)
+                    SELECT id, @model, @sha, @version, @pwin, @features FROM paper.shadow_entries WHERE session_date = @date AND trade_key = @key
+                    """, connection, transaction);
+                var p = insert.Parameters;
+                p.AddWithValue("model", NpgsqlDbType.Bigint, score.ModelId);
+                p.AddWithValue("sha", NpgsqlDbType.Char, score.ModelSha256);
+                p.AddWithValue("version", NpgsqlDbType.Varchar, score.FeatureVersion);
+                p.AddWithValue("pwin", NpgsqlDbType.Double, score.PWin);
+                p.AddWithValue("features", NpgsqlDbType.Char, score.FeaturesHash);
+                p.AddWithValue("date", NpgsqlDbType.Date, session.SessionDate);
+                p.AddWithValue("key", NpgsqlDbType.Varchar, score.TradeKey);
+                await insert.ExecuteNonQueryAsync(cancellationToken);
+            }
+
             await transaction.CommitAsync(cancellationToken);
             return true;
         }

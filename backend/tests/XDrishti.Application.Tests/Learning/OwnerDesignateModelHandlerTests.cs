@@ -14,7 +14,7 @@ public sealed class OwnerDesignateModelHandlerTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private static OwnerDesignateModelHandler Handler(MlRollbackFixture f) => new(f.Store, f.Designate, NullLogger<OwnerDesignateModelHandler>.Instance);
+    private static OwnerDesignateModelHandler Handler(MlRollbackFixture f) => new(f.Registry, f.Store, f.Promote, f.Designate, NullLogger<OwnerDesignateModelHandler>.Instance);
 
     private static void Propose(MlRollbackFixture f, long model, string state)
     {
@@ -82,5 +82,33 @@ public sealed class OwnerDesignateModelHandlerTests
         other.IsSuccess.ShouldBeTrue();
         f.Registry.Models[7].Role.ShouldBe(ModelRole.Retired);
         f.Registry.Models[8].Role.ShouldBe(ModelRole.Champion);
+    }
+
+    [Fact]
+    public async Task Naming_a_champion_while_another_is_champion_goes_through_promotion_and_is_refused_with_its_reasons()
+    {
+        var f = new MlRollbackFixture();
+        f.Add(7, ModelRole.Champion);
+        f.Add(8, ModelRole.Challenger, 'b');
+
+        var result = await Handler(f).HandleAsync(new OwnerDesignateModelCommand(8, ModelRole.Champion, "better", "cli:xd"), Ct);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(MlSafetyErrors.PromotionRefusedCode);
+        f.Registry.Models[7].Role.ShouldBe(ModelRole.Champion);
+        f.Registry.Models[8].Role.ShouldBe(ModelRole.Challenger);
+        f.Registry.Designations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Naming_the_champion_that_is_champion_already_is_not_a_promotion_and_changes_nothing()
+    {
+        var f = new MlRollbackFixture();
+        f.Add(7, ModelRole.Champion);
+
+        var result = await Handler(f).HandleAsync(new OwnerDesignateModelCommand(7, ModelRole.Champion, "again", "cli:xd"), Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Changed.ShouldBeFalse();
     }
 }
