@@ -5,24 +5,36 @@ export type ReplayRunItem = Schemas['ReplayRunListItem'];
 export type ReplayRun = Schemas['ReplayRunView'];
 export type ReplayStartBody = Schemas['ReplayStartBody'];
 
-const root = ['simulation', 'replay'] as const;
+export const replayRoot = ['simulation', 'replay'] as const;
+const root = replayRoot;
 export const replayPollMs = 3_000;
 
 /** True while a run still moves: the screen reads it often, and stops when it is over. */
 export const isReplayActive = (state: string | undefined) =>
   state === 'queued' || state === 'running' || state === 'cancelling';
 
+/** How often to read again: only while something moves. Exported so the rule can be tested on its own. */
+export const runsInterval = (runs: readonly { state: string }[] | undefined) =>
+  runs?.some((run) => isReplayActive(run.state)) ? replayPollMs : false;
+export const runInterval = (run: { state: string } | undefined) => (isReplayActive(run?.state) ? replayPollMs : false);
+export const pairInterval = (
+  pair: { answer: string | null; frozen: { state: string }; learning: { state: string } } | undefined,
+) =>
+  pair?.answer === null && (isReplayActive(pair.frozen.state) || isReplayActive(pair.learning.state))
+    ? replayPollMs
+    : false;
+
 export const replayRunsQuery = queryOptions({
   queryKey: [...root, 'runs'],
   queryFn: async ({ signal }) => unwrap(await api.GET('/api/replay/runs', { params: { query: { take: 20 } }, signal })),
-  refetchInterval: (query) => (query.state.data?.some((run) => isReplayActive(run.state)) ? replayPollMs : false),
+  refetchInterval: (query) => runsInterval(query.state.data),
 });
 
 export const replayRunQuery = (id: string) =>
   queryOptions({
     queryKey: [...root, 'run', id],
     queryFn: async ({ signal }) => unwrap(await api.GET('/api/replay/runs/{id}', { params: { path: { id } }, signal })),
-    refetchInterval: (query) => (isReplayActive(query.state.data?.state) ? replayPollMs : false),
+    refetchInterval: (query) => runInterval(query.state.data),
   });
 
 /** The detail reads follow the run: they are read again while it runs (`active`), never after. */
@@ -57,12 +69,12 @@ export const replayTradesQuery = (id: string, active: boolean) =>
     refetchInterval: active ? replayPollMs : false,
   });
 
-export const replayPairQuery = (pairId: string, active: boolean) =>
+export const replayPairQuery = (pairId: string) =>
   queryOptions({
     queryKey: [...root, 'pair', pairId],
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/replay/pairs/{pairId}', { params: { path: { pairId } }, signal })),
-    refetchInterval: active ? replayPollMs : false,
+    refetchInterval: (query) => pairInterval(query.state.data),
   });
 
 /** What the start form offers: the stored risk profiles and the stored charge sheet, if any. */

@@ -13,8 +13,8 @@ export interface ReplayForm {
   riskProfileId: string;
   /** `gross`, or the id of a stored charge sheet. */
   costs: string;
-  /** Empty = the server's default. */
-  versions: '' | 'start' | 'asOf';
+  /** `start`: today's active versions (a hindsight, the default); `asOf`: the versions of each day. */
+  versions: 'start' | 'asOf';
   modes: ReplayModes;
   filtersWithoutHistory: boolean;
   includeResearchCells: boolean;
@@ -28,7 +28,7 @@ export const initialForm: ReplayForm = {
   capital: '1000000',
   riskProfileId: '',
   costs: 'gross',
-  versions: '',
+  versions: 'start',
   modes: 'frozen',
   filtersWithoutHistory: false,
   includeResearchCells: false,
@@ -59,7 +59,7 @@ export function toBody(f: ReplayForm): ReplayStartBody {
     capital: Number(f.capital),
     riskProfileId: f.riskProfileId === '' ? null : f.riskProfileId,
     costs: f.costs,
-    versions: f.versions === '' ? null : f.versions,
+    versions: f.versions,
     modes: modeList[f.modes],
     filtersWithoutHistory: f.filtersWithoutHistory,
     includeResearchCells: f.includeResearchCells,

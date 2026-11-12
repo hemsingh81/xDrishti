@@ -168,14 +168,11 @@ export function ReplayStartForm({ onStarted }: { onStarted: (runId: string) => v
             set({ versions: e.target.value as ReplayForm['versions'] });
           }}
         >
-          <MenuItem value="" sx={{ minHeight: 44 }}>
-            Today&apos;s versions (hindsight)
+          <MenuItem value="start" sx={{ minHeight: 44 }}>
+            Today&apos;s active versions (hindsight, default)
           </MenuItem>
           <MenuItem value="asOf" sx={{ minHeight: 44 }}>
             As of each day
-          </MenuItem>
-          <MenuItem value="start" sx={{ minHeight: 44 }}>
-            As of the start date
           </MenuItem>
         </TextField>
       </Box>
@@ -204,7 +201,7 @@ export function ReplayStartForm({ onStarted }: { onStarted: (runId: string) => v
               }}
             />
           }
-          label="FiltersWithoutHistory"
+          label="Skip event / F&O-ban / surveillance filters where no history exists (adds a hindsight label)"
         />
         <FormHelperText sx={{ mt: -0.5, ml: 4 }}>
           Adds a hindsight label: filters that have no stored history are applied as they are today.
@@ -218,7 +215,7 @@ export function ReplayStartForm({ onStarted }: { onStarted: (runId: string) => v
               }}
             />
           }
-          label="IncludeResearchCells"
+          label="Let research-stage cells trade (adds a hindsight label)"
         />
         <FormHelperText sx={{ mt: -0.5, ml: 4 }}>
           Adds a hindsight label: research cells are included, though they were not live then.

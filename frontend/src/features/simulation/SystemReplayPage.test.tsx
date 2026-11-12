@@ -7,6 +7,7 @@ import { buildBasket, buildRiskProfiles } from '@/test/fixtures';
 import { pinClock } from '@/test/pinClock';
 import { renderWithProviders } from '@/test/render';
 import { problemResponse, server } from '@/test/server';
+import { pairInterval, replayPollMs, runInterval, runsInterval } from './api/replayApi';
 import { SystemReplayPage } from './components/replay/SystemReplayPage';
 
 pinClock('2026-11-12T04:00:00Z');
@@ -101,8 +102,8 @@ const pairView = (over: Partial<Schemas['ReplayPairView']> = {}): Schemas['Repla
   pairId: PAIR,
   frozen: item(),
   learning: item({ id: LEARN, mode: 'learning' }),
-  answer: 'Too little history',
-  reason: 'Only 3 informative days; 20 are needed.',
+  answer: 'too_little_history',
+  reason: null,
   days: 10,
   informativeDays: 3,
   meanDailyDifference: null,
@@ -277,6 +278,14 @@ describe('system replay screen', () => {
     const tiles = await screen.findByRole('group', { name: 'Key figures' });
     expect(banner.compareDocumentPosition(tiles) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(tiles).getByText('12.00%')).toBeInTheDocument();
+    // Exposure 0.5 and hit rate 0.66 are fractions: shown as percents.
+    expect(within(tiles).getByText('50.00%')).toBeInTheDocument();
+    expect(within(tiles).getByText('66.00%')).toBeInTheDocument();
+    // The results come first; the form is folded away below them.
+    const toggle = screen.getByRole('button', { name: 'New replay' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(banner.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Start replay' })).not.toBeInTheDocument();
     expect(within(tiles).getByText('The 7th replay of this range')).toBeInTheDocument();
   });
 
@@ -297,9 +306,35 @@ describe('system replay screen', () => {
     });
     open();
     expect(await screen.findByRole('heading', { name: 'Frozen against learning' })).toBeInTheDocument();
-    expect(await screen.findByText('Too little history')).toBeInTheDocument();
-    expect(screen.getByText('Only 3 informative days; 20 are needed.')).toBeInTheDocument();
+    expect(await screen.findByText('Too little history to tell learning and frozen apart.')).toBeInTheDocument();
     expect(screen.getByText('60.00%')).toBeInTheDocument();
+  });
+
+  it('shows the pair interval and the mean daily difference as percents with three decimals', async () => {
+    setup({
+      runs: [item({ pairId: PAIR }), item({ id: LEARN, pairId: PAIR, mode: 'learning' })],
+      run: run({ pairId: PAIR }),
+      pair: pairView({
+        answer: 'learning_better',
+        meanDailyDifference: 0.0011,
+        low: -0.00012,
+        high: 0.00345,
+      }),
+    });
+    open();
+    expect(await screen.findByText('Learning did better than frozen on the informative days.')).toBeInTheDocument();
+    expect(screen.getByText('-0.012% to 0.345%')).toBeInTheDocument();
+    expect(screen.getByText('0.110%')).toBeInTheDocument();
+  });
+
+  it('shows no measurable difference as an ordinary answer', async () => {
+    setup({
+      runs: [item({ pairId: PAIR }), item({ id: LEARN, pairId: PAIR, mode: 'learning' })],
+      run: run({ pairId: PAIR }),
+      pair: pairView({ answer: 'no_measurable_difference' }),
+    });
+    open();
+    expect(await screen.findByText('No measurable difference between learning and frozen.')).toBeInTheDocument();
   });
 
   it('shows no pair card for a single run', async () => {
@@ -310,10 +345,22 @@ describe('system replay screen', () => {
   });
 
   it('shows a running replay as partial and cancels it', async () => {
+    let cancelled = false;
     const counts = setup({
       runs: [item({ state: 'running' })],
-      run: run({ state: 'running', completeness: completeness({ complete: false, sessionsDone: 4 }) }),
+      run: () =>
+        run({
+          state: cancelled ? 'cancelling' : 'running',
+          completeness: completeness({ complete: false, sessionsDone: 4 }),
+        }),
     });
+    server.use(
+      http.post('/api/replay/runs/:id/cancel', () => {
+        counts.cancel += 1;
+        cancelled = true;
+        return HttpResponse.json({ state: 'cancelling' }, { status: 202 });
+      }),
+    );
     const user = userEvent.setup();
     open();
     expect(await screen.findByText('4 of 10 sessions · as of 12 Jan 2024')).toBeInTheDocument();
@@ -322,6 +369,8 @@ describe('system replay screen', () => {
     await waitFor(() => {
       expect(counts.cancel).toBe(1);
     });
+    expect(await screen.findByText(/Cancelling after the session in flight/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
   });
 
   it('shows a cancelled replay and a failed one with the stored reason', async () => {
@@ -342,26 +391,59 @@ describe('system replay screen', () => {
     expect(await screen.findByText(/session 2024-01-05 had no bars/)).toBeInTheDocument();
   });
 
-  it('stops reading the run once it has finished', async () => {
-    let state = 'running';
-    const counts = setup({
-      runs: [item({ state: 'running' })],
-      run: () => run({ state }),
+  it('reads again only while something moves', () => {
+    expect(runInterval({ state: 'queued' })).toBe(replayPollMs);
+    expect(runInterval({ state: 'running' })).toBe(replayPollMs);
+    expect(runInterval({ state: 'cancelling' })).toBe(replayPollMs);
+    for (const state of ['completed', 'cancelled', 'failed']) expect(runInterval({ state })).toBe(false);
+    expect(runInterval(undefined)).toBe(false);
+    expect(runsInterval([{ state: 'completed' }, { state: 'running' }])).toBe(replayPollMs);
+    expect(runsInterval([{ state: 'completed' }])).toBe(false);
+    expect(runsInterval(undefined)).toBe(false);
+  });
+
+  it('reads the pair again only while it has no answer and a run moves', () => {
+    const view = (answer: string | null, frozen: string, learning: string) => ({
+      answer,
+      frozen: { state: frozen },
+      learning: { state: learning },
     });
-    // Poll quickly: the screen asks again every 3 seconds while the run moves.
-    open();
+    expect(pairInterval(view(null, 'completed', 'running'))).toBe(replayPollMs);
+    expect(pairInterval(view(null, 'running', 'completed'))).toBe(replayPollMs);
+    expect(pairInterval(view(null, 'completed', 'completed'))).toBe(false);
+    expect(pairInterval(view('learning_better', 'completed', 'running'))).toBe(false);
+    expect(pairInterval(undefined)).toBe(false);
+  });
+
+  it('reads the detail once more when the run leaves the running state', async () => {
+    let state = 'running';
+    const counts = setup({ runs: [item({ state: 'running' })], run: () => run({ state }) });
+    const view = open();
     await screen.findByText(/sessions/);
-    state = 'completed';
-    await waitFor(
-      () => {
-        expect(counts.run).toBeGreaterThan(1);
-      },
-      { timeout: 6_000 },
+    let equityReads = 0;
+    server.use(
+      http.get('/api/replay/runs/:id/equity', () => {
+        equityReads += 1;
+        return HttpResponse.json({
+          hindsight: [],
+          runId: RUN,
+          completeness: completeness(),
+          costsLabel: COSTS,
+          capital: 1_000_000,
+          benchmarkSymbol: null,
+          benchmarkReason: null,
+          cashComplete: true,
+          points: [],
+        });
+      }),
     );
-    const seen = counts.run;
-    await new Promise((resolve) => setTimeout(resolve, 3_500));
-    expect(counts.run).toBeLessThanOrEqual(seen + 1);
-  }, 20_000);
+    state = 'completed';
+    await view.client.invalidateQueries({ queryKey: ['simulation', 'replay', 'run'] });
+    await waitFor(() => {
+      expect(equityReads).toBeGreaterThan(0);
+    });
+    expect(counts.run).toBeGreaterThan(1);
+  });
 
   describe('start form', () => {
     it('refuses a missing start date before anything is sent', async () => {
@@ -378,8 +460,8 @@ describe('system replay screen', () => {
       const user = userEvent.setup();
       open();
       await user.type(await screen.findByLabelText(/From/), '2024-01-01');
-      expect(screen.getByLabelText('FiltersWithoutHistory')).not.toBeChecked();
-      expect(screen.getByLabelText('IncludeResearchCells')).not.toBeChecked();
+      expect(screen.getByLabelText(/Skip event \/ F&O-ban/)).not.toBeChecked();
+      expect(screen.getByLabelText(/Let research-stage cells trade/)).not.toBeChecked();
       expect(screen.getByText(/Adds a hindsight label: filters/)).toBeInTheDocument();
       await user.click(screen.getByRole('radio', { name: 'Both (compared)' }));
       await user.click(screen.getByRole('button', { name: 'Start replay' }));
@@ -391,11 +473,31 @@ describe('system replay screen', () => {
         to: null,
         capital: 1000000,
         costs: 'gross',
-        versions: null,
+        versions: 'start',
         modes: ['frozen', 'learning'],
         filtersWithoutHistory: false,
         includeResearchCells: false,
       });
+    });
+
+    it('goes to the started run when the API answers 202', async () => {
+      setup({ runs: [] });
+      const user = userEvent.setup();
+      const view = open();
+      await user.type(await screen.findByLabelText(/From/), '2024-01-01');
+      await user.click(screen.getByRole('button', { name: 'Start replay' }));
+      await waitFor(() => {
+        expect(view.router.state.location.search).toBe(`?run=${RUN}`);
+      });
+    });
+
+    it("offers only the two versions rules, today's active versions first", async () => {
+      setup({ runs: [] });
+      const user = userEvent.setup();
+      open();
+      await user.click(await screen.findByRole('combobox', { name: 'Versions rule' }));
+      const options = screen.getAllByRole('option').map((o) => o.textContent);
+      expect(options).toEqual(["Today's active versions (hindsight, default)", 'As of each day']);
     });
 
     it.each([

@@ -44,7 +44,7 @@ export function ReplaySessionTable({ runId, active }: { runId: string; active: b
                     <TableCell align="right">Blocked</TableCell>
                     <TableCell align="right">P&amp;L</TableCell>
                     <TableCell align="right">Equity</TableCell>
-                    <TableCell align="right">Drawdown</TableCell>
+                    <TableCell align="right">Max drawdown so far</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>

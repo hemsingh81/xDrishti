@@ -1,7 +1,8 @@
 import { Alert, Box } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { ErrorState, LoadingState } from '@/shared/ui';
-import { isReplayActive, replayRunQuery } from '../../api/replayApi';
+import { isReplayActive, replayRoot, replayRunQuery } from '../../api/replayApi';
 import { HindsightBanner } from './HindsightBanner';
 import { PairCard } from './PairCard';
 import { ReplayCharts } from './ReplayCharts';
@@ -11,8 +12,17 @@ import { ReplaySessionTable } from './ReplaySessionTable';
 import { ReplayTrades } from './ReplayTrades';
 
 /** One run: the hindsight banner first, then the progress, the figures, the curve, the sessions, the trades and the pair. */
-export function ReplayResults({ runId, bothModes }: { runId: string; bothModes: boolean }) {
+export function ReplayResults({ runId }: { runId: string }) {
   const run = useQuery(replayRunQuery(runId));
+  const queryClient = useQueryClient();
+  const state = run.data?.state;
+  const wasActive = useRef(false);
+  // When the run leaves an active state, read everything once more so the detail ends on its final figures.
+  useEffect(() => {
+    const active = isReplayActive(state);
+    if (wasActive.current && !active) void queryClient.invalidateQueries({ queryKey: replayRoot });
+    wasActive.current = active;
+  }, [state, queryClient]);
   if (run.isPending) return <LoadingState label="Loading the replay…" />;
   if (run.isError) return <ErrorState error={run.error} />;
   const r = run.data;
@@ -30,7 +40,7 @@ export function ReplayResults({ runId, bothModes }: { runId: string; bothModes: 
       <ReplayCharts runId={r.id} active={active} />
       <ReplaySessionTable runId={r.id} active={active} />
       <ReplayTrades runId={r.id} active={active} />
-      {bothModes && r.pairId && <PairCard pairId={r.pairId} active={active} />}
+      {r.pairId && <PairCard pairId={r.pairId} />}
     </Box>
   );
 }
