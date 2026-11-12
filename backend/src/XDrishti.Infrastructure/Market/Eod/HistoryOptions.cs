@@ -30,6 +30,17 @@ internal sealed class HistoryOptions
     [ValidateObjectMembers]
     public ProbeOptions Probe { get; set; } = new();
 
+    [Required]
+    [ValidateObjectMembers]
+    public ReplayOptions Replay { get; set; } = new();
+
+    /// <summary>What a simulation does with backfilled pre-seam bars (CF-04d, ADR 0273).</summary>
+    internal sealed class ReplayOptions
+    {
+        /// <summary><c>Data:History:Replay:AdmitVerified</c>, default false. On: the pre-seam bars of an instrument that is proven verified enter a run, adjusted by the seam rule. Flip it between jobs, not during one.</summary>
+        public bool AdmitVerified { get; set; }
+    }
+
     internal sealed class NseOptions
     {
         /// <summary><c>Data:History:Nse:Enabled</c>, default false: with it off the job and the probe make no request at all.</summary>

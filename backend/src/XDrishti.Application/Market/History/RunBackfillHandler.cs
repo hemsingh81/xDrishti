@@ -107,6 +107,15 @@ internal sealed class RunBackfillHandler(
             }
         }
 
+        if (!command.DryRun && pending == 0)
+        {
+            // CF-04d: nothing to fetch, but the continuity check is local and writes the basis it ran on; it is what re-verifies an instrument after a re-probe, so it runs here too (no Dhan needed)
+            foreach (var work in works.Where(AllFinished))
+            {
+                await CheckSeamAsync(work, stats, cancellationToken);
+            }
+        }
+
         if (command.DryRun || pending == 0)
         {
             return Result.Success(Summary(command.DryRun, list.Count, pending, estimate, stats, null));
@@ -244,13 +253,16 @@ internal sealed class RunBackfillHandler(
             work.Ledger[chunk.From] = new ChunkRecord(target.InstrumentId, chunk.From, chunk.To, outcome.Status, outcome.Rows, attempts, outcome.Error);
         }
 
-        if (work.Chunks.All(c => work.Ledger.GetValueOrDefault(c.From) is { Status: ChunkStatus.Done or ChunkStatus.Empty } finished && finished.To == c.To))
+        if (AllFinished(work))
         {
             await CheckSeamAsync(work, stats, cancellationToken);
         }
 
         return null;
     }
+
+    private static bool AllFinished(Work work) =>
+        work.Chunks.All(c => work.Ledger.GetValueOrDefault(c.From) is { Status: ChunkStatus.Done or ChunkStatus.Empty } finished && finished.To == c.To);
 
     private async ValueTask<ChunkOutcome> RunChunkAsync(Work work, BackfillChunk chunk, int attempts, Stats stats, CancellationToken cancellationToken)
     {
@@ -332,7 +344,8 @@ internal sealed class RunBackfillHandler(
     private async ValueTask CheckSeamAsync(Work work, Stats stats, CancellationToken cancellationToken)
     {
         var id = work.Target.InstrumentId;
-        var before = await bars.ReadAsync(id, work.Seam.AddDays(-10), work.Seam.AddMinutes(-1), cancellationToken);
+        var seamDay = Midnight(IndiaTime.Today(work.Seam));   // pre-seam is by date (CF-04d): the seam day itself is a pure CSV day
+        var before = await bars.ReadAsync(id, seamDay.AddDays(-10), seamDay, cancellationToken);
         var after = await bars.ReadAsync(id, work.Seam, work.Seam.AddDays(1), cancellationToken);
         if (before.Count == 0 || after.Count == 0)
         {
@@ -340,7 +353,8 @@ internal sealed class RunBackfillHandler(
         }
 
         var through = (await actionQueries.ListCsvAdjustedThroughAsync([id], cancellationToken)).TryGetValue(id, out var date) ? date : (DateOnly?)null;
-        var factors = new SourceAwareFactors(await adjustments.GetAsync(id, cancellationToken), IndiaTime.Today(work.Seam), through);
+        var plain = await adjustments.GetAsync(id, cancellationToken);
+        var factors = new SourceAwareFactors(plain, IndiaTime.Today(work.Seam), through);
         var last = before[^1];
         var first = after[0];
         var lastClose = factors.Price(last.Close, SessionClock.DateOf(last.EpochSeconds));
@@ -348,9 +362,12 @@ internal sealed class RunBackfillHandler(
         var jump = SeamContinuity.IsJump(lastClose, firstOpen);
         var move = SeamContinuity.Move(lastClose, firstOpen);
         var record = (await store.ListSeamsAsync([id], cancellationToken)).GetValueOrDefault(id);
-        if (record is null || record.SeamJump != jump)
+        var basis = SeamBasis.Of(work.Seam, plain.Actions, through);
+        var jumpPct = move * 100;
+        if (record is null || record.SeamJump != jump || record.ContinuityBasis != basis || record.JumpPct != jumpPct)
         {
-            await store.SaveSeamAsync((record ?? new SeamRecord(id, work.Seam, ProbeStatus.None, null, null, null, null, false, null)) with { SeamJump = jump, JumpPct = move * 100 }, cancellationToken);
+            // CF-04d: the check writes its basis, verdict and move on every run, so "never ran" (null basis) is never confused with "ran and found no jump"
+            await store.SaveSeamAsync((record ?? new SeamRecord(id, work.Seam, ProbeStatus.None, null, null, null, null, false, null)) with { SeamJump = jump, JumpPct = jumpPct, ContinuityBasis = basis }, cancellationToken);
         }
 
         if (jump)

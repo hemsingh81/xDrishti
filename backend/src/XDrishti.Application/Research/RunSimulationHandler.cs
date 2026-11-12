@@ -345,7 +345,8 @@ internal sealed class RunSimulationHandler(
                 resultsDays is null ? null : new ResultsDaysRecord(resultsDays.Calendar?.Sha256 ?? "-", resultsDays.Calendar?.RowCount ?? 0, resultsDays.FilingsSha256, resultsDays.FilingCount, resultsDays.LagMinutes, ResultsDaySeries.Version, resultsDays.Surprises?.Sha256, resultsDays.Surprises?.Rows ?? 0, resultsDays.Surprises is null ? null : SurpriseInputs.Version, resultsDays.Surprises?.UnverifiedRows ?? 0, resultsDays.Surprises?.Seasons ?? 0, resultsDays.Surprises?.ThinSeasons ?? 0, missed.Missed, missed.Total),
                 Purpose: request.Purpose,
                 RelativeStrength: context.RelativeStrength?.Record(replays[k].Sum(r => r.Record.Scans.Sum(s => s.FeatureUnknown))),
-                UniverseBasis: targets.Basis);
+                UniverseBasis: targets.Basis,
+                BackfillAdmission: context.Admission.Record());
             firstHeader ??= header;
             runs.Add(RunAssembler.Assemble(header, replays[k]));
         }
@@ -550,10 +551,13 @@ internal sealed class RunSimulationHandler(
         }
 
         var request = context.Request;
-        var (raw, factors) = await _reader.ReadAsync(id, request.To, cancellationToken);
+        var read = await _reader.ReadAsync(id, request.To, context.CsvThrough.TryGetValue(id, out var through) ? through : null, cancellationToken);
+        context.Admission.Count(read.Decision);
+        var (raw, factors) = (read.Bars, read.Factors);
         var built = InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.ContextDays, context.ContextDays is { Count: > 0 } ? null : (context.ContextDays is null ? null : "no_context"), context.Events, context.ResultsDays,
             request.Fills?.ConservativeSlippage == true && entryTiers is not null ? await entryTiers.ForAsync(id, request.From, request.To, cancellationToken) : null,
-            context.ReadsTurnover && entryTiers is not null ? await entryTiers.TurnoverForAsync(id, request.From, request.To, cancellationToken) : null);
+            context.ReadsTurnover && entryTiers is not null ? await entryTiers.TurnoverForAsync(id, request.From, request.To, cancellationToken) : null,
+            read.Decision.Admitted);
         if (context.Targets.Dated is { } dated)
         {
             built = built with { MemberOn = dated.Of(id) };   // BK-11b: a leaver keeps no new entries; a position already open is never force-closed
@@ -575,5 +579,9 @@ internal sealed class RunSimulationHandler(
         EventCalendarSnapshot? Events,
         ResultsDayInputs? ResultsDays = null,
         bool ReadsTurnover = false,
-        IRelativeStrengthRun? RelativeStrength = null);
+        IRelativeStrengthRun? RelativeStrength = null)
+    {
+        /// <summary>What the admission rule said about each instrument with a seam row, for the label line (CF-04d).</summary>
+        public AdmissionTally Admission { get; } = new();
+    }
 }

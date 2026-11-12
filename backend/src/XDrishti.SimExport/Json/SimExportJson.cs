@@ -89,10 +89,21 @@ public static class SimExportJson
             return;
         }
 
+        if (typeInfo.Type == typeof(InstrumentRun))
+        {
+            // CF-04d: pre_seam exists only for an instrument whose pre-seam bars were admitted, so every other record text and hash is as before
+            foreach (var property in typeInfo.Properties.Where(p => string.Equals(p.Name, "pre_seam", StringComparison.Ordinal)))
+            {
+                property.ShouldSerialize = static (_, value) => value is not null;
+            }
+
+            return;
+        }
+
         if (typeInfo.Type == typeof(SimulationRun))
         {
-            // BK-11b: universe_basis exists only for a basket run that named a members basis, so every other record text and hash is as before
-            foreach (var property in typeInfo.Properties.Where(p => string.Equals(p.Name, "relative_strength", StringComparison.Ordinal) || string.Equals(p.Name, "universe_basis", StringComparison.Ordinal)))
+            // BK-11b: universe_basis exists only for a basket run that named a members basis, so every other record text and hash is as before; CF-04d: backfill_admission only for a run that counted a seam row
+            foreach (var property in typeInfo.Properties.Where(p => string.Equals(p.Name, "relative_strength", StringComparison.Ordinal) || string.Equals(p.Name, "universe_basis", StringComparison.Ordinal) || string.Equals(p.Name, "backfill_admission", StringComparison.Ordinal)))
             {
                 property.ShouldSerialize = static (_, value) => value is not null;
             }

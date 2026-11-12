@@ -85,14 +85,16 @@ internal sealed class ExtractTradeFeaturesHandler(
         foreach (var group in trades.GroupBy(t => t.InstrumentId))
         {
             var last = group.Max(t => SessionClock.DateOf(t.DecisionEpochSeconds));
-            var raw = await SeamAwareBars.ReadAsync(bars, seams, group.Key, SimulationBounds.From, SimulationBounds.Until(last), cancellationToken);
+            // the training sees the bars the run saw: an instrument admitted by the run's rule gets its pre-seam bars here too (CF-04d)
+            var read = await SeamAwareBars.ReadForRunAsync(bars, seams, group.Key, await adjustments.GetAsync(group.Key, cancellationToken), await adjustments.CsvAdjustedThroughAsync(group.Key, cancellationToken), SimulationBounds.From, SimulationBounds.Until(last), cancellationToken);
+            var raw = read.Bars;
             if (raw.Count == 0)
             {
                 noBars += group.Count();
                 continue;
             }
 
-            var factors = await adjustments.GetAsync(group.Key, cancellationToken);
+            var factors = read.Factors;
             var decisions = group.Select(t => new TradeFeatureDecision(t.Key, t.Timeframe, t.DecisionEpochSeconds, t.Side, t.StopPrice, t.TargetPrice)).ToList();
             var values = extractor.Extract(raw, factors, calendar, decisions);
             foreach (var t in group)

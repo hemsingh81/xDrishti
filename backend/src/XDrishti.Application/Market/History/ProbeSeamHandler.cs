@@ -168,14 +168,14 @@ internal sealed class ProbeSeamHandler(
         BackfillLog.ProbeDone(logger, target.Symbol, verdictName, verdict.MedianBps, verdict.WithinMaxPct, verdict.Compared);
         if (verdict.Verdict != SeamProbeVerdict.NoOverlap)
         {
-            await SaveAsync(target.InstrumentId, seam.Value, verdict, cancellationToken);
+            await SaveAsync(target.InstrumentId, seam.Value, verdict, SeamBasis.Of(seam.Value, factors.Actions, through), cancellationToken);
         }
 
         var text = string.Create(CultureInfo.InvariantCulture, $"{target.Symbol}: {verdict.Verdict.ToString().ToLowerInvariant()} (median {verdict.MedianBps:F2} bps, {verdict.WithinMaxPct:F1} % within {limits.MaxBps:F0} bps, {verdict.Compared} minutes)");
         return ProbeOutcome.Of(verdict.Verdict switch { SeamProbeVerdict.Passed => 0, SeamProbeVerdict.Failed => 1, _ => 2 }, text, requests);
     }
 
-    private async ValueTask SaveAsync(Guid id, DateTimeOffset seam, SeamProbeResult verdict, CancellationToken cancellationToken)
+    private async ValueTask SaveAsync(Guid id, DateTimeOffset seam, SeamProbeResult verdict, string basis, CancellationToken cancellationToken)
     {
         var record = (await store.ListSeamsAsync([id], cancellationToken)).GetValueOrDefault(id) ?? new SeamRecord(id, seam, ProbeStatus.None, null, null, null, null, false, null);
         var passed = verdict.Verdict == SeamProbeVerdict.Passed;
@@ -187,6 +187,7 @@ internal sealed class ProbeSeamHandler(
                 ProbedAt = clock.GetUtcNow(),
                 MedianBps = verdict.MedianBps,
                 WithinMaxPct = verdict.WithinMaxPct,
+                ProbeBasis = passed ? basis : null,   // CF-04d: the basis a pass rests on; a fail clears it
                 Detail = passed ? null : "Dhan's bars do not match the CSV basis after the seam adjustment",
             },
             cancellationToken);

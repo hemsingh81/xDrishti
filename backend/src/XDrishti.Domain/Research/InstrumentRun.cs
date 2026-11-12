@@ -34,6 +34,7 @@ namespace XDrishti.Domain.Research;
 /// <param name="Fates">What became of every candidate outcome.</param>
 /// <param name="CandidatesInWindow">Candidates whose decision date is in the window (a rule that fires only before <c>From</c> is visible).</param>
 /// <param name="TradesInWindow">Trades dated in the window, <c>EndOfData</c> ones included (<c>Fates.Trades + Fates.OpenAtEnd</c>).</param>
+/// <param name="PreSeam">Set only when the instrument's backfilled pre-seam bars were admitted (CF-04d): its seam date and the basis hash. Null for every other instrument.</param>
 public sealed record InstrumentRun(
     Guid InstrumentId,
     string Symbol,
@@ -59,7 +60,8 @@ public sealed record InstrumentRun(
     WalkCounters Walk,
     RunFates Fates,
     long CandidatesInWindow,
-    long TradesInWindow)
+    long TradesInWindow,
+    PreSeamRecord? PreSeam = null)
 {
     /// <summary>The most session notes a record keeps; the counts are exact beyond it.</summary>
     public const int MaxNotes = 100;

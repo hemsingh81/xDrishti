@@ -117,7 +117,8 @@ internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQuer
             return Stale(record, SimulationErrors.StaleInstrumentMissing, "the instrument is no longer in the master");
         }
 
-        var (raw, factors) = await _reader.ReadAsync(record.InstrumentId, run.To, cancellationToken);
+        var read = await _reader.ReadAsync(record.InstrumentId, run.To, basis is not null && basis.CsvThrough.TryGetValue(record.InstrumentId, out var through) ? through : null, cancellationToken);
+        var (raw, factors) = (read.Bars, read.Factors);
 
         if (!string.Equals(BarStreamHash.Compute(raw), record.BarsSha256, StringComparison.Ordinal))
         {
@@ -143,7 +144,7 @@ internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQuer
             // the lookups are read before the input is built, so that no filings-typed value is held across an await (the layering test of the event filter)
             var tierOn = basis.Conservative && basis.Tiers is not null ? await basis.Tiers.ForAsync(record.InstrumentId, run.From, run.To, cancellationToken) : null;
             var turnoverOn = basis.Strategy.ReadsTurnover && basis.Tiers is not null ? await basis.Tiers.TurnoverForAsync(record.InstrumentId, run.From, run.To, cancellationToken) : null;
-            var input = InstrumentInputReader.Build(record.InstrumentId, instrument, raw, factors, run.AcknowledgeCsvAdjusted, basis.Calendar, basis.CsvThrough, run.Options, run.From, run.To, null, basis.ContextDays, basis.ContextDays is { Count: > 0 } ? null : "no_context", basis.Events, basis.ResultsDays, tierOn, turnoverOn);
+            var input = InstrumentInputReader.Build(record.InstrumentId, instrument, raw, factors, run.AcknowledgeCsvAdjusted, basis.Calendar, basis.CsvThrough, run.Options, run.From, run.To, null, basis.ContextDays, basis.ContextDays is { Count: > 0 } ? null : "no_context", basis.Events, basis.ResultsDays, tierOn, turnoverOn, read.Decision.Admitted);
             input = basis.Members is { } dated ? input with { MemberOn = dated.Of(record.InstrumentId) } : input;   // BK-11b: the same entries are refused as in the dated run
             var requests = trades.Select(t => new ExplainRequest(t.Trade.Key, t.Trade.DecisionEpochSeconds, t.Trade.Side)).ToList();
             var answer = engine.Explain(basis.Strategy, input, requests);

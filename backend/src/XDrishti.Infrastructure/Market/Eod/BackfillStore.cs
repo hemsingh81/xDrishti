@@ -8,7 +8,7 @@ namespace XDrishti.Infrastructure.Market.Eod;
 /// <c>market.backfill_chunks</c> (the resumable ledger of the 1-minute backfill) and <c>market.backfill_seams</c> (the seam each instrument was planned against, the overlap probe's outcome and the continuity flag) by plain SQL, plus the three small reads the rest of the
 /// system has of them: the seam for the simulation (<see cref="IBackfillSeams"/>) and the unfinished work for the AU-12 gate (<see cref="IBackfillProgress"/>). The seam itself is always the oldest stored bar of source <c>csv</c>, never the file log (CF-04 review fix 2).
 /// </summary>
-internal sealed class BackfillStore(NpgsqlDataSource dataSource) : IBackfillStore, IBackfillSeams, IBackfillProgress
+internal sealed class BackfillStore(NpgsqlDataSource dataSource, IBackfillSettings settings) : IBackfillStore, IBackfillSeams, IBackfillProgress
 {
     public async ValueTask<DateTimeOffset?> CurrentSeamAsync(Guid instrumentId, CancellationToken cancellationToken)
     {
@@ -28,7 +28,7 @@ internal sealed class BackfillStore(NpgsqlDataSource dataSource) : IBackfillStor
         }
 
         await using var command = dataSource.CreateCommand("""
-            SELECT instrument_id, seam_at, probe_status, probed_at, median_bps, within_max_pct, detail, seam_jump, jump_pct
+            SELECT instrument_id, seam_at, probe_status, probed_at, median_bps, within_max_pct, detail, seam_jump, jump_pct, probe_basis, continuity_basis
             FROM market.backfill_seams WHERE instrument_id = ANY(@ids)
             """);
         command.Parameters.Add(new NpgsqlParameter("ids", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = instrumentIds.ToArray() });
@@ -44,7 +44,9 @@ internal sealed class BackfillStore(NpgsqlDataSource dataSource) : IBackfillStor
                 reader.IsDBNull(5) ? null : reader.GetDouble(5),
                 reader.IsDBNull(6) ? null : reader.GetString(6),
                 reader.GetBoolean(7),
-                reader.IsDBNull(8) ? null : reader.GetDouble(8));
+                reader.IsDBNull(8) ? null : reader.GetDouble(8),
+                reader.IsDBNull(9) ? null : reader.GetString(9),
+                reader.IsDBNull(10) ? null : reader.GetString(10));
             map[record.InstrumentId] = record;
         }
 
@@ -55,11 +57,12 @@ internal sealed class BackfillStore(NpgsqlDataSource dataSource) : IBackfillStor
     {
         ArgumentNullException.ThrowIfNull(seam);
         await using var command = dataSource.CreateCommand("""
-            INSERT INTO market.backfill_seams (instrument_id, seam_at, high_water_at, probe_status, probed_at, median_bps, within_max_pct, detail, seam_jump, jump_pct, updated_at)
-            VALUES (@id, @seam, @seam, @probe, @probed, @median, @within, @detail, @jump, @jump_pct, now())
+            INSERT INTO market.backfill_seams (instrument_id, seam_at, high_water_at, probe_status, probed_at, median_bps, within_max_pct, detail, seam_jump, jump_pct, probe_basis, continuity_basis, updated_at)
+            VALUES (@id, @seam, @seam, @probe, @probed, @median, @within, @detail, @jump, @jump_pct, @probe_basis, @continuity_basis, now())
             ON CONFLICT (instrument_id) DO UPDATE SET
                 seam_at = EXCLUDED.seam_at, high_water_at = GREATEST(market.backfill_seams.high_water_at, EXCLUDED.high_water_at), probe_status = EXCLUDED.probe_status, probed_at = EXCLUDED.probed_at, median_bps = EXCLUDED.median_bps,
-                within_max_pct = EXCLUDED.within_max_pct, detail = EXCLUDED.detail, seam_jump = EXCLUDED.seam_jump, jump_pct = EXCLUDED.jump_pct, updated_at = EXCLUDED.updated_at
+                within_max_pct = EXCLUDED.within_max_pct, detail = EXCLUDED.detail, seam_jump = EXCLUDED.seam_jump, jump_pct = EXCLUDED.jump_pct,
+                probe_basis = EXCLUDED.probe_basis, continuity_basis = EXCLUDED.continuity_basis, updated_at = EXCLUDED.updated_at
             """);
         command.Parameters.AddWithValue("id", seam.InstrumentId);
         command.Parameters.AddWithValue("seam", seam.SeamAt);
@@ -70,6 +73,8 @@ internal sealed class BackfillStore(NpgsqlDataSource dataSource) : IBackfillStor
         command.Parameters.Add(new NpgsqlParameter("detail", NpgsqlDbType.Varchar) { Value = (object?)seam.Detail ?? DBNull.Value });
         command.Parameters.AddWithValue("jump", seam.SeamJump);
         command.Parameters.Add(new NpgsqlParameter("jump_pct", NpgsqlDbType.Double) { Value = (object?)seam.JumpPct ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("probe_basis", NpgsqlDbType.Char) { Value = (object?)seam.ProbeBasis ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("continuity_basis", NpgsqlDbType.Char) { Value = (object?)seam.ContinuityBasis ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -157,6 +162,37 @@ internal sealed class BackfillStore(NpgsqlDataSource dataSource) : IBackfillStor
         command.Parameters.AddWithValue("id", instrumentId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken) ? reader.GetFieldValue<DateTimeOffset>(0) : null;
+    }
+
+    // CF-04d: the stored facts of the admission rule. With the switch off a run reads nothing (no scan, byte-equal behaviour); a report (xd data history) reads them and treats the switch as on.
+    public async ValueTask<SeamAdmissionFacts?> AdmissionFactsAsync(Guid instrumentId, bool forReport, CancellationToken cancellationToken)
+    {
+        if (!settings.AdmitVerified && !forReport)
+        {
+            return SeamAdmissionFacts.Off;
+        }
+
+        var record = (await ListSeamsAsync([instrumentId], cancellationToken)).GetValueOrDefault(instrumentId);
+        if (record is null)
+        {
+            return new SeamAdmissionFacts(true, null, null, null, false);
+        }
+
+        var highWater = await SeamOfAsync(instrumentId, cancellationToken);
+        var current = await CurrentSeamAsync(instrumentId, cancellationToken);
+        await using var command = dataSource.CreateCommand("SELECT EXISTS (SELECT 1 FROM market.backfill_chunks WHERE instrument_id = @id AND status IN ('planned', 'failed'))");
+        command.Parameters.AddWithValue("id", instrumentId);
+        var unfinished = (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? true);
+        return new SeamAdmissionFacts(true, record, current, highWater, unfinished);
+    }
+
+    public async ValueTask<bool> HasDhanBarsAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT EXISTS (SELECT 1 FROM market.bars_1m WHERE instrument_id = @id AND source = 'dhan' AND ts >= @from AND ts < @to)");
+        command.Parameters.AddWithValue("id", instrumentId);
+        command.Parameters.AddWithValue("from", from);
+        command.Parameters.AddWithValue("to", to);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? true);
     }
 
     public async ValueTask<int> UnfinishedInstrumentsAsync(CancellationToken cancellationToken)

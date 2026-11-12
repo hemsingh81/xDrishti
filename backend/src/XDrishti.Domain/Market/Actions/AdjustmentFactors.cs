@@ -18,8 +18,15 @@ public sealed class AdjustmentFactors
 
     private readonly double[] _suffix;
 
-    private AdjustmentFactors(AppliedAction[] actions)
+    // Source-aware mode (CF-04d): null for the plain rule. A bar dated before _seam is Dhan's raw backfill and takes every action after it; a bar at or after it is a CSV bar, already adjusted at source through _through.
+    private readonly DateOnly? _seam;
+
+    private readonly DateOnly? _csvAdjustedThrough;
+
+    private AdjustmentFactors(AppliedAction[] actions, DateOnly? seam = null, DateOnly? csvAdjustedThrough = null)
     {
+        _seam = seam;
+        _csvAdjustedThrough = csvAdjustedThrough;
         _actions = actions;
         _suffix = new double[actions.Length + 1];
         _suffix[actions.Length] = 1.0;
@@ -41,8 +48,22 @@ public sealed class AdjustmentFactors
         return sorted.Length == 0 ? None : new AdjustmentFactors(sorted);
     }
 
-    /// <summary>The factor for a bar dated <paramref name="barDate"/>: the product of the factors of all actions whose ex-date is after it (1 when none).</summary>
-    public double FactorAt(DateOnly barDate) => _suffix[FirstAfter(barDate)];
+    /// <summary>
+    /// The same actions in source-aware mode (CF-04d, ADR 0273): <see cref="FactorAt"/> then follows <see cref="XDrishti.Domain.Market.History.SourceAwareFactors"/>, the oracle. A bar dated before <paramref name="seamDate"/> takes every action whose ex-date is after it; a bar at or after the seam is a CSV bar
+    /// that is already adjusted through <paramref name="csvAdjustedThrough"/> and takes the actions whose ex-date is after both its date and that date. <see cref="Actions"/> and <see cref="ActionsAfter"/> are unchanged.
+    /// </summary>
+    public AdjustmentFactors SourceAware(DateOnly seamDate, DateOnly? csvAdjustedThrough) => _actions.Length == 0 ? this : new AdjustmentFactors(_actions, seamDate, csvAdjustedThrough);
+
+    /// <summary>The factor for a bar dated <paramref name="barDate"/>: the product of the factors of all actions whose ex-date is after it (1 when none); in source-aware mode, see <see cref="SourceAware"/>.</summary>
+    public double FactorAt(DateOnly barDate)
+    {
+        if (_seam is { } seam && barDate >= seam && _csvAdjustedThrough is { } through && through > barDate)
+        {
+            return _suffix[FirstAfter(through)];
+        }
+
+        return _suffix[FirstAfter(barDate)];
+    }
 
     /// <summary>The actions that change the bars dated <paramref name="barDate"/> (ex-date after it), by ex-date ascending.</summary>
     public IReadOnlyList<AppliedAction> ActionsAfter(DateOnly barDate)
