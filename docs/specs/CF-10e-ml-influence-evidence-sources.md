@@ -1,6 +1,6 @@
 # CF-10e — The three evidence sources of the ML influence gate
 
-- **Status:** Approved (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended). Not built. Part a waits for HO-01.
+- **Status:** Parts 1–2 built 2026-11-12, part 3 waits for HO-01, not deployed. (Approved: coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended.)
 - **Phase / roadmap row:** CF — Confidence programme, row CF-10e (after CF-10 10a–10d; GAP-04 of the 2026-11-12 due-diligence review)
 - **Size:** about 6.5 agent-days in three parts (estimate, uncalibrated): **10e-1** scores on shadow candidates and the forward figures 2.5 d · **10e-2** the calibration alarm from the stored monitor 1 d · **10e-3** the hold-out scoring pass 3 d. Build order 10e-1, 10e-2, then 10e-3 once HO-01 is decided and built.
 - **Needs:** CF-10 (built, ADRs 0214–0217, 0220), CF-08 shadow record (ADR 0211), CF-06 hold-out (ADR 0207); part a also needs **HO-01** (`docs/specs/HO-01-hold-out-epochs.md`, Draft, owner decision).
@@ -131,3 +131,12 @@ The gate `MlMayInfluence` (ADR 0217) can say "yes" for a model that earned it. T
 ## Done when
 - [ ] Every AC has evidence; `scripts/check.sh` green; Opus reviewer: no blockers or majors.
 - [ ] Migrations added; `gen-api` run; an ADR amending 0217 and 0220 written; docs/design/09 updated; roadmap row.
+
+## As built (parts 10e-1 and 10e-2, 2026-11-12, ADR 0281)
+- **Scores.** Migration `AddShadowScores` (raw SQL, insert-only, database-stamped time, refused from 09:00 India time, unique per entry and model). `ShadowScorer` (Application/Shadow) scores the champion and the challengers, up to five, for every candidate; the writer stores the scores in the session's transaction and a failed scoring writes the session without scores. Features: the extractor given only bars before the close preceding the session, plus the newest stored cell statistics before the session; no imputation.
+- **Forward figures.** `ShadowForwardFigures` (Domain, pure) behind `ShadowMlInfluenceEvidence`, read through `IShadowScoreReader` (graded, counts-for-edge candidates).
+- **Calibration (10e-2).** `ShadowRollbackEvidence` feeds the champion's graded scores to the P6-09 detector inside the monitor; `ShadowMlInfluenceEvidence` reads the newest `ml_monitor_checks` row: Fires true, Quiet false, anything else, no row or a row older than the last closed session null.
+- **D6.** `OwnerDesignateModelHandler` asks `PromoteChallengerCommand` (actor `owner:` plus the command line's actor) when a different champion exists. The tripwire test stays green and unchanged.
+- **Hold-out (10e-3) not built.** The hold-out source is still "unavailable", so the gate still refuses every model. No endpoint, setting, verb or UI of part a exists yet; AC 5 and 6 are open.
+- **Deviations / shortcuts.** The cap of five models is a constant, not `Confidence:MlInfluence:MaxScoredModels`. A win is R above zero. The known-at instant of an observation is the close of the candidate's session. Cell features need a stored cash snapshot of window `all` before the session, else the candidate gets no score. The scorer reads 730 days of bars per instrument (a monthly cell gets no score); the nightly time is logged. No API change, so no `gen-api`. The interval in `MlInfluenceView` belongs to part a.
+- **Evidence.** Unit: `ShadowForwardFiguresTests` (6), `ShadowEvidenceTests` (8), `ShadowScorerTests` (4, including the no-look-ahead property over mutated later bars), `OwnerDesignateModelHandlerTests` (two added); integration: the grants and guards test in `PaperShadowGuardsTests`; architecture: `MlInfluenceArchitectureTests` names `ShadowMlInfluenceEvidence` as the one source.

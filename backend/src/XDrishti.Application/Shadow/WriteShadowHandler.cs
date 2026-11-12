@@ -27,6 +27,8 @@ internal sealed class WriteShadowHandler(
     IPaperStore paper,
     IGovernanceStore governance,
     ITradingCalendar calendars,
+    ShadowScorer scorer,
+    ShadowOptions options,
     TimeProvider time,
     ILogger<WriteShadowHandler> logger) : ICommandHandler<WriteShadowCommand, ShadowWriteOutcome>
 {
@@ -182,7 +184,30 @@ internal sealed class WriteShadowHandler(
                 ShadowPlanFacts.CountsForEdge(item), context.EdgeEpoch));
         }
 
-        return new NewShadowSession(date, "ok", previous, ShadowDigest.Next(previous, date, "ok", entries.Select(e => e.RowHash)), entries);
+        // CF-10e: the models' scores of the rows go in the same transaction; a scoring that fails must not cost the session (the chain cannot be back-filled), so the session is then written without scores
+        IReadOnlyList<NewShadowScore> scores = [];
+        if (time.GetUtcNow() >= ShadowCutoff.For(date).AddMinutes(-options.ScoringDeadlineMinutesBeforeCutoff))
+        {
+            ShadowLog.ScoringTooLate(logger, options.ScoringDeadlineMinutesBeforeCutoff);
+        }
+        else
+        {
+            // scoring runs against the deadline itself, not only against its start: a slow night is cut off at the deadline and the session is written without scores
+            using var deadline = new CancellationTokenSource(ShadowCutoff.For(date).AddMinutes(-options.ScoringDeadlineMinutesBeforeCutoff) - time.GetUtcNow(), time);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
+            try
+            {
+                scores = await scorer.ScoreAsync(date, calendar, entries, linked.Token);
+            }
+#pragma warning disable CA1031 // The scores are extra evidence; the session itself must still be written before the open. A real shutdown (the caller's token) is rethrown by the filter; the deadline and any other failure leave the session without scores. Only a count-free event is logged (the shadow log carries counts only).
+            catch (Exception failure) when (failure is not OutOfMemoryException && !cancellationToken.IsCancellationRequested)
+#pragma warning restore CA1031
+            {
+                ShadowLog.ScoringFailed(logger);
+            }
+        }
+
+        return new NewShadowSession(date, "ok", previous, ShadowDigest.Next(previous, date, "ok", entries.Select(e => e.RowHash)), entries, scores);
     }
 
     private sealed record Context(long? EdgeEpoch, string? ConfigHash);

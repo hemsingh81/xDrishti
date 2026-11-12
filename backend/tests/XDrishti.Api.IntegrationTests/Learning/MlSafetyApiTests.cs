@@ -303,7 +303,7 @@ public sealed class MlSafetyApiTests(ApiFactory factory) : DataTestBase(factory)
     }
 
     [Fact]
-    public async Task The_command_line_designation_refuses_a_model_that_was_rolled_back_and_names_a_clean_one()
+    public async Task The_command_line_designation_refuses_a_model_that_was_rolled_back_and_sends_a_clean_one_through_promotion_which_refuses_it_for_unavailable_evidence()
     {
         var champion = await RegisterAsync('d', 'd', ModelRole.Champion);
         var id = await ProposeAsync(champion);
@@ -317,8 +317,11 @@ public sealed class MlSafetyApiTests(ApiFactory factory) : DataTestBase(factory)
 
         refused.Error.Code.ShouldBe("learning.designate_rolled_back");
         (await RoleAsync(champion)).ShouldBe("challenger");
-        named.IsSuccess.ShouldBeTrue(named.IsFailure ? named.Error.Message : string.Empty);
-        (await RoleAsync(clean)).ShouldBe("champion");
+        // CF-10e D6 (ADR 0281): a champion has existed, so the verb asks for a promotion; no source of challenger evidence exists, so every figure is unavailable and unavailable is never a pass
+        named.IsFailure.ShouldBeTrue();
+        named.Error.Code.ShouldBe("learning.promotion_refused");
+        named.Error.Message.ShouldContain("not available");
+        (await RoleAsync(clean)).ShouldBe("challenger");
     }
 
     [Fact]

@@ -978,9 +978,9 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListModelsQuery, Result<IReadOnlyList<ModelView>>>, ListModelsHandler>();
         services.AddScoped<IQueryHandler<GetModelQuery, Result<ModelDetailView>>, GetModelHandler>();
         services.AddScoped<IQueryHandler<ScoreWithModelQuery, Result<ModelScoreView>>, ScoreWithModelHandler>(); // for experiments and P7 (advisory)
-        services.TryAddSingleton<IMlInfluenceEvidence, NoMlInfluenceEvidence>(); // the figures of the predicate: nothing is available until the hold-out scoring, the model id on shadow candidates and the stored calibration detector exist (CF-10 part 10c-2)
+        services.AddScoped<IMlInfluenceEvidence, ShadowMlInfluenceEvidence>(); // the figures of the predicate: forward figures from the shadow scores, the calibration alarm from the stored monitor row; the hold-out source is unavailable until HO-01 (CF-10e parts 10e-1, 10e-2, ADR 0281)
         // the owner's switch ml.influence.enabled is IMlInfluenceSwitch, stored in research.ml_switch_settings (OFF with no row) and registered by Infrastructure with the other two switches (CF-10 part 10d-1, ADR 0220)
-        services.TryAddSingleton<IRollbackEvidence, NoRollbackEvidence>(); // the champion's scored outcomes and cells: no source exists, so the rollback triggers read unavailable (CF-10 part 10d-1)
+        services.AddScoped<IRollbackEvidence, ShadowRollbackEvidence>(); // the champion's graded shadow scores feed the calibration trigger; the band trigger has no cells and reads unavailable (CF-10e part 10e-2)
         services.TryAddSingleton<IChallengerEvidence, NoChallengerEvidence>(); // the paired comparison and the counterfactual of a challenger: no source exists, so promotion is refused with the reason (CF-10 part 10d-1)
         services.AddScoped<ICommandHandler<ChangeMlSettingsCommand, MlSettingsChanged>, ChangeMlSettingsHandler>(); // the owner's three ML switches, all default OFF (CF-10 part 10d-1)
         services.AddScoped<ICommandHandler<PromoteChallengerCommand, PromotionOutcome>, PromoteChallengerHandler>(); // promotion and re-promotion of a model: the owner, or auto when ml.auto_promote is ON (CF-10 part 10d-1, ADR 0220)
@@ -1149,6 +1149,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<StartEpochCommand, EpochView>, StartEpochHandler>(); // owner act, CLI only (P10-05)
         services.AddScoped<ICommandHandler<ExplainChangeCommand, ExplainOutcome>, ExplainChangeHandler>(); // owner note, CLI only (P10-05)
         services.AddScoped<ICommandHandler<CapturePaperFillsCommand, PaperCaptureOutcome>, CapturePaperFillsHandler>(); // paper fills of armed tickets: insert-only, replayed on stored bars, no order (P10-01)
+        services.AddScoped<ShadowScorer>(); // scores every shadow candidate with the champion and the challengers, stored with the session (CF-10e part 10e-1)
         services.AddScoped<ICommandHandler<WriteShadowCommand, ShadowWriteOutcome>, WriteShadowHandler>(); // the shadow record: forward-only, insert-only, switch OFF by default, no order (CF-08)
         services.TryAddSingleton(new ShadowOptions()); // Shadow:MaxResumeGapSessions and Shadow:DigestFolder (ADR 0232); the host replaces it with its configuration
         services.AddScoped<ICommandHandler<ExportShadowDigestCommand, ShadowDigestExported>, ExportShadowDigestHandler>(); // the weekly digest copy outside the database (CF-08 review fix 4)
