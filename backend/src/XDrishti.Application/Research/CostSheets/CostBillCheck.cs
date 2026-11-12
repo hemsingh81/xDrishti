@@ -26,7 +26,7 @@ internal static class CostBillCheck
 
     private const decimal Crore = 10_000_000m;
 
-    private static readonly string[] LineNames = ["brokerage", "gst", "stt", "sebi", "stamp duty", "txn charges", "other"];
+    internal static readonly string[] LineNames = ["brokerage", "gst", "stt", "sebi", "stamp duty", "txn charges", "other"];
 
     /// <summary>Compares the rows with the model. <paramref name="refused"/> and <paramref name="repeated"/> are counts the caller got from the reader; <paramref name="today"/> dates the suggested note.</summary>
     public static CostCheckReport Run(CostSheet sheet, IReadOnlyList<GtrRow> rows, int files, int refused, int repeated, DateOnly today)
@@ -162,7 +162,7 @@ internal static class CostBillCheck
             : Classified.Not("a one-sided row with brokerage, while the sheet's delivery brokerage is 0");
     }
 
-    private static Compared Compare(CostSheet sheet, GtrRow row, CostSegment segment, bool otherModelled)
+    internal static Compared Compare(CostSheet sheet, GtrRow row, CostSegment segment, bool otherModelled)
     {
         var legs = new List<(Side Side, decimal Value)>(2);
         if (row.BuyQty > 0)
@@ -229,7 +229,7 @@ internal static class CostBillCheck
     /// The rate a line implies over the rows of a class where the bill's cell is above 0 (a proposal, never stored): a percent of the turnover of the row (buy plus sell), except STT (a percent of the value it is charged on: the sell value of
     /// an intraday row, the single side of a delivery row), stamp duty (a percent of the buy value), the SEBI fee (rupees per crore of turnover) and GST (a percent of the brokerage, SEBI and transaction cells of the row). Rounded to six decimals.
     /// </summary>
-    private static CostCheckImplied? Implied(List<Compared> members, int line)
+    internal static CostCheckImplied? Implied(List<Compared> members, int line)
     {
         var rates = new List<decimal>();
         foreach (var member in members)
@@ -290,5 +290,6 @@ internal static class CostBillCheck
         public static Classified Not(string problem) => new(CostSegment.IntradayEquity, null, problem);
     }
 
-    private sealed record Compared(GtrRow Row, CostSegment Segment, decimal[] Differences, decimal Total, decimal[] Billed);
+    internal sealed record Compared(GtrRow Row, CostSegment Segment, decimal[] Differences, decimal Total, decimal[] Billed);
 }
+

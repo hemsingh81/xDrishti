@@ -4,6 +4,7 @@
 #   scripts/cost-sheet.sh load sheet.json --replace  # overwrite other rates under an existing id (a new set of rates is normally a new id)
 #   scripts/cost-sheet.sh show dhan-2026-10
 #   scripts/cost-sheet.sh check dhan-2026-10 ~/reports/fy2425.csv ~/reports/fy2526.csv   # compare with your ORIGINAL global transaction report files; writes nothing
+#   scripts/cost-sheet.sh derive ~/reports/fy2425.csv ~/reports/fy2526.csv [--out PATH] [--split 0.7]   # CS-01: propose a sheet from your ORIGINAL report files; writes data/cost-sheets/derived-<date>.json (0600) and its .residuals.csv, nothing else, no database row
 # A file argument may be relative to where you stand: it is made absolute before the script changes directory.
 # Exit codes: 0 done (a check with rows beyond the tolerance is still 0), 1 refused (nothing written), 2 wrong command line or configuration, 3 failure or a concurrent write, 130 cancelled.
 # Start the stack first with deploy/xd-up.sh and the developer database port (compose.dev.yaml, 127.0.0.1:5433). The one secret is the database password,
@@ -27,5 +28,13 @@ for arg in "$@"; do
     args+=("$arg")
   fi
 done
+# derive writes under the repository's data/ unless --out says otherwise (the script changes directory below)
+if [[ "${args[0]:-}" == "derive" ]]; then
+  has_out=0
+  for arg in "${args[@]}"; do [[ "$arg" == "--out" ]] && has_out=1; done
+  if [[ $has_out -eq 0 ]]; then
+    args+=(--out "$ROOT/data/cost-sheets/derived-$(date +%F).json")
+  fi
+fi
 cd "$ROOT/backend/src/XDrishti.Api"
 exec dotnet run -c Release --no-launch-profile -- cost-sheet "${args[@]+"${args[@]}"}"

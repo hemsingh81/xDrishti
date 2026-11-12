@@ -395,6 +395,50 @@ public sealed class CostSheetDatabaseTests(ApiFactory factory) : DataTestBase(fa
 
     private static readonly string[] BuyCells = ["0.00", "0.08", "8.00", "0.05", "3.00", "0.40", "0.00"];
 
+    // CS-01: delivery buys of 10,000.00 and intraday round trips of 10,000.00 each way, priced by hand in DeriveCostSheetTests
+    private static string DerivableReport() => Report(Enumerable.Range(1, 10).SelectMany(d => new[]
+    {
+        Row(d.ToString("00", CultureInfo.InvariantCulture) + " Apr 2026 00:00:00", "ZZ SCRIP ONE", "ZZBILL-D" + d, 100, "10000.00", 0, "0.00", "0.00", "0.07", "10.00", "0.10", "1.50", "0.30", "0.10"),
+        Row(d.ToString("00", CultureInfo.InvariantCulture) + " Apr 2026 00:00:00", "ZZ SCRIP TWO", "ZZBILL-I" + d, 100, "10000.00", 100, "10000.00", "4.80", "0.98", "2.50", "0.20", "0.30", "0.60", "0.20"),
+    }).ToArray());
+
+    [Fact]
+    public async Task Derive_writes_one_owner_only_sheet_and_its_residuals_and_not_one_database_row_and_never_overwrites()
+    {
+        using var temp = new TempFolder();
+        var report = WriteFile(temp, "report.csv", DerivableReport());
+        var output = Path.Combine(temp.Path, "out", "derived.json");
+        var before = await CountsAsync();
+
+        var outcome = await VerbAsync(["derive", report, "--out", output]);
+
+        outcome.Exit.ShouldBe(0, outcome.Error);
+        (await CountsAsync()).ShouldBe(before, "derive stores nothing");
+        CostSheetJson.Parse(await File.ReadAllTextAsync(output, Ct)).IsSuccess.ShouldBeTrue();
+        File.ReadAllLines(output + ".residuals.csv").Length.ShouldBe(21, "a header and the twenty bills");
+        if (!OperatingSystem.IsWindows())
+        {
+            File.GetUnixFileMode(output).ShouldBe(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            File.GetUnixFileMode(output + ".residuals.csv").ShouldBe(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+
+        outcome.Out.ShouldContain("derive set: 14 of 14 bills = 100.0 %, meets the rule");
+        outcome.Out.ShouldContain("check set: 6 of 6 bills = 100.0 %, meets the rule");
+        outcome.Out.ShouldContain("verdict: MEETS the rule");
+        foreach (var sentinel in Sentinels)
+        {
+            outcome.Out.ShouldNotContain(sentinel);
+            outcome.Error.ShouldNotContain(sentinel);
+            outcome.Logs.ShouldAllBe(l => !l.Contains(sentinel, StringComparison.Ordinal), sentinel);
+            (await File.ReadAllTextAsync(output, Ct)).ShouldNotContain(sentinel);
+        }
+
+        var again = await VerbAsync(["derive", report, "--out", output]);
+
+        again.Exit.ShouldBe(1);
+        again.Error.ShouldContain("never overwritten");
+    }
+
     [Fact]
     public async Task Check_reports_classes_counts_and_implied_rates_writes_nothing_and_prints_no_identifier_anywhere()
     {

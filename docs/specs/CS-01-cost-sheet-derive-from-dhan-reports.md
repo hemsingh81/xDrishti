@@ -1,6 +1,6 @@
 # CS-01 — `cost-sheet derive`: propose a charge sheet from the owner's Dhan reports
 
-- **Status:** Approved (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended). Not built.
+- **Status:** Built 2026-11-12, not deployed (approved on the coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended).
 - **Phase / roadmap row:** CS — costs, row CS-01 (new; closes the "derive" half of ISS-25, docs/design/18-roadmap.md:347)
 - **Size:** about 2 agent-days (estimate) · **Needs:** P3-03f (built, ADR 0044), P2-17 importers (built, ADR 0029), P8-23 (built, ADR 0127)
 - **Safety:** not a SAFETY slice. It writes one local file and nothing else; loading, checking and confirming a sheet stay the owner's acts. No order, no rate is stored by this verb.
@@ -49,3 +49,14 @@ Bills without intraday rows (ISS-05) give an intraday sheet of `unavailable` lin
 ## Done when
 - [ ] ACs 1–7 have evidence; `scripts/check.sh` green; reviewer: no blockers
 - [ ] docs/design/18-roadmap.md ISS-25 row notes the derive path (by the roadmap owner)
+
+## As built (2026-11-12)
+- **Code:** `Application/Research/CostSheets/` — `DeriveCostSheetQuery`, `DeriveCostSheetHandler`, `CostSheetDeriver` (classify, split, medians, residuals, sheet text), `CostDerivation` (answer records), `ReportRowReader` (the file reading and de-duplication moved out of `CheckCostSheetHandler`, now shared); `CostBillCheck.Implied` and `Compare` are now internal and reused unchanged. Host: `Api/CostSheet/` — action `derive` in `CostSheetOptions`/`CostSheetCommand`, `CostDeriveText`, log event 4497. Script: `scripts/cost-sheet.sh` line for `derive`, default output `data/cost-sheets/derived-<date>.json`.
+- **Tests:** `DeriveCostSheetTests` (9, hand-worked), `CostSheetVerbTests` (option lines), `CostSheetDatabaseTests.Derive_writes_one_owner_only_sheet...` (table counts unchanged, mode 0600, no overwrite, no identifier).
+- **Deviations from the text above, each deliberate:**
+  1. Two files are written, both 0600: the sheet and `<out>.residuals.csv` (AC 4 requires the csv; "one file" in AC 1 is read as one sheet file). Neither is overwritten: an existing output refuses (exit 1).
+  2. Fields the seven report cells cannot show are written, not derived, and the printout says so: delivery brokerage 0 (a delivery bill is, by classification, one with brokerage 0), brokerage minimum 0, brokerage cap = the largest billed brokerage of the derive bills, intraday STT on the buy side 0, delivery STT on both sides = the implied rate, DP charge 0 (not a report column; inside Oth. charges). A class with no derive bill is null throughout.
+  3. GST is one rate for the schedule, taken over the bills of both classes.
+  4. A one-sided NSE row with a brokerage cell above 0 fits no class and is not used (it cannot be told from delivery); a row with a negative Oth. cell is an adjustment and is not used, as in `check`.
+  5. The split is by date: the cut moves forward so a day is never split; the check set may be empty (then the verdict does not pass).
+  6. The verdict MEETS needs at least 95 % on both sets; it never changes the sheet's `unchecked` state.
