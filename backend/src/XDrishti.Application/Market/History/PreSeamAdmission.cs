@@ -81,5 +81,6 @@ internal static class PreSeamAdmission
         return last;
     }
 
-    private static DateTimeOffset Midnight(DateOnly date) => new(date.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset);
+    // an instant with offset 0: Npgsql writes a DateTimeOffset to timestamptz only so
+    private static DateTimeOffset Midnight(DateOnly date) => new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).ToUniversalTime();
 }

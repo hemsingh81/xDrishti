@@ -190,8 +190,8 @@ internal sealed class BackfillStore(NpgsqlDataSource dataSource, IBackfillSettin
     {
         await using var command = dataSource.CreateCommand("SELECT EXISTS (SELECT 1 FROM market.bars_1m WHERE instrument_id = @id AND source = 'dhan' AND ts >= @from AND ts < @to)");
         command.Parameters.AddWithValue("id", instrumentId);
-        command.Parameters.AddWithValue("from", from);
-        command.Parameters.AddWithValue("to", to);
+        command.Parameters.AddWithValue("from", from.ToUniversalTime());   // Npgsql writes a DateTimeOffset to timestamptz only with offset 0
+        command.Parameters.AddWithValue("to", to.ToUniversalTime());
         return (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? true);
     }
 

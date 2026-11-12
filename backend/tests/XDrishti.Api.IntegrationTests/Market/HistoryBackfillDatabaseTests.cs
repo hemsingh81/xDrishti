@@ -322,14 +322,14 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
         var lastDay = new DateTimeOffset(2024, 4, 1, 15, 29, 0, IndiaTime.Offset);
         var source = new Source(t =>
             t.Windows[0].To == new DateTimeOffset(2024, 4, 2, 0, 0, 0, IndiaTime.Offset)
-                ? [At(lastDay, 250), At(new DateTimeOffset(2024, 4, 2, 9, 14, 0, IndiaTime.Offset), 999), At(XSeam, 999)]
+                ? [At(lastDay, 250), At(XSeam, 999), At(XSeam.AddMinutes(1), 999)]
                 : []);
         using var scope = Factory.Services.CreateScope();
 
         var result = await Handler(scope, id, source).HandleAsync(new RunBackfillCommand(), Ct);
 
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
-        result.Value.BeyondSeam.ShouldBe(2, "the 09:14 minute of the seam day is dropped as well: the seam day is a pure CSV day");
+        result.Value.BeyondSeam.ShouldBe(2, "every Dhan bar dated on the seam day is dropped: the seam day is a pure CSV day");
         (await ScalarAsync<long>("SELECT count(*) FROM market.bars_1m WHERE instrument_id = @id AND source = 'dhan'", ("id", id))).ShouldBe(1);
         await using (var connection = await OpenAsync())
         {
@@ -341,7 +341,7 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
 
         var daily = await scope.ServiceProvider.GetRequiredService<IBarQueries>().ReadDailyBarsAsync(id, new DateOnly(2024, 1, 1), new DateOnly(2024, 12, 31), Ct);
 
-        daily.Select(d => d.Date).ShouldBe([new DateOnly(2024, 4, 2)], "the seam day bucket starts at India midnight and is no longer dropped; the day before is cut");
+        daily.Select(d => IndiaTime.Today(d.Ts)).ShouldBe([new DateOnly(2024, 4, 2)], "the seam day bucket starts at India midnight and is no longer dropped; the day before is cut");
     }
 
     [Fact]
@@ -373,7 +373,7 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
         (await store.HasDhanBarsAsync(id, from, to, Ct)).ShouldBeFalse();
         await using (var session = await scope.ServiceProvider.GetRequiredService<IBarStore>().BeginMergeAsync(id, BarSource.Dhan, Ct))
         {
-            await session.AddAsync([At(new DateTimeOffset(2024, 6, 3, 10, 0, 0, IndiaTime.Offset), 270)], Ct);
+            await session.AddAsync(new[] { At(new DateTimeOffset(2024, 6, 3, 10, 0, 0, IndiaTime.Offset), 270) }, Ct);
             await session.CompleteAsync(null, Ct);
         }
 

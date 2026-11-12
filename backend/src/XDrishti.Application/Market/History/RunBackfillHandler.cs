@@ -344,7 +344,7 @@ internal sealed class RunBackfillHandler(
     private async ValueTask CheckSeamAsync(Work work, Stats stats, CancellationToken cancellationToken)
     {
         var id = work.Target.InstrumentId;
-        var seamDay = Midnight(IndiaTime.Today(work.Seam));   // pre-seam is by date (CF-04d): the seam day itself is a pure CSV day
+        var seamDay = Midnight(IndiaTime.Today(work.Seam)).ToUniversalTime();   // pre-seam is by date (CF-04d): the seam day itself is a pure CSV day
         var before = await bars.ReadAsync(id, seamDay.AddDays(-10), seamDay, cancellationToken);
         var after = await bars.ReadAsync(id, work.Seam, work.Seam.AddDays(1), cancellationToken);
         if (before.Count == 0 || after.Count == 0)
