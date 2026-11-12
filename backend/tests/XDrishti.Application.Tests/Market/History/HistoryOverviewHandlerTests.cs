@@ -68,10 +68,10 @@ public sealed class HistoryOverviewHandlerTests
 
         var view = await handler.HandleAsync(new GetHistoryOverviewQuery(), Ct);
 
-        view.Totals.Years.ShouldBe(new HistoryDepthView(1, 1, 1, 1));
+        view.Totals.Years.ShouldBe(new HistoryYearsView(1, 1, 1, 1));
         view.Switch.Enabled.ShouldBeFalse();
         view.Switch.Editable.ShouldBeFalse();
-        view.Switch.Reason.ShouldNotBeNullOrEmpty();
+        view.Switch.Reason.ShouldStartWith("The history backfill is switched off");
         view.RunWindow.ShouldBe("20:00-06:00");
         view.InWindow.ShouldBeFalse();
         view.Running.ShouldBeFalse();

@@ -26,9 +26,9 @@ public sealed record HistoryByStatusView(
     [property: JsonPropertyName("seam_unresolved")] int SeamUnresolved,
     [property: JsonPropertyName("seam_jump")] int SeamJump);
 
-public sealed record HistoryDepthView(int Under2, int From2to3, int From3to5, int From5);
+public sealed record HistoryYearsView(int Under2, int From2to3, int From3to5, int From5);
 
-public sealed record HistoryTotalsView(int Instruments, HistoryByStatusView ByStatus, HistoryChunksView Chunks, HistoryDepthView Years);
+public sealed record HistoryTotalsView(int Instruments, HistoryByStatusView ByStatus, HistoryChunksView Chunks, HistoryYearsView Years);
 
 public sealed record HistoryDailyView(DateOnly From, DateOnly To);
 
@@ -39,7 +39,7 @@ public sealed record GetHistoryOverviewQuery : IQuery<HistoryOverview>;
 
 internal sealed class GetHistoryOverviewHandler(IFetchTargets targets, IBackfillStore store, IBackfillSettings settings, IBackfillCalendar calendar, IServiceRunStore runs, TimeProvider clock) : IQueryHandler<GetHistoryOverviewQuery, HistoryOverview>
 {
-    public const string OffReason = "Data:History:Backfill:Enabled is off (a deployment setting). It stays off until source-aware replay (CF-04d) is built.";
+    public const string OffReason = "The history backfill is switched off in the deployment settings; it stays off until the source-aware replay is in place (Data:History:Backfill:Enabled).";
 
     // Part A's daily files reach back at most this far; the span is read once for the whole set.
     private const int DailyLookbackDays = 6 * 366;
@@ -76,7 +76,7 @@ internal sealed class GetHistoryOverviewHandler(IFetchTargets targets, IBackfill
             rows.Count,
             new HistoryByStatusView(Count(rows, BackfillStatus.None), Count(rows, BackfillStatus.Planned), Count(rows, BackfillStatus.Partial), Count(rows, BackfillStatus.Done), Count(rows, BackfillStatus.SeamUnresolved), Count(rows, BackfillStatus.SeamJump)),
             new HistoryChunksView(rows.Sum(r => r.Chunks.Done), rows.Sum(r => r.Chunks.Failed), rows.Sum(r => r.Chunks.Total)),
-            new HistoryDepthView(u2, f2, f3, f5));
+            new HistoryYearsView(u2, f2, f3, f5));
 
         var today = IndiaTime.Today(now);
         var known = await calendar.KnownDaysAsync(today.AddDays(-DailyLookbackDays), today, cancellationToken);

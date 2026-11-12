@@ -19,6 +19,7 @@ public sealed record HistoryBackfillStarted(bool Started, Guid? RunId, int Chunk
 /// </summary>
 internal sealed class StartHistoryBackfillHandler(
     HistoryActGuard guard,
+    HistoryProbeGate gate,
     ICommandHandler<RunBackfillCommand, BackfillSummary> dryRun,
     ICommandHandler<RunServiceNowCommand, ServiceRunView> runNow,
     IIntradayBarSource source,
@@ -27,6 +28,28 @@ internal sealed class StartHistoryBackfillHandler(
     public async ValueTask<Result<HistoryBackfillStarted>> HandleAsync(StartHistoryBackfillCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
+        if (!HistoryActErrors.IsOwner(command.Actor))
+        {
+            return Result.Failure<HistoryBackfillStarted>(HistoryActErrors.OwnerOnly());
+        }
+
+        if (!gate.TryEnter())
+        {
+            return await RefusedAsync(HistoryActErrors.RunActive(), command.Actor); // a probe (or another start) is in the request now
+        }
+
+        try
+        {
+            return await StartAsync(command, cancellationToken);
+        }
+        finally
+        {
+            gate.Leave();
+        }
+    }
+
+    private async ValueTask<Result<HistoryBackfillStarted>> StartAsync(StartHistoryBackfillCommand command, CancellationToken cancellationToken)
+    {
         if (await guard.CheckAsync(cancellationToken) is { } refusal)
         {
             return await RefusedAsync(refusal, command.Actor);
@@ -57,7 +80,7 @@ internal sealed class StartHistoryBackfillHandler(
             return await RefusedAsync(Error.Conflict(DataErrors.DhanNotConnectedCode, state.Reason ?? "There is no connected primary Data account."), command.Actor);
         }
 
-        var started = await runNow.HandleAsync(new RunServiceNowCommand(HistoryBackfillService.Id, command.Actor), cancellationToken);
+        var started = await runNow.HandleAsync(new RunServiceNowCommand(HistoryBackfillService.Id, command.Actor, ByOwnerAct: true), cancellationToken);
         if (started.IsFailure)
         {
             return await RefusedAsync(started.Error.Code == ServiceErrors.AlreadyRunningCode ? HistoryActErrors.RunActive() : started.Error, command.Actor);

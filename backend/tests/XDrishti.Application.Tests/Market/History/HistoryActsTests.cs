@@ -54,7 +54,7 @@ public sealed partial class HistoryActsTests
 
         public HistoryActGuard Guard() => new(Runs, new FakeBackfillSettings(), Events, Substitute.For<IPlatformUnitOfWork>(), Clock);
 
-        public StartHistoryBackfillHandler Start() => new(Guard(), DryRun, RunNow, Source, Account);
+        public StartHistoryBackfillHandler Start(HistoryProbeGate? gate = null) => new(Guard(), gate ?? new HistoryProbeGate(), DryRun, RunNow, Source, Account);
 
         public ProbeHistorySeamHandler ProbeHandler(HistoryProbeGate? gate = null) => new(Guard(), gate ?? new HistoryProbeGate(), Probe);
     }
@@ -170,5 +170,41 @@ public sealed partial class HistoryActsTests
             Allowed().IsMatch(e.Detail!).ShouldBeTrue(e.Detail);
             e.Detail!.Length.ShouldBeLessThanOrEqualTo(AccountEvent.MaxDetailLength);
         }
+    }
+
+    [Fact]
+    public async Task A_probe_in_the_request_refuses_a_start_and_the_gate_is_released_after_a_start()
+    {
+        var rig = new Rig();
+        var gate = new HistoryProbeGate();
+        gate.TryEnter().ShouldBeTrue();
+
+        var refused = await rig.Start(gate).HandleAsync(new StartHistoryBackfillCommand("owner:o@x"), Ct);
+        gate.Leave();
+        var started = await rig.Start(gate).HandleAsync(new StartHistoryBackfillCommand("owner:o@x"), Ct);
+
+        refused.Error.Code.ShouldBe("history.run_active");
+        await rig.DryRun.ReceivedWithAnyArgs(1).HandleAsync(default!, Ct); // only the second call got as far as the dry run
+        started.IsSuccess.ShouldBeTrue();
+        gate.TryEnter().ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("owner:")]
+    [InlineData("system:scheduler")]
+    public async Task An_empty_or_non_owner_actor_is_refused_by_both_acts_before_anything_happens(string actor)
+    {
+        var rig = new Rig();
+
+        var start = await rig.Start().HandleAsync(new StartHistoryBackfillCommand(actor), Ct);
+        var probe = await rig.ProbeHandler().HandleAsync(new ProbeHistorySeamCommand(actor), Ct);
+
+        start.Error.Code.ShouldBe("history.owner_only");
+        probe.Error.Code.ShouldBe("history.owner_only");
+        await rig.DryRun.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+        await rig.Probe.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+        rig.Recorded.ShouldBeEmpty();
     }
 }

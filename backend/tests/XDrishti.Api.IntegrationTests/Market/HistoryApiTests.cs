@@ -238,6 +238,8 @@ public sealed partial class HistoryApiTests(ApiFactory factory) : DataTestBase(f
 
         result.Status.ShouldBe(HttpStatusCode.UnprocessableEntity);
         CodeOf(result.Body).ShouldBe("history.calendar_missing");
+        var message = result.Body.GetProperty("title").GetString()!;
+        message.ShouldMatch(@"cover \d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2} \(\d+ weekdays have no entry\)"); // the range and the count of missing days
         source.Plans.ShouldBeEmpty();
         (await CountAsync("SELECT count(*) FROM platform.service_runs WHERE service_id = 'history-backfill'")).ShouldBe(0);
     }
@@ -253,9 +255,35 @@ public sealed partial class HistoryApiTests(ApiFactory factory) : DataTestBase(f
 
         result.Status.ShouldBe(HttpStatusCode.UnprocessableEntity);
         CodeOf(result.Body).ShouldBe("history.disk_low");
-        result.Body.GetProperty("title").GetString()!.ShouldContain("1,000");
+        var title = result.Body.GetProperty("title").GetString()!;
+        title.ShouldContain("1,000"); // the free space
+        title.ShouldMatch(@"needs [\d,]+"); // and the bytes needed
         source.Plans.ShouldBeEmpty();
         (await CountAsync("SELECT count(*) FROM platform.service_runs WHERE service_id = 'history-backfill'")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Run_now_of_the_service_is_refused_without_a_password_and_the_owner_act_still_starts_it()
+    {
+        await SeedWithCsvAsync("RNW1");
+        UseCountingSource();
+        var on = OnClient(complete: true);
+
+        using var runNow = await on.PostAsync(new Uri("/api/services/history-backfill/run", UriKind.Relative), null, Ct);
+        var refusedBody = JsonDocument.Parse(await runNow.Content.ReadAsStringAsync(Ct)).RootElement;
+        var runsAfterRunNow = await CountAsync("SELECT count(*) FROM platform.service_runs WHERE service_id = 'history-backfill'");
+        var owner = await PostAsync(on, Backfill, Factory.OwnerPassword, Ct);
+
+        runNow.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        CodeOf(refusedBody).ShouldBe("services.run_now_unavailable");
+        runsAfterRunNow.ShouldBe(0);
+        owner.Status.ShouldBe(HttpStatusCode.Accepted);
+        var runner = _hosts[^1].Services.GetRequiredService<ServiceRunner>();
+        var watch = Stopwatch.StartNew();
+        while (runner.IsActive(HistoryBackfillService.Id) && watch.Elapsed < TimeSpan.FromSeconds(60))
+        {
+            await Task.Yield();
+        }
     }
 
     [Fact]

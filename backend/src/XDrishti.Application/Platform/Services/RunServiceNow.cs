@@ -13,9 +13,9 @@ namespace XDrishti.Application.Platform.Services;
 /// goes on in the background). <c>services.already_running</c> when it runs (or waits for a retry) already — a skipped run is recorded; <c>services.not_found</c>, <c>services.read_only</c>. A service that another process runs
 /// (the live feed, <see cref="IExternallyRunService"/>) is not started here: the request is audited and the manual-run marker is written (<see cref="IFeedManualRun"/>, <see cref="FeedManualRunSettings.Duration"/> from now), which
 /// the process reads within 15 seconds and then opens the run itself. The answer is then a <b>queued</b> run (status <c>queued</c>, an empty id: the record does not exist yet) - honest about what happened, and not "running", which
-/// the Services screen would take as a start to follow.
+/// the Services screen would take as a start to follow. <c>history-backfill</c> is started by hand only with <see cref="ByOwnerAct"/> (CF-04e: the owner act with a fresh password), never by this button.
 /// </summary>
-public sealed record RunServiceNowCommand(string ServiceId, string Actor) : ICommand;
+public sealed record RunServiceNowCommand(string ServiceId, string Actor, bool ByOwnerAct = false) : ICommand;
 
 internal sealed class RunServiceNowHandler(
     ServiceRegistry registry,
@@ -48,6 +48,11 @@ internal sealed class RunServiceNowHandler(
         if (command.ServiceId is XDrishti.Application.Depth.DepthRecorderService.Id or XDrishti.Application.Ticks.TickRecorderService.Id or XDrishti.Application.OptionChain.OptionChainRecorderService.Id or XDrishti.Application.OptionBackfill.OptionBackfillService.Id or XDrishti.Application.OpeningBars.OpeningBarsService.Id)
         {
             return Result.Failure<ServiceRunView>(ServiceErrors.RunNowUnavailable); // the depth, tick and option-chain recorders follow their three gates and window; "Run now" cannot start them (P7-16, P7-16b, P14-02, P14-03)
+        }
+
+        if (command.ServiceId == XDrishti.Application.Market.History.HistoryBackfillService.Id && !command.ByOwnerAct)
+        {
+            return Result.Failure<ServiceRunView>(ServiceErrors.RunNowUnavailable); // CF-04e: only the owner act of the history card (fresh password) starts it by hand; this button has no password
         }
 
         if (registry.IsExternal(command.ServiceId))

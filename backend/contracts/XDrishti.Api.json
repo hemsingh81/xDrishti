@@ -44435,33 +44435,6 @@
           }
         }
       },
-      "HistoryDepthView": {
-        "required": [
-          "under2",
-          "from2to3",
-          "from3to5",
-          "from5"
-        ],
-        "type": "object",
-        "properties": {
-          "under2": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "from2to3": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "from3to5": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "from5": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
       "HistoryInstrumentView": {
         "required": [
           "instrumentId",
@@ -44685,7 +44658,34 @@
             "$ref": "#/components/schemas/HistoryChunksView"
           },
           "years": {
-            "$ref": "#/components/schemas/HistoryDepthView"
+            "$ref": "#/components/schemas/HistoryYearsView"
+          }
+        }
+      },
+      "HistoryYearsView": {
+        "required": [
+          "under2",
+          "from2to3",
+          "from3to5",
+          "from5"
+        ],
+        "type": "object",
+        "properties": {
+          "under2": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "from2to3": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "from3to5": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "from5": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

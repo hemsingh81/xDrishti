@@ -14214,16 +14214,6 @@ export interface components {
       /** Format: date */
       to: string;
     };
-    HistoryDepthView: {
-      /** Format: int32 */
-      under2: number;
-      /** Format: int32 */
-      from2to3: number;
-      /** Format: int32 */
-      from3to5: number;
-      /** Format: int32 */
-      from5: number;
-    };
     HistoryInstrumentView: {
       /** Format: uuid */
       instrumentId: string;
@@ -14286,7 +14276,17 @@ export interface components {
       instruments: number;
       byStatus: components['schemas']['HistoryByStatusView'];
       chunks: components['schemas']['HistoryChunksView'];
-      years: components['schemas']['HistoryDepthView'];
+      years: components['schemas']['HistoryYearsView'];
+    };
+    HistoryYearsView: {
+      /** Format: int32 */
+      under2: number;
+      /** Format: int32 */
+      from2to3: number;
+      /** Format: int32 */
+      from3to5: number;
+      /** Format: int32 */
+      from5: number;
     };
     /** @description The locked block as served. */
     HoldOutBlockView: {

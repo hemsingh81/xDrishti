@@ -14,6 +14,11 @@ internal sealed class ProbeHistorySeamHandler(HistoryActGuard guard, HistoryProb
     public async ValueTask<Result<ProbeSeamSummary>> HandleAsync(ProbeHistorySeamCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
+        if (!HistoryActErrors.IsOwner(command.Actor))
+        {
+            return Result.Failure<ProbeSeamSummary>(HistoryActErrors.OwnerOnly());
+        }
+
         if (!gate.TryEnter())
         {
             return await RefusedAsync(HistoryActErrors.RunActive(), command.Actor);
