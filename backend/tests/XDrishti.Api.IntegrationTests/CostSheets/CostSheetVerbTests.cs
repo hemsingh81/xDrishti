@@ -82,6 +82,9 @@ public sealed class CostSheetVerbTests
         "show dhan-2026-10",
         "check dhan-2026-10 a.csv",
         "check dhan-2026-10 a.csv b.csv c.csv",
+        "derive a.csv",
+        "derive a.csv b.csv --out x.json --split 0.8",
+        "derive --split 0.8 a.csv",
     };
 
     [Theory]
@@ -109,6 +112,15 @@ public sealed class CostSheetVerbTests
         "check a",
         "check",
         "check a b --replace",
+        "derive",
+        "derive a.csv --split",
+        "derive a.csv --split 0.4",
+        "derive a.csv --split 0.95",
+        "derive a.csv --split abc",
+        "derive a.csv --out",
+        "derive a.csv --out x --out y",
+        "derive a.csv --replace",
+        "check a b.csv --out x",
     };
 
     [Theory]
@@ -131,6 +143,18 @@ public sealed class CostSheetVerbTests
         load.Files.ShouldBe(["a.json"]);
         (check.Action, check.SheetId, check.Replace).ShouldBe((CostSheetAction.Check, "dhan-x", false));
         check.Files.ShouldBe(["a.csv", "b.csv"]);
+    }
+
+    [Fact]
+    public void Derive_takes_report_files_an_optional_out_and_a_split_of_0_7_by_default()
+    {
+        var plain = CostSheetOptions.Parse(["derive", "a.csv", "b.csv"]).Options.ShouldNotBeNull();
+        var given = CostSheetOptions.Parse(["derive", "a.csv", "--out", "x.json", "--split", "0.8"]).Options.ShouldNotBeNull();
+
+        (plain.Action, plain.SheetId, plain.Out, plain.Split).ShouldBe((CostSheetAction.Derive, null, null, 0.7m));
+        plain.Files.ShouldBe(["a.csv", "b.csv"]);
+        (given.Out, given.Split).ShouldBe(("x.json", 0.8m));
+        CostSheetOptions.Usage.ShouldContain("cost-sheet derive <report.csv>");
     }
 
     // the cost flags of simulate (F1)

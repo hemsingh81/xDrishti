@@ -1,8 +1,6 @@
-using System.Globalization;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Research;
-using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Portfolio;
@@ -30,41 +28,12 @@ internal sealed class CheckCostSheetHandler(ICostSheetStore store, ISpreadsheetR
         }
 
         var today = IndiaTime.Today(time.GetUtcNow());
-        var rows = new List<GtrRow>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var refused = 0;
-        var repeated = 0;
-        for (var i = 0; i < query.Files.Count; i++)
+        var read = await ReportRowReader.ReadAsync(query.Files, spreadsheets, today, cancellationToken);
+        if (read.IsFailure)
         {
-            var sheet = await SheetLoader.LoadAsync(query.Files[i], spreadsheets, cancellationToken);
-            var read = sheet.IsFailure ? Result.Failure<GtrFile>(sheet.Error) : GlobalTransactionReader.Read(sheet.Value, today);
-            if (read.IsFailure)
-            {
-                var prefix = "File " + (i + 1).ToString(CultureInfo.InvariantCulture) + ": ";
-                return Result.Failure<CostCheckReport>(read.Error with
-                {
-                    Message = prefix + read.Error.Message,
-                    Fields = read.Error.Fields?.Select(f => f with { Message = prefix + f.Message }).ToList(),
-                });
-            }
-
-            refused += read.Value.BadTotal;
-            repeated += read.Value.Repeated;
-            foreach (var row in read.Value.Items)
-            {
-                // the same bill in two files (overlapping years) is one bill
-                var key = FormattableString.Invariant($"{row.BillNo}|{row.Date:yyyyMMdd}|{BillName.Parse(row.Name).Key}|{ReportCells.Norm(row.Exchange)}|{row.BuyQty}|{row.BuyValue}|{row.SellQty}|{row.SellValue}|{row.Charges}");
-                if (seen.Add(key))
-                {
-                    rows.Add(row);
-                }
-                else
-                {
-                    repeated++;
-                }
-            }
+            return Result.Failure<CostCheckReport>(read.Error);
         }
 
-        return Result.Success(CostBillCheck.Run(found.Value, rows, query.Files.Count, refused, repeated, today));
+        return Result.Success(CostBillCheck.Run(found.Value, read.Value.Rows, query.Files.Count, read.Value.Refused, read.Value.Repeated, today));
     }
 }

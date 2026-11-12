@@ -1,6 +1,6 @@
 # CS-01 — `cost-sheet derive`: propose a charge sheet from the owner's Dhan reports
 
-- **Status:** Approved (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended). Not built.
+- **Status:** Built 2026-11-12, not deployed (approved on the coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended).
 - **Phase / roadmap row:** CS — costs, row CS-01 (new; closes the "derive" half of ISS-25, docs/design/18-roadmap.md:347)
 - **Size:** about 2 agent-days (estimate) · **Needs:** P3-03f (built, ADR 0044), P2-17 importers (built, ADR 0029), P8-23 (built, ADR 0127)
 - **Safety:** not a SAFETY slice. It writes one local file and nothing else; loading, checking and confirming a sheet stay the owner's acts. No order, no rate is stored by this verb.
@@ -32,7 +32,7 @@ The owner runs one verb over his original Dhan global transaction report files a
 2. The JSON round-trips through `CostSheetJson.Parse` when every line has rows; with a line without rows the file holds `null` there and the printout names the line `unavailable`.
 3. Re-pricing the **derive set** with the proposed sheet reproduces each bill's billed total within ₹1 on ≥ 95 % of bills; the printout gives the share for the derive set and, separately, for the check set.
 4. The residual table lists per bill: date, class, billed total, modelled total, difference; the ten largest are printed and all rows go to `<out>.residuals.csv`.
-5. A line whose implied rate has (max − min) / median > 5 % over the derive set is flagged `unstable` with its date range.
+5. A line whose implied rate has (max − min) / median > 5 % over the derive set is flagged `unstable` with the dates where the rate moved, and (brokerage, STT, SEBI, stamp duty, transaction charges, other) is written `null` / `unavailable: fill from your tariff`, never as a median, so a rise inside the window cannot give a loadable sheet that understates later trades (review 2026-11-12). SEBI may often be null on small accounts: its cell is a few paise, so rounding alone moves the implied rate.
 6. No personal line (order id, client id) is printed or written; only date, class and amounts (same rule as `check`).
 7. Exit codes match `cost-sheet`: 0 done, 1 refused (no readable row), 2 wrong command line, 3 failure.
 
@@ -49,3 +49,22 @@ Bills without intraday rows (ISS-05) give an intraday sheet of `unavailable` lin
 ## Done when
 - [ ] ACs 1–7 have evidence; `scripts/check.sh` green; reviewer: no blockers
 - [ ] docs/design/18-roadmap.md ISS-25 row notes the derive path (by the roadmap owner)
+
+## As built (2026-11-12)
+- **Code:** `Application/Research/CostSheets/` — `DeriveCostSheetQuery`, `DeriveCostSheetHandler`, `CostSheetDeriver` (classify, split, medians, residuals, sheet text), `CostDerivation` (answer records), `ReportRowReader` (the file reading and de-duplication moved out of `CheckCostSheetHandler`, now shared); `CostBillCheck.Implied` and `Compare` are now internal and reused unchanged. Host: `Api/CostSheet/` — action `derive` in `CostSheetOptions`/`CostSheetCommand`, `CostDeriveText`, log event 4497. Script: `scripts/cost-sheet.sh` line for `derive`, default output `data/cost-sheets/derived-<date>.json`.
+- **Tests:** `DeriveCostSheetTests` (9, hand-worked), `DeriveBrokerageTests` (a known sheet with a per-leg cap of 20.00 and a minimum of 5.00 priced through `CostModel` at several sizes and three rounding rules), `CostSheetVerbTests` (option lines), `CostSheetDatabaseTests.Derive_writes_one_owner_only_sheet...` (table counts unchanged, mode 0600, no overwrite, no identifier).
+- **The rule (review 2026-11-12): a derived sheet never understates a cost.** What the bills prove is written; what they cannot prove is `null` (printed `unavailable: ...; fill from your tariff`), so the sheet cannot be loaded until the owner fills it.
+  - *Brokerage cap* (per leg, as `CostModel` applies it): written only when bills of at least two different turnovers show exactly the same largest whole-bill brokerage, a bill below it exists, and every bill at that amount is larger than every bill below it; the per-leg cap is half of it (an intraday bill has two legs). Otherwise null.
+  - *Brokerage rate*: the median over the bills below the cap only (all bills when no cap is proven); null (and flagged unstable, with the dates where the rate moved) when it moves by more than 5 %, for instance when a minimum binds on small bills.
+  - *Delivery brokerage*: 0 only when no one-sided NSE bill has brokerage above 0; otherwise null, and the count is printed on its own line (not among "rows not used"). *Delivery DP charge*: null always (not a report column). Intraday DP charge 0.
+  - *Assumed, not derived* (one printed line each, the owner checks them against the tariff): the brokerage minimum 0, the intraday buy-side STT 0, the delivery buy STT equal to its sell STT, the intraday DP charge 0, the rounding rule half-away-from-zero.
+  - GST is one rate, weighted: the sum of the GST cells over the sum of their bases (brokerage, SEBI, transaction), over the bills of both classes, rounded up at six decimals so it is never under the true rate.
+  - A proven brokerage cap is written even when the brokerage rate is null (the printout says so).
+  - The working sheet the residuals price with is read from the sheet text by `CostSheetJson` (the architecture rule: no other source file builds `ChargeRates`).
+  - The residuals price a null line as 0 (and a rate without a proven cap as uncapped), and the printout says so; a sheet with null lines is never presented as ready.
+- **Other deviations from the text above, each deliberate:**
+  1. Two files are written, both 0600 (the sheet and `<out>.residuals.csv`, which AC 4 requires), through `ExportFolderWriter.OpenNew`/`CreateDirectory`; an existing output refuses (exit 1); if the residuals cannot be written the sheet is deleted, and a file that was not created by this run is never deleted (a partly written file is, once our own open succeeded).
+  2. A one-sided NSE row with brokerage above 0 fits no class (counted separately, see above); a row with a negative Oth. cell is an adjustment and is not used, as in `check`.
+  3. The split is by date: the cut moves forward so a day is never split; the check set may be empty (then the verdict does not pass).
+  4. The verdict MEETS needs at least 95 % on both sets; it never changes the sheet's `unchecked` state, and a sheet with null lines is reported as not loadable.
+  5. `scripts/cost-sheet.sh` makes a relative `--out` absolute against the caller's directory; the default stays under `data/cost-sheets/` (git-ignored).

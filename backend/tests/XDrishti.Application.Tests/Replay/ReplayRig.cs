@@ -112,13 +112,13 @@ internal sealed class BarCandidates(IReplayFacts facts) : IReplayCandidates
 /// <summary>The pieces of a replay over a <see cref="ReplayWorld"/>: the real facts, the real session runner and driver, the engine of the invented market.</summary>
 internal sealed class ReplayRig
 {
-    private ReplayRig(ReplayWorld world, double incompleteShare, Func<IReplayFacts, IReplayCandidates>? candidates)
+    private ReplayRig(ReplayWorld world, double incompleteShare, Func<IReplayFacts, IReplayCandidates>? candidates, XDrishti.Application.Planning.PlanListFilter? lists = null)
     {
         World = world;
         Facts = world.Facts(incompleteShare);
         Simulation = new FakeSimulation(world);
         Candidates = candidates?.Invoke(Facts) ?? new BarCandidates(Facts);
-        Runner = new ReplaySessionRunner(Facts, Candidates, new TicketReplayer(world.Strategies!, world.Baskets!, Simulation));
+        Runner = new ReplaySessionRunner(Facts, Candidates, new TicketReplayer(world.Strategies!, world.Baskets!, Simulation), lists);
         Driver = new ReplayDriver(Facts, Runner);
     }
 
@@ -134,7 +134,7 @@ internal sealed class ReplayRig
 
     public ReplayDriver Driver { get; }
 
-    public static ReplayRig Create(ReplayWorld world, double incompleteShare = 0.2, Func<IReplayFacts, IReplayCandidates>? candidates = null) => new(world, incompleteShare, candidates);
+    public static ReplayRig Create(ReplayWorld world, double incompleteShare = 0.2, Func<IReplayFacts, IReplayCandidates>? candidates = null, XDrishti.Application.Planning.PlanListFilter? lists = null) => new(world, incompleteShare, candidates, lists);
 
     public static ReplayParams Params(int sessions = 5, string? sheet = null, decimal capital = 1_000_000m, ReplayMode mode = ReplayMode.Frozen, ReplayVersionRule rule = ReplayVersionRule.Start) =>
         new(ReplayWorld.Start, ReplayWorld.RunSessions[sessions - 1], new ReplayScope([ReplayWorld.Basket], []), capital, ReplayRiskProfile.Standard, sheet, rule, mode);

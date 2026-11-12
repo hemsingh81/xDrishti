@@ -86,7 +86,7 @@ internal sealed class ReplayDriver(IReplayFacts facts, ReplaySessionRunner runne
 
         var run = prepared.Value;
         var records = new List<ReplaySessionRecord>();
-        var labels = new SortedSet<string>(HindsightLabels.For(parameters), StringComparer.Ordinal);
+        var labels = new SortedSet<string>(HindsightLabels.For(parameters).Where(l => l != HindsightLabels.FiltersWithoutHistory), StringComparer.Ordinal);
         foreach (var day in run.Sessions)
         {
             cancellationToken.ThrowIfCancellationRequested();
