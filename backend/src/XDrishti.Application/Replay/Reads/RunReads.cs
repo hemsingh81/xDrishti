@@ -61,7 +61,9 @@ internal sealed class GetReplayRunHandler(IReplayReads reads) : IQueryHandler<Ge
             JsonDocument.Parse(run.ParamsJson).RootElement.Clone(),
             JsonDocument.Parse(run.SettingsJson).RootElement.Clone(),
             figures,
-            ReplayStats.Contribution(trades)));
+            ReplayStats.Contribution(trades),
+            run.Arm,
+            run.SweepId));
     }
 }
 

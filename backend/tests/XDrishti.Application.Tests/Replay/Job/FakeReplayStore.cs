@@ -50,13 +50,39 @@ internal sealed class FakeReplayStore : IReplayStore, IReplayReads
 
     private ReplayRunRow Row(Run r) => new(
         r.Created.Id, r.Pair, r.Created.From, r.Created.To, r.Created.Mode, r.Created.ParamsJson, r.Created.SettingsJson, r.Created.VersionsJson, r.Created.LearningSources, r.Created.InputHash, r.Created.ScopeHash, r.ResultHash, r.State, r.Cursor, r.Sessions.Count, r.Created.SessionsTotal,
-        Runs.Count(o => o.Created.From == r.Created.From && o.Created.To == r.Created.To && (o.Created.CreatedAt, o.Created.Id).CompareTo((r.Created.CreatedAt, r.Created.Id)) <= 0), r.Created.CreatedAt, r.FinishedAt, r.FailReason, r.Cursor is { } c && r.Sessions.TryGetValue(c, out var last) ? last.Equity : null, r.Cursor is { } c2 && r.Sessions.TryGetValue(c2, out var last2) ? last2.Drawdown : null);
+        Runs.Count(o => o.Created.From == r.Created.From && o.Created.To == r.Created.To && (o.Created.CreatedAt, o.Created.Id).CompareTo((r.Created.CreatedAt, r.Created.Id)) <= 0), r.Created.CreatedAt, r.FinishedAt, r.FailReason, r.Cursor is { } c && r.Sessions.TryGetValue(c, out var last) ? last.Equity : null, r.Cursor is { } c2 && r.Sessions.TryGetValue(c2, out var last2) ? last2.Drawdown : null, r.Created.Arm, r.Created.SweepId);
 
-    public ValueTask<ReplayInsert> InsertAsync(Guid? pairId, IReadOnlyList<NewReplayRun> runs, CancellationToken cancellationToken)
+    public List<NewReplaySweep> Sweeps { get; } = [];
+
+    public ValueTask<int> CancelSweepAsync(Guid sweepId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var touched = 0;
+        foreach (var r in Runs.Where(r => r.Created.SweepId == sweepId && ReplayRunStates.IsActive(r.State)))
+        {
+            r.State = r.State == ReplayRunStates.Queued ? ReplayRunStates.Cancelled : ReplayRunStates.Cancelling;
+            r.FinishedAt = r.State == ReplayRunStates.Cancelled ? now : null;
+            touched++;
+        }
+
+        return ValueTask.FromResult(touched);
+    }
+
+    public ValueTask<ReplaySweepRow?> GetSweepAsync(Guid sweepId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Sweeps.Where(s => s.Id == sweepId).Select(s => new ReplaySweepRow(s.Id, s.ParamsJson, s.Starts, s.CreatedAt)).FirstOrDefault());
+
+    public ValueTask<IReadOnlyList<ReplayRunRow>> GetSweepRunsAsync(Guid sweepId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<ReplayRunRow>>([.. Runs.Where(r => r.Created.SweepId == sweepId).OrderBy(r => r.Created.CreatedAt).Select(Row)]);
+
+    public ValueTask<ReplayInsert> InsertAsync(Guid? pairId, IReadOnlyList<NewReplayRun> runs, CancellationToken cancellationToken, NewReplaySweep? sweep = null)
     {
         if (Runs.Any(r => ReplayRunStates.IsActive(r.State)))
         {
             return ValueTask.FromResult(new ReplayInsert(false, [.. Runs.Where(r => ReplayRunStates.IsActive(r.State)).Select(Row)]));
+        }
+
+        if (sweep is not null)
+        {
+            Sweeps.Add(sweep);
         }
 
         var added = runs.Select(n => new Run(n, pairId)).ToList();

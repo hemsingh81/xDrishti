@@ -10,7 +10,10 @@ namespace XDrishti.Application.Abstractions.Replay;
 public interface IReplayStore
 {
     /// <summary>Stores the runs of one request (one run, or the frozen and learning runs that share <paramref name="pairId"/>) as <c>queued</c>, in one transaction, unless a replay is queued, running or cancelling: then nothing is stored and the active runs come back.</summary>
-    ValueTask<ReplayInsert> InsertAsync(Guid? pairId, IReadOnlyList<NewReplayRun> runs, CancellationToken cancellationToken);
+    ValueTask<ReplayInsert> InsertAsync(Guid? pairId, IReadOnlyList<NewReplayRun> runs, CancellationToken cancellationToken, NewReplaySweep? sweep = null);
+
+    /// <summary>Asks every active run of the sweep to stop (SR-02): a queued run becomes <c>cancelled</c> at once, a running one <c>cancelling</c> (it stops after its session). Returns how many runs were touched; the trial-ledger rows stay.</summary>
+    ValueTask<int> CancelSweepAsync(Guid sweepId, DateTimeOffset now, CancellationToken cancellationToken);
 
     /// <summary>Marks the runs as recorded: their trial-ledger rows exist. A run is claimed only once it is recorded.</summary>
     ValueTask MarkRecordedAsync(IReadOnlyList<Guid> runIds, CancellationToken cancellationToken);
@@ -53,6 +56,12 @@ public interface IReplayReads
 
     /// <summary>The runs of one pair (the frozen and the learning run of a request), oldest first.</summary>
     ValueTask<IReadOnlyList<ReplayRunRow>> GetPairAsync(Guid pairId, CancellationToken cancellationToken);
+
+    /// <summary>One sweep; null when there is none (SR-02).</summary>
+    ValueTask<ReplaySweepRow?> GetSweepAsync(Guid sweepId, CancellationToken cancellationToken);
+
+    /// <summary>The runs of one sweep, oldest first (the order they run in).</summary>
+    ValueTask<IReadOnlyList<ReplayRunRow>> GetSweepRunsAsync(Guid sweepId, CancellationToken cancellationToken);
 
     /// <summary>The stored sessions with their session between <paramref name="from"/> and <paramref name="to"/> (each end optional), oldest first.</summary>
     ValueTask<IReadOnlyList<ReplaySessionRow>> SessionsAsync(Guid runId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken);

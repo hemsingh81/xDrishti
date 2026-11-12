@@ -95,6 +95,22 @@ internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates 
             notes.Add(string.Create(CultureInfo.InvariantCulture, $"data_missing: bars of {set.IncompleteBars} of {set.Universe} instruments are incomplete"));
             blocked.AddRange(set.Found.Select(c => new ReplayBlocked(c.Draft.Symbol, c.Cell.Key, BlockReason.DataMissing, "incomplete_bars")));
         }
+        else if (p.Arm == ReplayArm.Baseline)
+        {
+            // SR-02: no selection; every candidate at equal risk, through the same fill path below
+            var held = book.OpenAt(session).Select(t => t.Item.Symbol).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var outcome = BaselineSizer.Size(set.Found, figures, p.Profile, held);
+            foreach (var (item, _) in outcome.Taken)
+            {
+                candidateItems.TryAdd((item.Symbol, item.Evidence.CellKey), item.Rank);
+                var row = new ReplayCandidateRow(item.Symbol, item.Side, item.Evidence.CellKey, item.Rank);
+                taken.Add(row);
+                ranked.Add(row);
+                takenItems.Add(item);
+            }
+
+            blocked.AddRange(outcome.Blocked);
+        }
         else
         {
             var close = Close(session);

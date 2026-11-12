@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { formatPercent } from '@/shared/lib/format';
 import { ErrorState, Facts, LoadingState, type Fact } from '@/shared/ui';
 import { replayPairQuery } from '../../api/replayApi';
+import { ArmComparisonCard } from './ArmComparisonCard';
 
 const pct = (v: number | null) => (v === null ? 'n/a' : `${formatPercent(v * 100)}%`);
 /** A daily difference of equity, a fraction: shown as a percent with three decimals so a small edge is not rounded away. */
@@ -22,6 +23,7 @@ const answers: Record<string, string> = {
 export function PairCard({ pairId }: { pairId: string }) {
   const pair = useQuery(replayPairQuery(pairId));
   const d = pair.data;
+  if (d?.selectionVsBaseline) return <ArmComparisonCard comparison={d.selectionVsBaseline} hindsight={d.hindsight} />;
   const facts: Fact[] = d
     ? [
         { label: 'Days', value: d.days ?? 'n/a' },

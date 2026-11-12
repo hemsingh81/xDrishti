@@ -22,7 +22,9 @@ public sealed record ReplayRunListItem(
     decimal? FinalEquity,
     decimal? MaxDrawdownPct,
     int TrialNumber,
-    string CostsLabel);
+    string CostsLabel,
+    string Arm = "selection",
+    Guid? SweepId = null);
 
 /// <summary>The figures of a run over the sessions stored so far; each is null where it cannot be told (too few sessions, no trades).</summary>
 public sealed record ReplayFigures(decimal Capital, decimal FinalEquity, decimal ReturnPct, double? Cagr, decimal? MaxDrawdownPct, double? Sharpe, double? Exposure, int Trades, int ClosedTrades, double? HitRate, double? MeanR);
@@ -51,7 +53,9 @@ public sealed record ReplayRunView(
     JsonElement Parameters,
     JsonElement SettingsSnapshot,
     ReplayFigures? Figures,
-    IReadOnlyList<ReplayStrategyContribution> Contribution);
+    IReadOnlyList<ReplayStrategyContribution> Contribution,
+    string Arm = "selection",
+    Guid? SweepId = null);
 
 /// <summary>One day of the equity curve: the equity, the drawdown from the peak so far, the cash (equity less the cost of the positions open at the close) and the benchmark rebased to the capital.</summary>
 public sealed record ReplayEquityPoint(DateOnly Session, decimal Equity, decimal DrawdownPct, decimal Cash, decimal? Benchmark);
@@ -127,12 +131,34 @@ public sealed record ReplayBookTradeView(
 /// <summary>The trades of a run.</summary>
 public sealed record ReplayTradeListView(IReadOnlyList<ReplayLabelView> Hindsight, Guid RunId, ReplayCompleteness Completeness, string CostsLabel, IReadOnlyList<ReplayBookTradeView> Trades);
 
-/// <summary>The frozen-versus-learning comparison of a pair (AC 9), computed on read from the two stored runs. <see cref="Answer"/> is null while a run is not complete, with the reason.</summary>
+/// <summary>
+/// The selection run against the no-selection baseline of one request (SR-02, D2), computed on read by the same paired day bootstrap as the frozen-versus-learning pair. <see cref="Answer"/> is null while a run is not complete, with the reason; the probabilities are null with too little history.
+/// <see cref="Label"/> says what the baseline is (no choosing among the system's candidates, not random stocks) and <see cref="Shortcut"/> that equity is realised only.
+/// </summary>
+public sealed record ReplayArmComparisonView(
+    ReplayRunListItem Selection,
+    ReplayRunListItem Baseline,
+    string? Answer,
+    string? Reason,
+    int? Days,
+    int? InformativeDays,
+    double? MeanDailyDifference,
+    double? ProbabilitySelectionBetter,
+    double? ProbabilityBaselineBetter,
+    double? Low,
+    double? High,
+    double? Cut,
+    double? HurtsBar,
+    int? MinDays,
+    string Label,
+    string Shortcut);
+
+/// <summary>The comparison of a pair (AC 9): frozen versus learning, or (a baseline pair) <see cref="SelectionVsBaseline"/> with <see cref="Frozen"/> and <see cref="Learning"/> null. Computed on read from the stored runs. <see cref="Answer"/> is null while a run is not complete, with the reason.</summary>
 public sealed record ReplayPairView(
     IReadOnlyList<ReplayLabelView> Hindsight,
     Guid PairId,
-    ReplayRunListItem Frozen,
-    ReplayRunListItem Learning,
+    ReplayRunListItem? Frozen,
+    ReplayRunListItem? Learning,
     string? Answer,
     string? Reason,
     int? Days,
@@ -144,4 +170,5 @@ public sealed record ReplayPairView(
     double? High,
     double? Cut,
     double? HurtsBar,
-    int? MinDays);
+    int? MinDays,
+    ReplayArmComparisonView? SelectionVsBaseline = null);
