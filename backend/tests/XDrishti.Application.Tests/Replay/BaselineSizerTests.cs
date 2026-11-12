@@ -100,7 +100,7 @@ public sealed class BaselineSizerTests
         var outcome = BaselineSizer.Size([.. Eight().Take(3)], Figures(funds: 300_000m), ReplayRiskProfile.Standard, None());
 
         outcome.Taken.ShouldNotBeEmpty();
-        outcome.Taken.Sum(t =>t.Item.Allocations[0].Quantity * 500m).ShouldBeLessThanOrEqualTo(300_000m);
+        outcome.Taken.Sum(t => t.Item.Allocations[0].Quantity * 500m).ShouldBeLessThanOrEqualTo(300_000m);
     }
 
     [Fact]

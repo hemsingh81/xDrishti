@@ -7,9 +7,9 @@ using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Quality;
-using XDrishti.Domain.Research;
 using XDrishti.Domain.Replay;
 using XDrishti.Domain.Reporting;
+using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Replay.Reads;
 
