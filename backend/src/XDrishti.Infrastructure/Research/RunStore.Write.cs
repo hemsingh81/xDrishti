@@ -107,7 +107,7 @@ internal sealed partial class RunStore
 
         var start = reader.GetFieldValue<DateOnly>(0);
 
-        var latest = start.AddDays(-1 - holdOut.TrainingEmbargoDays);
+        var latest = XDrishti.Domain.Confidence.HoldOutOptions.TrainingCut(start, holdOut.TrainingEmbargoDays);
         return run.Run.To > latest || run.Run.From > latest
             ? $"The training window reaches the hold-out block (starts {start:yyyy-MM-dd}) or its {holdOut.TrainingEmbargoDays}-day embargo; it must end on or before {latest:yyyy-MM-dd}. Nothing was stored."
             : null;

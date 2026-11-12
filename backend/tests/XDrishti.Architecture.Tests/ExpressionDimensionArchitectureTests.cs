@@ -63,6 +63,7 @@ public sealed partial class ExpressionDimensionArchitectureTests
         string[] cashOnly =
         [
             "XDrishti.Application/Selection/ShowSelectionHandler.cs", "XDrishti.Infrastructure/Planning/StoredTicketSource.cs", "XDrishti.Application/Paper/ConfigSnapshotSource.cs",
+            "XDrishti.Application/Learning/CellsRefresh/RefreshCellStatsHandler.cs", // the scheduled refresh (LC-01) repeats the newest cash snapshot
             "XDrishti.Application/Replay/ReplayFacts.cs", // the system replay (SR-01) reads the cells of a plan: cash only, as the live ticket source does
         ];
         var readers = Files(".").Where(f => Regex.IsMatch(File.ReadAllText(f), @"\.(ListLatestAsync|ListLatestCashAsync|ListLatestBeforeAsync|ListRegimeLatestAsync|ListUniverseLatestAsync|FindLatestAsync)\(")).Select(Rel)

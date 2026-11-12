@@ -9,7 +9,7 @@ namespace XDrishti.Application.Learning.CellsRefresh;
 
 /// <summary>
 /// The scheduled cell-statistics refresh (<see cref="Id"/>, spec LC-01, ADR 0277): after the end-of-day run it carries out <see cref="RefreshCellStatsCommand"/>. It starts <b>paused</b>; resuming it is an owner act with a fresh password, because it writes a decision input with no human in
-/// between. Latest only (ADR 0240): one run writes one snapshot as of the latest closed session. It is not in the nightly's <c>MustFollow</c>: a paused refresh must not block the nightly's recovery; the gate is the check. It fails closed and never re-stamps. It places no order.
+/// between. Latest only (ADR 0240): one run writes one snapshot as of the latest closed session. It is not in the nightly's <c>MustFollow</c>: a paused refresh must not block the nightly's recovery; the gate is the check. It fails closed: on any failure it stores no snapshot and re-dates nothing, so a failure never becomes a stale pass. It places no order.
 /// </summary>
 public sealed class CellsRefreshService(IServiceScopeFactory scopes) : IScheduledService
 {

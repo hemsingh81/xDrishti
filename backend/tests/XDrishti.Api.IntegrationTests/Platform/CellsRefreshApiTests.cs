@@ -34,13 +34,13 @@ public sealed class CellsRefreshApiTests(ApiFactory factory) : DataTestBase(fact
     }
 
     [Fact]
-    public async Task Resuming_without_or_with_a_wrong_password_is_401_and_the_service_stays_paused()
+    public async Task A_missing_password_is_403_counting_nothing_and_a_wrong_one_is_401_and_the_service_stays_paused()
     {
         var none = await ResumeAsync("cells-refresh", null);
         var wrong = await ResumeAsync("cells-refresh", new { password = "not-the-password" });
 
-        none.Status.ShouldBe(HttpStatusCode.Unauthorized);
-        none.Body.GetProperty("code").GetString().ShouldBe("auth.invalid_credentials");
+        none.Status.ShouldBe(HttpStatusCode.Forbidden);
+        none.Body.GetProperty("code").GetString().ShouldBe("auth.step_up_required");
         wrong.Status.ShouldBe(HttpStatusCode.Unauthorized);
         (await ServiceAsync("cells-refresh")).GetProperty("enabled").GetBoolean().ShouldBeFalse();
     }

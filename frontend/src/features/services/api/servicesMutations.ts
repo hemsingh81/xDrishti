@@ -67,7 +67,14 @@ export function usePauseService() {
 export function useResumeService() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => unwrap(await api.POST('/api/services/{id}/resume', { params: { path: { id } } })),
+    // A service with resumeNeedsPassword (the cell-statistics refresh, LC-01) is resumed with a fresh password in the body.
+    mutationFn: async ({ id, password }: { id: string; password?: string }) =>
+      unwrap(
+        await api.POST('/api/services/{id}/resume', {
+          params: { path: { id } },
+          ...(password === undefined ? {} : { body: { password } }),
+        }),
+      ),
     onSuccess: (service) => {
       showService(queryClient, service);
     },

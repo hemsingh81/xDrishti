@@ -16,7 +16,7 @@ internal sealed class ResumeServiceHandler(ServiceRegistry registry, ServiceSett
     {
         if (!command.FreshPassword && registry.Find(command.ServiceId)?.Definition.Constraints.ResumeIsOwnerAct == true)
         {
-            return Result.Failure<ServiceView>(XDrishti.Application.Auth.AuthErrors.StepUpRequired);
+            return Result.Failure<ServiceView>(ServiceErrors.StepUpRequired);
         }
 
         return await ServiceToggle.SetEnabledAsync(command.ServiceId, enabled: true, command.Actor, registry, settings, writer, reader, cancellationToken);

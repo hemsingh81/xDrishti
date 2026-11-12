@@ -39,7 +39,7 @@ internal sealed class RefreshCellStatsHandler(
     public async ValueTask<Result<RefreshCellStatsOutcome>> HandleAsync(RefreshCellStatsCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-        var template = await cells.ListLatestCashAsync(null, null, cancellationToken);
+        var template = CashCells.Only(await cells.ListLatestCashAsync(null, null, cancellationToken), "cells-refresh", logger); // cash cells only (ADR 0193); the regime and tier rows below are only looked at for their snapshot key
         if (template.Count == 0)
         {
             return Fail(CellsRefreshErrors.NoSnapshot(null));
@@ -51,6 +51,11 @@ internal sealed class RefreshCellStatsHandler(
             return Fail(CellsRefreshErrors.TemplateUnreadable(null));
         }
 
+        if (sources.Count > ComputeCellStatsHandler.MaxSources)
+        {
+            return Fail(CellsRefreshErrors.TooManySources(sources.Count, null));
+        }
+
         var now = time.GetUtcNow();
         var calendar = await tradingCalendar.GetAsync(cancellationToken);
         var session = calendar.LastClosedSession(now);
@@ -60,7 +65,7 @@ internal sealed class RefreshCellStatsHandler(
             return Fail(CellsRefreshErrors.NoHoldOut(null));
         }
 
-        // phase 1: decide for every source; simulate what is extended, store nothing yet
+        // phase 1: decide for every source; simulate what is extended, store nothing yet. shortcut: up to 50 simulated runs (the cap of one snapshot) are held in memory at once so that a failed one leaves nothing stored; the run is after eod, outside market hours
         var kept = new List<string>();
         var pending = new List<Pending>();
         foreach (var source in sources)
@@ -126,9 +131,10 @@ internal sealed class RefreshCellStatsHandler(
             if (!stored.Value.WasAlreadyStored)
             {
                 newRuns++;
-                // shortcut: the ledger row follows the store without a shared transaction; the row id comes from the run key, so a repeat adds nothing
-                await ledger.AppendAsync(new LedgerRow(Guid.ParseExact(p.Run.RunKey[..32], "N"), p.Run.RunKey, p.Version.StrategyId, p.Version.Version, p.Run.Strategy.DefinitionSha256, null, p.Run.Universe.Label, p.Run.From, p.Run.To, CellsRefreshRules.TrialKind, now, CellsRefreshRules.TrialKind), cancellationToken);
             }
+
+            // shortcut: the ledger row follows the store without a shared transaction. It is appended for every extended source: the row id comes from the run key and the insert is ON CONFLICT DO NOTHING, so a repeat adds nothing and a look lost to a failed append is counted by the retry
+            await ledger.AppendAsync(new LedgerRow(Guid.ParseExact(p.Run.RunKey[..32], "N"), p.Run.RunKey, p.Version.StrategyId, p.Version.Version, p.Run.Strategy.DefinitionSha256, null, p.Run.Universe.Label, p.Run.From, p.Run.To, CellsRefreshRules.TrialKind, now, CellsRefreshRules.TrialKind), cancellationToken);
 
             extended.Add($"{Short(source.RunKey)} -> {Short(p.Run.RunKey)}");
             finalSources.Add(source with { RunKey = p.Run.RunKey });

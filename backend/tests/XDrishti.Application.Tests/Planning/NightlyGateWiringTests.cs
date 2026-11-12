@@ -105,10 +105,29 @@ public sealed class NightlyGateWiringTests
         var cells = Substitute.For<ICellStatsStore>();
         cells.NewestAsOfAsync(Ct).Returns(Friday);
 
-        var result = await new SelectionInputsGate(cells).CheckAsync(Context, Ct);
+        var result = await new SelectionInputsGate(cells, State()).CheckAsync(Context, Ct);
 
         result.Status.ShouldBe(GateStatus.Pass);
         await cells.DidNotReceive().ListLatestAsync(Arg.Any<string?>(), Arg.Any<string?>(), Ct);
+    }
+
+    private static XDrishti.Application.Learning.CellsRefresh.CellsRefreshState State()
+    {
+        var schedules = Substitute.For<IServiceScheduleReader>();
+        schedules.GetAsync("cells-refresh", Arg.Any<CancellationToken>()).Returns(new ServiceScheduleInfo(false, null, "", null));
+        return new XDrishti.Application.Learning.CellsRefresh.CellsRefreshState(schedules, Substitute.For<IServiceRunStore>());
+    }
+
+    [Fact]
+    public async Task A_too_old_snapshot_fails_the_gate_with_the_state_of_the_refresh_in_its_reason()
+    {
+        var cells = Substitute.For<ICellStatsStore>();
+        cells.NewestAsOfAsync(Ct).Returns(Friday.AddDays(-8));
+
+        var result = await new SelectionInputsGate(cells, State()).CheckAsync(Context, Ct);
+
+        result.Status.ShouldBe(GateStatus.Fail);
+        result.Reason.ShouldContain("Last refresh: paused.");
     }
 
     [Fact]
@@ -117,6 +136,6 @@ public sealed class NightlyGateWiringTests
         var cells = Substitute.For<ICellStatsStore>();
         cells.NewestAsOfAsync(Ct).Returns((DateOnly?)null);
 
-        (await new SelectionInputsGate(cells).CheckAsync(Context, Ct)).Status.ShouldBe(GateStatus.Unavailable);
+        (await new SelectionInputsGate(cells, State()).CheckAsync(Context, Ct)).Status.ShouldBe(GateStatus.Unavailable);
     }
 }

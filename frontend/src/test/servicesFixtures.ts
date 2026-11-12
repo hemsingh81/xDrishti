@@ -124,6 +124,7 @@ export const buildServiceView = (overrides: Partial<ServiceView> = {}): ServiceV
   issues: [],
   isDefault: true,
   revision: 3,
+  resumeNeedsPassword: false,
   ...overrides,
 });
 

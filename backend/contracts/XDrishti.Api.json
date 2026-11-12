@@ -6869,7 +6869,7 @@
         "tags": [
           "Services"
         ],
-        "summary": "Resume a paused service. Audited. An optional body { password } is required only for a service with resumeNeedsPassword (cells-refresh, LC-01): a missing or wrong password is 401 auth.invalid_credentials (counted toward the lockout) and the service stays paused. 404 services.not_found, 409 services.read_only",
+        "summary": "Resume a paused service. Audited. An optional body { password } is required only for a service with resumeNeedsPassword (cells-refresh, LC-01): a missing password is 403 auth.step_up_required (nothing is counted), a wrong one is 401 auth.invalid_credentials (counted toward the lockout), and the service stays paused. 404 services.not_found, 409 services.read_only",
         "operationId": "ResumeService",
         "parameters": [
           {
@@ -6910,6 +6910,16 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/problem+json": {
                 "schema": {

@@ -20,7 +20,7 @@ namespace XDrishti.Application.Platform.Services;
 /// </summary>
 public sealed record GetServiceNoticesQuery : IQuery<ServiceNotices>;
 
-internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, ServiceSettingsReader settings, IServiceRunStore runs, IRecoveryLedger recovery, RecoverySettings recoveryOptions, IEssentialSettingStore essentials, TimeProvider clock, ICellStatsStore? cellStats = null, ITradingCalendar? tradingCalendar = null, CellsRefreshState? refreshState = null, CellsRefreshOptions? cellsOptions = null) : IQueryHandler<GetServiceNoticesQuery, ServiceNotices>
+internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, ServiceSettingsReader settings, IServiceRunStore runs, IRecoveryLedger recovery, RecoverySettings recoveryOptions, IEssentialSettingStore essentials, TimeProvider clock, ICellStatsStore cellStats, ITradingCalendar tradingCalendar, CellsRefreshState refreshState, CellsRefreshOptions cellsOptions) : IQueryHandler<GetServiceNoticesQuery, ServiceNotices>
 {
     public const string Failed = "service_failed";
 
@@ -99,13 +99,13 @@ internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, Service
         }
 
         // LC-01 (D8): the cell statistics are getting old while the nightly plan is enabled: one notice per day
-        if (cellStats is not null && tradingCalendar is not null && refreshState is not null && all.Any(s => s.Id == NightlyService.Id && s.Settings.Enabled)
+        if (all.Any(s => s.Id == NightlyService.Id && s.Settings.Enabled)
             && await cellStats.NewestAsOfAsync(cancellationToken) is { } asOf)
         {
             var calendar = await tradingCalendar.GetAsync(cancellationToken);
             var last = calendar.LastClosedSession(now);
             var age = asOf >= last ? 0 : calendar.TradingDaysBetween(asOf, last);
-            if (CellsRefreshRules.ShouldNotify(age, (cellsOptions ?? new CellsRefreshOptions()).NoticeAfterSessions))
+            if (CellsRefreshRules.ShouldNotify(age, cellsOptions.NoticeAfterSessions))
             {
                 var today = IndiaTime.Today(now).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                 notices.Add(new ServiceNotice($"cells:stale:{today}", CellsRefreshRules.StaleNoticeKind, "warning", CellsRefreshRules.StaleText(age, NightlyRules.MaxCellStatsAgeSessions, await refreshState.DescribeAsync(cancellationToken)), CellsRefreshRules.ServiceId, now));

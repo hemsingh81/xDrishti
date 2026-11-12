@@ -85,8 +85,9 @@ internal sealed class ServicesEndpoints : IEndpointModule
 
         group.MapPost("/{id}/resume", ResumeAsync)
             .WithName("ResumeService")
-            .WithSummary("Resume a paused service. Audited. An optional body { password } is required only for a service with resumeNeedsPassword (cells-refresh, LC-01): a missing or wrong password is 401 auth.invalid_credentials (counted toward the lockout) and the service stays paused. 404 services.not_found, 409 services.read_only")
+            .WithSummary("Resume a paused service. Audited. An optional body { password } is required only for a service with resumeNeedsPassword (cells-refresh, LC-01): a missing password is 403 auth.step_up_required (nothing is counted), a wrong one is 401 auth.invalid_credentials (counted toward the lockout), and the service stays paused. 404 services.not_found, 409 services.read_only")
             .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
@@ -211,9 +212,9 @@ internal sealed class ServicesEndpoints : IEndpointModule
             return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
         }
 
-        // LC-01: the resume of this service is an owner act: a fresh password, wrong or missing is 401 auth.invalid_credentials and counts toward the lockout; the step-up window is neither opened nor used
+        // LC-01: the resume of this service is an owner act (the CF-10/11/12 order): a body without a password is 403 auth.step_up_required and counts nothing; a wrong one is the sign-in 401 or 423 with its lockout rules; the step-up window is neither opened nor used
         http.Response.Headers.CacheControl = "no-store";
-        var owner = await OwnerAct.AuthorizeAsync(http, passwordCheck, request?.Password, cancellationToken);
+        var owner = await OwnerAct.FreshAsync(http, passwordCheck, request?.Password, cancellationToken);
         if (owner.IsFailure)
         {
             return ProblemResults.From(owner.Error, http);

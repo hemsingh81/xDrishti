@@ -2017,7 +2017,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Resume a paused service. Audited. An optional body { password } is required only for a service with resumeNeedsPassword (cells-refresh, LC-01): a missing or wrong password is 401 auth.invalid_credentials (counted toward the lockout) and the service stays paused. 404 services.not_found, 409 services.read_only */
+    /** Resume a paused service. Audited. An optional body { password } is required only for a service with resumeNeedsPassword (cells-refresh, LC-01): a missing password is 403 auth.step_up_required (nothing is counted), a wrong one is 401 auth.invalid_credentials (counted toward the lockout), and the service stays paused. 404 services.not_found, 409 services.read_only */
     post: operations['ResumeService'];
     delete?: never;
     options?: never;
@@ -30737,6 +30737,15 @@ export interface operations {
       };
       /** @description Unauthorized */
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
         headers: {
           [name: string]: unknown;
         };

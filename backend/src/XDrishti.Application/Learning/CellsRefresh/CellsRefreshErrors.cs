@@ -10,9 +10,12 @@ public static class CellsRefreshErrors
     public const string NoHoldOutCode = "cells_refresh.no_holdout";
     public const string TemplateUnreadableCode = "cells_refresh.template_unreadable";
     public const string NotRebuildableCode = "cells_refresh.not_rebuildable";
+    public const string TooManySourcesCode = "cells_refresh.too_many_sources";
     public const string SourceFailedCode = "cells_refresh.source_failed";
 
     public static Error NoSnapshot(DateOnly? end) => Error.Conflict(NoSnapshotCode, Say("No cell statistics snapshot is stored; the first one is the owner's xd learn cells.", end));
+
+    public static Error TooManySources(int count, DateOnly? end) => Error.Conflict(TooManySourcesCode, Say($"The newest snapshot names {count} runs; a snapshot reads at most 50.", end));
 
     public static Error NoHoldOut(DateOnly? end) => Error.Conflict(NoHoldOutCode, Say("No hold-out block is fixed, so no safe refresh end can be determined.", end));
 

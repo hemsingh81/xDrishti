@@ -43,7 +43,7 @@ public static class CellsRefreshRules
             return null;
         }
 
-        var cut = start.AddDays(-1 - embargoDays);
+        var cut = Confidence.HoldOutOptions.TrainingCut(start, embargoDays);
         return cut < lastClosedSession ? cut : lastClosedSession;
     }
 

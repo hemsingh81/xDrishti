@@ -197,7 +197,7 @@ internal sealed class QualityGate(IQualityQueries quality) : INightlyGate
 }
 
 /// <summary>A cell statistics snapshot exists, is not from after the session and is not too old (spec P7-08).</summary>
-internal sealed class SelectionInputsGate(ICellStatsStore cells, CellsRefreshState? refresh = null) : INightlyGate
+internal sealed class SelectionInputsGate(ICellStatsStore cells, CellsRefreshState refresh) : INightlyGate
 {
     public string Id => NightlyGateIds.SelectionInputs;
 
@@ -207,7 +207,7 @@ internal sealed class SelectionInputsGate(ICellStatsStore cells, CellsRefreshSta
         var result = NightlyChecks.Selection(newest, context);
 
         // LC-01 (ADR 0277): a snapshot that is too old says what the scheduled refresh did; the rule itself is unchanged
-        return result.Status == GateStatus.Fail && newest is { } asOf && asOf <= context.Session && refresh is not null
+        return result.Status == GateStatus.Fail && newest is { } asOf && asOf <= context.Session
             ? NightlyChecks.Selection(newest, context, await refresh.DescribeAsync(cancellationToken))
             : result;
     }

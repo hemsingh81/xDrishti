@@ -133,6 +133,7 @@ export function createServicesFake(options: ServicesFakeOptions = {}) {
     resets: [] as string[],
     pauses: [] as string[],
     resumes: [] as string[],
+    resumePasswords: [] as (string | null)[],
     runs: [] as string[],
     runPages: [] as { id: string; page: number; pageSize: number }[],
   };
@@ -437,12 +438,23 @@ export function createServicesFake(options: ServicesFakeOptions = {}) {
       const paused = { ...service, enabled: false, nextRun: null, revision: service.revision + 1 };
       return HttpResponse.json(replace({ ...paused, status: statusOf(paused) }));
     }),
-    http.post('/api/services/:id/resume', ({ params }) => {
+    http.post('/api/services/:id/resume', async ({ params, request }) => {
       const id = String(params.id);
       calls.resumes.push(id);
       const service = find(id);
       if (!service) return notFound();
       if (service.readOnly) return readOnly();
+      if (service.resumeNeedsPassword) {
+        // LC-01: a body without a password is 403 (nothing counted), a wrong one 401
+        const body = (await request.json().catch(() => null)) as { password?: string } | null;
+        calls.resumePasswords.push(body?.password ?? null);
+        if (!body?.password) {
+          return problemResponse({ title: 'Re-enter your password to continue.', code: 'auth.step_up_required' }, 403);
+        }
+        if (body.password !== 'right-password') {
+          return problemResponse({ title: 'The password is not right.', code: 'auth.invalid_credentials' }, 401);
+        }
+      }
       const resumed = {
         ...service,
         enabled: true,

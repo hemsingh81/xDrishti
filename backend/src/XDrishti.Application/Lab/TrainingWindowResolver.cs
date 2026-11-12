@@ -29,7 +29,7 @@ internal sealed class TrainingWindowResolver(LabHoldOutGuard guard, HoldOutOptio
             return Result.Failure<TrainingWindow>(LabErrors.HoldOutUnavailable("The stored history is too short to keep a hold-out block; a training run does not start."));
         }
 
-        var latest = block.Start.AddDays(-1 - options.TrainingEmbargoDays);
+        var latest = HoldOutOptions.TrainingCut(block.Start, options.TrainingEmbargoDays);
         var start = from ?? history.First;
         var end = to ?? latest;
         if (start > latest || end > latest)

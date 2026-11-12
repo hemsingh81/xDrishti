@@ -48,6 +48,9 @@ internal sealed class ServicesWorld : IDisposable
             .Singleton<IRecoveryLedger>(Ledger)
             .Singleton<XDrishti.Application.Abstractions.SettingsCatalog.IEssentialSettingStore>(Essentials)
             .Singleton(new RecoverySettings())
+            .Singleton(Substitute.For<XDrishti.Application.Abstractions.Learning.ICellStatsStore>()) // the cell-statistics notice (LC-01): the tests that need it replace this
+            .Singleton(new XDrishti.Application.Learning.CellsRefresh.CellsRefreshOptions())
+            .Scoped<XDrishti.Application.Learning.CellsRefresh.CellsRefreshState>()
             .Singleton<ServiceRunner, ServiceRunner>()
             .Singleton<RecoveryRunner, RecoveryRunner>()
             .Singleton<ServiceScheduler, ServiceScheduler>()

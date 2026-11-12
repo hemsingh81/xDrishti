@@ -17,6 +17,7 @@ using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Research;
+using XDrishti.Tests.Shared;
 
 namespace XDrishti.Application.Tests.Learning.CellsRefresh;
 
@@ -81,8 +82,8 @@ public sealed class RefreshCellStatsHandlerTests
         _planner.PlanAsync(Arg.Any<StoredRunHeader>(), Arg.Any<string>(), Ct).Returns(call => Result.Success(Request(call.Arg<StoredRunHeader>().To)));
     }
 
-    private RefreshCellStatsHandler Handler() =>
-        new(_runs, _cells, _holdOut, new HoldOutOptions(), _calendar, _strategies, _registrations, _planner, _simulation, _store, _writer, _ledger, _compute,
+    private RefreshCellStatsHandler Handler(ITestLedger? ledger = null) =>
+        new(_runs, _cells, _holdOut, new HoldOutOptions(), _calendar, _strategies, _registrations, _planner, _simulation, _store, _writer, ledger ?? _ledger, _compute,
             new FakeTimeProvider(new DateTimeOffset(2026, 11, 12, 12, 0, 0, TimeSpan.Zero)), NullLogger<RefreshCellStatsHandler>.Instance);
 
     private static SimulationRequest Request(DateOnly to) =>
@@ -168,7 +169,7 @@ public sealed class RefreshCellStatsHandlerTests
     }
 
     [Fact]
-    public async Task A_refresh_run_that_was_stored_already_adds_no_ledger_row()
+    public async Task A_refresh_run_that_was_stored_already_still_appends_the_idempotent_ledger_row_and_counts_no_new_run()
     {
         Newest(new CellSource(R1, "intraday", "E"));
         Source(R1, Sha1, "ORB", new DateOnly(2026, 3, 31), registered: true);
@@ -178,7 +179,89 @@ public sealed class RefreshCellStatsHandlerTests
         var result = await Handler().HandleAsync(new RefreshCellStatsCommand("system:cells-refresh"), Ct);
 
         result.IsSuccess.ShouldBeTrue();
-        await _ledger.DidNotReceiveWithAnyArgs().AppendAsync(default!, Ct);
+        result.Value.NewRuns.ShouldBe(0);
+        await _ledger.Received(1).AppendAsync(Arg.Is<LedgerRow>(r => r.RunKey == R1New && r.TrialKind == "cells_refresh"), Ct);
+    }
+
+    [Fact]
+    public async Task A_ledger_append_that_throws_after_the_store_is_counted_once_by_the_retry()
+    {
+        Newest(new CellSource(R1, "intraday", "E"));
+        Source(R1, Sha1, "ORB", new DateOnly(2026, 3, 31), registered: true);
+        _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Ct).Returns(Result.Success(FakeRun(R1New, Sha1, End)));
+        var flaky = new FlakyLedger();
+
+        await Should.ThrowAsync<InvalidOperationException>(async () => await Handler(flaky).HandleAsync(new RefreshCellStatsCommand("system:cells-refresh"), Ct));
+        _store.HandleAsync(Arg.Any<StoreRunCommand>(), Ct).Returns(Result.Success(new StoreOutcome(1, true))); // the retry finds the run stored already
+        await Handler(flaky).HandleAsync(new RefreshCellStatsCommand("system:cells-refresh"), Ct);
+        await Handler(flaky).HandleAsync(new RefreshCellStatsCommand("system:cells-refresh"), Ct);
+
+        flaky.Rows.Count.ShouldBe(1); // one look, however often it is appended
+    }
+
+    [Fact]
+    public async Task A_store_failure_after_an_earlier_source_was_stored_ends_the_run_with_no_snapshot()
+    {
+        Newest(new CellSource(R1, "intraday", "E"), new CellSource(R3, "intraday", "E3"));
+        Source(R1, Sha1, "ORB", new DateOnly(2026, 3, 31), registered: true);
+        Source(R3, Sha3, "EMA", new DateOnly(2026, 3, 31), registered: true);
+        var second = new string('e', 64);
+        _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Ct).Returns(Result.Success(FakeRun(R1New, Sha1, End)), Result.Success(FakeRun(second, Sha3, End)));
+        _store.HandleAsync(Arg.Is<StoreRunCommand>(c => c.Run!.RunKey == second), Ct).Returns(Result.Failure<StoreOutcome>(Error.Conflict("store.write_failed", "no")));
+
+        var result = await Handler().HandleAsync(new RefreshCellStatsCommand("system:cells-refresh"), Ct);
+
+        result.Error.Code.ShouldBe(CellsRefreshErrors.SourceFailedCode);
+        await _compute.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task A_newest_snapshot_naming_more_than_fifty_runs_fails_closed()
+    {
+        var many = Enumerable.Range(0, 51).Select(i => new CellSource(i.ToString("x64", System.Globalization.CultureInfo.InvariantCulture), "intraday", "E")).ToArray();
+        Newest(many);
+
+        var result = await Handler().HandleAsync(new RefreshCellStatsCommand("system:cells-refresh"), Ct);
+
+        result.Error.Code.ShouldBe(CellsRefreshErrors.TooManySourcesCode);
+        await _runs.DidNotReceiveWithAnyArgs().FindAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task With_every_bar_after_the_end_changed_the_snapshot_key_is_unchanged_and_with_a_bar_before_it_the_key_changes()
+    {
+        // no look-ahead (AC 7): the request never reaches past the end, the run key is a function of the bars up to the request's end, and the snapshot key is a function of the run keys
+        Newest(new CellSource(R1, "intraday", "E"));
+        Source(R1, Sha1, "ORB", new DateOnly(2026, 3, 31), registered: true);
+        var bars = new SortedDictionary<DateOnly, int> { [new DateOnly(2026, 3, 31)] = 100, [End] = 101, [End.AddDays(3)] = 102, [Session] = 103 };
+        _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Ct).Returns(call =>
+        {
+            var to = call.Arg<RunSimulationQuery>().Request.To;
+            var text = string.Join(',', bars.Where(b => b.Key <= to).Select(b => $"{b.Key:yyyy-MM-dd}={b.Value}"));
+            var key = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text)));
+            return Result.Success(FakeRun(key, Sha1, to));
+        });
+        _runs.FindAsync(Arg.Is<string>(k => k != R1), Ct).Returns(call => Header(call.Arg<string>(), Sha1, "ORB", End));
+        _runs.StreamTradesAsync(Arg.Any<string>(), false, Ct).Returns(_ => OneTrade());
+        _cells.StoreAsync(Arg.Any<CellSnapshotToStore>(), Ct).Returns(true);
+        var realCompute = new ComputeCellStatsHandler(_runs, _cells, Substitute.For<XDrishti.Application.Abstractions.Market.Context.IContextFigures>(), new FakeTimeProvider(new DateTimeOffset(2026, 11, 12, 12, 0, 0, TimeSpan.Zero)), NullLogger<ComputeCellStatsHandler>.Instance);
+        RefreshCellStatsHandler Real() => new(_runs, _cells, _holdOut, new HoldOutOptions(), _calendar, _strategies, _registrations, _planner, _simulation, _store, _writer, _ledger, realCompute, new FakeTimeProvider(new DateTimeOffset(2026, 11, 12, 12, 0, 0, TimeSpan.Zero)), NullLogger<RefreshCellStatsHandler>.Instance);
+
+        var before = (await Real().HandleAsync(new RefreshCellStatsCommand("t"), Ct)).Value.SnapshotKey;
+        bars[End.AddDays(3)] = 999;
+        bars[Session] = -5;
+        var after = (await Real().HandleAsync(new RefreshCellStatsCommand("t"), Ct)).Value.SnapshotKey;
+        bars[End] = 1;
+        var control = (await Real().HandleAsync(new RefreshCellStatsCommand("t"), Ct)).Value.SnapshotKey;
+
+        after.ShouldBe(before);
+        control.ShouldNotBe(before);
+    }
+
+    private static async IAsyncEnumerable<RunTrade> OneTrade()
+    {
+        await Task.Yield();
+        yield return new RunTrade(FabricatedRun.Trade(FabricatedRun.IdA, "NSE:A", Side.Buy, End.AddDays(-30), rFilled: 1, rExact: 1, strategy: "ORB"), []);
     }
 
     [Fact]
@@ -260,5 +343,34 @@ public sealed class RefreshCellStatsHandlerTests
 
         _computed!.ByRegime.ShouldBeTrue();
         _computed.ByUniverse.ShouldBeFalse();
+    }
+
+    /// <summary>A ledger whose first append throws, then inserts by run id once (as the database does with ON CONFLICT DO NOTHING).</summary>
+    private sealed class FlakyLedger : ITestLedger
+    {
+        private bool _fail = true;
+
+        public Dictionary<Guid, LedgerRow> Rows { get; } = [];
+
+        public ValueTask<bool> AppendAsync(LedgerRow row, CancellationToken cancellationToken)
+        {
+            if (_fail)
+            {
+                _fail = false;
+                throw new InvalidOperationException("the database went away");
+            }
+
+            return ValueTask.FromResult(Rows.TryAdd(row.RunId, row));
+        }
+
+        public ValueTask<int> CountVariantsAsync(string strategyId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<TrialCounts> CountTrialsAsync(string strategyId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<bool> HasFullRunAsync(string strategyId, string strategyHash, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<bool> HasHashAsync(string strategyId, string strategyHash, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<IReadOnlyList<LedgerRow>> ListAsync(string strategyId, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }
