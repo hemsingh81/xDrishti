@@ -1,7 +1,7 @@
 namespace XDrishti.Api.CostSheets;
 
 /// <summary>
-/// The log lines of the <c>cost-sheet</c> verb (spec P3-03f, F4; event ids 4412 to 4414, the next free ones after the simulate verb's 4405 to 4411; unique across the solution, asserted by the architecture tests). The sheet id, its rates hash,
+/// The log lines of the <c>cost-sheet</c> verb (spec P3-03f, F4; event ids 4412 to 4414 and 4497 (CS-01), the next free ones after the simulate verb's 4405 to 4411; unique across the solution, asserted by the architecture tests). The sheet id, its rates hash,
 /// statuses and counts only: never a rate, a bill, a name, a client code or a path.
 /// </summary>
 internal static partial class CostSheetLog
@@ -14,4 +14,7 @@ internal static partial class CostSheetLog
 
     [LoggerMessage(EventId = 4414, Level = LogLevel.Information, Message = "Cost sheet {SheetId} checked, rates {RatesSha256}: {Files} files, {Compared} rows compared, {Beyond} beyond the tolerance")]
     public static partial void Checked(ILogger logger, string sheetId, string ratesSha256, int files, int compared, int beyond);
+
+    [LoggerMessage(EventId = 4497, Level = LogLevel.Information, Message = "Cost sheet {SheetId} derived: {Files} files, {DeriveBills} bills to derive from, {CheckBills} to check on, derive set passes: {DerivePasses}, check set passes: {CheckPasses}")]
+    public static partial void Derived(ILogger logger, string sheetId, int files, int deriveBills, int checkBills, bool derivePasses, bool checkPasses);
 }

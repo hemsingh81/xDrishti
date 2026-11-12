@@ -878,6 +878,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<LoadCostSheetCommand, LoadedCostSheet>, LoadCostSheetHandler>();
         services.AddScoped<IQueryHandler<ShowCostSheetQuery, Result<ShownCostSheet>>, ShowCostSheetHandler>();
         services.AddScoped<IQueryHandler<CheckCostSheetQuery, Result<CostCheckReport>>, CheckCostSheetHandler>();
+        services.AddScoped<IQueryHandler<DeriveCostSheetQuery, Result<CostDerivation>>, DeriveCostSheetHandler>();
         services.AddScoped<ICommandHandler<StoreRunCommand, StoreOutcome>, StoreRunHandler>(); // the result store (P3-10)
         services.AddScoped<ICommandHandler<StoreComparisonCommand, StoreOutcome>, StoreComparisonHandler>(); // a comparison of exits (P4-05)
         services.AddScoped<ICommandHandler<StoreExitSelectionCommand, StoreOutcome>, StoreExitSelectionHandler>(); // an exit choice (P4-06)
