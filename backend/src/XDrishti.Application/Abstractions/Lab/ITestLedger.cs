@@ -32,6 +32,9 @@ public sealed record LedgerRow(
 
     /// <summary>True for a system replay row; the readers that take hashes from the listing skip these as they skip training sweeps.</summary>
     public bool IsSystemReplay => string.Equals(TrialKind, SystemReplayKind, StringComparison.Ordinal);
+
+    /// <summary>True for a scheduled cell-statistics refresh row (LC-01, ADR 0277): one row per newly stored refresh run. Counted in the total of looks (<c>TrialCounts.CellsRefreshes</c>), never a variant hash: the readers that take hashes skip it.</summary>
+    public bool IsCellsRefresh => string.Equals(TrialKind, XDrishti.Domain.Learning.CellsRefreshRules.TrialKind, StringComparison.Ordinal);
 }
 
 /// <summary>

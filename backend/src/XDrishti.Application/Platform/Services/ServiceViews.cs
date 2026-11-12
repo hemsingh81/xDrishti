@@ -58,7 +58,8 @@ public sealed record ServiceView(
     IReadOnlyList<ServiceIssueView> Issues,
     bool IsDefault,
     long Revision,
-    ServiceLiveView? Live = null);
+    ServiceLiveView? Live = null,
+    bool ResumeNeedsPassword = false);
 
 /// <summary>
 /// What a service that another process runs (the live feed) says about itself, from that process's heartbeat: <c>state</c> is its state word (connected · idle · connecting · reconnecting · closed · paused · no_token · token_refused · flapping ·

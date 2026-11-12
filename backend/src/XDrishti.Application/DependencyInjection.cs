@@ -42,6 +42,7 @@ using XDrishti.Application.Execution;
 using XDrishti.Application.Filings;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
+using XDrishti.Application.Learning.CellsRefresh;
 using XDrishti.Application.Learning.Jobs;
 using XDrishti.Application.Learning.SimTraining;
 using XDrishti.Application.LearningPhase;
@@ -410,6 +411,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, ShadowDigestService>(); // copies the newest chain digest to a log outside the database every week (CF-08 review fix 4, ADR 0232); starts paused, nothing exported while paper.shadow.enabled is OFF
         services.AddSingleton<IScheduledService, DecayMonitorService>(); // the daily kill-rule evaluation of each strategy's forward series, after the shadow grading (CF-12 part 12b); starts paused, automatic demotion only with the owner's setting ON (default OFF), no order
         services.AddSingleton<IScheduledService, MlMonitorService>(); // the daily rollback evaluation of each champion, after the decay monitor (CF-10 part 10d-1); starts paused, automatic acts only with the owner's settings ON (default OFF), no order
+        services.AddSingleton<IScheduledService, CellsRefreshService>(); // the scheduled cell-statistics refresh (LC-01); starts paused, resuming needs the owner's password, fails closed
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
         services.AddSingleton<IScheduledService, BriefingService>(); // the daily briefing text after the suggestions (P9-06); starts paused, the model is used only under both switches
         services.AddSingleton<IScheduledService, WeeklyReviewService>(); // the weekly review text after the digest (P9-06); starts paused, applies nothing
@@ -849,6 +851,14 @@ public static class DependencyInjection
         return services;
     }
 
+    /// <summary>The handler of the scheduled cell-statistics refresh (LC-01, ADR 0277) and its request planner: only the host that runs the services (the API) calls this; the host also registers <see cref="IRunRecordWriter"/>. The service itself, the gate text and the notice need none of it, so every other host (CLI, worker, feed) stays valid without it.</summary>
+    public static IServiceCollection AddCellsRefreshRunner(this IServiceCollection services)
+    {
+        services.AddScoped<ICommandHandler<RefreshCellStatsCommand, RefreshCellStatsOutcome>, RefreshCellStatsHandler>();
+        services.AddScoped<ISourceRequestPlanner, ReplaySourceRequestPlanner>();
+        return services;
+    }
+
     /// <summary>The chunk executor and the runner of the simulate-everything job (AU-12): only the host that runs the job (the API) calls this.</summary>
     public static IServiceCollection AddSimAllRunner(this IServiceCollection services)
     {
@@ -885,6 +895,8 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetStoredRunQuery, Result<StoredRunHeader>>, GetStoredRunHandler>();
         services.AddScoped<IQueryHandler<ListStoredRunsQuery, Result<Page<StoredRunHeader>>>, ListStoredRunsHandler>();
         services.AddScoped<IQueryHandler<PageStoredTradesQuery, Result<Page<RunTrade>>>, PageStoredTradesHandler>();
+        services.AddScoped<CellsRefreshState>();
+        services.TryAddSingleton(new CellsRefreshOptions()); // the host replaces it with its configuration (section Learning:CellsRefresh)
         services.AddScoped<ICommandHandler<ComputeCellStatsCommand, CellStatsOutcome>, ComputeCellStatsHandler>(); // cell statistics, Bayesian and recency (P6-01, ADR 0064)
         services.AddScoped<ICommandHandler<ExtractTradeFeaturesCommand, TradeFeaturesOutcome>, ExtractTradeFeaturesHandler>(); // decision-time features of a stored run (P6-04, ADR 0066)
         services.AddScoped<ExtensionFeatureExtractor>();

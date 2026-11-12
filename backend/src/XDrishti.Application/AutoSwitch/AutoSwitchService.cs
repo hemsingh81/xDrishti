@@ -8,6 +8,7 @@ using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.SettingsCatalog;
 using XDrishti.Application.Learning;
+using XDrishti.Application.Learning.CellsRefresh;
 using XDrishti.Application.Market.Bars.Eod;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Platform.Services;
@@ -39,8 +40,8 @@ internal sealed partial class AutoSwitchService(
 {
     public const string Key = "auto.enabled";
 
-    /// <summary>The services Auto resumes, in the order of the chain: data, history, learning, the nightly plan, the suggestions.</summary>
-    public static readonly IReadOnlyList<string> Chain = [EodService.Id, PortfolioBrokerHistoryService.Id, WeeklyService.Id, NightlyService.Id, SuggestionsService.Id];
+    /// <summary>The services Auto resumes, in the order of the chain: data, history, the cell-statistics refresh (LC-01, ADR 0277), learning, the nightly plan, the suggestions.</summary>
+    public static readonly IReadOnlyList<string> Chain = [EodService.Id, PortfolioBrokerHistoryService.Id, CellsRefreshService.Id, WeeklyService.Id, NightlyService.Id, SuggestionsService.Id];
 
     private const string Pass = "pass";
     private const string Fail = "fail";
@@ -101,7 +102,7 @@ internal sealed partial class AutoSwitchService(
                 continue;
             }
 
-            var done = await resume.HandleAsync(new ResumeServiceCommand(id, command.Actor), cancellationToken);
+            var done = await resume.HandleAsync(new ResumeServiceCommand(id, command.Actor, FreshPassword: true), cancellationToken);
             if (done.IsFailure)
             {
                 await UndoAsync(resumed, command.Actor);

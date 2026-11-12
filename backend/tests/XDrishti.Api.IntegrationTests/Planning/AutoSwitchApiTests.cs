@@ -32,7 +32,7 @@ public sealed class AutoSwitchApiTests(ApiFactory factory) : DataTestBase(factor
 
         read.Status.ShouldBe(HttpStatusCode.OK);
         read.Body.GetProperty("on").GetBoolean().ShouldBeFalse();
-        read.Body.GetProperty("chain").GetArrayLength().ShouldBe(5);
+        read.Body.GetProperty("chain").GetArrayLength().ShouldBe(6);
         read.Body.GetProperty("preconditions").EnumerateArray().Single(p => p.GetProperty("id").GetString() == "scope").GetProperty("status").GetString().ShouldBe("fail");
         read.Body.GetProperty("noOrderNotice").GetString()!.ShouldContain("never approves, arms or places an order");
         anonymous.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);

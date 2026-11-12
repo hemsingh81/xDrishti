@@ -12,6 +12,9 @@ public static class ServiceErrors
     public const string AlreadyRunningCode = "services.already_running";
     public const string ReadOnlyCode = "services.read_only";
 
+    /// <summary>A service whose resume is an owner act (LC-01) was resumed without a verified fresh password. The same code and text as the Auth module's, kept here so the platform services namespace names no other module.</summary>
+    public static readonly Error StepUpRequired = Error.Forbidden("auth.step_up_required", "Re-enter your password to continue.");
+
     public static readonly Error NotFound = Error.NotFound(NotFoundCode, "There is no such service.");
 
     public static readonly Error RevisionChanged = Error.Conflict(RevisionChangedCode, "The service was changed elsewhere. Reload it and try again.");

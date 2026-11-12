@@ -2017,7 +2017,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Resume a paused service. Audited. 404 services.not_found, 409 services.read_only */
+    /** Resume a paused service. Audited. An optional body { password } is required only for a service with resumeNeedsPassword (cells-refresh, LC-01): a missing password is 403 auth.step_up_required (nothing is counted), a wrong one is 401 auth.invalid_credentials (counted toward the lockout), and the service stays paused. 404 services.not_found, 409 services.read_only */
     post: operations['ResumeService'];
     delete?: never;
     options?: never;
@@ -22407,6 +22407,10 @@ export interface components {
       /** Format: int32 */
       revision: number;
     };
+    /** @description The optional body of `POST /api/services/{id}/resume`: the owner's password, typed again; needed only for a service with `resumeNeedsPassword` (LC-01). */
+    ResumeServiceRequest: {
+      password: null | string;
+    };
     /** @description The profit/loss figures that every holding row, lot row and summary carries. */
     ReturnsView: {
       /** Format: double */
@@ -23350,6 +23354,8 @@ export interface components {
       /** Format: int64 */
       revision: number;
       live?: null | components['schemas']['ServiceLiveView'];
+      /** @default false */
+      resumeNeedsPassword: boolean;
     };
     /** @description The trading-day timeline: market hours (null on a day without a session), the review cutoff, whether the date is a trading day and every enabled service's starts and bands. */
     ServicesTimeline: {
@@ -30962,7 +30968,11 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['ResumeServiceRequest'];
+      };
+    };
     responses: {
       /** @description OK */
       200: {
@@ -30971,6 +30981,24 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ServiceView'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
       /** @description Not Found */

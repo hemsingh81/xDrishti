@@ -25,7 +25,7 @@ internal sealed class AutoSwitchHarness : IServiceScheduleReader, IAutoSwitch, I
 {
     public const string Owner = "owner:me@x.test";
 
-    public static readonly string[] Chain = [EodService.Id, PortfolioBrokerHistoryService.Id, WeeklyService.Id, NightlyService.Id, SuggestionsService.Id];
+    public static readonly string[] Chain = [EodService.Id, PortfolioBrokerHistoryService.Id, XDrishti.Application.Learning.CellsRefresh.CellsRefreshService.Id, WeeklyService.Id, NightlyService.Id, SuggestionsService.Id];
 
     public AutoSwitchHarness()
     {

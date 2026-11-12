@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ServiceView } from '@/shared/api';
 import { useToast } from '@/shared/ui/toastContext';
 import { usePauseService, useResumeService, useRunService } from '../api/servicesMutations';
@@ -9,11 +10,43 @@ export function useServiceActions() {
   const run = useRunService();
   const pause = usePauseService();
   const resume = useResumeService();
-  const busyId = [run, pause, resume].find((m) => m.isPending)?.variables ?? null;
+  // A service whose resume needs the owner's password (LC-01): the row asks first, in a dialog, and sends it in the body.
+  const [asking, setAsking] = useState<ServiceView | null>(null);
+  const busyId = run.isPending
+    ? run.variables
+    : pause.isPending
+      ? pause.variables
+      : resume.isPending
+        ? resume.variables.id
+        : null;
+
+  const resumed = (service: ServiceView) => {
+    notify(`${service.name} resumed.`);
+  };
 
   return {
     /** The service an action is in flight for (its buttons wait). */
     busyId,
+    /** The service whose resume is waiting for the password, or null. */
+    asking,
+    /** The password dialog's pending state and refusal (shown as it came; a wrong password does not end the session). */
+    resumeState: { pending: resume.isPending, error: resume.error },
+    closeAsking: () => {
+      setAsking(null);
+      resume.reset();
+    },
+    resumeWithPassword: (service: ServiceView, password: string) => {
+      resume.mutate(
+        { id: service.id, password },
+        {
+          onSuccess: () => {
+            setAsking(null);
+            resume.reset();
+            resumed(service);
+          },
+        },
+      );
+    },
     runNow: (service: ServiceView) => {
       run.mutate(service.id, {
         onSuccess: (started) => {
@@ -35,21 +68,32 @@ export function useServiceActions() {
     },
     togglePause: (service: ServiceView) => {
       const pausing = service.enabled;
-      (pausing ? pause : resume).mutate(service.id, {
-        onSuccess: () => {
-          notify(
-            pausing
-              ? `${service.name} paused. It does not run by itself until you resume it.`
-              : `${service.name} resumed.`,
-          );
+      if (!pausing && service.resumeNeedsPassword) {
+        setAsking(service);
+        return;
+      }
+      if (pausing) {
+        pause.mutate(service.id, {
+          onSuccess: () => {
+            notify(`${service.name} paused. It does not run by itself until you resume it.`);
+          },
+          onError: (error) => {
+            notify(actionErrorText(error, service.name, `${service.name} could not be paused.`), 'error');
+          },
+        });
+        return;
+      }
+      resume.mutate(
+        { id: service.id },
+        {
+          onSuccess: () => {
+            resumed(service);
+          },
+          onError: (error) => {
+            notify(actionErrorText(error, service.name, `${service.name} could not be resumed.`), 'error');
+          },
         },
-        onError: (error) => {
-          notify(
-            actionErrorText(error, service.name, `${service.name} could not be ${pausing ? 'paused' : 'resumed'}.`),
-            'error',
-          );
-        },
-      });
+      );
     },
   };
 }

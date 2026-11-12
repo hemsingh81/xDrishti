@@ -1,11 +1,11 @@
 # LC-01 — Scheduled cell-statistics refresh
 
-- **Status:** Approved (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended). Not built.
+- **Status:** Built 2026-11-12, not deployed (approved by the coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended).
 - **Phase / roadmap row:** LC — Learning loop, row LC-01 (gap GAP-01 of the due-diligence review of 2026-11-12).
 - **Size:** about 2.5 agent-days (service and handler 1, owner-act resume and screen 0.5, notice, gate text, Auto chain, paper list and ledger kind 0.5, tests 0.5).
 - **Needs:** nothing unbuilt (P6-01, P7-08, CF-06, CF-08, P10-05, AU-02, AU-11, AU-17 are built). HO-01 (Draft) is what lets new sessions in; until then the behaviour is the one under "Before HO-01".
 - **Safety:** light. It writes a decision input (the snapshot the nightly ranks cells with) with no human in between, so: paused by default, resuming is a fresh-password owner act, it fails closed on every missing input, it never stores a partial snapshot, it leaves the gate's rule unchanged, and it has no order, approval or arming path.
-- **Design refs:** docs/design/09-learning-engine.md; ADRs 0064, 0086, 0207, 0240, 0243, 0252; specs P6-01, P7-08, CF-08 D6, P10-05 AC 11a. Decision record: a new ADR (the next free number at build time), amending ADR 0252 §1.
+- **Design refs:** docs/design/09-learning-engine.md; ADRs 0064, 0086, 0207, 0240, 0243, 0252; specs P6-01, P7-08, CF-08 D6, P10-05 AC 11a. Decision record: [ADR 0277](../adr/0277-the-cell-statistics-refresh-repeats-the-newest-snapshot-to-the-hold-out-cut-fails-closed-and-resumes-only-with-the-owners-password.md), amending ADR 0252 §1.
 
 ## Goal
 With Auto ON, the nightly plan keeps running after its first week. A service recomputes the cell statistics every session from stored research runs, so the selection-inputs gate sees a snapshot as of the last closed session. When the service could not run, the gate's reason says why.
@@ -89,7 +89,7 @@ The cut is fixed (block start − 31 days). After the first run, which may exten
 ## Acceptance criteria
 1. **Registration.** `cells-refresh` is registered and paused at first start, `After eod`, `LatestOnly` (a `RecoveryClassTableTests` row), and absent from `nightly.MustFollow`.
 2. **Resume.**
-   - With no password or a wrong one: 401 `auth.invalid_credentials` (counted toward the lockout), and the service stays paused.
+   - With no password: 403 `auth.step_up_required` (nothing counted); with a wrong one: 401 `auth.invalid_credentials` (counted toward the lockout); the service stays paused in both.
    - With a fresh password: resumed, with an audit row.
    - Every other service resumes with a session, as today.
 3. **Auto.** ON resumes and records six services. OFF pauses `cells-refresh` only if ON resumed it.
@@ -115,7 +115,7 @@ The cut is fixed (block start − 31 days). After the first run, which may exten
 ## Contract
 - **Service:** as D1.
 - **API:**
-  - `POST /api/services/{id}/resume` takes an optional body `{ "password": string }`, required only when `ResumeIsOwnerAct`. A missing or wrong password is 401 `auth.invalid_credentials`.
+  - `POST /api/services/{id}/resume` takes an optional body `{ "password": string }`, required only when `ResumeIsOwnerAct`. A missing password is 403 `auth.step_up_required`, a wrong one 401 `auth.invalid_credentials`.
   - `ServiceView.resumeNeedsPassword: bool`.
   - `scripts/gen-api.sh` in the same change.
 - **Data:**
@@ -148,3 +148,11 @@ The cut is fixed (block start − 31 days). After the first run, which may exten
 - [ ] `scripts/check.sh` is green and the reviewer finds no blockers.
 - [ ] `gen-api` is run and the migration is added.
 - [ ] The ADR is written (amending 0252 §1), and doc 09 and doc 16 are updated.
+
+## As built (2026-11-12)
+Built on `feature/lc-01`, not deployed. Decisions D1 to D9 as written; ADR 0277 records them and amends ADR 0252 §1 (six services).
+- **Owner constraint: roadmap open decision 9 (paper epoch against cell refresh) is NOT decided.** The P10 paper-epoch rule (ADR 0119) is unchanged: a refresh remains a `frozen` change that restarts the paper count, and `cells-refresh` is only listed as a blocker while enabled (D7). The conflict in Risks stands until the owner decides.
+- **Code.** Domain: `CellsRefreshRules`, `ServiceConstraints.ResumeIsOwnerAct`, `TrialCounts.CellsRefreshes`. Application (`Learning/CellsRefresh`): `CellsRefreshService`, `RefreshCellStatsHandler`, `CellsRefreshState`, `CellsRefreshOptions`, `ISourceRequestPlanner` (the replay planner proves the exact request). Resume body, `ServiceView.resumeNeedsPassword`, gate reason, `cells_stale` notice, Auto chain, paper blocker list, ledger kind (migration `AddCellsRefreshTrialKind`), setting `Learning:CellsRefresh:NoticeAfterSessions` (Internal, 1 to 4, default 3). `gen-api` run.
+- **Deviations and shortcuts.** (1) A run with no snapshot fails before the hold-out is read, so with neither, the code is `cells_refresh.no_snapshot`. (2) Extra failure codes beyond the spec: `cells_refresh.not_rebuildable` (a source that needs extending and whose request cannot be proven, never guessed), `cells_refresh.source_failed`, `cells_refresh.template_unreadable`. (3) A source whose window ends after the refresh end is kept as `up_to_date` (no new failure code). (4) All simulations are made first and held in memory (up to 50) so a failed one stores nothing; the ledger row follows the store without a shared transaction, its id derived from the run key. (5) The frontend step-up dialog and the Services-screen text are not built here (frontend untouched; OPS-01 does the Auto screen); the API contract carries `resumeNeedsPassword`. (6) `MustFollow = [eod]` is declared on the service itself.
+- **Review fixes.** The ledger row is appended for every extended source (idempotent by run key); the Services screen asks for the password in a dialog (`PasswordReasonDialog`, no reason) and `/api/services/{id}/resume` is a password-check path of the client, so a wrong password never signs out; more than 50 sources fails closed (`cells_refresh.too_many_sources`); one formula for the cut (`HoldOutOptions.TrainingCut`). Decision 9 follow-up: with an epoch open, Auto ON resumes `cells-refresh` and each run restarts the paper count; the owner decides this with decision 9.
+- **Tests.** Domain rules; handler with fakes (ACs 4 to 6, 11, all or nothing); service definition, resume, gate text, state and notice (ACs 1 to 3, 6, 8); architecture fences (AC 10 and D9); integration for resume with and without the password, the paper blocker and the ledger kind (ACs 2, 9); `RecoveryClassTableTests` row.

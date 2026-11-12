@@ -298,10 +298,13 @@ internal static class ApiSetup
         services.AddOptions<SimAllSettings>().BindConfiguration(SimAllSettings.Section).ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<XDrishti.Application.Replay.SystemReplayOptions>().BindConfiguration(XDrishti.Application.Replay.SystemReplayOptions.Section).ValidateDataAnnotations().ValidateOnStart(); // the system replay's bounds (SR-01, Internal)
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<XDrishti.Application.Replay.SystemReplayOptions>>().Value));
+        services.AddOptions<XDrishti.Application.Learning.CellsRefresh.CellsRefreshOptions>().BindConfiguration(XDrishti.Application.Learning.CellsRefresh.CellsRefreshOptions.Section).ValidateDataAnnotations().ValidateOnStart(); // the bell of the cell-statistics refresh (LC-01, Internal)
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<XDrishti.Application.Learning.CellsRefresh.CellsRefreshOptions>>().Value));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<SimAllSettings>>().Value));
         services.AddOptions<SimTrainingSettings>().BindConfiguration(SimTrainingSettings.Section).ValidateDataAnnotations().ValidateOnStart();
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<SimTrainingSettings>>().Value));
         services.AddSimAllRunner();
+        services.AddCellsRefreshRunner(); // the scheduled cell-statistics refresh (LC-01): needs the IRunRecordWriter this host registers
         services.AddHostedService<SimAllService>();
         services.AddReplayRunner(); // the system replay job (SR-01 part B, ADR 0272): its own hosted loop, never beside a simulate-everything chunk
         services.AddHostedService<XDrishti.Api.Lab.ReplayService>();

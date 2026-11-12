@@ -7,6 +7,7 @@ import { queryRoots, type ServiceView } from '@/shared/api';
 import { formatIstDayAndTime } from '@/shared/lib/format';
 import { LoadingState } from '@/shared/ui';
 import { servicesQuery } from '../api/servicesQueries';
+import { ResumePasswordDialog } from './ResumePasswordDialog';
 import { useServiceActions } from '../hooks/useServiceActions';
 import { useServicesWatch } from '../hooks/useServicesWatch';
 import { problemText } from '../lib/errors';
@@ -102,6 +103,13 @@ function ServicesContent() {
           </Box>
         </>
       )}
+      <ResumePasswordDialog
+        service={actions.asking}
+        pending={actions.resumeState.pending}
+        error={actions.resumeState.error}
+        onSubmit={actions.resumeWithPassword}
+        onClose={actions.closeAsking}
+      />
       {configuring && items && (
         <ConfigureDialog
           key={`${configuring.id}:${String(configuring.revision)}`}

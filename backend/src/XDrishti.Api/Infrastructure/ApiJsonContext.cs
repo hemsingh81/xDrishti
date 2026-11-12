@@ -351,6 +351,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(XDrishti.Api.Endpoints.SetAutoScopeRequest))]
 [JsonSerializable(typeof(XDrishti.Application.AutoSwitch.AutoView))]
 [JsonSerializable(typeof(XDrishti.Api.Endpoints.TurnAutoOnRequest))]
+[JsonSerializable(typeof(XDrishti.Api.Endpoints.ResumeServiceRequest))]
 [JsonSerializable(typeof(TicketChartView))]
 [JsonSerializable(typeof(IReadOnlyList<PlanView>))]
 [JsonSerializable(typeof(PlanRunView))]

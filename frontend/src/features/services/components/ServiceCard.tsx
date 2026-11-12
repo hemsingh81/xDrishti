@@ -76,6 +76,11 @@ export function ServiceCard({ service, names, busy, ...handlers }: ServiceCardPr
             {service.live.summary}
           </Typography>
         ) : null}
+        {service.resumeNeedsPassword && !service.enabled ? (
+          <Typography variant="body2" color="text.secondary">
+            Needs your password to resume.
+          </Typography>
+        ) : null}
         {jobId ? <RunProgress jobId={jobId} /> : null}
         <ScheduleBlock service={service} />
       </Box>

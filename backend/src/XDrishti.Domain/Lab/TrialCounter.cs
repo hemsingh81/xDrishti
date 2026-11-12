@@ -9,7 +9,7 @@ public static class TrialCounter
     public static int Total(TrialCounts parts)
     {
         ArgumentNullException.ThrowIfNull(parts);
-        return checked(Math.Max(0, parts.RunHashes) + Math.Max(0, parts.SweepPoints) + Math.Max(0, parts.ExtraExits) + Math.Max(0, parts.Replans) + Math.Max(0, parts.NullRows) + Math.Max(0, parts.LinkedSweeps) + Math.Max(0, parts.SystemReplays));
+        return checked(Math.Max(0, parts.RunHashes) + Math.Max(0, parts.SweepPoints) + Math.Max(0, parts.ExtraExits) + Math.Max(0, parts.Replans) + Math.Max(0, parts.NullRows) + Math.Max(0, parts.LinkedSweeps) + Math.Max(0, parts.SystemReplays) + Math.Max(0, parts.CellsRefreshes));
     }
 
     /// <summary>The extra looks of a first full test with <paramref name="candidates"/> exits: one less than the candidates, never below zero.</summary>
