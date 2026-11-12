@@ -49,7 +49,7 @@ public sealed partial class CostSheetArchitectureTests
     [Fact]
     public void The_three_handlers_are_internal_and_sealed_and_their_messages_are_public()
     {
-        string[] handlers = ["LoadCostSheetHandler", "ShowCostSheetHandler", "CheckCostSheetHandler"];
+        string[] handlers = ["LoadCostSheetHandler", "ShowCostSheetHandler", "CheckCostSheetHandler", "DeriveCostSheetHandler"];
 
         foreach (var name in handlers)
         {
@@ -69,7 +69,7 @@ public sealed partial class CostSheetArchitectureTests
         Api.GetExportedTypes().Where(t => t.Namespace == VerbNamespace).ShouldBeEmpty();
         foreach (var other in new[] { Application, Infrastructure })
         {
-            other.GetTypes().Where(t => t.Name is "CostSheetCommand" or "CostSheetProgram" or "CostSheetOptions" or "CostSheetLog" or "CostCheckText").ShouldBeEmpty("the verb is host code");
+            other.GetTypes().Where(t => t.Name is "CostSheetCommand" or "CostSheetProgram" or "CostSheetOptions" or "CostSheetLog" or "CostCheckText" or "CostDeriveText").ShouldBeEmpty("the verb is host code");
         }
     }
 
@@ -94,13 +94,13 @@ public sealed partial class CostSheetArchitectureTests
     }
 
     [Fact]
-    public void The_verb_logs_with_the_ids_4412_to_4414_and_no_other()
+    public void The_verb_logs_with_the_ids_4412_to_4414_and_4497_and_no_other()
     {
         var ids = Api.GetType(VerbNamespace + ".CostSheetLog").ShouldNotBeNull()
             .GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
             .SelectMany(m => m.GetCustomAttributes<LoggerMessageAttribute>().Select(a => a.EventId)).Order().ToList();
 
-        ids.ShouldBe([4412, 4413, 4414]);
+        ids.ShouldBe([4412, 4413, 4414, 4497], "4497 is derive (CS-01)");
     }
 
     [Fact]

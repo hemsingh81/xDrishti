@@ -28,7 +28,8 @@ internal sealed class RunBasketFetchHandler(
     ListFileProcessor lists,
     INseLotApplier lotApplier,
     TimeProvider clock,
-    ILogger<RunBasketFetchHandler> logger) : ICommandHandler<RunBasketFetchCommand, BasketFetchRun>
+    ILogger<RunBasketFetchHandler> logger,
+    XDrishti.Application.Abstractions.Market.Lists.IListDayStore? days = null) : ICommandHandler<RunBasketFetchCommand, BasketFetchRun>
 {
     public const string NoUserAgent = "no_user_agent";
 
@@ -201,12 +202,38 @@ internal sealed class RunBasketFetchHandler(
         {
             var same = plan.Fetch with { Outcome = FetchOutcomes.Unchanged };
             await sources.RecordAsync(update, same, cancellationToken);
+            await RecordDayAsync(source, plan, cancellationToken);
             return same;
         }
 
         var applied = plan.Fetch with { Outcome = FetchOutcomes.Applied };
         var done = await applier.ApplyAsync(new MembershipApplication(source.BasketId, source.Name, plan.Change, plan.Order!, plan.Effective, now, update, applied, plan.Origin), cancellationToken);
+        if (done)
+        {
+            await RecordDayAsync(source, plan, cancellationToken);
+        }
+
         return done ? applied : applied with { Outcome = FetchOutcomes.Failed, Error = "concurrent_change", Added = 0, Removed = 0 };
+    }
+
+    // DATA-01 (ADR 0274): the ban file of a trade date is also a dated coverage row (an empty list is a covered day), so the as-of port knows exactly which dates a good file stood for. Only when every symbol matched (an unmatched banned symbol would read "not banned"); a failed write never fails the fetch.
+    private async ValueTask RecordDayAsync(BasketSourceInfo source, ListPlan plan, CancellationToken cancellationToken)
+    {
+        if (days is null || source.Format != ListBaskets.BanFormat || plan.TradeDate is not { } date || plan.Fetch.Unmatched > 0 || plan.Order is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await days.InsertAsync(source.BasketId, date, plan.Order, XDrishti.Application.Market.Lists.ListArchive.SourceDaily, cancellationToken);
+        }
+#pragma warning disable CA1031 // the fetch is already recorded; a failed coverage write only leaves the date uncovered (unavailable), the safe side
+        catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
+#pragma warning restore CA1031
+        {
+            XDrishti.Application.Planning.ListFilterLog.DayNotRecorded(logger, date, failure.GetType().Name);
+        }
     }
 
     /// <summary>Whether the schedule asks this source now: after its retry time when one is set, otherwise once a day from the run time (twice a day in a review window); the NSE F&amp;O files at their own India times.</summary>

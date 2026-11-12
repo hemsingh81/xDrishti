@@ -18,7 +18,8 @@ internal static class ReplayReadSupport
         [HindsightLabels.DataSeenBefore] = "Hindsight: the strategies were designed on this history.",
         [HindsightLabels.BeforeCosts] = GrossLabel,
         [HindsightLabels.LifecycleAsRecorded] = "Hindsight: learning mode used the cell lifecycle as recorded, not recomputed.",
-        [HindsightLabels.FiltersWithoutHistory] = "The event, F&O-ban and surveillance filters were not applied: they have no history.",
+        [HindsightLabels.FiltersWithoutHistory] = "The event filter, and the F&O-ban and surveillance filters on the sessions without a stored dated list row, were not applied: they have no history.",
+        [HindsightLabels.EventFilterWithoutHistory] = "The event filter was not applied: it has no history.",
         [HindsightLabels.BaselineArm] = "The no-selection baseline takes every candidate of the system's own cells at equal risk: it is no choosing among the system's candidates, not random stocks.",
         [HindsightLabels.ResearchCells] = "Cells in the research state were allowed to be candidates.",
     };
@@ -36,7 +37,14 @@ internal static class ReplayReadSupport
         var codes = new SortedSet<string>(p is null ? [HindsightLabels.SettingsNow, HindsightLabels.DataSeenBefore, HindsightLabels.BeforeCosts] : HindsightLabels.For(p), StringComparer.Ordinal);
         if (extra is not null)
         {
-            codes.UnionWith(extra);
+            var stored = extra.ToList();
+            // DATA-01: with stored sessions, filters_without_history stands only if a session says so (every session of the run covered by the dated lists clears it). No stored session: the label of the parameters stays.
+            if (stored.Count > 0 && !stored.Contains(HindsightLabels.FiltersWithoutHistory))
+            {
+                codes.Remove(HindsightLabels.FiltersWithoutHistory);
+            }
+
+            codes.UnionWith(stored);
         }
 
         return [.. codes.Select(c => new ReplayLabelView(c, Sentences.GetValueOrDefault(c, c)))];

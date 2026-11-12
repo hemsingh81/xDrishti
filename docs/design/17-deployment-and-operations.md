@@ -164,3 +164,7 @@ Nothing else is needed for the master: no published port, no volume (the file is
 | External SSD + UPS (one-time, recommended) | ≈ ₹10–18k |
 | ISP static IP | Only when automated orders are enabled (P12); decision Q6: later, revisit at the P11 exit. The enquiry (ISP lead time, Dhan's 7-day IP lock) runs from the start of P11: [runbook](../research/p11-static-ip-and-sebi-runbook.md), record in the app (P11-05); the daily login, the token cover, the 09:10 record and the invalid-IP steps are in the [execution runbook](../engineering/execution-runbook.md) (P12-11); a static IP is outbound only, no port is opened |
 | Cloud | ₹0 — none used |
+
+## Dated NSE lists (DATA-01, [ADR 0274](../adr/0274-the-live-plan-and-the-replay-read-the-fno-ban-and-surveillance-filters-from-dated-list-rows-through-an-as-of-port-and-a-dated-ban-file-backfill-is-an-off-by-default-guarded-fetch.md))
+
+Settings, both default OFF: `Data:History:Lists:Enabled` (with `MaxPerDay` 500 and `DelayMs` 1500) allows the owner's verbs `xd data lists-probe --dates` (at most 5 files, stores nothing) and `xd data lists-backfill --from --to [--dry-run]`; they send nothing until the owner has read NSE's terms, added the dated archive path to the master-data allow-list (the app never edits it) and switched the setting on. `Selection:ListFilters:Enabled` feeds the plan and the replay from the stored rows; compare one nightly plan in a dry run before switching it on.
