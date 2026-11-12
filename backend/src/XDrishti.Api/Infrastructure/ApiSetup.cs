@@ -154,6 +154,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, PaperPhaseCheckEndpoints>(); // the paper phase check (P10-06): one GET, computed on read
         services.AddSingleton<IEndpointModule, TicketAlertsEndpoints>(); // price-crossing alerts and prompts on the plan screen (P7-20); preferences only, no order
         services.AddSingleton<IEndpointModule, ReportsEndpoints>();
+        services.AddSingleton<IEndpointModule, ReplayEndpoints>(); // the system replay (SR-01 part C, ADR 0272): start, read while running, cancel; research only, no order
         services.AddSingleton<IEndpointModule, BasketBenchmarkEndpoints>(); // the owner's basket benchmark (BK-06c)
         services.AddSingleton<IEndpointModule, MarketStrengthEndpoints>(); // the stored relative-strength rows (BK-09): one GET, read only
         services.AddSingleton<IEndpointModule, ReportsPhaseCheckEndpoints>(); // the P8 phase check (P8-17): one GET, computed on read

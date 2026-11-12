@@ -39,6 +39,8 @@ public sealed class AutoScopeTests
     private sealed class FixedScope(ResolvedAutoScope? scope) : IAutoScopeSource
     {
         public ValueTask<ResolvedAutoScope?> ResolveAsync(CancellationToken cancellationToken) => ValueTask.FromResult(scope);
+
+        public ValueTask<ResolvedAutoScope?> ResolveAsync(DateOnly? asOf, CancellationToken cancellationToken) => ValueTask.FromResult(scope);
     }
 
     private static SelectionPlanBuilder BuilderWith(IReadOnlyList<TicketCandidate> found, IAutoScopeSource? scope)

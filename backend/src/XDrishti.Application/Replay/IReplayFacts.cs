@@ -17,6 +17,9 @@ public interface IReplayFacts
     /// <summary>The last session the replay may read: the hold-out start less one day and less the embargo. Throws <see cref="ReplayHoldOutException"/> when no block is fixed.</summary>
     ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken);
 
+    /// <summary>The close of each day bar of an instrument (the benchmark index of the equity read) from <paramref name="from"/> to <paramref name="to"/> inclusive, through the same hold-out clamp as every other read of the replay (<see cref="ReplayHoldOutException"/> past it).</summary>
+    ValueTask<IReadOnlyList<(DateOnly Session, double Close)>> DayClosesAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken);
+
     /// <summary>
     /// Tells the facts of one run the last session it will replay (so the bars of each instrument are read once for the whole run) and, when the run resumes after a restart, the settings snapshot and the strategy versions that were stored with it (so neither is re-read from today's settings and today's active versions). With a version map a strategy that is not in it has no version. With <paramref name="learningFixed"/> learning mode recomputes from <paramref name="learningSources"/> (null: the sources of the frozen rows) and never asks for today's newest snapshot.
     /// The default does nothing: a facts source that keeps no window and has no stored snapshot needs neither.

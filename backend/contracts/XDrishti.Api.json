@@ -16800,6 +16800,494 @@
         }
       }
     },
+    "/api/replay/runs": {
+      "post": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "Start a replay of the whole system from a chosen date: body from, to (default the last readable session before the hold-out and its embargo), scope {basketIds, instrumentIds} (empty: the stored auto scope with its baskets as of from), capital (default 1000000), riskProfileId (default the seeded standard profile), costs (null or gross, else the id of a stored charge sheet), versions (start or asOf, default asOf), modes (frozen and/or learning, default frozen; both give two linked runs and a pairId), filtersWithoutHistory and includeResearchCells (both default false; each is a labelled hindsight). 202 with runIds and pairId. 422 replay.invalid (bad input, an empty snapshot, the memory cap); 409 replay.busy (a replay is active, or the 1-minute backfill is incomplete), replay.holdout (to reaches the hold-out; the last allowed date is in the message)",
+        "operationId": "StartReplay",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplayStartBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartedReplay"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "The replay runs, newest first (skip, take 1 to 200, default 50): id, created, range, mode, state, completeness, final equity, max drawdown, trial number, costs label, hindsight labels. Read only.",
+        "operationId": "ListReplayRuns",
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReplayRunListItem"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/replay/runs/{id}": {
+      "get": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "One replay run, readable while it runs: the hindsight labels first, completeness (complete, sessions done of total, the as-of session), the costs label (\"before costs (charge sheet not filled, ISS-25)\" when gross), trial number, input and result hashes, the settings snapshot, and the figures so far (return, CAGR, max drawdown, Sharpe of daily returns, exposure, trades, hit rate, mean R, contribution per strategy). Read only.",
+        "operationId": "GetReplayRun",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayRunView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/replay/runs/{id}/equity": {
+      "get": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "The daily equity, drawdown, cash line and the benchmark (Nifty 500, or the index chosen for the basket reports) rebased to the capital, between from and to (dates, optional). Read only.",
+        "operationId": "GetReplayEquity",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayEquityView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/replay/runs/{id}/sessions": {
+      "get": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "One row per stored session between from and to (dates, optional): candidates, taken, blocked by reason, the day's result, equity. Read only.",
+        "operationId": "ListReplaySessions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaySessionListView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/replay/runs/{id}/sessions/{session}": {
+      "get": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "The full record of one session (yyyy-MM-dd): candidates, ranked list, taken, blocked with reasons, fills, the book open at the close. 404 replay.session_not_found while it is not stored. Read only.",
+        "operationId": "GetReplaySession",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaySessionView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/replay/runs/{id}/trades": {
+      "get": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "The trades of the replay book in booking order, each with a barsRoute to the instrument's day bars where its symbol names one instrument. Read only.",
+        "operationId": "ListReplayTrades",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayTradeListView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/replay/pairs/{pairId}": {
+      "get": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "The frozen-versus-learning comparison of two linked runs, computed on read from their stored equity (paired day bootstrap): learning_better, frozen_better, no_measurable_difference or too_little_history, with n and the probabilities. No answer (with the reason) while a run is not complete. Read only.",
+        "operationId": "GetReplayPair",
+        "parameters": [
+          {
+            "name": "pairId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayPairView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/replay/runs/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "Stop a queued or running replay after the session in flight; the finished sessions are kept and the run reads cancelled. 202 with the new state (cancelled or cancelling). 404 replay.not_found; 409 replay.not_active when it has finished.",
+        "operationId": "CancelReplay",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayCancelView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports/basket-benchmark": {
       "put": {
         "tags": [
@@ -62661,6 +63149,167 @@
         },
         "description": "One bar: `t` is the epoch seconds of its start."
       },
+      "ReplayBlockedView": {
+        "required": [
+          "symbol",
+          "cellKey",
+          "reason",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "cellKey": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "description": "A candidate that was not taken, with its one reason."
+      },
+      "ReplayBookTradeView": {
+        "required": [
+          "tradeNo",
+          "symbol",
+          "side",
+          "strategy",
+          "cellKey",
+          "qty",
+          "entrySession",
+          "entryPrice",
+          "stopPrice",
+          "swing",
+          "exitSession",
+          "grossPnl",
+          "charges",
+          "netPnl",
+          "r",
+          "barsRoute"
+        ],
+        "type": "object",
+        "properties": {
+          "tradeNo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "strategy": {
+            "type": "string"
+          },
+          "cellKey": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "entrySession": {
+            "type": "string",
+            "format": "date"
+          },
+          "entryPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "stopPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "swing": {
+            "type": "boolean"
+          },
+          "exitSession": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "grossPnl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "charges": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "netPnl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "r": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "barsRoute": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One trade of the replay book. string? ReplayBookTradeView.BarsRoute opens the instrument's day bars when the symbol matches exactly one instrument (P8-11 addresses the trades of a stored simulation run by its key, which a replay trade is not)."
+      },
+      "ReplayCancelView": {
+        "required": [
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          }
+        },
+        "description": "The answer of a cancel: the new state, cancelled for a run that had not started and cancelling for one that is running."
+      },
+      "ReplayCandidateView": {
+        "required": [
+          "symbol",
+          "side",
+          "cellKey",
+          "rank"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "cellKey": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A candidate of a session."
+      },
       "ReplayChartView": {
         "required": [
           "timeframe",
@@ -62748,6 +63397,36 @@
         },
         "description": "`state` is ok, entry_mismatch or no_bars; `entryOnBars` is null with no bar."
       },
+      "ReplayCompleteness": {
+        "required": [
+          "complete",
+          "sessionsDone",
+          "sessionsTotal",
+          "asOfSession"
+        ],
+        "type": "object",
+        "properties": {
+          "complete": {
+            "type": "boolean"
+          },
+          "sessionsDone": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sessionsTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "asOfSession": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "How far a run has got (AC 14): bool ReplayCompleteness.Complete is true only for a run whose every session was replayed."
+      },
       "ReplayCostingView": {
         "required": [
           "sheetId",
@@ -62795,6 +63474,93 @@
           }
         },
         "description": "What the run charged the trade. The figures are present only when the owner confirmed this very charge sheet (`confirmed`); otherwise only the sheet id is, and the screen says \"costed on sheet X, not confirmed as yours\" beside the gross figures."
+      },
+      "ReplayEquityPoint": {
+        "required": [
+          "session",
+          "equity",
+          "drawdownPct",
+          "cash",
+          "benchmark"
+        ],
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "string",
+            "format": "date"
+          },
+          "equity": {
+            "type": "number",
+            "format": "double"
+          },
+          "drawdownPct": {
+            "type": "number",
+            "format": "double"
+          },
+          "cash": {
+            "type": "number",
+            "format": "double"
+          },
+          "benchmark": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "One day of the equity curve: the equity, the drawdown from the peak so far, the cash (equity less the cost of the positions open at the close) and the benchmark rebased to the capital."
+      },
+      "ReplayEquityView": {
+        "required": [
+          "runId",
+          "completeness",
+          "costsLabel",
+          "capital",
+          "benchmarkSymbol",
+          "benchmarkReason",
+          "cashComplete",
+          "points"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "completeness": {
+            "$ref": "#/components/schemas/ReplayCompleteness"
+          },
+          "costsLabel": {
+            "type": "string"
+          },
+          "capital": {
+            "type": "number",
+            "format": "double"
+          },
+          "benchmarkSymbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "benchmarkReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cashComplete": {
+            "type": "boolean"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayEquityPoint"
+            }
+          }
+        },
+        "description": "The equity curve of a run against its benchmark (Nifty 500 unless the owner chose another index for the basket reports)."
       },
       "ReplayFeatureItemView": {
         "required": [
@@ -62861,6 +63627,149 @@
         },
         "description": "The decision-time features stored for the trade (catalog `version`): `state` is value, or unavailable with the `reason` (no row stored, or a row of another decision). Never a zero for an unknown."
       },
+      "ReplayFigures": {
+        "required": [
+          "capital",
+          "finalEquity",
+          "returnPct",
+          "cagr",
+          "maxDrawdownPct",
+          "sharpe",
+          "exposure",
+          "trades",
+          "closedTrades",
+          "hitRate",
+          "meanR"
+        ],
+        "type": "object",
+        "properties": {
+          "capital": {
+            "type": "number",
+            "format": "double"
+          },
+          "finalEquity": {
+            "type": "number",
+            "format": "double"
+          },
+          "returnPct": {
+            "type": "number",
+            "format": "double"
+          },
+          "cagr": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxDrawdownPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "sharpe": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "exposure": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "closedTrades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hitRate": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "meanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "The figures of a run over the sessions stored so far; each is null where it cannot be told (too few sessions, no trades)."
+      },
+      "ReplayFillView": {
+        "required": [
+          "symbol",
+          "side",
+          "cellKey",
+          "session",
+          "status",
+          "qty",
+          "entryPrice",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "cellKey": {
+            "type": "string"
+          },
+          "session": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "entryPrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "description": "An entry replayed on the next session."
+      },
+      "ReplayLabelView": {
+        "required": [
+          "code",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "description": "One hindsight label: its code and the plain sentence the screen shows first (SR-01, AC 10)."
+      },
       "ReplayLegView": {
         "required": [
           "at",
@@ -62896,6 +63805,730 @@
           }
         },
         "description": "One fill of a trade with legs: `kind` is entry, add or exit; `share` the fraction of the maximum quantity; `reason` empty for an entry or an add."
+      },
+      "ReplayOpenPositionView": {
+        "required": [
+          "symbol",
+          "side",
+          "qty",
+          "entrySession",
+          "entryPrice",
+          "stopPrice",
+          "swing"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "entrySession": {
+            "type": "string",
+            "format": "date"
+          },
+          "entryPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "stopPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "swing": {
+            "type": "boolean"
+          }
+        },
+        "description": "A position open at the close of the session."
+      },
+      "ReplayPairView": {
+        "required": [
+          "pairId",
+          "frozen",
+          "learning",
+          "answer",
+          "reason",
+          "days",
+          "informativeDays",
+          "meanDailyDifference",
+          "probabilityLearningBetter",
+          "probabilityFrozenBetter",
+          "low",
+          "high",
+          "cut",
+          "hurtsBar",
+          "minDays"
+        ],
+        "type": "object",
+        "properties": {
+          "pairId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "frozen": {
+            "$ref": "#/components/schemas/ReplayRunListItem"
+          },
+          "learning": {
+            "$ref": "#/components/schemas/ReplayRunListItem"
+          },
+          "answer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "days": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "informativeDays": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "meanDailyDifference": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "probabilityLearningBetter": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "probabilityFrozenBetter": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "low": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "high": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "cut": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "hurtsBar": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "minDays": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "The frozen-versus-learning comparison of a pair (AC 9), computed on read from the two stored runs. string? ReplayPairView.Answer is null while a run is not complete, with the reason."
+      },
+      "ReplayRunListItem": {
+        "required": [
+          "id",
+          "pairId",
+          "createdAt",
+          "from",
+          "to",
+          "mode",
+          "state",
+          "completeness",
+          "finalEquity",
+          "maxDrawdownPct",
+          "trialNumber",
+          "costsLabel",
+          "hindsight"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pairId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "completeness": {
+            "$ref": "#/components/schemas/ReplayCompleteness"
+          },
+          "finalEquity": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxDrawdownPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "trialNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "costsLabel": {
+            "type": "string"
+          },
+          "hindsight": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayLabelView"
+            }
+          }
+        },
+        "description": "One row of the list of runs."
+      },
+      "ReplayRunView": {
+        "required": [
+          "hindsight",
+          "id",
+          "pairId",
+          "createdAt",
+          "finishedAt",
+          "from",
+          "to",
+          "mode",
+          "state",
+          "failReason",
+          "completeness",
+          "costsLabel",
+          "basis",
+          "trialNumber",
+          "inputHash",
+          "resultHash",
+          "parameters",
+          "settingsSnapshot",
+          "figures",
+          "contribution"
+        ],
+        "type": "object",
+        "properties": {
+          "hindsight": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayLabelView"
+            }
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pairId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "failReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "completeness": {
+            "$ref": "#/components/schemas/ReplayCompleteness"
+          },
+          "costsLabel": {
+            "type": "string"
+          },
+          "basis": {
+            "type": "string"
+          },
+          "trialNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inputHash": {
+            "type": "string"
+          },
+          "resultHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "settingsSnapshot": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "figures": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReplayFigures"
+              }
+            ]
+          },
+          "contribution": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayStrategyContribution"
+            }
+          }
+        },
+        "description": "The summary of one run: settings snapshot, hashes, hindsight labels first, completeness, figures and the costs label."
+      },
+      "ReplayScopeBody": {
+        "required": [
+          "basketIds",
+          "instrumentIds"
+        ],
+        "type": "object",
+        "properties": {
+          "basketIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "instrumentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "description": "The baskets and instruments a replay covers; both empty means the owner's stored auto scope, its baskets read as of the start date."
+      },
+      "ReplaySessionListItem": {
+        "required": [
+          "session",
+          "candidates",
+          "taken",
+          "blockedByReason",
+          "pnl",
+          "equity",
+          "drawdownPct",
+          "openPositions",
+          "labels"
+        ],
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "string",
+            "format": "date"
+          },
+          "candidates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "taken": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "blockedByReason": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "pnl": {
+            "type": "number",
+            "format": "double"
+          },
+          "equity": {
+            "type": "number",
+            "format": "double"
+          },
+          "drawdownPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "openPositions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "One session of the list: what was taken, what was blocked by reason, the day's result and the equity."
+      },
+      "ReplaySessionListView": {
+        "required": [
+          "runId",
+          "completeness",
+          "costsLabel",
+          "sessions"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "completeness": {
+            "$ref": "#/components/schemas/ReplayCompleteness"
+          },
+          "costsLabel": {
+            "type": "string"
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplaySessionListItem"
+            }
+          }
+        },
+        "description": "The sessions of a run, one row each."
+      },
+      "ReplaySessionView": {
+        "required": [
+          "runId",
+          "session",
+          "costsLabel",
+          "candidates",
+          "ranked",
+          "taken",
+          "blocked",
+          "fills",
+          "exits",
+          "equity",
+          "drawdownPct",
+          "openRiskPct",
+          "openPositions",
+          "labels",
+          "notes",
+          "openBookComplete",
+          "openBook"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "session": {
+            "type": "string",
+            "format": "date"
+          },
+          "costsLabel": {
+            "type": "string"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayCandidateView"
+            }
+          },
+          "ranked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayCandidateView"
+            }
+          },
+          "taken": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayCandidateView"
+            }
+          },
+          "blocked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayBlockedView"
+            }
+          },
+          "fills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayFillView"
+            }
+          },
+          "exits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "equity": {
+            "type": "number",
+            "format": "double"
+          },
+          "drawdownPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "openRiskPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "openPositions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "openBookComplete": {
+            "type": "boolean"
+          },
+          "openBook": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayOpenPositionView"
+            }
+          }
+        },
+        "description": "The full record of one session."
+      },
+      "ReplayStartBody": {
+        "required": [
+          "from",
+          "to",
+          "scope",
+          "capital",
+          "riskProfileId",
+          "costs",
+          "versions",
+          "modes"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "scope": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReplayScopeBody"
+              }
+            ]
+          },
+          "capital": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "riskProfileId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "costs": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "versions": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "modes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "filtersWithoutHistory": {
+            "type": "boolean",
+            "default": false
+          },
+          "includeResearchCells": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "description": "The body of the start of a replay (SR-01 part C). Defaults: to is the last readable session before the hold-out and its embargo, capital 1000000, the seeded standard profile, gross costs (costs null or \"gross\"; otherwise the id of a stored charge sheet), versions asOf, modes frozen."
+      },
+      "ReplayStrategyContribution": {
+        "required": [
+          "strategy",
+          "trades",
+          "result",
+          "sumR"
+        ],
+        "type": "object",
+        "properties": {
+          "strategy": {
+            "type": "string"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "result": {
+            "type": "number",
+            "format": "double"
+          },
+          "sumR": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "What one strategy contributed: closed trades, result in rupees (net, or gross when the run is) and the sum of R."
+      },
+      "ReplayTradeListView": {
+        "required": [
+          "runId",
+          "completeness",
+          "costsLabel",
+          "trades"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "completeness": {
+            "$ref": "#/components/schemas/ReplayCompleteness"
+          },
+          "costsLabel": {
+            "type": "string"
+          },
+          "trades": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayBookTradeView"
+            }
+          }
+        },
+        "description": "The trades of a run."
       },
       "ReplayTradeView": {
         "required": [
@@ -68940,6 +70573,38 @@
         },
         "description": "Starts a refresh. `force` skips the \"file unchanged\" check."
       },
+      "StartedReplay": {
+        "required": [
+          "runIds",
+          "pairId",
+          "trialNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "runIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "The ids, in the order of the request."
+          },
+          "pairId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The id the two runs of a pair share; null for one run.",
+            "format": "uuid"
+          },
+          "trialNumber": {
+            "type": "integer",
+            "description": "How many replays have looked at this range, this one included (AC 12): \"the 7th replay of this range\".",
+            "format": "int32"
+          }
+        },
+        "description": "The runs that were stored."
+      },
       "StepUpRequest": {
         "required": [
           "password"
@@ -73184,6 +74849,9 @@
     },
     {
       "name": "Reports"
+    },
+    {
+      "name": "Replay"
     },
     {
       "name": "Market"

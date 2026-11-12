@@ -68,6 +68,8 @@ public sealed class PlanBuilderChoiceTests
     private sealed class NoScope : IAutoScopeSource
     {
         public ValueTask<ResolvedAutoScope?> ResolveAsync(CancellationToken cancellationToken) => ValueTask.FromResult<ResolvedAutoScope?>(null);
+
+        public ValueTask<ResolvedAutoScope?> ResolveAsync(DateOnly? asOf, CancellationToken cancellationToken) => ValueTask.FromResult<ResolvedAutoScope?>(null);
     }
 
     private sealed class NoTickets : ITicketSource

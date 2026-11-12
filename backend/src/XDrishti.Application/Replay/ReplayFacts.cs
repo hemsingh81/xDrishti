@@ -80,6 +80,9 @@ internal sealed class ReplayFacts(
 
     public ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken) => _bars.LastReadableAsync(cancellationToken);
 
+    public async ValueTask<IReadOnlyList<(DateOnly Session, double Close)>> DayClosesAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        [.. (await _bars.DaysAsync(instrumentId, from, to, cancellationToken)).Select(b => (XDrishti.Domain.Market.IndiaTime.Today(b.Ts), b.Close))];
+
     public void BeginRun(DateOnly last, ReplaySettingsSnapshot? stored, IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>>? versions = null, string? learningSources = null, bool learningFixed = false)
     {
         _bars.PlanRange(last);
