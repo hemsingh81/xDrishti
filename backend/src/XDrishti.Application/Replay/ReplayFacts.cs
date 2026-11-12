@@ -73,6 +73,7 @@ internal sealed class ReplayFacts(
     private bool _versionsFixed;
     private bool _learningFixed;
     private string? _learningSources;
+    private readonly Dictionary<DateOnly, IReadOnlyList<StoredCellStats>> _frozenByDate = [];
     private IReadOnlyList<StoredCellStats>? _frozen;
     private IReadOnlyList<CellInput>? _learningInputs;
     private ReplaySettingsSnapshot? _settings;
@@ -236,7 +237,13 @@ internal sealed class ReplayFacts(
         ArgumentNullException.ThrowIfNull(parameters);
         var calendar = await CalendarAsync(cancellationToken);
         var freezeDate = NextSession(calendar, parameters.From);
-        var frozen = _frozen ??= CashCells.Only(await stats.ListLatestBeforeAsync(freezeDate, null, CellWindow.All.Code(), cancellationToken), "replay", logger);
+        // one snapshot per freeze date: the runs of a sweep (SR-02) share this instance and each starts from its own date
+        if (!_frozenByDate.TryGetValue(freezeDate, out var frozen))
+        {
+            _frozenByDate[freezeDate] = frozen = CashCells.Only(await stats.ListLatestBeforeAsync(freezeDate, null, CellWindow.All.Code(), cancellationToken), "replay", logger);
+        }
+
+        _frozen = frozen;
         var notes = new List<string>();
         IReadOnlyList<StoredCellStats> rows = frozen;
         DateTimeOffset stateCut;

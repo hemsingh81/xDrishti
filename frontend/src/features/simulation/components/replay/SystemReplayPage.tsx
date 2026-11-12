@@ -9,6 +9,8 @@ import { replayRunsQuery } from '../../api/replayApi';
 import { SimulationTabs } from '../SimulationTabs';
 import { ReplayResults } from './ReplayResults';
 import { ReplayStartForm } from './ReplayStartForm';
+import { SweepCard } from './SweepCard';
+import { SweepStartForm } from './SweepStartForm';
 
 /** The whole-system replay (SR-01 part E): read one, start one. A research tool, fenced from evidence. */
 export function SystemReplayPage() {
@@ -20,6 +22,9 @@ export function SystemReplayPage() {
   const list = runs.data ?? [];
   const run = list.find((r) => r.id === chosen) ?? list[0];
   const open = formOpen ?? (runs.data !== undefined && !run);
+  const [sweepFormOpen, setSweepFormOpen] = useState(false);
+  // A sweep is shown when its id is in the address, or when the chosen replay is one of its starts.
+  const sweepId = params.get('sweep') ?? run?.sweepId ?? undefined;
   return (
     <>
       <PageHeader
@@ -46,13 +51,14 @@ export function SystemReplayPage() {
             >
               {list.map((r) => (
                 <MenuItem key={r.id} value={r.id} sx={{ minHeight: 44 }}>
-                  {`${formatDate(r.from)} to ${formatDate(r.to)} · ${r.mode} · ${r.state}`}
+                  {`${formatDate(r.from)} to ${formatDate(r.to)} · ${r.mode}${r.arm === 'baseline' ? ' (baseline)' : ''} · ${r.state}`}
                 </MenuItem>
               ))}
             </TextField>
             <ReplayResults key={run.id} runId={run.id} />
           </>
         )}
+        {sweepId && <SweepCard key={sweepId} sweepId={sweepId} />}
         <Card component="section" aria-labelledby="replay-start-title">
           <CardContent>
             <Typography id="replay-start-title" variant="h2" component="h2">
@@ -74,6 +80,33 @@ export function SystemReplayPage() {
                   onStarted={(id) => {
                     setFormOpen(false);
                     setParams({ run: id });
+                  }}
+                />
+              </Box>
+            </Collapse>
+          </CardContent>
+        </Card>
+        <Card component="section" aria-labelledby="replay-sweep-start-title">
+          <CardContent>
+            <Typography id="replay-sweep-start-title" variant="h2" component="h2">
+              <Button
+                onClick={() => {
+                  setSweepFormOpen(!sweepFormOpen);
+                }}
+                aria-expanded={sweepFormOpen}
+                aria-controls="replay-sweep-panel"
+                color="inherit"
+                sx={{ font: 'inherit', p: 0, minHeight: 44, textTransform: 'none' }}
+              >
+                New start-date sweep
+              </Button>
+            </Typography>
+            <Collapse in={sweepFormOpen} unmountOnExit id="replay-sweep-panel">
+              <Box sx={{ pt: 1.5 }}>
+                <SweepStartForm
+                  onStarted={(id) => {
+                    setSweepFormOpen(false);
+                    setParams({ sweep: id });
                   }}
                 />
               </Box>

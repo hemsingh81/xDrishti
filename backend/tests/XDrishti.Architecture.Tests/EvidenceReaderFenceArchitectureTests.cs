@@ -278,7 +278,7 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
     {
         // SR-01 (AC 11, ADR 0272): a replay is research, not evidence. Cell statistics sources, Lab verdicts, the readiness scorecard, the decay monitor and model training read none of its tables. Only the store, its ports, the job and the registrations name them; a reader of the
         // replay (the API of part C, the comparison of part D) is added to this list on purpose, and never one of the evidence readers.
-        var name = new Regex(@"\bIReplayStore\b|\bIReplayReads\b|\bReplayStore\b|\bReplayRunRow\b|\breplay_(runs|sessions|trades)\b", RegexOptions.CultureInvariant, ScanRegex.Timeout);
+        var name = new Regex(@"\bIReplayStore\b|\bIReplayReads\b|\bReplayStore\b|\bReplayRunRow\b|\breplay_(runs|sessions|sweeps|trades)\b", RegexOptions.CultureInvariant, ScanRegex.Timeout);
         var users = Sources().Where(f => name.IsMatch(StripComments(File.ReadAllText(f)))).Select(Rel).Order(StringComparer.Ordinal).ToList();
 
         users.ShouldBe(
@@ -289,10 +289,14 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
             "XDrishti.Application/Replay/Job/ReplayRunner.cs",
             "XDrishti.Application/Replay/Job/StartReplayHandler.cs",
             "XDrishti.Application/Replay/Reads/ReplayReadSupport.cs", // part C: the replay's own read side, behind the owner-only /api/replay routes; never an evidence reader
+            "XDrishti.Application/Replay/Reads/ReplayRequestResolver.cs", // SR-02: the shared part of a start and a sweep request
+            "XDrishti.Application/Replay/Reads/ReplayTradeChart.cs", // SR-02 part C: a replay trade on its bars, behind the owner-only route
             "XDrishti.Application/Replay/Reads/RunReads.cs",
             "XDrishti.Application/Replay/Reads/SeriesReads.cs",
             "XDrishti.Application/Replay/Reads/StartReplayRequestHandler.cs",
             "XDrishti.Application/Replay/Reads/TradePairReads.cs",
+            "XDrishti.Application/Replay/Sweeps/ReplaySweepReads.cs", // SR-02 part B: the sweep's own read and cancel
+            "XDrishti.Application/Replay/Sweeps/StartReplaySweepRequestHandler.cs",
             "XDrishti.Application/SimAll/SimAllRunner.cs",
             "XDrishti.Infrastructure/DependencyInjection.cs",
             "XDrishti.Infrastructure/Replay/ReplayStore.cs",

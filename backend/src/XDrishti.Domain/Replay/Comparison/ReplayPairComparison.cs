@@ -19,7 +19,30 @@ public static class ReplayPairComparison
     public const string InvalidCode = "replay.pair_invalid";
 
     /// <summary>Compares the runs. Both series are one entry per session, in order, from the same start capital.</summary>
-    public static Result<ReplayPairResult> Compare(IReadOnlyList<ReplayDayEquity> frozen, IReadOnlyList<ReplayDayEquity> learning, decimal capital, LoopOptions? options = null)
+    public static Result<ReplayPairResult> Compare(IReadOnlyList<ReplayDayEquity> frozen, IReadOnlyList<ReplayDayEquity> learning, decimal capital, LoopOptions? options = null) =>
+        Run(frozen, learning, capital, options, "learning_vs_frozen", "sr01");
+
+    /// <summary>SR-02: the selection run against the no-selection baseline, by the same rule (the "learning" slot of the rule is the selection run, the "frozen" slot the baseline). Seeded apart from the learning pair.</summary>
+    public static Result<ReplayArmResult> CompareArms(IReadOnlyList<ReplayDayEquity> selection, IReadOnlyList<ReplayDayEquity> baseline, decimal capital, LoopOptions? options = null)
+    {
+        var r = Run(baseline, selection, capital, options, "selection_vs_baseline", "sr02");
+        if (r.IsFailure)
+        {
+            return Result.Failure<ReplayArmResult>(r.Error);
+        }
+
+        var v = r.Value;
+        var answer = v.Answer switch
+        {
+            PairAnswer.LearningBetter => ArmAnswer.SelectionBetter,
+            PairAnswer.FrozenBetter => ArmAnswer.BaselineBetter,
+            PairAnswer.NoMeasurableDifference => ArmAnswer.NoMeasurableDifference,
+            _ => ArmAnswer.TooLittleHistory,
+        };
+        return Result.Success(new ReplayArmResult(answer, v.Days, v.InformativeDays, v.MeanDailyDifference, v.ProbabilityLearningBetter, v.ProbabilityFrozenBetter, v.Low, v.High, v.Cut, v.HurtsBar, v.MinDays));
+    }
+
+    private static Result<ReplayPairResult> Run(IReadOnlyList<ReplayDayEquity> frozen, IReadOnlyList<ReplayDayEquity> learning, decimal capital, LoopOptions? options, string armName, string keyPrefix)
     {
         ArgumentNullException.ThrowIfNull(frozen);
         ArgumentNullException.ThrowIfNull(learning);
@@ -65,8 +88,8 @@ public static class ReplayPairComparison
             return Result.Success(new ReplayPairResult(PairAnswer.TooLittleHistory, f.Length, informative, mean, null, null, null, null, options.HelpsAt, LoopOptions.HurtsBar, options.MinDays));
         }
 
-        var key = string.Create(CultureInfo.InvariantCulture, $"sr01|{days[0]:yyyy-MM-dd}|{days[^1]:yyyy-MM-dd}|{days.Length}");
-        var arm = ThreeArmLoopTest.Compare("learning_vs_frozen", l, f, days, options.MinDays, options.Draws, options.Level, options.HelpsAt, LoopOptions.HurtsBar, key);
+        var key = string.Create(CultureInfo.InvariantCulture, $"{keyPrefix}|{days[0]:yyyy-MM-dd}|{days[^1]:yyyy-MM-dd}|{days.Length}");
+        var arm = ThreeArmLoopTest.Compare(armName, l, f, days, options.MinDays, options.Draws, options.Level, options.HelpsAt, LoopOptions.HurtsBar, key);
         PairAnswer? answer = arm.Verdict switch
         {
             LoopVerdict.Helps => PairAnswer.LearningBetter,

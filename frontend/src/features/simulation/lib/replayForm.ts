@@ -18,6 +18,8 @@ export interface ReplayForm {
   modes: ReplayModes;
   filtersWithoutHistory: boolean;
   includeResearchCells: boolean;
+  /** Frozen mode only: also run the no-selection baseline arm and compare. */
+  baseline: boolean;
 }
 
 export const initialForm: ReplayForm = {
@@ -32,6 +34,7 @@ export const initialForm: ReplayForm = {
   modes: 'frozen',
   filtersWithoutHistory: false,
   includeResearchCells: false,
+  baseline: false,
 };
 
 /** The reason the form cannot be sent yet, else undefined. */
@@ -63,6 +66,7 @@ export function toBody(f: ReplayForm): ReplayStartBody {
     modes: modeList[f.modes],
     filtersWithoutHistory: f.filtersWithoutHistory,
     includeResearchCells: f.includeResearchCells,
+    baseline: f.modes === 'frozen' && f.baseline,
   };
 }
 

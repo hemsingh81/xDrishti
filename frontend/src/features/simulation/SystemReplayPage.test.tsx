@@ -41,6 +41,7 @@ const item = (over: Partial<Item> = {}): Item => ({
   maxDrawdownPct: 2,
   trialNumber: 7,
   costsLabel: COSTS,
+  arm: 'selection',
   hindsight: [{ code: 'settings_now', text: 'Settings are as of today.' }],
   ...over,
 });
@@ -65,6 +66,7 @@ const run = (over: Partial<Run> = {}): Run => ({
   costsLabel: COSTS,
   basis: 'gross',
   trialNumber: 7,
+  arm: 'selection',
   inputHash: 'a',
   resultHash: 'b',
   parameters: {},
