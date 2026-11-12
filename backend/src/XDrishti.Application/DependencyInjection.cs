@@ -851,6 +851,14 @@ public static class DependencyInjection
         return services;
     }
 
+    /// <summary>The handler of the scheduled cell-statistics refresh (LC-01, ADR 0277) and its request planner: only the host that runs the services (the API) calls this; the host also registers <see cref="IRunRecordWriter"/>. The service itself, the gate text and the notice need none of it, so every other host (CLI, worker, feed) stays valid without it.</summary>
+    public static IServiceCollection AddCellsRefreshRunner(this IServiceCollection services)
+    {
+        services.AddScoped<ICommandHandler<RefreshCellStatsCommand, RefreshCellStatsOutcome>, RefreshCellStatsHandler>();
+        services.AddScoped<ISourceRequestPlanner, ReplaySourceRequestPlanner>();
+        return services;
+    }
+
     /// <summary>The chunk executor and the runner of the simulate-everything job (AU-12): only the host that runs the job (the API) calls this.</summary>
     public static IServiceCollection AddSimAllRunner(this IServiceCollection services)
     {
@@ -887,8 +895,6 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetStoredRunQuery, Result<StoredRunHeader>>, GetStoredRunHandler>();
         services.AddScoped<IQueryHandler<ListStoredRunsQuery, Result<Page<StoredRunHeader>>>, ListStoredRunsHandler>();
         services.AddScoped<IQueryHandler<PageStoredTradesQuery, Result<Page<RunTrade>>>, PageStoredTradesHandler>();
-        services.AddScoped<ICommandHandler<RefreshCellStatsCommand, RefreshCellStatsOutcome>, RefreshCellStatsHandler>(); // the scheduled refresh of the cell statistics (LC-01, ADR 0277)
-        services.AddScoped<ISourceRequestPlanner, ReplaySourceRequestPlanner>();
         services.AddScoped<CellsRefreshState>();
         services.TryAddSingleton(new CellsRefreshOptions()); // the host replaces it with its configuration (section Learning:CellsRefresh)
         services.AddScoped<ICommandHandler<ComputeCellStatsCommand, CellStatsOutcome>, ComputeCellStatsHandler>(); // cell statistics, Bayesian and recency (P6-01, ADR 0064)

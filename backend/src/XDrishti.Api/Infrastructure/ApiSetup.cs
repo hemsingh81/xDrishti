@@ -304,6 +304,7 @@ internal static class ApiSetup
         services.AddOptions<SimTrainingSettings>().BindConfiguration(SimTrainingSettings.Section).ValidateDataAnnotations().ValidateOnStart();
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<SimTrainingSettings>>().Value));
         services.AddSimAllRunner();
+        services.AddCellsRefreshRunner(); // the scheduled cell-statistics refresh (LC-01): needs the IRunRecordWriter this host registers
         services.AddHostedService<SimAllService>();
         services.AddReplayRunner(); // the system replay job (SR-01 part B, ADR 0272): its own hosted loop, never beside a simulate-everything chunk
         services.AddHostedService<XDrishti.Api.Lab.ReplayService>();
