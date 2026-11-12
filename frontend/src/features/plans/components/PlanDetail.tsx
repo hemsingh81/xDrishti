@@ -46,7 +46,12 @@ export function PlanDetail({ planId }: { planId: number }) {
     void queryClient.invalidateQueries({ queryKey: planKeys.notices });
   }, [queryClient, planId]);
 
-  if (plan.isPending || review.isPending) return <LoadingState label="Loading plan…" />;
+  if (plan.isPending || review.isPending)
+    return (
+      <Box sx={{ minHeight: 1000 }}>
+        <LoadingState label="Loading plan…" />
+      </Box>
+    );
   if (plan.isError) return <ErrorState error={plan.error} />;
   if (review.isError) return <ErrorState error={review.error} />;
 

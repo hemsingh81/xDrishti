@@ -1,4 +1,5 @@
-import { Alert, Stack } from '@mui/material';
+import { Alert, Box, Skeleton, Stack } from '@mui/material';
+import { visuallyHidden } from '@mui/utils';
 import { useQuery } from '@tanstack/react-query';
 import { LoadingState } from '@/shared/ui';
 import { modesQuery } from '../api/viewsApi';
@@ -13,9 +14,15 @@ export function ModesTab() {
   const { data, error, isPending, refetch } = useQuery(modesQuery);
   return (
     <Stack sx={{ gap: 3 }}>
-      {isPending && <LoadingState label="Loading modes" />}
+      {/* Hidden words, and a spacer below the switch where the ladder lands: a 124 px spinner on top moved everything up (shift 0.56). */}
+      {isPending && (
+        <Box sx={visuallyHidden}>
+          <LoadingState label="Loading modes" />
+        </Box>
+      )}
       {error && <RetryError error={error} onRetry={() => void refetch()} />}
       <ExecutionSwitchCard />
+      {isPending && <Skeleton aria-hidden variant="rounded" sx={{ height: { xs: 584, md: 300 } }} />}
       {data?.accounts.length === 0 && (
         <Alert severity="info" role="status">
           No account is set up for execution.

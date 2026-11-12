@@ -19,7 +19,8 @@ export function AutoPage() {
         description="Turn on the nightly chain, pick what to cover and read tomorrow's suggestions. It only suggests; no order is placed."
       />
       <Stack spacing={2}>
-        <Card>
+        {/* While each card loads it holds its settled height (measured), so the page below does not jump. */}
+        <Card sx={{ minHeight: auto.isPending ? { xs: 430, md: 192 } : undefined }}>
           <CardContent>
             {auto.isPending && <LoadingState label="Loading Auto…" />}
             {auto.isError && <ErrorState error={auto.error} />}

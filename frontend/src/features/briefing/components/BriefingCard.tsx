@@ -1,4 +1,5 @@
-import { Box, Chip, Paper, Stack, Typography } from '@mui/material';
+import { Box, Chip, Skeleton, Paper, Stack, Typography } from '@mui/material';
+import { visuallyHidden } from '@mui/utils';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '@/shared/api';
 import { ErrorState, LoadingState } from '@/shared/ui';
@@ -69,7 +70,15 @@ export function BriefingCard({ kind, subject }: { kind: BriefingKind; subject: s
   const title = kind === 'daily' ? 'Briefing' : 'Weekly review';
   let body;
   if (query.isPending) {
-    body = <LoadingState label={`Loading the ${title.toLowerCase()}…`} />;
+    // Words stay for a reader, the height is the settled card's (about 53 px inside the paper): a 124 px spinner pushed the plan down.
+    body = (
+      <Box sx={{ minHeight: 53 }}>
+        <Skeleton variant="rounded" height={53} />
+        <Box sx={visuallyHidden}>
+          <LoadingState label={`Loading the ${title.toLowerCase()}…`} />
+        </Box>
+      </Box>
+    );
   } else if (query.error instanceof ApiError && query.error.status === 404) {
     body = (
       <Typography variant="body2" color="text.secondary">

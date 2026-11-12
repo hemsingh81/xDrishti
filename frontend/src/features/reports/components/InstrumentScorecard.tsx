@@ -29,7 +29,7 @@ export function InstrumentScorecard({ query }: ReportPanelProps) {
         ? 'loading…'
         : ((symbol && best.get(symbol)) ?? 'none ranked');
   return (
-    <QueryPanel title="Instrument scorecard" query={result}>
+    <QueryPanel title="Instrument scorecard" query={result} reserve={{ xs: 800, md: 567 }}>
       {(w) => {
         const min = w.minTrades;
         return (

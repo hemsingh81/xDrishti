@@ -97,7 +97,11 @@ function AccountCard({ a, needed }: { a: Account; needed: number }) {
 export function PhaseCheckPanel() {
   const { data, error, isPending, refetch } = useQuery(phaseCheckQuery);
   return (
-    <Box component="section" aria-label="Phase check" sx={{ display: 'grid', gap: 2 }}>
+    <Box
+      component="section"
+      aria-label="Phase check"
+      sx={{ display: 'grid', gap: 2, minHeight: isPending ? { xs: 464, md: 373 } : undefined, alignContent: 'start' }}
+    >
       <Typography variant="h2" sx={{ fontSize: '1.25rem' }}>
         Phase check: semi-auto sessions
       </Typography>

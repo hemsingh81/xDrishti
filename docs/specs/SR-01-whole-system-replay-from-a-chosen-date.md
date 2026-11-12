@@ -238,7 +238,13 @@ All eight answered by the owner on 2026-11-11 as recommended ("Approve all"); th
 - Hindsight labels come first on every run read, and `before_costs` is stated on every gross run.
 
 ## Done when
-- [ ] All acceptance criteria have evidence
-- [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors (Opus for parts A and B)
-- [ ] Contract regenerated (`scripts/gen-api.sh`); migration `AddSystemReplay` added
-- [ ] ADR 0272 written; docs/design/11-strategy-lab.md and 13-reports-and-ui.md updated; roadmap row updated
+- [x] All acceptance criteria have evidence (parts A to C: the evidence notes above; part D: `ReplayPairComparison` tests; part E: `SystemReplayPage.test.tsx`; golden, look-ahead, resume, fence and architecture tests exist in the backend test projects)
+- [x] `scripts/check.sh` green; reviewer agent: no blockers/majors (Opus for parts A and B). Each part A to E passed an Opus review (two to four rounds) and a green full `scripts/check.sh` before its merge (2026-11-12; merges dd472414, 5ef8766b, c459674d, 9098bb43, 710935f6)
+- [x] Contract regenerated (`scripts/gen-api.sh`; `/api/replay` is in `frontend/src/shared/api/schema.d.ts`); migration `AddSystemReplay` added (`20261111195451`)
+- [x] ADR 0272 written (status Proposed until the owner has read it); docs/design/11-strategy-lab.md and 13-reports-and-ui.md updated (2026-11-12); roadmap rows updated
+
+## What is still open (2026-11-12)
+- **Not deployed.** The owner deploys; until then none of this runs in the app.
+- **Not run on real data.** No replay has been run on the owner's stored bars; every figure above is from fixtures.
+- **Speed and memory unmeasured on real data.** The 0.88 s per session and 968 MiB figures are from the explicit `ReplayBenchmarks` on in-memory stores; the target (one year over 100 stocks in one night) is not yet shown on the real database, and 100 instruments are at the edge of `xd-api` `mem_limit: 1g` (the cap `Replay:MaxWindowMb` 300 allows 53).
+- ADR 0272 is not yet Accepted; the charge sheet is still empty (ISS-25), so every run is gross.

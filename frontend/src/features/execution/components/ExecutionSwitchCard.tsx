@@ -29,7 +29,11 @@ export function ExecutionSwitchCard() {
   const on = data?.inForce?.executionEnabled === true;
   const pending = data?.pending ?? null;
   return (
-    <section aria-label="Execution switch">
+    <Box
+      component="section"
+      aria-label="Execution switch"
+      sx={{ minHeight: isPending ? { xs: 289, md: 183 } : undefined }}
+    >
       <Typography variant="h2" sx={{ fontSize: 18, mb: 1 }}>
         Execution switch
       </Typography>
@@ -111,6 +115,6 @@ export function ExecutionSwitchCard() {
           );
         }}
       />
-    </section>
+    </Box>
   );
 }

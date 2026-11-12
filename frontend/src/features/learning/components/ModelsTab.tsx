@@ -33,6 +33,7 @@ function ModelList() {
   return (
     <Panel
       title="Models"
+      reserve={query.isPending ? { xs: 623, md: 492 } : undefined}
       actions={
         <FilterBar
           label="Model role"

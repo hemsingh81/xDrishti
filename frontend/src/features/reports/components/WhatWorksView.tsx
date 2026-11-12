@@ -16,7 +16,7 @@ export function WhatWorksView({ query }: { query: ReportQuery }) {
   const cellName = (group: GroupView) =>
     group.parts.map((part) => `${part.dimension} ${baskets.part(part.dimension, part.value)}`).join(' · ');
   return (
-    <QueryPanel title="Ranked cells" query={result}>
+    <QueryPanel title="Ranked cells" query={result} reserve={{ xs: 800, md: 716 }}>
       {(w) => {
         const min = w.minTrades;
         return (

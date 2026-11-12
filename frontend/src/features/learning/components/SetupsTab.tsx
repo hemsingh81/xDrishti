@@ -22,6 +22,7 @@ export function SetupsTab() {
     <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 2 }}>
       <Panel
         title="Setups by timeframe"
+        reserve={cells.isPending ? { xs: 877, md: 638 } : undefined}
         actions={
           <ToggleButtonGroup
             exclusive

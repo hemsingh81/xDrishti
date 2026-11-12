@@ -1,5 +1,6 @@
 import {
   Alert,
+  Box,
   Button,
   Checkbox,
   Chip,
@@ -20,7 +21,12 @@ import { autoProblem } from '../lib/problem';
 export function AutoScopePicker() {
   const scope = useQuery(autoScopeQuery);
   const baskets = useQuery(autoBasketsQuery);
-  if (scope.isPending || baskets.isPending) return <LoadingState label="Loading scope…" />;
+  if (scope.isPending || baskets.isPending)
+    return (
+      <Box sx={{ minHeight: { xs: 327, md: 294 } }}>
+        <LoadingState label="Loading scope…" />
+      </Box>
+    );
   if (scope.isError) return <ErrorState error={scope.error} />;
   if (baskets.isError) return <ErrorState error={baskets.error} />;
   // Keyed by version so a scope saved elsewhere resets the draft.

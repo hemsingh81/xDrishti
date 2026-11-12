@@ -118,7 +118,7 @@ function GroupBlock({ group, min }: { group: Group; min: number | null }) {
 export function MaeMfeReport({ query, min }: ReportPanelProps) {
   const result = useQuery(maeMfeQuery(query));
   return (
-    <QueryPanel title="MAE and MFE" query={result}>
+    <QueryPanel title="MAE and MFE" query={result} reserve={{ xs: 800, md: 800 }}>
       {({ groups, evidence }) => (
         <Box sx={{ display: 'grid', gap: 1.5 }}>
           {groups.length === 0 ? (

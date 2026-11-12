@@ -33,7 +33,7 @@ export function StrategyTimeframePanel({ query, min }: ReportPanelProps) {
   const result = useQuery(pivotQuery(query, lenses.pivot));
   const navigate = useNavigate();
   return (
-    <QueryPanel title="Strategy by timeframe" query={result}>
+    <QueryPanel title="Strategy by timeframe" query={result} reserve={{ xs: 267, md: 0 }}>
       {(pivot) => {
         const rows = pivot.rows.map((row) => ({ id: row, label: row }));
         const columns = pivot.columns.map((column) => ({ id: column, label: column }));

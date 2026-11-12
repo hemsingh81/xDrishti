@@ -94,6 +94,9 @@ function CounterfactualPanels({ report, journey }: { report: Counterfactual; jou
   );
 }
 
+/** Capped at about one screen (the settled panels measure about 1,300 px at 360 and 1,000 px at 1440): holds the place in view so the page below does not jump. */
+const reservedHeight = { xs: 1000, md: 880 };
+
 /**
  * Journey (P8-12): whether a model that kept learning beat a frozen copy on the same later trades, window by window, beside the
  * lessons and model versions of the same period and the plan-price grades by week. Every number is a server field; the live line
@@ -111,7 +114,12 @@ export function JourneyTab() {
   const lessons = useQuery(lessonsQuery('all'));
   const models = useQuery(modelsQuery('all'));
   const changelog = useQuery(changelogQuery());
-  if (journey.isPending) return <LoadingState label="Loading the journey…" />;
+  if (journey.isPending)
+    return (
+      <Box sx={{ minHeight: reservedHeight }}>
+        <LoadingState label="Loading the journey…" />
+      </Box>
+    );
   if (journey.isError) return <ErrorState error={journey.error} />;
   const data = journey.data;
   return (
@@ -127,7 +135,11 @@ export function JourneyTab() {
         </Panel>
       ) : (
         <>
-          {report.isPending && <LoadingState label="Loading the counterfactual…" />}
+          {report.isPending && (
+            <Box sx={{ minHeight: reservedHeight }}>
+              <LoadingState label="Loading the counterfactual…" />
+            </Box>
+          )}
           {report.isError && <ErrorState error={report.error} />}
           {report.data && <CounterfactualPanels report={report.data} journey={data} />}
         </>
