@@ -130,6 +130,30 @@ public sealed class ListDaysDatabaseTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task A_ban_file_re_published_for_the_same_date_that_adds_a_symbol_reads_banned_for_a_daily_row()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_list_days_amended_probe", Ct);
+        await using var source = NpgsqlDataSource.Create(scratch.ConnectionString);
+        var store = new ListDayStore(source);
+        var reader = new ListFlagsAsOfReader(source);
+        var first = await InstrumentAsync(source, "AAA");
+        var added = await InstrumentAsync(source, "BBB");
+        var d = new DateOnly(2026, 11, 2);
+        await store.InsertAsync(ListBaskets.Ban.Id, d, [first], "daily", Ct);
+        await using (var stay = source.CreateCommand("INSERT INTO market.basket_members (id, basket_id, instrument_id, valid_from, position, added_by) VALUES (gen_random_uuid(), @ban, @added, '2026-11-01 18:30:00+00', 1, 'system')"))
+        {
+            stay.Parameters.AddWithValue("ban", ListBaskets.Ban.Id);
+            stay.Parameters.AddWithValue("added", added);
+            await stay.ExecuteNonQueryAsync(Ct);
+        }
+
+        var flags = await reader.ForAsync([first, added], d, d, Ct);
+
+        flags.OnBan(first).ShouldBe(true);
+        flags.OnBan(added).ShouldBe(true, "the later file's stay is not hidden by the first file's day row");
+    }
+
+    [Fact]
     public async Task Down_removes_the_tables_and_up_again_is_clean()
     {
         await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_list_days_down_probe", Ct);

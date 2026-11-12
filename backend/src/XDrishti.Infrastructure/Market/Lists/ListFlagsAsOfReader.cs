@@ -28,17 +28,24 @@ internal sealed class ListFlagsAsOfReader(NpgsqlDataSource dataSource) : IListFl
 
     private async ValueTask<(bool Covered, HashSet<Guid> Members)> BanAsync(Guid[] ids, DateOnly date, CancellationToken cancellationToken)
     {
-        await using (var command = dataSource.CreateCommand("SELECT 1 FROM market.list_day_coverage WHERE basket_id = @basket AND trade_date = @date"))
+        await using (var command = dataSource.CreateCommand("SELECT source FROM market.list_day_coverage WHERE basket_id = @basket AND trade_date = @date"))
         {
             command.Parameters.AddWithValue("basket", NpgsqlDbType.Uuid, ListBaskets.Ban.Id);
             command.Parameters.AddWithValue("date", date);
-            if (await command.ExecuteScalarAsync(cancellationToken) is not null)
+            if (await command.ExecuteScalarAsync(cancellationToken) is string source)
             {
                 await using var members = dataSource.CreateCommand("SELECT instrument_id FROM market.list_day_members WHERE basket_id = @basket AND trade_date = @date AND instrument_id = ANY(@ids)");
                 members.Parameters.AddWithValue("basket", NpgsqlDbType.Uuid, ListBaskets.Ban.Id);
                 members.Parameters.AddWithValue("date", date);
                 members.Parameters.AddWithValue("ids", ids);
-                return (true, await ReadIdsAsync(members, cancellationToken));
+                var found = await ReadIdsAsync(members, cancellationToken);
+                if (source == "daily")
+                {
+                    // A same-date file re-published later is applied to the stays but the day row keeps the first file: the union with the stays covering the date can only over-state a ban, never hide one.
+                    found.UnionWith(await StayMembersAsync(ListBaskets.Ban.Id, ids, date, cancellationToken));
+                }
+
+                return (true, found);
             }
         }
 

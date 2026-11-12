@@ -88,6 +88,11 @@ public sealed class ListFilterPlanTests
         var plan = (await builder.BuildAsync(WiredPlanFixture.Request, Ct)).Value;
 
         plan.Items.ShouldBeEmpty();
+        var withCandidates = (await Build(true, _ => Flags(true, true)).Builder.BuildAsync(WiredPlanFixture.Request, Ct)).Value;
+        withCandidates.Items.SelectMany(i => i.Evidence.Unavailable).ShouldNotContain("fno_ban", "every candidate was answered, so it is applied");
+        var unanswered = (await Build(true, _ => Flags(false, false)).Builder.BuildAsync(WiredPlanFixture.Request, Ct)).Value;
+        unanswered.Items.SelectMany(i => i.Evidence.Unavailable).ShouldContain("fno_ban");
+        unanswered.Items.SelectMany(i => i.Evidence.Unavailable).ShouldContain("surveillance");
     }
 
     [Fact]
