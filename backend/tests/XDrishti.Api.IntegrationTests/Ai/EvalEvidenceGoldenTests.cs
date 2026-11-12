@@ -182,7 +182,7 @@ public sealed class EvalEvidenceGoldenTests(ApiFactory factory) : IAsyncLifetime
         foreach (var endpoint in endpoints)
         {
             var evidence = endpoint.Metadata.GetOrderedMetadata<Microsoft.AspNetCore.Authorization.IAuthorizeData>().Any(a => a.Policy == "AssistantEvidenceRead");
-            var path = System.Text.RegularExpressions.Regex.Replace(endpoint.RoutePattern.RawText!, @"\{[^}]*\}", m => m.Value.Contains("guid", StringComparison.Ordinal) ? Guid.NewGuid().ToString() : m.Value.Contains("int", StringComparison.Ordinal) ? "1" : "x");
+            var path = System.Text.RegularExpressions.Regex.Replace(endpoint.RoutePattern.RawText!, @"\{[^}]*\}", m => m.Value.Contains("guid", StringComparison.Ordinal) ? Guid.NewGuid().ToString() : m.Value.Contains("int", StringComparison.Ordinal) || m.Value.Contains("long", StringComparison.Ordinal) ? "1" : "x");
             foreach (var method in endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods)
             {
                 using var response = await client.SendAsync(new HttpRequestMessage(new HttpMethod(method), new Uri(path, UriKind.Relative)), Ct);

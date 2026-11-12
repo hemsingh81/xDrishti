@@ -536,6 +536,7 @@
    "capital": 1000000,
    "filtersWithoutHistory": true,
    "labels": [
+    "filters_without_history",
     "survivorship"
    ],
    "equity": [
