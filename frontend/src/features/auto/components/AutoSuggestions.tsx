@@ -1,4 +1,4 @@
-import { Alert, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { formatWeekdayDate } from '@/shared/lib/format';
@@ -26,7 +26,12 @@ export function AutoSuggestions() {
   const [stock, setStock] = useState('');
   const members = useQuery({ ...basketSymbolsQuery(basket), enabled: basket !== '' });
 
-  if (query.isPending) return <LoadingState label="Loading suggestions…" />;
+  if (query.isPending)
+    return (
+      <Box sx={{ minHeight: { xs: 228, md: 164 } }}>
+        <LoadingState label="Loading suggestions…" />
+      </Box>
+    );
   if (query.isError) return <ErrorState error={query.error} />;
   const data = query.data;
   if (!data) {

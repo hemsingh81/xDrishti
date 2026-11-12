@@ -1,4 +1,4 @@
-import { Box } from '@mui/material';
+import { Box, Skeleton } from '@mui/material';
 import { visuallyHidden } from '@mui/utils';
 import { lazy, Suspense } from 'react';
 import { LoadingState } from '@/shared/ui';
@@ -12,6 +12,7 @@ export function BriefingCard({ kind, subject }: { kind: BriefingKind; subject: s
     <Suspense
       fallback={
         <Box sx={{ minHeight: 85 }}>
+          <Skeleton variant="rounded" height={85} />
           <Box sx={visuallyHidden}>
             <LoadingState label="Loading the briefing…" />
           </Box>

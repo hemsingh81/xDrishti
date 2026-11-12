@@ -6,6 +6,7 @@ import { buildBasket, buildBasketMembers, sampleInstruments } from '@/test/fixtu
 import { buildAuto, buildAutoSuggestions, buildSuggestion } from '@/test/autoFixtures';
 import { pinClock } from '@/test/pinClock';
 import { renderWithProviders } from '@/test/render';
+import { reservedHeights } from '@/test/reservedHeight';
 import { problemResponse, server } from '@/test/server';
 import { AutoPage } from './components/AutoPage';
 
@@ -175,5 +176,21 @@ describe('Auto page', () => {
     await user.click(await screen.findByRole('option', { name: buildBasket().name }));
     expect(await screen.findByText(/The basket could not be read/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /INFY BUY/ })).toBeInTheDocument();
+  });
+
+  it('holds the settled height of the suggestions card while it loads, and not after', async () => {
+    renderWithProviders(<AutoPage />);
+    const holder = screen.getByText('Loading suggestions…').closest('[role=status]')?.parentElement;
+    expect(holder).not.toBeNull();
+    expect(reservedHeights(holder!).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/No suggestions to show/)).toBeInTheDocument();
+    expect(screen.queryByText('Loading suggestions…')).not.toBeInTheDocument();
+  });
+
+  it('keeps no reserved box for the scope card when it fails', async () => {
+    server.use(http.get('/api/auto/scope', () => problemResponse({ title: 'Broken.', code: 'x' }, 500)));
+    renderWithProviders(<AutoPage />);
+    expect(await screen.findAllByRole('alert')).not.toHaveLength(0);
+    expect(screen.queryByText('Loading scope…')).not.toBeInTheDocument();
   });
 });

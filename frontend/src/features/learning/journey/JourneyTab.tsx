@@ -94,7 +94,7 @@ function CounterfactualPanels({ report, journey }: { report: Counterfactual; jou
   );
 }
 
-/** About one screen of the settled panels (measured 1,300 px at 360 and 1,000 px at 1440): holds the place so the page below does not jump. */
+/** Capped at about one screen (the settled panels measure about 1,300 px at 360 and 1,000 px at 1440): holds the place in view so the page below does not jump. */
 const reservedHeight = { xs: 1000, md: 880 };
 
 /**

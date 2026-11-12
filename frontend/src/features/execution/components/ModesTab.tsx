@@ -1,4 +1,4 @@
-import { Alert, Box, Stack } from '@mui/material';
+import { Alert, Box, Skeleton, Stack } from '@mui/material';
 import { visuallyHidden } from '@mui/utils';
 import { useQuery } from '@tanstack/react-query';
 import { LoadingState } from '@/shared/ui';
@@ -22,7 +22,7 @@ export function ModesTab() {
       )}
       {error && <RetryError error={error} onRetry={() => void refetch()} />}
       <ExecutionSwitchCard />
-      {isPending && <Box aria-hidden sx={{ minHeight: { xs: 584, md: 300 } }} />}
+      {isPending && <Skeleton aria-hidden variant="rounded" sx={{ height: { xs: 584, md: 300 } }} />}
       {data?.accounts.length === 0 && (
         <Alert severity="info" role="status">
           No account is set up for execution.

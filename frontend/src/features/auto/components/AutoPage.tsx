@@ -19,7 +19,7 @@ export function AutoPage() {
         description="Turn on the nightly chain, pick what to cover and read tomorrow's suggestions. It only suggests; no order is placed."
       />
       <Stack spacing={2}>
-        {/* Minimum heights are the settled heights (measured); the page below does not jump as the three cards load. */}
+        {/* While each card loads it holds its settled height (measured), so the page below does not jump. */}
         <Card sx={{ minHeight: auto.isPending ? { xs: 430, md: 192 } : undefined }}>
           <CardContent>
             {auto.isPending && <LoadingState label="Loading Auto…" />}
@@ -27,12 +27,12 @@ export function AutoPage() {
             {auto.data && <AutoSwitchCard auto={auto.data} />}
           </CardContent>
         </Card>
-        <Card sx={{ minHeight: { xs: 389, md: 326 } }}>
+        <Card>
           <CardContent>
             <AutoScopePicker />
           </CardContent>
         </Card>
-        <Card sx={{ minHeight: { xs: 290, md: 230 } }}>
+        <Card>
           <CardContent>
             <AutoSuggestions />
           </CardContent>

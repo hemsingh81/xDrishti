@@ -48,7 +48,7 @@ export function PlanDetail({ planId }: { planId: number }) {
 
   if (plan.isPending || review.isPending)
     return (
-      <Box sx={{ minHeight: { xs: 1100, md: 1100 } }}>
+      <Box sx={{ minHeight: 1000 }}>
         <LoadingState label="Loading plan…" />
       </Box>
     );
