@@ -31,7 +31,8 @@ internal static class ReplayReadSupport
 
     public static IReadOnlyList<ReplayLabelView> Labels(ReplayParams? p, IEnumerable<string>? extra = null)
     {
-        var codes = new SortedSet<string>(p is null ? [HindsightLabels.SettingsNow, HindsightLabels.DataSeenBefore] : HindsightLabels.For(p), StringComparer.Ordinal);
+        // without stored parameters the run is treated as gross (no sheet is known), so before_costs is always stated
+        var codes = new SortedSet<string>(p is null ? [HindsightLabels.SettingsNow, HindsightLabels.DataSeenBefore, HindsightLabels.BeforeCosts] : HindsightLabels.For(p), StringComparer.Ordinal);
         if (extra is not null)
         {
             codes.UnionWith(extra);
@@ -40,12 +41,14 @@ internal static class ReplayReadSupport
         return [.. codes.Select(c => new ReplayLabelView(c, Sentences.GetValueOrDefault(c, c)))];
     }
 
+    public static IReadOnlyList<ReplayLabelView> Describe(IEnumerable<string> codes) => [.. codes.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Select(c => new ReplayLabelView(c, Sentences.GetValueOrDefault(c, c)))];
+
     public static ReplayCompleteness Completeness(ReplayRunRow run) => new(run.Complete, run.SessionsDone, run.SessionsTotal, run.CursorSession);
 
-    public static ReplayRunListItem ListItem(ReplayRunRow run, ReplaySessionRow? last)
+    public static ReplayRunListItem ListItem(ReplayRunRow run)
     {
         var p = ParamsOf(run);
-        return new ReplayRunListItem(run.Id, run.PairId, run.CreatedAt, run.From, run.To, run.Mode, run.State, Completeness(run), last?.Equity, last?.Drawdown, run.TrialNumber, CostsLabel(p), Labels(p));
+        return new ReplayRunListItem(Labels(p), run.Id, run.PairId, run.CreatedAt, run.From, run.To, run.Mode, run.State, Completeness(run), run.LastEquity, run.LastDrawdown, run.TrialNumber, CostsLabel(p));
     }
 
     /// <summary>The strategy of a cell key (its first part).</summary>

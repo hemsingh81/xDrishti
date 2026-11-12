@@ -57,6 +57,12 @@ public interface IReplayReads
     /// <summary>The stored sessions with their session between <paramref name="from"/> and <paramref name="to"/> (each end optional), oldest first.</summary>
     ValueTask<IReadOnlyList<ReplaySessionRow>> SessionsAsync(Guid runId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
 
+    /// <summary>The stored equity series of the run between the dates (each optional), oldest first, without the session records (the list, the summary and the equity read need no jsonb).</summary>
+    ValueTask<IReadOnlyList<ReplayEquityRow>> EquityAsync(Guid runId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
+
+    /// <summary>The distinct hindsight labels the stored sessions carry (survivorship comes from the session, not from the parameters).</summary>
+    ValueTask<IReadOnlyList<string>> LabelsAsync(Guid runId, CancellationToken cancellationToken);
+
     /// <summary>One stored session; null when it is not stored (yet).</summary>
     ValueTask<ReplaySessionRow?> SessionAsync(Guid runId, DateOnly session, CancellationToken cancellationToken);
 

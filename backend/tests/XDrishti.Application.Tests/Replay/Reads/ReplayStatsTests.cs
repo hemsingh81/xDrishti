@@ -20,12 +20,13 @@ public sealed class ReplayStatsTests
     [Fact]
     public void Figures_come_from_the_equity_series_and_the_closed_trades()
     {
-        var days = new[] { (D1, 1_010_000m, 1), (D1.AddDays(1), 1_005_000m, 0), (D1.AddDays(2), 1_020_000m, 1) };
+        var days = new[] { new ReplayEquityRow(D1, 1_010_000m, null, 1), new ReplayEquityRow(D1.AddDays(1), 1_005_000m, null, 0), new ReplayEquityRow(D1.AddDays(2), 1_020_000m, 0.5m, 1) };
         var trades = new[] { Trade(1, 120m, 1.2), Trade(2, -50m, -0.5), Trade(3, null, null, closed: false) };
 
-        var f = ReplayStats.Figures(1_000_000m, D1, days, 0.5m, trades)!;
+        var f = ReplayStats.Figures(1_000_000m, D1, days, null, trades)!;
 
         f.FinalEquity.ShouldBe(1_020_000m);
+        f.MaxDrawdownPct.ShouldBe(0.5m);
         f.ReturnPct.ShouldBe(2m);
         f.Exposure!.Value.ShouldBe(2 / 3.0, 1e-9);
         (f.Trades, f.ClosedTrades).ShouldBe((3, 2));
@@ -38,7 +39,7 @@ public sealed class ReplayStatsTests
     [Fact]
     public void One_flat_day_has_no_sharpe_and_no_cagr()
     {
-        var f = ReplayStats.Figures(1_000_000m, D1, [(D1, 1_000_000m, 0)], null, [])!;
+        var f = ReplayStats.Figures(1_000_000m, D1, [new ReplayEquityRow(D1, 1_000_000m, null, 0)], null, [])!;
 
         f.Sharpe.ShouldBeNull();
         f.Cagr.ShouldBeNull();

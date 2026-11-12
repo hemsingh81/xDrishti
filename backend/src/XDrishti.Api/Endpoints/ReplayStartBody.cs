@@ -3,7 +3,7 @@ namespace XDrishti.Api.Endpoints;
 /// <summary>The baskets and instruments a replay covers; both empty means the owner's stored auto scope, its baskets read as of the start date.</summary>
 internal sealed record ReplayScopeBody(IReadOnlyList<Guid>? BasketIds, IReadOnlyList<Guid>? InstrumentIds);
 
-/// <summary>The body of the start of a replay (SR-01 part C). Defaults: to is the last readable session before the hold-out and its embargo, capital 1000000, the seeded standard profile, gross costs (costs null or "gross"; otherwise the id of a stored charge sheet), versions asOf, modes frozen.</summary>
+/// <summary>The body of the start of a replay (SR-01 part C). Defaults: to is the last readable session before the hold-out and its embargo, capital 1000000, the seeded standard profile, gross costs (costs null or "gross"; otherwise the id of a stored charge sheet), versions start (the version active today, a labelled hindsight), modes frozen.</summary>
 internal sealed record ReplayStartBody(
     DateOnly From,
     DateOnly? To,

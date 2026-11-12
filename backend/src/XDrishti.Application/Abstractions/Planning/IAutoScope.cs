@@ -30,7 +30,4 @@ public sealed record ResolvedAutoScope(string Hash, IReadOnlySet<Guid> Instrumen
 public interface IAutoScopeSource
 {
     ValueTask<ResolvedAutoScope?> ResolveAsync(CancellationToken cancellationToken);
-
-    /// <summary>The scope with its baskets expanded to their members as of the close of <paramref name="asOf"/> (SR-01, Q8); with <c>null</c> it is the live read above.</summary>
-    ValueTask<ResolvedAutoScope?> ResolveAsync(DateOnly? asOf, CancellationToken cancellationToken);
 }

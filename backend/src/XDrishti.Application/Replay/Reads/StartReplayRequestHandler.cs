@@ -9,8 +9,8 @@ using XDrishti.Domain.Replay;
 namespace XDrishti.Application.Replay.Reads;
 
 /// <summary>
-/// What the owner asks for when starting a replay (SR-01 part C). <paramref name="To"/> null is the last readable session (before the hold-out and its embargo); an empty scope is the owner's stored auto scope with its baskets as of <paramref name="From"/> (Q8); <paramref name="Capital"/> null is Rs 10,00,000;
-/// <paramref name="RiskProfileId"/> null is the seeded standard profile; <paramref name="CostSheetId"/> null is gross; <paramref name="Versions"/> is <c>start</c> or <c>asOf</c> (null is <c>asOf</c>, the version in force at each session); <paramref name="Modes"/> null is frozen only.
+/// What the owner asks for when starting a replay (SR-01 part C). <paramref name="To"/> null is the last readable session (before the hold-out and its embargo); an empty scope is the owner's stored auto scope, its baskets and instruments, so the members are read as of each session (Q8); <paramref name="Capital"/> null is Rs 10,00,000;
+/// <paramref name="RiskProfileId"/> null is the seeded standard profile; <paramref name="CostSheetId"/> null is gross; <paramref name="Versions"/> is <c>start</c> or <c>asOf</c> (null is <c>start</c>, Q1); <paramref name="Modes"/> null is frozen only.
 /// </summary>
 public sealed record StartReplayRequest(
     DateOnly From,
@@ -26,10 +26,15 @@ public sealed record StartReplayRequest(
     bool IncludeResearchCells) : ICommand;
 
 /// <summary>Turns the request into the parameters of one run, or of a frozen and a learning run, and starts them through <see cref="StartReplayHandler"/>, which stores, hashes, checks the hold-out and the memory cap and queues them.</summary>
-internal sealed class StartReplayRequestHandler(IReplayFacts facts, IReplayReads reads, IAutoScopeSource autoScope, IRiskProfileStore profiles, ICommandHandler<StartReplayCommand, StartedReplay> start)
+internal sealed class StartReplayRequestHandler(IReplayFacts facts, IReplayReads reads, IAutoScopeStore autoScope, IRiskProfileStore profiles, ICommandHandler<StartReplayCommand, StartedReplay> start)
     : ICommandHandler<StartReplayRequest, StartedReplay>
 {
     public const decimal DefaultCapital = 1_000_000m;
+
+    /// <summary>The most baskets and instruments one request may name (checked before anything is read).</summary>
+    public const int MaxBaskets = 200;
+
+    public const int MaxInstruments = 2000;
 
     public async ValueTask<Result<StartedReplay>> HandleAsync(StartReplayRequest request, CancellationToken cancellationToken)
     {
@@ -48,6 +53,11 @@ internal sealed class StartReplayRequestHandler(IReplayFacts facts, IReplayReads
                 default:
                     return Invalid("modes are frozen and/or learning");
             }
+        }
+
+        if (request.BasketIds is { Count: > MaxBaskets } || request.InstrumentIds is { Count: > MaxInstruments })
+        {
+            return Invalid($"at most {MaxBaskets} baskets and {MaxInstruments} instruments");
         }
 
         if (!TryRule(request.Versions, out var rule))
@@ -78,9 +88,9 @@ internal sealed class StartReplayRequestHandler(IReplayFacts facts, IReplayReads
         }
 
         var scope = new ReplayScope([.. request.BasketIds ?? []], [.. request.InstrumentIds ?? []]);
-        if (scope.IsEmpty && await autoScope.ResolveAsync(request.From, cancellationToken) is { } auto)
+        if (scope.IsEmpty && await autoScope.LatestAsync(cancellationToken) is { } stored)
         {
-            scope = new ReplayScope([], [.. auto.InstrumentIds.Order()]);
+            scope = new ReplayScope(stored.BasketIds, stored.InstrumentIds); // the baskets stay baskets: members are read as of each session, with the survivorship label
         }
 
         var profile = ReplayRiskProfile.Standard;
@@ -107,14 +117,14 @@ internal sealed class StartReplayRequestHandler(IReplayFacts facts, IReplayReads
 
     private static bool TryRule(string? text, out ReplayVersionRule rule)
     {
-        rule = ReplayVersionRule.AsOf;
+        rule = ReplayVersionRule.Start;
         switch (text)
         {
             case null:
-            case "asOf":
-                return true;
             case "start":
-                rule = ReplayVersionRule.Start;
+                return true;
+            case "asOf":
+                rule = ReplayVersionRule.AsOf;
                 return true;
             default:
                 return false;

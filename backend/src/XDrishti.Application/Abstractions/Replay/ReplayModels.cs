@@ -39,6 +39,8 @@ public sealed record NewReplayRun(Guid Id, DateOnly From, DateOnly To, string Mo
 /// <param name="CreatedAt">When it was stored.</param>
 /// <param name="FinishedAt">When it ended; null while active.</param>
 /// <param name="FailReason">Why a failed run failed (the session and the reason); null otherwise.</param>
+/// <param name="LastEquity">The equity at the close of the cursor session, read with the run (no second read); null before the first session.</param>
+/// <param name="LastDrawdown">The stored drawdown of the cursor session; null before the first session or without a basis.</param>
 public sealed record ReplayRunRow(
     Guid Id,
     Guid? PairId,
@@ -59,7 +61,9 @@ public sealed record ReplayRunRow(
     int TrialNumber,
     DateTimeOffset CreatedAt,
     DateTimeOffset? FinishedAt,
-    string? FailReason)
+    string? FailReason,
+    decimal? LastEquity = null,
+    decimal? LastDrawdown = null)
 {
     /// <summary>Every session was replayed (AC 14: <c>complete: false</c> while the job runs, and for a cancelled or failed run).</summary>
     public bool Complete => State == ReplayRunStates.Completed;
@@ -104,3 +108,6 @@ public sealed record ReplayTradeRow(
 /// <param name="Figures">The ledger figures; equity, open risk and the realised series come only from the paper ledger.</param>
 /// <param name="Trades">Trades stored.</param>
 public sealed record ReplaySummary(ReplayRunRow Run, LedgerFigures Figures, int Trades);
+
+/// <summary>One day of the stored equity series, read without the session record: the equity, the stored drawdown and how many positions were open at the close.</summary>
+public sealed record ReplayEquityRow(DateOnly Session, decimal Equity, decimal? Drawdown, int OpenPositions);

@@ -36,7 +36,7 @@ public sealed class StartReplayRequestHandlerTests
 
         public IReplayReads Reads { get; } = Substitute.For<IReplayReads>();
 
-        public IAutoScopeSource Scope { get; } = Substitute.For<IAutoScopeSource>();
+        public IAutoScopeStore Scope { get; } = Substitute.For<IAutoScopeStore>();
 
         public IRiskProfileStore Profiles { get; } = Substitute.For<IRiskProfileStore>();
 
@@ -52,7 +52,7 @@ public sealed class StartReplayRequestHandlerTests
         new(From, to, baskets, null, null, null, null, versions, modes, false, false);
 
     [Fact]
-    public async Task The_defaults_are_the_last_readable_session_the_standard_profile_gross_asOf_and_frozen()
+    public async Task The_defaults_are_the_last_readable_session_the_standard_profile_gross_start_rule_and_frozen()
     {
         var rig = new Rig();
 
@@ -60,7 +60,7 @@ public sealed class StartReplayRequestHandlerTests
 
         result.IsSuccess.ShouldBeTrue();
         var p = rig.Sent!.Runs.Single();
-        (p.To, p.Capital, p.Profile, p.CostSheetId, p.VersionRule, p.Mode).ShouldBe((Last, 1_000_000m, ReplayRiskProfile.Standard, null, ReplayVersionRule.AsOf, ReplayMode.Frozen));
+        (p.To, p.Capital, p.Profile, p.CostSheetId, p.VersionRule, p.Mode).ShouldBe((Last, 1_000_000m, ReplayRiskProfile.Standard, null, ReplayVersionRule.Start, ReplayMode.Frozen));
     }
 
     [Fact]
@@ -68,23 +68,38 @@ public sealed class StartReplayRequestHandlerTests
     {
         var rig = new Rig();
 
-        await rig.RunAsync(Request(modes: ["frozen", "learning"], versions: "start", baskets: [Guid.NewGuid()]));
+        await rig.RunAsync(Request(modes: ["frozen", "learning"], versions: "asOf", baskets: [Guid.NewGuid()]));
 
         rig.Sent!.Runs.Select(r => r.Mode).ShouldBe([ReplayMode.Frozen, ReplayMode.Learning]);
         rig.Sent.Runs.Select(r => r with { Mode = ReplayMode.Frozen }).Distinct().Count().ShouldBe(1);
-        rig.Sent.Runs[0].VersionRule.ShouldBe(ReplayVersionRule.Start);
+        rig.Sent.Runs[0].VersionRule.ShouldBe(ReplayVersionRule.AsOf);
     }
 
     [Fact]
-    public async Task With_no_scope_given_the_stored_auto_scope_is_read_as_of_the_start_date()
+    public async Task With_no_scope_given_the_stored_auto_scope_is_used_with_its_baskets_kept_as_baskets()
     {
         var rig = new Rig();
-        var id = Guid.NewGuid();
-        rig.Scope.ResolveAsync(From, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<ResolvedAutoScope?>(new ResolvedAutoScope("h", new HashSet<Guid> { id })));
+        var (basket, instrument) = (Guid.NewGuid(), Guid.NewGuid());
+        rig.Scope.LatestAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<StoredAutoScope?>(new StoredAutoScope(1, [basket], [instrument], "h", "owner", DateTimeOffset.UnixEpoch)));
 
         await rig.RunAsync(Request());
 
-        rig.Sent!.Runs.Single().Scope.InstrumentIds.ShouldBe([id]);
+        var scope = rig.Sent!.Runs.Single().Scope;
+        scope.BasketIds.ShouldBe([basket]);
+        scope.InstrumentIds.ShouldBe([instrument]);
+    }
+
+    [Fact]
+    public async Task More_baskets_or_instruments_than_the_caps_are_replay_invalid_before_anything_is_read()
+    {
+        var rig = new Rig();
+
+        var baskets = await rig.RunAsync(Request(baskets: [.. Enumerable.Range(0, 201).Select(_ => Guid.NewGuid())]));
+        var instruments = await rig.RunAsync(Request() with { InstrumentIds = [.. Enumerable.Range(0, 2001).Select(_ => Guid.NewGuid())] });
+
+        (baskets.Error.Code, instruments.Error.Code).ShouldBe(("replay.invalid", "replay.invalid"));
+        rig.Sent.ShouldBeNull();
+        await rig.Facts.DidNotReceive().LastReadableSessionAsync(Arg.Any<CancellationToken>());
     }
 
     [Theory]

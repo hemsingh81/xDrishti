@@ -2,7 +2,6 @@ using System.Text.Json;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Replay;
 using XDrishti.Domain.Common;
-using XDrishti.Domain.Replay;
 
 namespace XDrishti.Application.Replay.Reads;
 
@@ -19,14 +18,7 @@ internal sealed class ListReplayRunsHandler(IReplayReads reads) : IQueryHandler<
             return Result.Failure<IReadOnlyList<ReplayRunListItem>>(Error.Validation(ReplayDriver.InvalidCode, "skip is 0 or more and take is 1 to 200"));
         }
 
-        var items = new List<ReplayRunListItem>();
-        foreach (var run in await reads.ListRunsAsync(query.Skip, query.Take, cancellationToken))
-        {
-            var last = run.CursorSession is { } at ? await reads.SessionAsync(run.Id, at, cancellationToken) : null;
-            items.Add(ReplayReadSupport.ListItem(run, last));
-        }
-
-        return Result.Success<IReadOnlyList<ReplayRunListItem>>(items);
+        return Result.Success<IReadOnlyList<ReplayRunListItem>>([.. (await reads.ListRunsAsync(query.Skip, query.Take, cancellationToken)).Select(ReplayReadSupport.ListItem)]); // the last equity comes with the run row: one query
     }
 }
 
@@ -44,14 +36,13 @@ internal sealed class GetReplayRunHandler(IReplayReads reads) : IQueryHandler<Ge
         }
 
         var p = ReplayReadSupport.ParamsOf(run);
-        var sessions = await reads.SessionsAsync(run.Id, null, null, cancellationToken);
+        var days = await reads.EquityAsync(run.Id, null, null, cancellationToken); // no session record is loaded here
         var trades = await reads.TradesAsync(run.Id, cancellationToken);
-        var records = sessions.Select(s => (Row: s, Record: ReplayJson.Read<ReplaySessionRecord>(s.RecordJson))).ToList();
-        var survivorship = records.Where(r => r.Record is not null).SelectMany(r => r.Record!.Labels);
-        var days = records.Select(r => (r.Row.Session, r.Row.Equity, r.Record?.OpenPositions ?? 0)).ToList();
-        var figures = p is null ? null : ReplayStats.Figures(p.Capital, run.From, days, sessions.Count == 0 ? null : sessions[^1].Drawdown, trades);
+        var labels = await reads.LabelsAsync(run.Id, cancellationToken);
+        var summary = await reads.SummaryAsync(run.Id, cancellationToken); // PaperLedger over the stored trades: equity, drawdown (AC 7)
+        var figures = p is null ? null : ReplayStats.Figures(p.Capital, run.From, days, summary, trades);
         return Result.Success(new ReplayRunView(
-            ReplayReadSupport.Labels(p, survivorship),
+            ReplayReadSupport.Labels(p, labels),
             run.Id,
             run.PairId,
             run.CreatedAt,

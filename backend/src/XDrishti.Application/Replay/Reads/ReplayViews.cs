@@ -10,6 +10,7 @@ public sealed record ReplayCompleteness(bool Complete, int SessionsDone, int Ses
 
 /// <summary>One row of the list of runs.</summary>
 public sealed record ReplayRunListItem(
+    IReadOnlyList<ReplayLabelView> Hindsight,
     Guid Id,
     Guid? PairId,
     DateTimeOffset CreatedAt,
@@ -21,8 +22,7 @@ public sealed record ReplayRunListItem(
     decimal? FinalEquity,
     decimal? MaxDrawdownPct,
     int TrialNumber,
-    string CostsLabel,
-    IReadOnlyList<ReplayLabelView> Hindsight);
+    string CostsLabel);
 
 /// <summary>The figures of a run over the sessions stored so far; each is null where it cannot be told (too few sessions, no trades).</summary>
 public sealed record ReplayFigures(decimal Capital, decimal FinalEquity, decimal ReturnPct, double? Cagr, decimal? MaxDrawdownPct, double? Sharpe, double? Exposure, int Trades, int ClosedTrades, double? HitRate, double? MeanR);
@@ -58,6 +58,7 @@ public sealed record ReplayEquityPoint(DateOnly Session, decimal Equity, decimal
 
 /// <summary>The equity curve of a run against its benchmark (Nifty 500 unless the owner chose another index for the basket reports).</summary>
 public sealed record ReplayEquityView(
+    IReadOnlyList<ReplayLabelView> Hindsight,
     Guid RunId,
     ReplayCompleteness Completeness,
     string CostsLabel,
@@ -68,10 +69,10 @@ public sealed record ReplayEquityView(
     IReadOnlyList<ReplayEquityPoint> Points);
 
 /// <summary>One session of the list: what was taken, what was blocked by reason, the day's result and the equity.</summary>
-public sealed record ReplaySessionListItem(DateOnly Session, int Candidates, int Taken, IReadOnlyDictionary<string, int> BlockedByReason, decimal Pnl, decimal Equity, decimal? DrawdownPct, int OpenPositions, IReadOnlyList<string> Labels);
+public sealed record ReplaySessionListItem(DateOnly Session, int Candidates, int Taken, IReadOnlyDictionary<string, int> BlockedByReason, decimal Pnl, decimal Equity, decimal? DrawdownPct, int OpenPositions, IReadOnlyList<ReplayLabelView> Labels);
 
 /// <summary>The sessions of a run, one row each.</summary>
-public sealed record ReplaySessionListView(Guid RunId, ReplayCompleteness Completeness, string CostsLabel, IReadOnlyList<ReplaySessionListItem> Sessions);
+public sealed record ReplaySessionListView(IReadOnlyList<ReplayLabelView> Hindsight, Guid RunId, ReplayCompleteness Completeness, string CostsLabel, IReadOnlyList<ReplaySessionListItem> Sessions);
 
 /// <summary>A candidate of a session.</summary>
 public sealed record ReplayCandidateView(string Symbol, string Side, string CellKey, int Rank);
@@ -87,6 +88,7 @@ public sealed record ReplayOpenPositionView(string Symbol, string Side, int Qty,
 
 /// <summary>The full record of one session.</summary>
 public sealed record ReplaySessionView(
+    IReadOnlyList<ReplayLabelView> Hindsight,
     Guid RunId,
     DateOnly Session,
     string CostsLabel,
@@ -100,12 +102,11 @@ public sealed record ReplaySessionView(
     decimal? DrawdownPct,
     decimal? OpenRiskPct,
     int OpenPositions,
-    IReadOnlyList<string> Labels,
     IReadOnlyList<string> Notes,
     bool OpenBookComplete,
     IReadOnlyList<ReplayOpenPositionView> OpenBook);
 
-/// <summary>One trade of the replay book. <see cref="BarsRoute"/> opens the instrument's day bars when the symbol matches exactly one instrument (P8-11 addresses the trades of a stored simulation run by its key, which a replay trade is not).</summary>
+/// <summary>One trade of the replay book.</summary>
 public sealed record ReplayBookTradeView(
     long TradeNo,
     string Symbol,
@@ -121,14 +122,14 @@ public sealed record ReplayBookTradeView(
     decimal? GrossPnl,
     decimal? Charges,
     decimal? NetPnl,
-    double? R,
-    string? BarsRoute);
+    double? R);
 
 /// <summary>The trades of a run.</summary>
-public sealed record ReplayTradeListView(Guid RunId, ReplayCompleteness Completeness, string CostsLabel, IReadOnlyList<ReplayBookTradeView> Trades);
+public sealed record ReplayTradeListView(IReadOnlyList<ReplayLabelView> Hindsight, Guid RunId, ReplayCompleteness Completeness, string CostsLabel, IReadOnlyList<ReplayBookTradeView> Trades);
 
 /// <summary>The frozen-versus-learning comparison of a pair (AC 9), computed on read from the two stored runs. <see cref="Answer"/> is null while a run is not complete, with the reason.</summary>
 public sealed record ReplayPairView(
+    IReadOnlyList<ReplayLabelView> Hindsight,
     Guid PairId,
     ReplayRunListItem Frozen,
     ReplayRunListItem Learning,

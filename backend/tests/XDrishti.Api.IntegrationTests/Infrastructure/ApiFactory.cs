@@ -175,6 +175,17 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddSingleton<IRefreshJobChannel>(RefreshJobs);
             services.AddSingleton<IDataJobChannel>(DataJobs);
 
+            // The reads of a replay start can be put in by a test (SR-01 part C): the real readers answer unless Replay holds doubles.
+            var gate = services.Single(d => d.ServiceType == typeof(XDrishti.Application.Abstractions.SimAll.ISimAllBackfillGate));
+            services.Remove(gate);
+            services.AddScoped<XDrishti.Application.Abstractions.SimAll.ISimAllBackfillGate>(sp => ReplayStart.Gate ?? (XDrishti.Application.Abstractions.SimAll.ISimAllBackfillGate)ActivatorUtilities.CreateInstance(sp, gate.ImplementationType!));
+            var facts = services.Single(d => d.ServiceType == typeof(XDrishti.Application.Replay.IReplayFacts));
+            services.Remove(facts);
+            services.AddScoped<XDrishti.Application.Replay.IReplayFacts>(sp => ReplayStart.Facts ?? (XDrishti.Application.Replay.IReplayFacts)ActivatorUtilities.CreateInstance(sp, facts.ImplementationType!));
+            var inputs = services.Single(d => d.ServiceType == typeof(XDrishti.Application.Abstractions.Replay.IReplayInputs));
+            services.Remove(inputs);
+            services.AddScoped<XDrishti.Application.Abstractions.Replay.IReplayInputs>(sp => (XDrishti.Application.Abstractions.Replay.IReplayInputs)sp.GetRequiredService<XDrishti.Application.Replay.IReplayFacts>());
+
             // The scheduler's own loop is switched off for the suite: tests look at the schedules themselves (ServiceScheduler.TickAsync) with the clock pinned.
             if (services.SingleOrDefault(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(ServiceSchedulerHost)) is { } scheduler)
             {
@@ -205,6 +216,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddScoped<ITradeReferenceData>(sp => new HookedTradeReferenceData((ITradeReferenceData)ActivatorUtilities.CreateInstance(sp, reference.ImplementationType!), TradeHooks));
         });
     }
+
+    /// <summary>The doubles a test puts in for the reads of a replay start (SR-01 part C); reset it when done.</summary>
+    public Replay.ReplayStartDoubles ReplayStart { get; } = new();
 
     /// <summary>A client without a session. Each client appears to come from its own address (own rate-limit bucket); cookies are handled by the tests.</summary>
     public HttpClient CreateAnonymousClient()
