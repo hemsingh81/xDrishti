@@ -3,6 +3,7 @@ import { Card, CardContent, Stack } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
 import { autoQuery } from '../api/autoApi';
+import { EvidenceServices } from './EvidenceServices';
 import { AutoScopePicker } from './AutoScopePicker';
 import { AutoSuggestions } from './AutoSuggestions';
 import { AutoSwitchCard } from './AutoSwitchCard';
@@ -30,6 +31,11 @@ export function AutoPage() {
         <Card>
           <CardContent>
             <AutoScopePicker />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <EvidenceServices />
           </CardContent>
         </Card>
         <Card>

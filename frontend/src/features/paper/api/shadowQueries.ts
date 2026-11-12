@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query';
+import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, unwrap, type Schemas } from '@/shared/api';
 
 export type ShadowSummary = Schemas['ShadowSummaryView'];
@@ -6,7 +6,17 @@ export type ShadowGroup = Schemas['ShadowGroupView'];
 export type ShadowSequential = Schemas['ShadowSequentialView'];
 export type SequentialStatus = Schemas['SequentialStatusView'];
 
-// GETs only: the Shadow tab is read only. (The switch has no control here; the owner uses the CLI or the API.)
+/** The owner's change of the shadow switch (OPS-01): the password is typed for this act and lives only in the call's variables. */
+export function useShadowSwitch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    gcTime: 0,
+    mutationFn: async (body: { enabled: boolean; reason: string; password: string; acknowledgeGap: boolean }) =>
+      unwrap(await api.PUT('/api/paper/shadow/settings', { body })),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['paper'] }),
+  });
+}
+
 export const shadowSummaryQuery = queryOptions({
   queryKey: ['paper', 'shadow-summary'] as const,
   queryFn: async ({ signal }) => unwrap(await api.GET('/api/paper/shadow/summary', { signal })),

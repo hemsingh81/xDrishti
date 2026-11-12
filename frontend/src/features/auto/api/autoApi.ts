@@ -17,6 +17,12 @@ export const autoQuery = queryOptions({
   queryFn: async ({ signal }) => unwrap(await api.GET('/api/auto', { signal })),
 });
 
+/** The shadow record switch, read from the Paper summary (same key, so the Paper tab and this screen share one cache entry). */
+export const autoShadowSwitchQuery = queryOptions({
+  queryKey: ['paper', 'shadow-summary'] as const,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/paper/shadow/summary', { signal })),
+});
+
 export const autoScopeQuery = queryOptions({
   queryKey: autoKeys.scope,
   queryFn: async ({ signal }) => unwrap(await api.GET('/api/auto/scope', { signal })),

@@ -1,9 +1,10 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { buildBasket, buildBasketMembers, sampleInstruments } from '@/test/fixtures';
 import { buildAuto, buildAutoSuggestions, buildSuggestion } from '@/test/autoFixtures';
+import { buildServiceView } from '@/test/servicesFixtures';
 import { pinClock } from '@/test/pinClock';
 import { renderWithProviders } from '@/test/render';
 import { reservedHeights } from '@/test/reservedHeight';
@@ -192,5 +193,42 @@ describe('Auto page', () => {
     renderWithProviders(<AutoPage />);
     expect(await screen.findAllByRole('alert')).not.toHaveLength(0);
     expect(screen.queryByText('Loading scope…')).not.toBeInTheDocument();
+  });
+
+  it('lists the evidence services read only, says Auto does not resume them, and reads a missing one as missing', async () => {
+    server.use(
+      http.get('/api/services', () =>
+        HttpResponse.json({
+          items: [
+            buildServiceView({ id: 'shadow-write', enabled: true }),
+            buildServiceView({ id: 'shadow-grade', enabled: false }),
+            buildServiceView({ id: 'paper-review', enabled: true, status: 'failed' }),
+            buildServiceView({ id: 'cells-refresh', enabled: true }),
+          ],
+        }),
+      ),
+    );
+    renderWithProviders(<AutoPage />);
+    const list = await screen.findByRole('list', { name: 'Evidence services' });
+    expect(within(list).getByText(/Shadow write: running/)).toBeInTheDocument();
+    expect(within(list).getByText(/Shadow grade: paused/)).toBeInTheDocument();
+    expect(within(list).getByText(/Paper capture: missing/)).toBeInTheDocument();
+    expect(within(list).getByText(/Shadow digest: missing/)).toBeInTheDocument();
+    expect(within(list).getByText(/History backfill: missing/)).toBeInTheDocument();
+    expect(within(list).getByText(/Paper review: failed/)).toBeInTheDocument();
+    expect(await within(list).findByText(/Shadow record switch: OFF/)).toBeInTheDocument();
+    const resumed = screen.getByRole('list', { name: 'Resumed by Auto' });
+    expect(within(resumed).getByText(/Cells refresh: running/)).toBeInTheDocument();
+    expect(within(resumed).getByText(/restarts the paper count/)).toBeInTheDocument();
+    expect(within(list).queryByText(/Cells refresh/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Auto does not resume these/)).toBeInTheDocument();
+    expect(within(list).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('shows an error, never running, when the services cannot be read', async () => {
+    server.use(http.get('/api/services', () => problemResponse({ title: 'Down.', code: 'x.down' }, 500)));
+    renderWithProviders(<AutoPage />);
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByText(/: running/)).not.toBeInTheDocument();
   });
 });

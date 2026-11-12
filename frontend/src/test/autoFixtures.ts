@@ -63,6 +63,7 @@ export const buildAutoSuggestions = (
 /** Defaults: Auto OFF, no scope, no plan. */
 export const autoHandlers = [
   http.get('/api/auto', () => HttpResponse.json(buildAuto())),
+  http.get('/api/paper/shadow/summary', () => HttpResponse.json({ enabled: false })),
   http.get('/api/auto/scope', () => HttpResponse.json(buildAutoScope())),
   http.get('/api/auto/suggestions', () =>
     HttpResponse.json(

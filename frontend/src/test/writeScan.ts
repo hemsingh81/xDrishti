@@ -27,3 +27,16 @@ export function findWrites(text: string): string[] {
   if (fetchFinding(text)) found.push('fetch that is not GET');
   return found;
 }
+
+/**
+ * OPS-01 (ADR 0278): the single narrow exception to "Paper is read only", the owner's shadow switch. Removes exactly one
+ * `api.PUT('/api/paper/shadow/settings'` and one `useMutation` from `features/paper/api/shadowQueries.ts`; any second
+ * write, or the same text anywhere else, is left in and found.
+ */
+export function withoutShadowSwitch(path: string, text: string): string {
+  if (!path.endsWith('features/paper/api/shadowQueries.ts')) return text;
+  return text
+    .replace("api.PUT('/api/paper/shadow/settings'", '(')
+    .replace('useMutation(', '(')
+    .replace('useMutation, ', '');
+}
