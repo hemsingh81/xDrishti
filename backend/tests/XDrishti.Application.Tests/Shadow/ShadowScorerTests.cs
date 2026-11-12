@@ -67,7 +67,7 @@ public sealed class ShadowScorerTests
         });
         _seams.SeamOfAsync(Instrument, Ct).Returns((DateTimeOffset?)null);
         _adjustments.GetAsync(Instrument, Ct).Returns(AdjustmentFactors.None);
-        _adjustments.CsvAdjustedThroughAsync(Instrument, Ct).Returns((DateOnly?)null);
+        
         var member = new BasketMemberView(Guid.NewGuid(), new InstrumentSummary(Instrument, "NSE:P1", "n", "n", "EQ", null, null, null, 1, null, null, false, false, false, null!), 1, DateTimeOffset.UnixEpoch, null, null, "t", null, null);
         _baskets.ListAsync(false, Ct).Returns((IReadOnlyList<BasketView>)[new BasketView(Guid.NewGuid(), "b", "c", "p", null, 1, 1, DateTimeOffset.UnixEpoch, null, "manual", false, null, null)]);
         _baskets.MembersAsync(Arg.Any<Guid>(), null, null, Ct).Returns(new BasketMembers(Guid.NewGuid(), "b", null, null, 1, [member]));

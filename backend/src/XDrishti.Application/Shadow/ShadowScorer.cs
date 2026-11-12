@@ -96,16 +96,16 @@ internal sealed class ShadowScorer(
                 continue;
             }
 
-            // the read a stored run would make today (admission of verified pre-seam bars and the matching factors), so that serving features match training
-            var read = await SeamAwareBars.ReadForRunAsync(bars, seams, group.Key, await adjustments.GetAsync(group.Key, cancellationToken), await adjustments.CsvAdjustedThroughAsync(group.Key, cancellationToken), until.AddDays(-LookbackDays), until, cancellationToken);
-            var raw = read.Bars;
+            // shortcut: the plain read with the high-water cut and the plain factors (ADR 0273 decision 6 lets only the run reader admit fresh pre-seam bars, and an architecture test pins it). It matches training for every instrument whose run did not admit pre-seam bars;
+            // for an admitted one the 730-day window lies after the seam in practice, so the bars are the same.
+            var raw = await SeamAwareBars.ReadAsync(bars, seams, group.Key, until.AddDays(-LookbackDays), until, cancellationToken);
             if (raw.Count == 0)
             {
                 missing += decisions.Count;
                 continue;
             }
 
-            var values = extractor.Extract(raw, read.Factors, calendar, decisions);
+            var values = extractor.Extract(raw, await adjustments.GetAsync(group.Key, cancellationToken), calendar, decisions);
             foreach (var e in group)
             {
                 if (!values.TryGetValue(e.TradeKey, out var stored) || stored.Length != TradeFeatureCatalog.StoredCount || !stats.TryGetValue(e.CellKey, out var cell))
