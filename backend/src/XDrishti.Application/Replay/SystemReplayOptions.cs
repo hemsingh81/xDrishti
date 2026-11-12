@@ -40,6 +40,9 @@ public sealed class SystemReplayOptions
     [Range(64, 4096)]
     public int MaxWindowMb { get; set; } = 300;
 
+    /// <summary>Bytes of bars one instrument holds in the rolling window (the lookback plus the read-ahead, 375 bars a session, 48 bytes a bar): the start check and <c>xd evidence preflight</c> share this one formula.</summary>
+    public long BytesPerInstrument => (ClampedBars.MinuteLookbackDays * 5L / 7 + ReadAheadSessions) * 375 * 48;
+
     /// <summary>The disk floor in bytes.</summary>
     public long MinFreeBytes => MinFreeGb * 1024L * 1024 * 1024;
 }

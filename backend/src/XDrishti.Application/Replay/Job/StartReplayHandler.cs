@@ -51,7 +51,7 @@ internal sealed class StartReplayHandler(ReplayDriver driver, ReplayInputHasher 
             var learning = await inputs.LearningSourcesAsync(p, cancellationToken);
             var settings = prepared.Value.Run.Settings;
             var (input, scopeHash, instruments) = await hasher.ComputeAsync(p, settings, versions, prepared.Value.Sessions, learning, cancellationToken);
-            var perInstrument = (ClampedBars.MinuteLookbackDays * 5L / 7 + options.ReadAheadSessions) * 375 * 48; // bytes of bars one instrument holds in the rolling window
+            var perInstrument = options.BytesPerInstrument;
             if (instruments * perInstrument > options.MaxWindowMb * 1024L * 1024)
             {
                 var largest = options.MaxWindowMb * 1024L * 1024 / perInstrument;

@@ -1104,6 +1104,7 @@ public static class DependencyInjection
         // The system replay (SR-01 part A, ADR 0272): research only, in memory, no order. One scope serves one run (the facts remember what they read).
         services.TryAddSingleton(new XDrishti.Application.Replay.SystemReplayOptions()); // the host replaces it with its configuration (section Replay)
         services.AddScoped<XDrishti.Application.Replay.IReplayFacts, XDrishti.Application.Replay.ReplayFacts>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.Evidence.GetEvidencePreflightQuery, XDrishti.Application.Evidence.EvidencePreflightView>, XDrishti.Application.Evidence.GetEvidencePreflightHandler>(); // xd evidence preflight (EV-01): read only
         services.AddScoped<XDrishti.Application.Replay.ReplaySessionRunner>();
         services.AddScoped<XDrishti.Application.Replay.ReplayDriver>();
         services.AddScoped<XDrishti.Application.Replay.ReplayInputHasher>();

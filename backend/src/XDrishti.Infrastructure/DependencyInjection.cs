@@ -661,6 +661,7 @@ public static class DependencyInjection
         services.AddScoped<XDrishti.Application.Abstractions.Market.History.IBackfillCalendar, XDrishti.Infrastructure.Market.Eod.EodStore>(); // the days Part A has a verdict for: the calendar before the 1-minute backfill
         // CF-04 Part B: the 1-minute backfill's ledger and seams. OFF by default (Data:History:Backfill:Enabled); the settings are bound with the section above.
         services.AddSingleton<XDrishti.Application.Abstractions.Market.History.IBackfillSettings, XDrishti.Infrastructure.Market.Eod.BackfillSettings>();
+        services.AddScoped<XDrishti.Application.Abstractions.Evidence.IEvidencePreflightHost, XDrishti.Infrastructure.Evidence.EvidencePreflightHost>(); // xd evidence preflight (EV-01): compiled migrations, compose mem_limit, the NSE switch
         services.AddScoped<XDrishti.Infrastructure.Market.Eod.BackfillStore>();
         services.AddScoped<XDrishti.Application.Abstractions.Market.History.IBackfillStore>(sp => sp.GetRequiredService<XDrishti.Infrastructure.Market.Eod.BackfillStore>());
         services.AddScoped<XDrishti.Application.Abstractions.Market.History.IBackfillSeams>(sp => sp.GetRequiredService<XDrishti.Infrastructure.Market.Eod.BackfillStore>());
