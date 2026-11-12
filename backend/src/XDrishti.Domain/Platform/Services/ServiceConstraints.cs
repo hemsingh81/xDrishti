@@ -30,4 +30,7 @@ public sealed record ServiceConstraints
     public RecoveryClass? RecoveryClass { get; init; }
 
     public CatchUpReach CatchUpReach { get; init; } = CatchUpReach.SameDay;
+
+    /// <summary>Resuming the service is an owner act that needs a fresh password (LC-01, ADR 0277): it writes a decision input with no human in between. Pausing still needs a session only (it lowers risk). False for every other service.</summary>
+    public bool ResumeIsOwnerAct { get; init; }
 }

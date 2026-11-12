@@ -5,6 +5,7 @@ using XDrishti.Application.Abstractions.AutoSwitch;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.AutoSwitch;
+using XDrishti.Application.Platform.Services;
 using XDrishti.Application.SettingsCatalog;
 using XDrishti.Application.Tests.LearnedSettings;
 
@@ -65,6 +66,8 @@ public sealed class AutoSwitchServiceTests
         row.Kind.ShouldBe("on");
         row.Actor.ShouldBe(Owner);
         row.Changed.ShouldBe(AutoSwitchHarness.Chain);
+        row.Changed.Count.ShouldBe(6); // LC-01: the cell-statistics refresh is the sixth service
+        await _h.Resume.Received(1).HandleAsync(Arg.Is<ResumeServiceCommand>(c => c.ServiceId == "cells-refresh" && c.FreshPassword), Ct); // Auto ON is a fresh-password act
         row.Snapshot["auto.enabled.before"].ShouldBe("false");
         row.Snapshot["auto.enabled.after"].ShouldBe("true");
         row.Snapshot["service.eod.before"].ShouldBe("paused");

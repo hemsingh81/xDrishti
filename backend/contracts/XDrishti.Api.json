@@ -6869,7 +6869,7 @@
         "tags": [
           "Services"
         ],
-        "summary": "Resume a paused service. Audited. 404 services.not_found, 409 services.read_only",
+        "summary": "Resume a paused service. Audited. An optional body { password } is required only for a service with resumeNeedsPassword (cells-refresh, LC-01): a missing or wrong password is 401 auth.invalid_credentials (counted toward the lockout) and the service stays paused. 404 services.not_found, 409 services.read_only",
         "operationId": "ResumeService",
         "parameters": [
           {
@@ -6881,6 +6881,22 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ResumeServiceRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -6888,6 +6904,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -66383,6 +66409,21 @@
         },
         "description": "One visible upcoming results meeting: `Days` trading sessions from the India date of the question to its `EventSession` (the first session on or after `MeetingDate`); `IntimatedAt` is when the exchange published the row; `Revision` is 1 for the first row and 2 and up for reschedules."
       },
+      "ResumeServiceRequest": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The optional body of `POST /api/services/{id}/resume`: the owner's password, typed again; needed only for a service with `resumeNeedsPassword` (LC-01)."
+      },
       "ReturnsView": {
         "required": [
           "invested",
@@ -68876,6 +68917,10 @@
                 "$ref": "#/components/schemas/ServiceLiveView"
               }
             ]
+          },
+          "resumeNeedsPassword": {
+            "type": "boolean",
+            "default": false
           }
         },
         "description": "A service on the Services screen (ADR 0018). `status`: healthy · running · failed (its latest run failed) · paused. `schedule` is the stored form (`scheduleWords` says it in words);\n`allowedScheduleTypes` are the types the owner may choose; `isDefault` says the choices are the definition's defaults; `lastRun` is the latest run of any kind, `nextRun` the next\nscheduled start (null when paused, when it follows another service, is always up or has no day ahead). `revision` is sent back with a save (0 until the first save or seed). A `readOnly`\nentry is set elsewhere (`manageUrl`) and refuses writes. `live` is only given for a service that another process runs (the live feed): what its heartbeat says; its `status` is then derived from the stored row, the\nlatest run and that heartbeat (failed when it should be up and does not report)."

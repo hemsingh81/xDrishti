@@ -10934,7 +10934,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_test_ledger_hash", "strategy_hash ~ '^[0-9a-f]{64}$' AND window_from <= window_to");
 
-                            t.HasCheckConstraint("ck_test_ledger_trial", "trial_kind IN ('run','replan','null','training_sweep','system_replay') AND extra_trials >= 0");
+                            t.HasCheckConstraint("ck_test_ledger_trial", "trial_kind IN ('run','replan','null','training_sweep','system_replay','cells_refresh') AND extra_trials >= 0");
                         });
                 });
 

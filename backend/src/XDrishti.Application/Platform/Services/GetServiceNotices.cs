@@ -1,8 +1,14 @@
 using System.Globalization;
+using XDrishti.Application.Abstractions.Learning;
+using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.SettingsCatalog;
+using XDrishti.Application.Learning.CellsRefresh;
+using XDrishti.Application.Planning;
+using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market;
+using XDrishti.Domain.Planning;
 using XDrishti.Domain.Platform.Services;
 
 namespace XDrishti.Application.Platform.Services;
@@ -14,7 +20,7 @@ namespace XDrishti.Application.Platform.Services;
 /// </summary>
 public sealed record GetServiceNoticesQuery : IQuery<ServiceNotices>;
 
-internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, ServiceSettingsReader settings, IServiceRunStore runs, IRecoveryLedger recovery, RecoverySettings recoveryOptions, IEssentialSettingStore essentials, TimeProvider clock) : IQueryHandler<GetServiceNoticesQuery, ServiceNotices>
+internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, ServiceSettingsReader settings, IServiceRunStore runs, IRecoveryLedger recovery, RecoverySettings recoveryOptions, IEssentialSettingStore essentials, TimeProvider clock, ICellStatsStore? cellStats = null, ITradingCalendar? tradingCalendar = null, CellsRefreshState? refreshState = null, CellsRefreshOptions? cellsOptions = null) : IQueryHandler<GetServiceNoticesQuery, ServiceNotices>
 {
     public const string Failed = "service_failed";
 
@@ -89,6 +95,20 @@ internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, Service
             if (!notices.Any(n => n.Id == id))
             {
                 notices.Add(new ServiceNotice(id, RecoveryPartial, "warning", $"{service.Definition.Name} ran for {partial.Occurrence} but its data is not complete: {(string.IsNullOrWhiteSpace(partial.Reason) ? "see the History of the service" : Short(partial.Reason))}", partial.ServiceId, now));
+            }
+        }
+
+        // LC-01 (D8): the cell statistics are getting old while the nightly plan is enabled: one notice per day
+        if (cellStats is not null && tradingCalendar is not null && refreshState is not null && all.Any(s => s.Id == NightlyService.Id && s.Settings.Enabled)
+            && await cellStats.NewestAsOfAsync(cancellationToken) is { } asOf)
+        {
+            var calendar = await tradingCalendar.GetAsync(cancellationToken);
+            var last = calendar.LastClosedSession(now);
+            var age = asOf >= last ? 0 : calendar.TradingDaysBetween(asOf, last);
+            if (CellsRefreshRules.ShouldNotify(age, (cellsOptions ?? new CellsRefreshOptions()).NoticeAfterSessions))
+            {
+                var today = IndiaTime.Today(now).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                notices.Add(new ServiceNotice($"cells:stale:{today}", CellsRefreshRules.StaleNoticeKind, "warning", CellsRefreshRules.StaleText(age, NightlyRules.MaxCellStatsAgeSessions, await refreshState.DescribeAsync(cancellationToken)), CellsRefreshRules.ServiceId, now));
             }
         }
 

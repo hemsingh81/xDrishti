@@ -15,7 +15,7 @@ flowchart TB
     L4 -- graded outcomes --> L1
 ```
 
-**What feeds Layer 1 today.** The arrow is the design; as built, cell statistics are computed from stored **research runs** by the owner's CLI (`xd learn cells`, no scheduled job until LC-01, [doc 18](18-roadmap.md)). Forward shadow and paper grades (CF-08, P10) do **not** feed the cells: no selection rule reads the shadow outcomes of the current epoch (CF-08 D6), and the graded paper trades count toward the P10 exit only.
+**What feeds Layer 1 today.** The arrow is the design; as built, cell statistics are computed from stored **research runs** by the owner's CLI (`xd learn cells`; since LC-01 the paused-by-default `cells-refresh` service repeats the newest snapshot each session to the hold-out cut, [ADR 0277](../adr/0277-the-cell-statistics-refresh-repeats-the-newest-snapshot-to-the-hold-out-cut-fails-closed-and-resumes-only-with-the-owners-password.md)). Forward shadow and paper grades (CF-08, P10) do **not** feed the cells: no selection rule reads the shadow outcomes of the current epoch (CF-08 D6), and the graded paper trades count toward the P10 exit only.
 
 **Layer 1 — Cell statistics.** For each cell `(strategy, tf, side, style, exit_policy, regime)` and windows
 (all / 250 days / 60 days): n, win rate, avg win/loss R, expectancy, profit factor, max drawdown, MAE/MFE

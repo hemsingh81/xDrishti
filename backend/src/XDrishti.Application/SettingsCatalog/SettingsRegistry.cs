@@ -97,6 +97,7 @@ public static class SettingsRegistry
         Config("Replay:MaxWindowMb", "System replay: most memory the bars of one replay may need (MiB); raise it with the xd-api memory limit", SettingTier.Internal, "300", 64, 4096),
         Config("Replay:RunInMarketHours", "System replay: also run in market hours", SettingTier.Internal, "false"),
         Config("Simulate:ChunkTimeoutMinutes", "Simulate-everything: longest time of one chunk (minutes)", SettingTier.Internal, "30", 1, 240),
+        Config("Learning:CellsRefresh:NoticeAfterSessions", "Cell statistics refresh: the bell speaks when the newest snapshot is this many sessions old (the nightly plan fails at 6)", SettingTier.Internal, "3", 1, 4),
         Config("Migrate:SkipOwner", "Skip owner provisioning at migrate", SettingTier.Internal, "false"),
         Config("Planning:Builder:UseSelection", "Plan builder uses the selection", SettingTier.Internal, "false"),
         Config("Planning:OpenBook:AssumedEmpty", "Assume the open book is empty", SettingTier.Internal, "false"),

@@ -3,6 +3,7 @@ using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Quality;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Learning.CellsRefresh;
 using XDrishti.Application.Market.Bars.Eod;
 using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Portfolio.BrokerHistory;
@@ -114,7 +115,7 @@ internal static class NightlyChecks
             : GateResult.Passed(gate, Say($"{run.Failed} of {run.Instruments} instruments failed the data-quality checks."));
     }
 
-    public static GateResult Selection(DateOnly? newestAsOf, GateContext c)
+    public static GateResult Selection(DateOnly? newestAsOf, GateContext c, string? refreshState = null)
     {
         const string gate = NightlyGateIds.SelectionInputs;
         if (newestAsOf is not { } asOf)
@@ -129,7 +130,7 @@ internal static class NightlyChecks
 
         var age = c.Calendar.TradingDaysBetween(asOf, c.Session);
         return age > NightlyRules.MaxCellStatsAgeSessions
-            ? GateResult.Failed(gate, Say($"The newest cell statistics are as of {asOf:yyyy-MM-dd}, {age} sessions old (the limit is {NightlyRules.MaxCellStatsAgeSessions})."))
+            ? GateResult.Failed(gate, Say($"The newest cell statistics are as of {asOf:yyyy-MM-dd}, {age} sessions old (the limit is {NightlyRules.MaxCellStatsAgeSessions}).{(refreshState is null ? string.Empty : $" Last refresh: {refreshState}.")}"))
             : GateResult.Passed(gate, Say($"Cell statistics as of {asOf:yyyy-MM-dd}."));
     }
 
@@ -196,12 +197,18 @@ internal sealed class QualityGate(IQualityQueries quality) : INightlyGate
 }
 
 /// <summary>A cell statistics snapshot exists, is not from after the session and is not too old (spec P7-08).</summary>
-internal sealed class SelectionInputsGate(ICellStatsStore cells) : INightlyGate
+internal sealed class SelectionInputsGate(ICellStatsStore cells, CellsRefreshState? refresh = null) : INightlyGate
 {
     public string Id => NightlyGateIds.SelectionInputs;
 
     public async ValueTask<GateResult> CheckAsync(GateContext context, CancellationToken cancellationToken)
     {
-        return NightlyChecks.Selection(await cells.NewestAsOfAsync(cancellationToken), context);
+        var newest = await cells.NewestAsOfAsync(cancellationToken);
+        var result = NightlyChecks.Selection(newest, context);
+
+        // LC-01 (ADR 0277): a snapshot that is too old says what the scheduled refresh did; the rule itself is unchanged
+        return result.Status == GateStatus.Fail && newest is { } asOf && asOf <= context.Session && refresh is not null
+            ? NightlyChecks.Selection(newest, context, await refresh.DescribeAsync(cancellationToken))
+            : result;
     }
 }

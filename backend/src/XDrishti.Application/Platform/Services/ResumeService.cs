@@ -3,12 +3,22 @@ using XDrishti.Domain.Common;
 
 namespace XDrishti.Application.Platform.Services;
 
-/// <summary>Resumes a paused service: it follows its schedule again from now on (a time that passed while it was paused is not made up for). Audited. A service that is on already is returned as it is. <c>services.not_found</c>, <c>services.read_only</c>.</summary>
-public sealed record ResumeServiceCommand(string ServiceId, string Actor) : ICommand;
+/// <summary>
+/// Resumes a paused service: it follows its schedule again from now on (a time that passed while it was paused is not made up for). Audited. A service that is on already is returned as it is. <c>services.not_found</c>, <c>services.read_only</c>.
+/// <paramref name="FreshPassword"/> is true only after the caller verified a fresh password for this act (the endpoint, or Auto's own fresh-password ON): a service whose resume is an owner act (<c>ResumeIsOwnerAct</c>, LC-01) is refused with <c>auth.step_up_required</c> without it.
+/// </summary>
+public sealed record ResumeServiceCommand(string ServiceId, string Actor, bool FreshPassword = false) : ICommand;
 
 internal sealed class ResumeServiceHandler(ServiceRegistry registry, ServiceSettingsReader settings, ServiceWriter writer, ServiceViewReader reader)
     : ICommandHandler<ResumeServiceCommand, ServiceView>
 {
-    public async ValueTask<Result<ServiceView>> HandleAsync(ResumeServiceCommand command, CancellationToken cancellationToken) =>
-        await ServiceToggle.SetEnabledAsync(command.ServiceId, enabled: true, command.Actor, registry, settings, writer, reader, cancellationToken);
+    public async ValueTask<Result<ServiceView>> HandleAsync(ResumeServiceCommand command, CancellationToken cancellationToken)
+    {
+        if (!command.FreshPassword && registry.Find(command.ServiceId)?.Definition.Constraints.ResumeIsOwnerAct == true)
+        {
+            return Result.Failure<ServiceView>(XDrishti.Application.Auth.AuthErrors.StepUpRequired);
+        }
+
+        return await ServiceToggle.SetEnabledAsync(command.ServiceId, enabled: true, command.Actor, registry, settings, writer, reader, cancellationToken);
+    }
 }

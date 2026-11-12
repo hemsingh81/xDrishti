@@ -41,7 +41,8 @@ internal static class ServiceMapper
             [.. issues.Where(i => i.ServiceId == definition.Id).Select(ServiceIssueView.From)],
             isDefault,
             service.Revision,
-            external?.Live);
+            external?.Live,
+            definition.Constraints.ResumeIsOwnerAct);
     }
 
     public static IReadOnlyList<RuleSubject> Subjects(IEnumerable<EffectiveService> services) => [.. services.Select(s => new RuleSubject(s.Definition, s.Settings))];

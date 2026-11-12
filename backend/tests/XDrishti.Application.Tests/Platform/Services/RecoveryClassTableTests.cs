@@ -29,6 +29,7 @@ public sealed class RecoveryClassTableTests
         ["system-baskets"] = RecoveryClass.LatestOnly,
         ["derived-baskets"] = RecoveryClass.LatestOnly,
         ["post-trade-prompts"] = RecoveryClass.LatestOnly,
+        ["cells-refresh"] = RecoveryClass.LatestOnly,
         ["weekly"] = RecoveryClass.LatestOnly,
         ["weekly-review"] = RecoveryClass.LatestOnly,
         ["proposals"] = RecoveryClass.LatestOnly,

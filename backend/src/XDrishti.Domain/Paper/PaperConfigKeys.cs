@@ -67,7 +67,7 @@ public static class PaperConfigKeys
     public const string EnginePrefix = "engine.";
 
     /// <summary>Services that write learning state (cell statistics, models, learning) by id. Enabled during an epoch, each run restarts the count.</summary>
-    public static IReadOnlyList<string> LearningWriterServices { get; } = ["cells", "retrain", "weekly"];
+    public static IReadOnlyList<string> LearningWriterServices { get; } = ["cells", "retrain", "weekly", "cells-refresh"];
 
     /// <summary>The warning shown beside an enabled learning writer.</summary>
     public const string BlockerText = "enabled during an epoch: each run restarts the count";

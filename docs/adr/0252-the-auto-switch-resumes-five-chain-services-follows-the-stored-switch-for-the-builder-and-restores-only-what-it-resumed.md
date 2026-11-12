@@ -4,6 +4,8 @@
 - **Date:** 2026-11-10.
 - **Relation to other ADRs:** Builds [0244](0244-one-auto-switch-runs-the-chain-and-only-suggests.md) (this fixes its service list) on the stored `auto.enabled` of [0247](0247-learned-setting-changes-are-bounded-steps-on-a-short-allow-list-stored-in-an-insert-only-log-and-applied-at-the-next-start.md) and the scope and suggestions of [0251](0251-auto-scope-is-an-insert-only-id-list-that-filters-candidates-before-selection-and-suggestions-are-a-read-model-over-the-stored-plan.md).
 
+> **Amended 2026-11-12 by [0277](0277-the-cell-statistics-refresh-repeats-the-newest-snapshot-to-the-hold-out-cut-fails-closed-and-resumes-only-with-the-owners-password.md) (LC-01):** §1's chain is now **six** services: `eod`, `portfolio-broker-history`, `cells-refresh`, `weekly`, `nightly`, `suggestions`. The new one resumes only with a fresh password (Auto ON is one), and OFF pauses it only if ON resumed it, like the others.
+
 ## Context
 Spec AU-17: one switch for the chain from data to next-day suggestions, safe by default, with a record of what it changed. The owner's rule of 2026-10-23 applies: default OFF, ON is an authenticated owner act, an automatic step is recorded as `auto`, an `unavailable` input never passes, and no setting allows an order.
 

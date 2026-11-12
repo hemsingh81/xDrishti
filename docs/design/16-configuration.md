@@ -273,6 +273,7 @@ services:
   broker-history:   { schedule: { type: daily, time: "16:30", days: trading } }   # built in P2-13 (ADR 0025), service id portfolio-broker-history, "Portfolio trades & ledger": Dhan trades and ledger of the Portfolio accounts; first-start seed Portfolio:BrokerHistory:Enabled
   nightly:          { schedule: { type: daily, time: "18:30", days: trading } }
   suggestions:      { schedule: { type: after, after: nightly } }
+  cells-refresh:    { schedule: { type: after, after: eod } }   # built in LC-01 (ADR 0277): starts paused, resuming needs the owner's password; recomputes the cell statistics as of the last closed session from the newest snapshot's sources, to the hold-out cut less the embargo, fails closed; bell notice at Learning:CellsRefresh:NoticeAfterSessions (Internal, default 3, 1..4)
   retrain:          { schedule: { type: weekly, weekday: Sat, time: "10:00" } }
   backup:           { schedule: { type: daily, time: "23:30", days: all }, params: { retention_daily: 30 } }
   defaults:         { retries: 2, timeout_min: 30, catch_up: true, notify_on_failure: true }
