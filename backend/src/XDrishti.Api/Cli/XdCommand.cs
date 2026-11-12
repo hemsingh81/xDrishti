@@ -279,6 +279,11 @@ internal static class XdCommand
             return await DataEodCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "data" && args[1].StartsWith("lists-", StringComparison.Ordinal))
+        {
+            return await DataListsCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "data" && args[1] is "backfill" or "probe-seam" or "history")
         {
             return await DataBackfillCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);

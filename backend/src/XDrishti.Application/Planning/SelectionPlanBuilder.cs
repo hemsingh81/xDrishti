@@ -30,7 +30,8 @@ internal sealed class SelectionPlanBuilder(
     PlanEventFilter? eventFilter = null,
     IAutoScopeSource? scopeSource = null,
     ISizingInputs? sizing = null,
-    IBasketSettingsStore? basketSettings = null) : IPlanBuilder
+    IBasketSettingsStore? basketSettings = null,
+    PlanListFilter? listFilter = null) : IPlanBuilder
 {
     public const string BuilderId = "selection";
 
@@ -87,7 +88,19 @@ internal sealed class SelectionPlanBuilder(
             EventFilterLog.Excluded(logger, request.ForDate, events.Days, excluded, kept);
         }
 
-        var always = events.Active ? AlwaysWithoutEvents : AlwaysWithEvents;
+        // DATA-01: with the switch ON the dated lists answer OnFnoBan and UnderSurveillance (ban for the plan's date, surveillance for the build session); a date with no stored row stays unavailable. With it OFF nothing changes.
+        var lists = listFilter is null ? PlanListFacts.Inactive : await listFilter.ReadAsync([.. ids.Values.Where(v => v is not null).Select(v => v!.Value)], request.ForDate, request.Session, cancellationToken);
+        var answered = false;
+        if (lists.Active)
+        {
+            candidates = [.. candidates.Select(c => c with { OnFnoBan = lists.BanFor(ids.GetValueOrDefault(c.Symbol)), UnderSurveillance = lists.SurveillanceFor(ids.GetValueOrDefault(c.Symbol)) })];
+            answered = candidates.All(c => c.OnFnoBan is not null && c.UnderSurveillance is not null);
+            var banned = candidates.Count(c => c.OnFnoBan == true);
+            var surveilled = candidates.Count(c => c.UnderSurveillance == true);
+            ListFilterLog.Applied(logger, request.ForDate, lists.Flags.BanCovered, lists.Flags.SurveillanceCovered, banned, surveilled);
+        }
+
+        var always = (events.Active ? AlwaysWithoutEvents : AlwaysWithEvents).Where(a => !(answered && a is "fno_ban" or "surveillance")).ToArray();
         var selection = CandidateSelector.Select(candidates, rules ?? new SelectionRules());
 
         var wanted = selection.Ranked.Select(r => r.Merged.Winner.Candidate.Symbol).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Select(s => new ContextInstrument(ids.GetValueOrDefault(s), s)).ToList();

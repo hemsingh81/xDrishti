@@ -18,7 +18,7 @@ namespace XDrishti.Application.Replay;
 /// (<see cref="SelectionPlanBuilder"/>: selection, smart rules, cluster check, portfolio fill, size scaling, wiring) over ports that hand it the as-of facts and the replay account, and books the next session's fills of the taken items through the one replay path
 /// (<see cref="TicketReplayer"/>). Equity, open risk and the realised series come only from <see cref="PaperLedger"/>. It calls no gate of the nightly pipeline, no plan store and writes nothing: the book is in memory.
 /// </summary>
-internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates candidates, TicketReplayer replayer)
+internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates candidates, TicketReplayer replayer, PlanListFilter? listFilter = null)
 {
     /// <summary>The label of a note when the next session lies beyond the end of the range.</summary>
     public const string EndOfRangeNote = "end_of_range: no entries after the last replayed session";
@@ -59,7 +59,20 @@ internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates 
         // 3. Candidates from the as-of facts, and the share of the universe whose bars are incomplete.
         var set = await candidates.ReadAsync(p, session, forDate, cancellationToken);
         notes.AddRange(set.Notes);
-        var labels = HindsightLabels.For(p).ToList();
+        var labels = HindsightLabels.For(p).Where(l => l != HindsightLabels.FiltersWithoutHistory).ToList();
+
+        // DATA-01: the ban and surveillance filters are fed from the dated lists (switch ON). The label stays unless both lists have a stored row for this session; the event filter has no history either way.
+        var listsCovered = listFilter is not null && (await listFilter.ReadAsync([], forDate, session, cancellationToken)).Covered;
+        if (p.FiltersWithoutHistory && !listsCovered)
+        {
+            labels.Add(HindsightLabels.FiltersWithoutHistory);
+            notes.Add("filters_without_history: no stored ban or surveillance row for " + session.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        }
+        else if (p.FiltersWithoutHistory)
+        {
+            notes.Add("event_filter_without_history");
+        }
+
         if (set.Survivorship)
         {
             labels.Add(HindsightLabels.Survivorship);
@@ -84,13 +97,14 @@ internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates 
                 new FixedTicketSource(new TicketSourceResult(set.Found, set.Rejected, set.Unavailable, [])),
                 new ReplayContextSource(facts, run, book, session),
                 NullLogger<SelectionPlanBuilder>.Instance,
-                RulesOf(run),
+                RulesOf(run, listsCovered),
                 run.Settings.Smart,
                 run.Settings.Fill,
                 null,
                 null,
                 new ReplaySizingInputs(facts),
-                new SnapshotBasketSettings(run.Settings.Basket));
+                new SnapshotBasketSettings(run.Settings.Basket),
+                listFilter);
             var planned = await builder.BuildAsync(new PlanBuildRequest(session, forDate, close, close), cancellationToken);
             if (planned.IsFailure)
             {
@@ -198,8 +212,8 @@ internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates 
     }
 
     /// <summary>The selection rules of the snapshot; with <c>FiltersWithoutHistory</c> the event, F&amp;O-ban and surveillance filters are optional (an unavailable answer does not hold a candidate back; a fail still rejects).</summary>
-    private static SelectionRules RulesOf(ReplayRunContext run) => run.Parameters.FiltersWithoutHistory
-        ? run.Settings.Rules with { OptionalFilters = [.. run.Settings.Rules.Optional.Union([FilterCodes.Event, FilterCodes.FnoBan, FilterCodes.Surveillance])] }
+    private static SelectionRules RulesOf(ReplayRunContext run, bool listsCovered) => run.Parameters.FiltersWithoutHistory
+        ? run.Settings.Rules with { OptionalFilters = [.. run.Settings.Rules.Optional.Union(listsCovered ? [FilterCodes.Event] : [FilterCodes.Event, FilterCodes.FnoBan, FilterCodes.Surveillance])] }
         : run.Settings.Rules;
 
     private static int QuantityOf(NewPlanItem item) => item.Allocations.FirstOrDefault(a => a.AccountId == ReplayBook.AccountId)?.Quantity ?? 0;

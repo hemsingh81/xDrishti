@@ -1,6 +1,6 @@
 # DATA-01 — Dated NSE F&O-ban and ASM/GSM history, and the filters fed from it
 
-- **Status:** Approved (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended). Not built.
+- **Status:** Approved (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended). Built 2026-11-12 (ADR 0274), not deployed.
 - **Phase / roadmap row:** DATA — history, row DATA-01 (new; GAP-08)
 - **Size:** about 3 agent-days (estimate; +0.5 d over the review's figure for the selection wiring found below) · **Needs:** BK-05 list baskets (ADR 0256), BK-01 fetch pattern (ADR 0254), CF-04 allow-list pattern (ADR 0195), SR-01 replay (ADR 0272)
 - **Safety:** SAFETY (a network fetch of NSE archive files). OFF by default. The NSE terms reading, the ADR acceptance and the allow-list edit are the owner's acts. No order; no rule is loosened: an answer replaces `unavailable` only where a dated row exists, and a `fail` still rejects.
@@ -52,3 +52,11 @@ NSE archive layout or bot blocking (UNVERIFIED user-agent acceptance, ADR 0254);
 ## Done when
 - [ ] ACs 1–8 have evidence; `scripts/check.sh` green; reviewer: no blockers
 - [ ] ADR written; docs/design/10 and 17 updated; owner acts listed in the ADR
+
+## As built (2026-11-12, ADR 0274)
+- **Port and wiring:** `IListFlagsAsOf` (ban for the plan's date, ASM/GSM for the build session), `PlanListFilter`, `SelectionPlanBuilder` last optional parameter; the replay runner passes the same filter. `Selection:ListFilters:Enabled` and `Data:History:Lists:Enabled` default OFF.
+- **Verbs:** `xd data lists-probe`, `xd data lists-backfill` (`DataListsCommand`). Ban list only: no dated ASM/GSM archive is known, so it stays forward-only.
+- **Deviation:** two insert-only tables, `market.list_day_coverage` and `market.list_day_members` (migration `AddListDays`), because stays cannot record a covered empty day and are closed by UPDATE. A day is rejected if any banned symbol cannot be matched to the catalogue.
+- **Label rule:** per session, both lists covered clears the label for that session (the event filter stays optional, noted); the run label clears only when no session carries it. The run-list row (no sessions read) still shows the parameter label.
+- **Archive URL** `/archives/fo/sec_ban/fo_secban_DDMMYYYY.csv` is UNVERIFIED; the allow-list entry and the NSE terms are the owner's acts (ADR 0274).
+- **Evidence:** ACs 1 to 8 by `ListFilterPlanTests`, `ListsBackfillTests`, `NseListArchiveSourceTests`, `ListDaysDatabaseTests`, `ListDaysGrantsTests`, `ReplayReviewTests`, `ListHistoryArchitectureTests`. `docs/design/10` and `17` lines not edited (the ADR carries the decision).

@@ -202,6 +202,9 @@ public static class DependencyInjection
         services.AddScoped<IResultsCalendar, ResultsCalendar>(); // days_to_results as known at an instant (P15-04): named by PlanEventFilter and the switch view since P15-06, by no other decision code
         services.AddScoped<IEventCalendarSnapshots, EventCalendarSnapshots>(); // the results-calendar snapshot of a run that names not_event_day: one read before the walk (P15-06, ADR 0182)
         services.AddScoped<IEventFilterSwitch, EventFilterSwitch>(); // the effective event-risk switch: the newest decision row, OFF when none or unreadable (P15-06)
+        services.AddScoped<PlanListFilter>(); // DATA-01: the plan's and the replay's ban and surveillance answers from the dated lists, only while Selection:ListFilters:Enabled is ON
+        services.AddScoped<ICommandHandler<XDrishti.Application.Market.Lists.ListsProbeCommand, XDrishti.Application.Market.Lists.ListsProbeReport>, XDrishti.Application.Market.Lists.ListsProbeHandler>(); // xd data lists-probe: at most five dated ban files, stores nothing
+        services.AddScoped<ICommandHandler<XDrishti.Application.Market.Lists.ListsBackfillCommand, XDrishti.Application.Market.Lists.ListsBackfillSummary>, XDrishti.Application.Market.Lists.ListsBackfillHandler>(); // xd data lists-backfill: OFF by default (zero requests while off)
         services.AddScoped<PlanEventFilter>(); // the plan's exclusion by event and its checklist days from the results calendar, only while the switch is ON (P15-06)
         services.AddScoped<IQueryHandler<GetEventFilterQuery, EventFilterView>, GetEventFilterHandler>(); // GET /api/selection/event-filter (P15-06): read
         services.AddScoped<ICommandHandler<ChangeEventFilterCommand, EventFilterView>, ChangeEventFilterHandler>(); // the owner's switch change: fresh password on every change, recorded as owner (P15-06)

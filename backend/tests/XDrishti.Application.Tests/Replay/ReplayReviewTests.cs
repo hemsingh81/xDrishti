@@ -99,6 +99,47 @@ public sealed class ReplayReviewTests
         on.Value.Labels.ShouldContain(HindsightLabels.FiltersWithoutHistory);
     }
 
+    private static XDrishti.Application.Planning.PlanListFilter Lists(bool enabled, Func<DateOnly, bool> covered)
+    {
+        var settings = NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Market.Lists.IListFilterSettings>();
+        settings.Enabled.Returns(enabled);
+        var port = NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Market.Lists.IListFlagsAsOf>();
+        port.ForAsync(default!, default, default, default).ReturnsForAnyArgs(call => ValueTask.FromResult(new XDrishti.Application.Abstractions.Market.Lists.ListFlags(covered(call.ArgAt<DateOnly>(1)), covered(call.ArgAt<DateOnly>(2)), new HashSet<Guid>(), new HashSet<Guid>())));
+        return new XDrishti.Application.Planning.PlanListFilter(settings, port, Microsoft.Extensions.Logging.Abstractions.NullLogger<XDrishti.Application.Planning.PlanListFilter>.Instance);
+    }
+
+    [Fact]
+    public async Task The_filters_without_history_label_clears_only_when_every_session_has_a_stored_list_row_and_lists_the_uncovered_dates()
+    {
+        var strict = Rising("AAA");
+        strict.Rules = new SelectionRules(OptionalFilters: [FilterCodes.Cost]);
+        var all = await ReplayRig.Create(strict, lists: Lists(true, _ => true)).Driver.RunAsync(ReplayRig.Params(2) with { FiltersWithoutHistory = true }, Ct);
+        var partialWorld = Rising("AAA");
+        partialWorld.Rules = new SelectionRules(OptionalFilters: [FilterCodes.Cost]);
+        var partial = await ReplayRig.Create(partialWorld, lists: Lists(true, d => d <= ReplayWorld.RunSessions[1])).Driver.RunAsync(ReplayRig.Params(2) with { FiltersWithoutHistory = true }, Ct);
+        var offWorld = Rising("AAA");
+        offWorld.Rules = new SelectionRules(OptionalFilters: [FilterCodes.Cost]);
+        var off = await ReplayRig.Create(offWorld, lists: Lists(false, _ => true)).Driver.RunAsync(ReplayRig.Params(2) with { FiltersWithoutHistory = true }, Ct);
+
+        all.Value.Labels.ShouldNotContain(HindsightLabels.FiltersWithoutHistory);
+        all.Value.Sessions[0].Taken.Select(t => t.Symbol).ShouldBe(["AAA"], "a covered day without a ban lets the share through even though the lists are required");
+        partial.Value.Labels.ShouldContain(HindsightLabels.FiltersWithoutHistory);
+        partial.Value.Sessions[0].Labels.ShouldNotContain(HindsightLabels.FiltersWithoutHistory);
+        partial.Value.Sessions[1].Labels.ShouldContain(HindsightLabels.FiltersWithoutHistory);
+        partial.Value.Sessions[1].Notes.ShouldContain(n => n.Contains(ReplayWorld.RunSessions[1].ToString("yyyy-MM-dd"), StringComparison.Ordinal));
+        off.Value.Labels.ShouldContain(HindsightLabels.FiltersWithoutHistory, "switch off: no list is read and nothing is cleared");
+    }
+
+    [Fact]
+    public void The_read_side_drops_the_label_only_when_stored_sessions_do_not_carry_it()
+    {
+        var p = ReplayRig.Params(2) with { FiltersWithoutHistory = true };
+
+        XDrishti.Application.Replay.Reads.ReplayReadSupport.Labels(p).ShouldContain(l => l.Code == HindsightLabels.FiltersWithoutHistory);
+        XDrishti.Application.Replay.Reads.ReplayReadSupport.Labels(p, [HindsightLabels.SettingsNow]).ShouldNotContain(l => l.Code == HindsightLabels.FiltersWithoutHistory);
+        XDrishti.Application.Replay.Reads.ReplayReadSupport.Labels(p, [HindsightLabels.SettingsNow, HindsightLabels.FiltersWithoutHistory]).ShouldContain(l => l.Code == HindsightLabels.FiltersWithoutHistory);
+    }
+
     [Fact]
     public async Task Research_cells_are_not_candidates_by_default_and_the_switch_allows_them_with_its_label()
     {
