@@ -8,6 +8,7 @@ using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Quality;
 using XDrishti.Domain.Research;
+using XDrishti.Domain.Replay;
 using XDrishti.Domain.Reporting;
 
 namespace XDrishti.Application.Replay.Reads;
@@ -86,7 +87,16 @@ internal sealed class GetReplayTradeChartHandler(IReplayReads reads, IReplayFact
         }
 
         var calendar = await facts.CalendarAsync(cancellationToken);
-        var last = await facts.LastReadableSessionAsync(cancellationToken);
+        DateOnly last;
+        try
+        {
+            last = await facts.LastReadableSessionAsync(cancellationToken);
+        }
+        catch (ReplayHoldOutException)
+        {
+            return HoldOut();
+        }
+
         var limits = new List<string>(BaseLimits);
         var exitDay = trade.ExitSession ?? run.CursorSession ?? trade.EntrySession;
         var window = TradeReplayWindow.Compute(calendar, trade.EntrySession, exitDay, before, after);
@@ -99,11 +109,24 @@ internal sealed class GetReplayTradeChartHandler(IReplayReads reads, IReplayFact
             limits.Add("The window was cut at the hold-out clamp: the last readable session is " + last.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + ".");
         }
 
+        try
+        {
+            return await ReadAsync(query, run, p, trade, timeframe, calendar, last, window, toDate, toEpoch, limits, cancellationToken);
+        }
+        catch (ReplayHoldOutException)
+        {
+            return HoldOut(); // the clamp refused a read: the same answer as the start of a run past it
+        }
+    }
+
+    private async ValueTask<Result<ReplayTradeChartView>> ReadAsync(GetReplayTradeChartQuery query, ReplayRunRow run, ReplayParams p, ReplayTradeRow trade, Timeframe timeframe, XDrishti.Domain.Market.Calendar.TradingCalendar calendar, DateOnly last, ReplayWindow window, DateOnly toDate, long toEpoch, List<string> limits, CancellationToken cancellationToken)
+    {
         var symbol = (await facts.UniverseAsync(p, trade.EntrySession, cancellationToken)).Members.FirstOrDefault(m => string.Equals(m.Symbol, trade.Symbol, StringComparison.OrdinalIgnoreCase));
         List<Bar> minutes = [];
         double tick = (double)TickSpec.FallbackSize;
         if (symbol is not null)
         {
+            // shortcut: the facts return the 400-day lookback up to the cut and the window is cut out of it; a window never reaches back that far (at most 60 sessions before the entry), so nothing is lost. Read the range only if that changes.
             minutes = [.. (await facts.MinuteBarsAsync(symbol.Id, toDate, cancellationToken)).Where(b => b.EpochSeconds >= window.FromEpoch && b.EpochSeconds <= toEpoch)];
             var spec = TickSpec.FromMasterPaise((await instruments.GetAsync(symbol.Id, cancellationToken))?.TickSize);
             tick = (double)(spec.IsSuccess ? spec.Value.Size : TickSpec.FallbackSize);
@@ -135,6 +158,8 @@ internal sealed class GetReplayTradeChartHandler(IReplayReads reads, IReplayFact
             ReplayReadSupport.Labels(p, await reads.LabelsAsync(run.Id, cancellationToken)), run.Id, trade.TradeNo, trade.Symbol, trade.Side, trade.Qty, trade.EntrySession, trade.EntryAt, trade.EntryPrice, trade.StopPrice,
             trade.ExitSession, trade.ExitAt, exit, exit is not null, trade.GrossPnl, trade.NetPnl, ReplayReadSupport.CostsLabel(p), chart, markers, limits));
     }
+
+    private static Result<ReplayTradeChartView> HoldOut() => Result.Failure<ReplayTradeChartView>(Error.Conflict(ReplayDriver.HoldOutCode, "The window reaches the hold-out; the replay may not read it."));
 
     private static Result<ReplayTradeChartView> Invalid(string message) => Result.Failure<ReplayTradeChartView>(Error.Validation(ReplayDriver.InvalidCode, message));
 }

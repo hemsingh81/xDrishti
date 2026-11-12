@@ -86,7 +86,7 @@ internal sealed class StartReplayHandler(ReplayDriver driver, ReplayInputHasher 
         }
 
         Guid? pair = sweep is null && rows.Count > 1 ? Guid.CreateVersion7(now) : null;
-        var newSweep = sweep is null ? null : new NewReplaySweep(sweepId!.Value, ReplayJson.Canonical(command.Runs[0] with { From = sweep[0] }), sweep, now);
+        var newSweep = sweep is null ? null : new NewReplaySweep(sweepId!.Value, ReplayJson.Canonical(command.Runs[0]), sweep, now);
         var inserted = await store.InsertAsync(pair, rows, cancellationToken, newSweep);
         if (!inserted.Started)
         {

@@ -220,4 +220,18 @@ public sealed class ReplaySweepHandlerTests
         result.Error.Message.ShouldContain("126");
         rig.Store.Runs.ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task A_single_replay_started_while_a_sweep_has_queued_runs_is_busy()
+    {
+        var rig = new ReplayJobRig(ReplayJobRig.SwingWorld());
+        var sweep = Guid.NewGuid();
+        var at = new DateTimeOffset(2026, 11, 10, 1, 0, 0, TimeSpan.Zero);
+        await rig.Store.InsertAsync(null, [new NewReplayRun(Guid.NewGuid(), new DateOnly(2025, 1, 1), Last, "frozen", "{}", "{}", "{}", null, new string('a', 64), new string('b', 64), 5, at, "selection", sweep)], Ct, new NewReplaySweep(sweep, "{}", [new DateOnly(2025, 1, 1), new DateOnly(2025, 2, 1)], at));
+
+        var result = await rig.StartAsync(ReplayRig.Params(6));
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(StartReplayHandler.BusyCode);
+    }
 }

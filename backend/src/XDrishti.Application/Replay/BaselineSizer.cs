@@ -54,6 +54,13 @@ internal static class BaselineSizer
             return new BaselineOutcome([], blocked, 0);
         }
 
+        // the live daily-loss limit (the pre-trade checklist's rule: reaching it stops new tickets)
+        if (figures.DailyLossPct is { } loss && (double)loss >= profile.DailyLossPct)
+        {
+            blocked.AddRange(usable.Select(c => new ReplayBlocked(c.Draft.Symbol, c.Cell.Key, BlockReason.TotalRisk, "daily_loss")));
+            return new BaselineOutcome([], blocked, 0);
+        }
+
         var equity = (double)figures.Equity.Value;
         var open = (double)(figures.OpenRiskPct ?? 0m);
         var headroom = profile.MaxTotalRiskPct - open;

@@ -154,7 +154,7 @@ public sealed partial class ReplayArchitectureTests
     }
 
     [Fact]
-    public void The_replay_may_write_only_its_three_tables_and_only_the_one_store_names_them()
+    public void The_replay_may_write_only_its_four_tables_and_only_the_one_store_names_them()
     {
         // AC 11 (ADR 0272): the whole list of what a replay writes. Planning, paper, shadow, learning, model and settings tables are not on it; the trial-ledger row goes through the ledger port, which is the ledger's own writer.
         string[] allowed = ["research.replay_runs", "research.replay_sessions", "research.replay_sweeps", "research.replay_trades"]; // SR-02 added the insert-only sweep table

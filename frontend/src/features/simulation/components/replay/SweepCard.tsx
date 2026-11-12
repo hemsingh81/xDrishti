@@ -74,7 +74,7 @@ export function SweepCard({ sweepId }: { sweepId: string }) {
             <HindsightBanner run={d} />
             <Typography sx={{ fontWeight: 600 }}>{`This sweep adds ${String(d.looksAdded)} replay looks.`}</Typography>
             <Typography variant="body2">{`Ends ${formatDate(d.to)}. ${sweepWords[d.state] ?? d.state}`}</Typography>
-            {!d.complete && d.state !== 'running' && (
+            {!d.complete && d.completedStarts > 0 && (
               <Alert severity="info">
                 {`Partial: ${String(d.completedStarts)} of ${String(d.starts.length)} starts completed. The spread covers the completed starts only.`}
               </Alert>

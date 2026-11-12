@@ -112,4 +112,15 @@ public sealed class ReplayTradeChartTests
     {
         (await new Rig(Entry.AddDays(30)).Ask(timeframe: "3m")).Error.Code.ShouldBe("replay.invalid");
     }
+
+    [Fact]
+    public async Task A_read_the_clamp_refuses_is_the_hold_out_conflict()
+    {
+        var rig = new Rig(Entry.AddDays(30));
+        rig.Facts.UniverseAsync(Arg.Any<ReplayParams>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns<ValueTask<ReplayUniverse>>(_ => throw new ReplayHoldOutException(Entry, Entry));
+
+        var result = await rig.Ask();
+
+        result.Error.Code.ShouldBe("replay.holdout");
+    }
 }

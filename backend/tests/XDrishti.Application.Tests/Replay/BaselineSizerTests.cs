@@ -18,7 +18,7 @@ public sealed class BaselineSizerTests
         return new TicketCandidate(draft, Cell, null, CellState.Active);
     }
 
-    private static LedgerFigures Figures(decimal equity = 1_000_000m, decimal openRiskPct = 1.0m, decimal? funds = null) => new(0, null, 0, "gross", 0, 0, equity, 0, funds ?? equity, 0, openRiskPct, 0, null, 0, null);
+    private static LedgerFigures Figures(decimal equity = 1_000_000m, decimal openRiskPct = 1.0m, decimal? funds = null, decimal? lastSessionPct = null) => new(0, null, 0, "gross", 0, 0, equity, 0, funds ?? equity, 0, openRiskPct, 0, lastSessionPct, 0, null);
 
     private static IReadOnlyList<TicketCandidate> Eight() => [.. Enumerable.Range(1, 8).Select(i => Candidate("SYM" + i))];
 
@@ -53,6 +53,22 @@ public sealed class BaselineSizerTests
         outcome.Taken.ShouldBeEmpty();
         outcome.Blocked.Count.ShouldBe(8);
         outcome.Blocked.ShouldAllBe(b => b.Reason == BlockReason.TotalRisk);
+    }
+
+    [Theory]
+    [InlineData(-1.5, true)]
+    [InlineData(-2.0, true)]
+    [InlineData(-1.49, false)]
+    [InlineData(0.8, false)]
+    public void A_daily_loss_at_or_past_the_profile_limit_stops_every_new_candidate(double lastSessionPct, bool stopped)
+    {
+        var outcome = BaselineSizer.Size(Eight(), Figures(lastSessionPct: (decimal)lastSessionPct), ReplayRiskProfile.Standard, None());
+
+        (outcome.Taken.Count == 0).ShouldBe(stopped);
+        if (stopped)
+        {
+            outcome.Blocked.ShouldAllBe(b => b.Detail == "daily_loss");
+        }
     }
 
     [Fact]
