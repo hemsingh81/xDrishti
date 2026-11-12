@@ -30,6 +30,7 @@ namespace XDrishti.Domain.Research;
 /// <param name="RelativeStrength">The stored relative-strength rows of the instrument (BK-09), given only for a run whose strategy names mom_rank, rs_vs_index or sector_rs; the engine reads them as of the previous closed session.</param>
 /// <param name="MemberOn">Whether the instrument is a member of the basket on an entry date (BK-11b); given only for a run with <c>membersBasis</c> dated, otherwise null (every date is a member date). A non-member date takes no new entry; an open position is never closed by leaving.</param>
 /// <param name="TierOn">The liquidity tier of the instrument on an entry date (CF-05, D2, ADR 0229); given only for a run with conservative slippage, otherwise null. A run with conservative slippage and no lookup excludes every trade (an unknown tier is never tier A).</param>
+/// <param name="PreSeam">Set only when the instrument's backfilled pre-seam bars are in <paramref name="RawBars"/> and <paramref name="Factors"/> is in source-aware mode (CF-04d, ADR 0273); the record carries it and the run key names it.</param>
 /// <param name="Costs">How the trades are sized and charged after the window cut (ADR 0042, D1 and D2); null for a gross replay. The handler of P3-04a passes none: a run through it is gross until P3-03f.</param>
 public sealed record InstrumentReplayInput(
     Guid InstrumentId,
@@ -52,7 +53,8 @@ public sealed record InstrumentReplayInput(
     Func<DateOnly, LiquidityTier>? TierOn = null,
     Func<DateOnly, decimal?>? TurnoverOn = null,
     XDrishti.Domain.Market.Strength.RelativeStrengthInputs? RelativeStrength = null,
-    Func<DateOnly, bool>? MemberOn = null)
+    Func<DateOnly, bool>? MemberOn = null,
+    PreSeamRecord? PreSeam = null)
 {
     /// <summary>The results-days inputs carry the surprise numbers a quintile feature needs (P15-09).</summary>
     public bool HasSurpriseInputs() => ResultsDays?.HasSurprises ?? false;

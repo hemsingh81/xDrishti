@@ -59,7 +59,7 @@ public sealed class TradeCardsArchitectureTests
         used.ShouldNotContain(m => EngineModules.Any(module => m.Type.StartsWith(module, StringComparison.Ordinal)), "no engine or renderer type");
         used.ShouldNotContain(m => m.Member == "BeginMergeAsync", "a reader of the bars never merges");
         used.ShouldNotContain(m => m.Member == "Replay" || m.Member == "ReplayUntilCancelled" || m.Member == "Prepare", "the trade is not recomputed here");
-        used.ShouldContain(m => m.Member == "ReadAsync", "the scan does see the read");
+        used.ShouldContain(m => m.Member == "ReadAsync" || m.Member == "ReadRecordedAsync", "the scan does see the read");
         AssemblyScan.MembersUsedBy(Application, "XDrishti.Application.Research.RunSimulationHandler").ShouldContain(m => m.Member == "ReplayUntilCancelled", "the scan does see an engine call where there is one");
     }
 

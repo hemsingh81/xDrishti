@@ -22,15 +22,18 @@ internal sealed class InstrumentInputReader(IBarStore bars, IBarQueries barQueri
         known is not null ? known.GetValueOrDefault(id) : await barQueries.FindInstrumentAsync(id, cancellationToken);
 
     /// <summary>
-    /// The stored bars from the first stored bar to the end of <paramref name="to"/>, and the factors of the instrument. Bars before the instrument's seam (the 1-minute backfill of CF-04 Part B: Dhan's raw bars before the first CSV bar) never enter a run:
-    /// they are raw, and the replay adjusts by one predicate, so until the source-aware factors are wired into the replay they are left out for every instrument (<c>seam_unverified</c>, fail closed).
+    /// The stored bars from the first stored bar to the end of <paramref name="to"/>, and the factors of the instrument. An instrument whose pre-seam (Dhan, raw) bars pass the admission rule of CF-04d gets them, with the source-aware factors (<see cref="RunBars.Decision"/> says so);
+    /// every other instrument gets the bars from its seam date on and the plain factors, exactly as before. <paramref name="csvThrough"/> is the date its loaded CSV files are adjusted through, when it has any.
     /// </summary>
-    public async ValueTask<(IReadOnlyList<Bar> Raw, AdjustmentFactors Factors)> ReadAsync(Guid id, DateOnly to, CancellationToken cancellationToken)
+    public async ValueTask<RunBars> ReadAsync(Guid id, DateOnly to, DateOnly? csvThrough, CancellationToken cancellationToken)
     {
-        var raw = await SeamAwareBars.ReadAsync(bars, seams, id, SimulationBounds.From, SimulationBounds.Until(to), cancellationToken);
         var factors = await adjustments.GetAsync(id, cancellationToken);
-        return (raw, factors);
+        return await SeamAwareBars.ReadForRunAsync(bars, seams, id, factors, csvThrough, SimulationBounds.From, SimulationBounds.Until(to), cancellationToken);
     }
+
+    /// <summary>The second read of the trade cards: follows the run's record (<paramref name="recorded"/>) and not today's switch; null when an admitted instrument is no longer admitted on the same basis (stale).</summary>
+    public async ValueTask<RunBars?> ReadRecordedAsync(Guid id, DateOnly to, DateOnly? csvThrough, PreSeamRecord? recorded, CancellationToken cancellationToken) =>
+        await SeamAwareBars.ReadRecordedAsync(bars, seams, id, await adjustments.GetAsync(id, cancellationToken), csvThrough, recorded, SimulationBounds.From, SimulationBounds.Until(to), cancellationToken);
 
     /// <summary>Builds the engine input from what was read; the tick and the CSV guard decide a preset skip (both can apply: the precedence keeps <c>csv_adjusted_twice</c>).</summary>
     public static InstrumentReplayInput Build(
@@ -50,10 +53,12 @@ internal sealed class InstrumentInputReader(IBarStore bars, IBarQueries barQueri
         EventCalendarSnapshot? events = null,
         ResultsDayInputs? resultsDays = null,
         Func<DateOnly, LiquidityTier>? tierOn = null,
-        Func<DateOnly, decimal?>? turnoverOn = null)
+        Func<DateOnly, decimal?>? turnoverOn = null,
+        PreSeamRecord? preSeam = null)
     {
         var tick = TickSpec.FromMasterPaise(instrument.TickSize);
-        var twice = !acknowledgeCsvAdjusted && AdjustsCsvTwice(raw, factors, csvThrough, id);
+        // An admitted instrument is never "adjusted twice": under the CSV rule no in-span action touches a CSV bar, and the probe pass shows the CSV is on the adjusted-through basis (CF-04d decision 7).
+        var twice = preSeam is null && !acknowledgeCsvAdjusted && AdjustsCsvTwice(raw, factors, csvThrough, id);
         SkipReason? preset = twice ? SkipReason.CsvAdjustedTwice : tick.IsFailure ? SkipReason.TickSizeInvalid : null;
         var detail = twice
             ? "An applied corporate action falls into the CSV prices, which are already adjusted at source; acknowledge to run it."
@@ -80,7 +85,8 @@ internal sealed class InstrumentInputReader(IBarStore bars, IBarQueries barQueri
             events,
             resultsDays,
             tierOn,
-            turnoverOn);
+            turnoverOn,
+            PreSeam: preSeam);
     }
 
     /// <summary>The guard of ADR 0017 §5: an applied action that changes the bars read and falls on or before the date the loaded CSV files reach would adjust their prices a second time.</summary>

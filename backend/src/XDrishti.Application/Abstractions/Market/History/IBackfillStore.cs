@@ -3,8 +3,8 @@ namespace XDrishti.Application.Abstractions.Market.History;
 /// <summary>One row of <c>market.backfill_chunks</c>: the India dates <c>[From, To)</c> of one instrument and how the request went.</summary>
 public sealed record ChunkRecord(Guid InstrumentId, DateOnly From, DateOnly To, string Status, int Rows, int Attempts, string? Error);
 
-/// <summary>One row of <c>market.backfill_seams</c>: the seam (first CSV bar) the planner and the writer last saw, the overlap probe's outcome and the continuity flag.</summary>
-public sealed record SeamRecord(Guid InstrumentId, DateTimeOffset SeamAt, string ProbeStatus, DateTimeOffset? ProbedAt, double? MedianBps, double? WithinMaxPct, string? Detail, bool SeamJump, double? JumpPct);
+/// <summary>One row of <c>market.backfill_seams</c>: the seam (first CSV bar) the planner and the writer last saw, the overlap probe's outcome and the continuity flag. <c>ProbeBasis</c> is the <c>SeamBasis</c> of a passed probe (null after a fail); <c>ContinuityBasis</c> is the basis of the last continuity check, which writes it on every run (null when it never ran): CF-04d.</summary>
+public sealed record SeamRecord(Guid InstrumentId, DateTimeOffset SeamAt, string ProbeStatus, DateTimeOffset? ProbedAt, double? MedianBps, double? WithinMaxPct, string? Detail, bool SeamJump, double? JumpPct, string? ProbeBasis = null, string? ContinuityBasis = null);
 
 /// <summary>Chunk counts of one instrument for <c>xd data history</c>.</summary>
 public sealed record ChunkCounts(Guid InstrumentId, int Total, int Finished, int Failed);
@@ -33,10 +33,29 @@ public interface IBackfillStore
     ValueTask<IReadOnlyList<ChunkCounts>> CountChunksAsync(CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// The stored facts the admission rule reads about one instrument (CF-04d, <c>SeamVerification.Decide</c>). <see cref="SwitchOn"/> is <c>Data:History:Replay:AdmitVerified</c>. With the switch off (and no report asked for) nothing else is read: <see cref="Record"/> is null and the rest is empty.
+/// A null <see cref="Record"/> with the switch on means the instrument has no seam row.
+/// </summary>
+public sealed record SeamAdmissionFacts(bool SwitchOn, SeamRecord? Record, DateTimeOffset? CurrentSeam, DateTimeOffset? HighWater, bool UnfinishedChunks)
+{
+    /// <summary>The facts of a switch that is off, and what a port that knows nothing answers (fail closed).</summary>
+    public static SeamAdmissionFacts Off { get; } = new(false, null, null, null, false);
+}
+
 /// <summary>What every simulation, learning and report read applies (<c>SeamAwareBars</c>): the <b>high-water</b> seam, the latest seam ever recorded for the instrument (never lowered, so a seam that moves earlier cannot admit raw Dhan bars). Null when it has no seam row.</summary>
 public interface IBackfillSeams
 {
     ValueTask<DateTimeOffset?> SeamOfAsync(Guid instrumentId, CancellationToken cancellationToken);
+
+    /// <summary><c>Data:History:Replay:AdmitVerified</c>. The policy of what the switch does lives in <c>PreSeamAdmission</c>; the port only says it. The default is off: a port that does not implement it admits nothing.</summary>
+    bool AdmitVerified => false;
+
+    /// <summary>The stored facts of the admission rule, read whatever the switch says (the policy is <c>PreSeamAdmission</c>'s). The default answers <see cref="SeamAdmissionFacts.Off"/>: a port that does not implement it admits nothing.</summary>
+    ValueTask<SeamAdmissionFacts?> AdmissionFactsAsync(Guid instrumentId, CancellationToken cancellationToken) => ValueTask.FromResult<SeamAdmissionFacts?>(SeamAdmissionFacts.Off);
+
+    /// <summary>Whether a <c>dhan</c> bar is stored in <c>[from, to)</c>. The default answers true (fail closed).</summary>
+    ValueTask<bool> HasDhanBarsAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) => ValueTask.FromResult(true);
 }
 
 /// <summary>What the AU-12 entry gate reads: whether the backfill still has work (a running backfill is visible as planned chunks).</summary>

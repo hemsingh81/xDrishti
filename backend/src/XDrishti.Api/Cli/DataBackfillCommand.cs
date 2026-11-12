@@ -1,5 +1,6 @@
 using System.Globalization;
 using XDrishti.Api.Simulate;
+using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.History;
 using XDrishti.Domain.Common;
@@ -17,7 +18,7 @@ internal static class DataBackfillCommand
         usage:
           xd data backfill [--instrument ID] [--dry-run]   fetch Dhan's 1-minute bars for the years before each instrument's first CSV bar (needs Data:History:Backfill:Enabled); resumable; --dry-run plans and estimates only
           xd data probe-seam [--instrument ID]              compare Dhan's bars with the CSV bars inside the CSV span, in memory (same switch); a failed probe makes the instrument seam_unresolved
-          xd data history                                   how far back each tracked instrument reaches and the state of its backfill
+          xd data history                                   how far back each tracked instrument reaches, the state of its backfill and whether its pre-seam bars are verified (verified=yes or the first reason)
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
         """;
@@ -51,10 +52,12 @@ internal static class DataBackfillCommand
                     return await Report(await sp.GetRequiredService<ICommandHandler<ProbeSeamCommand, ProbeSeamSummary>>().HandleAsync(new ProbeSeamCommand(parsed.InstrumentId), cancellationToken), r => [.. r.Lines, r.Text], console);
                 default:
                     var rows = await sp.GetRequiredService<IQueryHandler<ShowHistoryQuery, IReadOnlyList<HistoryRow>>>().HandleAsync(new ShowHistoryQuery(), cancellationToken);
-                    await console.Out.WriteLineAsync($"{rows.Count} instruments (symbol, first CSV bar, status, chunks done/failed/total, probe)");
+                    var admit = sp.GetRequiredService<IBackfillSettings>().AdmitVerified;
+                    await console.Out.WriteLineAsync($"admission switch: {(admit ? "on" : "off")} (Data:History:Replay:AdmitVerified)" + (admit ? string.Empty : "; verified= shows what each instrument would be, nothing is admitted"));
+                    await console.Out.WriteLineAsync($"{rows.Count} instruments (symbol, first CSV bar, status, chunks done/failed/total, probe, verified: yes or the first reason pre-seam bars would not be admitted)");
                     foreach (var row in rows)
                     {
-                        await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"{row.Symbol} {(row.FirstCsvBar is { } first ? first.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "-")} {row.Status} {row.ChunksDone}/{row.ChunksFailed}/{row.ChunksTotal} {row.ProbeStatus}"));
+                        await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"{row.Symbol} {(row.FirstCsvBar is { } first ? first.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "-")} {row.Status} {row.ChunksDone}/{row.ChunksFailed}/{row.ChunksTotal} {row.ProbeStatus} verified={row.Verified}"));
                     }
 
                     return XdCommand.Done;

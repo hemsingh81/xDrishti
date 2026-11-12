@@ -10,4 +10,7 @@ public interface IAdjustmentFactors
 {
     /// <summary>The factors of the instrument's applied actions (<see cref="AdjustmentFactors.None"/> when it has none).</summary>
     ValueTask<AdjustmentFactors> GetAsync(Guid instrumentId, CancellationToken cancellationToken);
+
+    /// <summary>The date the instrument's loaded CSV files are adjusted through; null when it has none (and for a port that does not know: the admission rule then fails closed, CF-04d).</summary>
+    ValueTask<DateOnly?> CsvAdjustedThroughAsync(Guid instrumentId, CancellationToken cancellationToken) => ValueTask.FromResult<DateOnly?>(null);
 }

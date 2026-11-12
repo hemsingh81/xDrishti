@@ -11,6 +11,9 @@ internal static partial class SimTrainingLog
     [LoggerMessage(EventId = 7351, Level = LogLevel.Warning, Message = "sim_training.refused {Code}")]
     public static partial void Refused(ILogger logger, string code);
 
+    [LoggerMessage(EventId = 7353, Level = LogLevel.Warning, Message = "sim_training.stale_trades run {RunKey}: {Stale} trades left without features, the run admitted pre-seam bars and the admission no longer holds")]
+    public static partial void StaleTrades(ILogger logger, string runKey, int stale);
+
     [LoggerMessage(EventId = 7352, Level = LogLevel.Warning, Message = "sim_training.failed {JobId}")]
     public static partial void Failed(ILogger logger, Guid jobId, Exception exception);
 }

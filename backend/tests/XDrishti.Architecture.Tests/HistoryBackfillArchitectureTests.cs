@@ -64,7 +64,62 @@ public sealed class HistoryBackfillArchitectureTests
     {
         var reader = File.ReadAllText(Path.Combine(Src, "XDrishti.Application", "Research", "InstrumentInputReader.cs"));
 
-        reader.ShouldContain("SeamAwareBars.ReadAsync");
+        reader.ShouldContain("SeamAwareBars.ReadForRunAsync");
+    }
+
+    // CF-04d decision 6: the run reader decides admission afresh (ReadForRunAsync, only from InstrumentInputReader.ReadAsync); the readers that follow a stored run (the cards through the same reader, the feature extraction that training uses, the trade replay) go through ReadRecordedAsync.
+    private static SortedSet<string> CallersOf(string method)
+    {
+        var callers = new SortedSet<string>(StringComparer.Ordinal);
+        using var module = Mono.Cecil.ModuleDefinition.ReadModule(typeof(XDrishti.Application.DependencyInjection).Assembly.Location);
+        foreach (var type in module.GetTypes())
+        {
+            var root = type;
+            while (root.DeclaringType is not null)
+            {
+                root = root.DeclaringType;
+            }
+
+            if (root.FullName == "XDrishti.Application.Market.History.SeamAwareBars")
+            {
+                continue;
+            }
+
+            foreach (var m in type.Methods.Where(x => x.HasBody))
+            {
+                if (m.Body.Instructions.Any(i => i.Operand is Mono.Cecil.MethodReference call && call.Name == method && call.DeclaringType.FullName == "XDrishti.Application.Market.History.SeamAwareBars"))
+                {
+                    // an async method's body is its state machine's MoveNext: name the enclosing type and the outer method it was made from
+                    callers.Add(root.FullName + "." + (type.DeclaringType is null ? m.Name : type.Name.Split('>')[0].TrimStart('<')));
+                }
+            }
+        }
+
+        return callers;
+    }
+
+    [Fact]
+    public void The_fresh_admission_read_is_made_only_by_the_run_reader_and_the_stored_run_reads_only_by_the_stored_run_readers()
+    {
+        CallersOf("ReadForRunAsync").ToList().ShouldBe(["XDrishti.Application.Research.InstrumentInputReader.ReadAsync"], "only the run reader decides admission afresh (CF-04d, ADR 0273)");
+        CallersOf("ReadRecordedAsync").ToList().ShouldBe(
+        [
+            "XDrishti.Application.Learning.ExtractTradeFeaturesHandler.ExtractAsync",
+            "XDrishti.Application.Reporting.GetTradeReplayHandler.HandleAsync",
+            "XDrishti.Application.Research.InstrumentInputReader.ReadRecordedAsync",
+        ], ignoreOrder: true, customMessage: "a reader that follows a stored run reads through ReadRecordedAsync and never decides afresh");
+    }
+
+    [Fact]
+    public void The_admission_facts_are_read_only_from_the_seam_aware_read_and_the_history_report()
+    {
+        var offenders = SourceFiles()
+            .Where(f => Path.GetFileName(f) is not ("PreSeamAdmission.cs" or "IBackfillStore.cs" or "BackfillStore.cs"))
+            .Where(f => File.ReadAllText(f).Contains("AdmissionFactsAsync", StringComparison.Ordinal))
+            .Select(f => Path.GetRelativePath(Src, f))
+            .ToList();
+
+        offenders.ShouldBeEmpty("PreSeamAdmission is the one place that turns the stored facts into a decision");
     }
 
     [Fact]

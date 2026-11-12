@@ -60,17 +60,18 @@ public sealed class SeamProbeTests
     }
 
     [Fact]
-    public void The_guard_drops_a_bar_at_or_after_the_first_csv_bar_and_counts_it()
+    public void The_guard_drops_every_bar_dated_on_or_after_the_seam_date_and_counts_it()
     {
-        var seam = new DateTimeOffset(2024, 4, 1, 9, 15, 0, TimeSpan.FromMinutes(330));
-        var before = new Bar(seam.ToUnixTimeSeconds() - 60, 1, 1, 1, 1, 1);
+        var seam = new DateTimeOffset(2024, 4, 2, 9, 15, 0, TimeSpan.FromMinutes(330));
+        var lastDay = new Bar(new DateTimeOffset(2024, 4, 1, 15, 29, 0, TimeSpan.FromMinutes(330)).ToUnixTimeSeconds(), 1, 1, 1, 1, 1);
+        var seamDayBeforeCsv = new Bar(new DateTimeOffset(2024, 4, 2, 9, 14, 0, TimeSpan.FromMinutes(330)).ToUnixTimeSeconds(), 1, 1, 1, 1, 1);
         var atSeam = new Bar(seam.ToUnixTimeSeconds(), 1, 1, 1, 1, 1);
         var after = new Bar(seam.ToUnixTimeSeconds() + 60, 1, 1, 1, 1, 1);
 
-        var (allowed, beyond) = SeamGuard.Split([before, atSeam, after], seam);
+        var (allowed, beyond) = SeamGuard.Split([lastDay, seamDayBeforeCsv, atSeam, after], seam);
 
-        allowed.ShouldBe([before]);
-        beyond.ShouldBe(2);
+        allowed.ShouldBe([lastDay]);
+        beyond.ShouldBe(3);
     }
 
     [Theory]

@@ -7,6 +7,8 @@ internal sealed class BackfillSettings(IOptions<HistoryOptions> options) : IBack
 {
     public bool Enabled => options.Value.Backfill.Enabled;
 
+    public bool AdmitVerified => options.Value.Replay.AdmitVerified;
+
     public int Years => options.Value.Backfill.Years;
 
     public int ChunkDays => options.Value.Backfill.ChunkDays;

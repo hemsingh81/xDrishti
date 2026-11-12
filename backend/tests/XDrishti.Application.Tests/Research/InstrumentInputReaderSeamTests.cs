@@ -24,7 +24,7 @@ public sealed class InstrumentInputReaderSeamTests
     {
         var id = Guid.NewGuid();
         var store = new FakeBarStore();
-        store.Stored[id] = [At(Seam.AddDays(-30)), At(Seam.AddMinutes(-1)), At(Seam), At(Seam.AddMinutes(1))];
+        store.Stored[id] = [At(Seam.AddDays(-30)), At(Seam.AddDays(-1)), At(Seam), At(Seam.AddMinutes(1))];
         var adjustments = Substitute.For<IAdjustmentFactors>();
         adjustments.GetAsync(id, Arg.Any<CancellationToken>()).Returns(AdjustmentFactors.None);
         var seams = new FakeSeams();
@@ -34,8 +34,8 @@ public sealed class InstrumentInputReaderSeamTests
         }
 
 
-        var (raw, _) = await new InstrumentInputReader(store, Substitute.For<IBarQueries>(), adjustments, seams).ReadAsync(id, new DateOnly(2026, 4, 30), Ct);
-        return raw.Count;
+        var read = await new InstrumentInputReader(store, Substitute.For<IBarQueries>(), adjustments, seams).ReadAsync(id, new DateOnly(2026, 4, 30), null, Ct);
+        return read.Bars.Count;
     }
 
     [Fact]

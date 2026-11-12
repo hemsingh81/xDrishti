@@ -33,6 +33,13 @@ internal sealed class TrainingRunReader(NpgsqlDataSource dataSource) : ITraining
         return (await ReadAsync(command, cancellationToken)).FirstOrDefault();
     }
 
+    public async ValueTask<string?> ReadRecordTextAsync(string runKey, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT r.record_json FROM research.sim_runs r WHERE r.purpose = 'training' AND r.run_key = @key");
+        command.Parameters.AddWithValue("key", NpgsqlDbType.Char, runKey);
+        return await command.ExecuteScalarAsync(cancellationToken) as string;
+    }
+
     public async IAsyncEnumerable<RunTrade> StreamTradesAsync(string runKey, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(runKey);

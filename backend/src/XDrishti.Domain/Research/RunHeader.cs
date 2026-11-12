@@ -22,4 +22,5 @@ public sealed record RunHeader(
     ResultsDaysRecord? ResultsDays = null,
     RunPurpose Purpose = RunPurpose.Research,
     RelativeStrengthRecord? RelativeStrength = null,
-    UniverseBasisRecord? UniverseBasis = null);
+    UniverseBasisRecord? UniverseBasis = null,
+    BackfillAdmissionRecord? BackfillAdmission = null);

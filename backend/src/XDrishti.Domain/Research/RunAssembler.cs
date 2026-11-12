@@ -64,7 +64,8 @@ public static class RunAssembler
             header.ResultsDays,
             header.Purpose == RunPurpose.Training,
             header.RelativeStrength,
-            header.UniverseBasis);
+            header.UniverseBasis,
+            header.BackfillAdmission);
     }
 
     /// <summary>
@@ -81,7 +82,7 @@ public static class RunAssembler
 
     /// <summary>
     /// The text whose SHA-256 is the run key: UTF-8 lines, each ending in <c>\n</c>: <c>xd-run &lt;schema&gt;</c>, <c>engine=</c>, <c>strategy=</c> (the definition hash), <c>params=</c>, <c>timeframe=</c>, <c>window=</c>, <c>options=</c>, <c>ack=</c>,
-    /// <c>fills=</c> (the canonical JSON), <c>costs=</c> (<c>none</c>, or <c>sheet id|rates sha256|capital|profile name|risk %|max capital %|max cost R</c>), <c>universe=</c> (the label), one <c>i=</c> per instrument in run order, <c>context=</c>, <c>events=</c> (<c>snapshot sha256|lag|rule version</c>) and <c>rdays=</c> (<c>snapshot sha256|filings sha256|lag|series version</c>) only for a strategy that reads them, and <c>cal=</c>. An <c>i=</c> line is <c>id|bars hash or -|skip reason or -|ex-date:kind:numerator:denominator,…|tick or -|1 if the tick is the fallback else 0</c>.
+    /// <c>fills=</c> (the canonical JSON), <c>costs=</c> (<c>none</c>, or <c>sheet id|rates sha256|capital|profile name|risk %|max capital %|max cost R</c>), <c>universe=</c> (the label), one <c>i=</c> per instrument in run order, one <c>seam=</c> (<c>id|seam date|basis sha256</c>) per instrument whose pre-seam bars were admitted (CF-04d), <c>context=</c>, <c>events=</c> (<c>snapshot sha256|lag|rule version</c>) and <c>rdays=</c> (<c>snapshot sha256|filings sha256|lag|series version</c>) only for a strategy that reads them, and <c>cal=</c>. An <c>i=</c> line is <c>id|bars hash or -|skip reason or -|ex-date:kind:numerator:denominator,…|tick or -|1 if the tick is the fallback else 0</c>.
     /// Numbers are written by <see cref="CanonicalText"/>, so the text does not depend on the culture, on the scale of the tick or on the sign of a zero.
     /// </summary>
     /// <param name="header">The header of the run.</param>
@@ -113,6 +114,12 @@ public static class RunAssembler
                 "i",
                 instrument.InstrumentId.ToString("D") + "|" + (instrument.BarsSha256 ?? "-") + "|" + (instrument.Skipped is { } skip ? skip.ToCode() : "-") + "|" + actions + "|"
                 + (instrument.TickSize is { } tick ? CanonicalText.Number(tick) : "-") + "|" + (instrument.TickFromFallback ? "1" : "0"));
+        }
+
+        foreach (var instrument in instruments.Where(i => i.PreSeam is not null))
+        {
+            // only an instrument whose pre-seam bars were admitted has this line, so every other key is unchanged (CF-04d, ADR 0273)
+            Line(text, "seam", instrument.InstrumentId.ToString("D") + "|" + Date(instrument.PreSeam!.SeamDate) + "|" + instrument.PreSeam.BasisSha256);
         }
 
         if (header.ContextSha256 is { } context)

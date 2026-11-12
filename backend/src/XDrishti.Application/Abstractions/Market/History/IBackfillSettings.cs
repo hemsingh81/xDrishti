@@ -6,6 +6,9 @@ public interface IBackfillSettings
     /// <summary><c>Data:History:Backfill:Enabled</c>, default false. Off means zero HTTP calls, from the service, the verbs and the probe alike.</summary>
     bool Enabled { get; }
 
+    /// <summary><c>Data:History:Replay:AdmitVerified</c>, default false (CF-04d): a verified instrument's pre-seam bars enter a simulation. Off means every record, key and label is what it was before.</summary>
+    bool AdmitVerified { get; }
+
     /// <summary>How many years back the backfill reaches (default 5, 1..5).</summary>
     int Years { get; }
 

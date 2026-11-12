@@ -60,8 +60,15 @@ internal sealed class GetTradeReplayHandler(
         var trade = stored.Trade;
         var tradingCalendar = await calendar.GetAsync(cancellationToken);
         var window = TradeReplayWindow.Compute(tradingCalendar, trade.TradeDate, SessionClock.DateOf(trade.ExitEpochSeconds), before, after);
-        var raw = await XDrishti.Application.Market.History.SeamAwareBars.ReadAsync(bars, seams, trade.InstrumentId, DateTimeOffset.FromUnixTimeSeconds(window.FromEpoch), DateTimeOffset.FromUnixTimeSeconds(window.ToEpoch), cancellationToken);
-        var factors = await adjustments.GetAsync(trade.InstrumentId, cancellationToken);
+        var recorded = XDrishti.Application.Market.History.RunPreSeam.Parse(await runs.ReadRecordTextAsync(query.RunKey, cancellationToken));
+        var read = await XDrishti.Application.Market.History.SeamAwareBars.ReadRecordedAsync(bars, seams, trade.InstrumentId, await adjustments.GetAsync(trade.InstrumentId, cancellationToken), await adjustments.CsvAdjustedThroughAsync(trade.InstrumentId, cancellationToken), recorded, DateTimeOffset.FromUnixTimeSeconds(window.FromEpoch), DateTimeOffset.FromUnixTimeSeconds(window.ToEpoch), cancellationToken);
+        if (read is null)
+        {
+            return Result.Failure<TradeReplayView>(ReportErrors.AdmissionChanged());
+        }
+
+        var factors = read.Factors;
+        var raw = read.Bars;
         var minutes = ReplayBars.Adjust(raw, factors);
         var viewBars = ReplayBars.Aggregate(minutes, timeframe);
         if (viewBars.Count > TradeReplayWindow.MaxBars)

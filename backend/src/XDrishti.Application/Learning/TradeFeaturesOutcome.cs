@@ -4,4 +4,5 @@ namespace XDrishti.Application.Learning;
 /// <param name="Trades">The closed trades of the run.</param>
 /// <param name="Stored">Rows newly written.</param>
 /// <param name="NoBars">Trades left without features because their instrument has no stored bars.</param>
-public sealed record TradeFeaturesOutcome(int Trades, int Stored, int NoBars);
+/// <param name="Stale">Trades left without features because the run admitted pre-seam bars of their instrument and the admission no longer holds on the same basis (CF-04d).</param>
+public sealed record TradeFeaturesOutcome(int Trades, int Stored, int NoBars, int Stale = 0);

@@ -85,6 +85,7 @@ public static class RunLabels
             .. ReferenceLine(run),
             "universe: " + run.Universe.Label + SurvivorshipNote,
             DataLine(run),
+            .. (run.BackfillAdmission is { } admission ? [admission.Label()] : Array.Empty<string>()),
             .. HistoryDepth.Lines(run),
             EngineLine(run.EngineVersion),
             TickLabel,

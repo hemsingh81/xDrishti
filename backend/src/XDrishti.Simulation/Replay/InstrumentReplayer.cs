@@ -515,7 +515,8 @@ public static class InstrumentReplayer
         scanned.Walk,
         scanned.Fates,
         scanned.CandidatesInWindow,
-        scanned.TradesInWindow);
+        scanned.TradesInWindow,
+        input.PreSeam);
 
     /// <summary>What the data said, before and whether or not a scan was made.</summary>
     private sealed record Facts(
