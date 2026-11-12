@@ -39,6 +39,7 @@ internal sealed class ListFlagsAsOfReader(NpgsqlDataSource dataSource) : IListFl
                 members.Parameters.AddWithValue("date", date);
                 members.Parameters.AddWithValue("ids", ids);
                 var found = await ReadIdsAsync(members, cancellationToken);
+                // shortcut: a same-date file re-published later with a symbol the catalogue cannot match leaves the date covered (the day row stays from the first file); the unmatched symbol cannot be told apart anyway. Known limit, ADR 0274.
                 if (source == "daily")
                 {
                     // A same-date file re-published later is applied to the stays but the day row keeps the first file: the union with the stays covering the date can only over-state a ban, never hide one.

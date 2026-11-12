@@ -18,4 +18,5 @@ Read NSE's terms; add `nsearchives.nseindia.com` with `^/archives/fo/sec_ban/fo_
 ## Consequences
 - Turning the live wiring on changes which candidates are held: until the ban and ASM/GSM lists are covered for the plan's dates, required filters hold every candidate (as before).
 - The forward ASM/GSM list is covered only through the last master check, so a plan for a date after it reads unavailable for surveillance.
+- Known limit: a daily ban file for a date that is re-published with a symbol the catalogue cannot match leaves that date covered from the first file plus the stays; the unmatched symbol is not stored either way.
 - Nothing places an order and no rule is loosened.

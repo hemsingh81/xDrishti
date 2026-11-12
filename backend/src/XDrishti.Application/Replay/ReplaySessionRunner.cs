@@ -61,12 +61,12 @@ internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates 
         notes.AddRange(set.Notes);
         var labels = HindsightLabels.For(p).Where(l => l != HindsightLabels.FiltersWithoutHistory).ToList();
 
-        // DATA-01: the ban and surveillance filters are fed from the dated lists (switch ON). The label stays unless both lists have a stored row for this session; the event filter has no history either way.
         if (set.Survivorship)
         {
             labels.Add(HindsightLabels.Survivorship);
         }
 
+        // DATA-01: the ban and surveillance filters are fed from the dated lists (switch ON). The label stays unless both lists have a stored row for this session; the event filter has no history either way.
         var listFacts = listFilter is null ? PlanListFacts.Inactive : await listFilter.ReadAsync([], forDate, session, cancellationToken);
         var listsCovered = listFacts.Covered;
         if (p.FiltersWithoutHistory && listFacts.Active)

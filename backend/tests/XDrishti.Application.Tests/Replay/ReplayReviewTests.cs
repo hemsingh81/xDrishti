@@ -134,6 +134,18 @@ public sealed class ReplayReviewTests
     }
 
     [Fact]
+    public async Task A_run_before_the_known_since_date_carries_the_survivorship_label_on_its_sessions_and_the_run()
+    {
+        var world = Rising("AAA");
+        world.KnownSince = ReplayWorld.RunSessions[1];
+
+        var run = await ReplayRig.Create(world).Driver.RunAsync(ReplayRig.Params(2), Ct);
+
+        run.Value.Sessions[0].Labels.ShouldContain(HindsightLabels.Survivorship);
+        run.Value.Labels.ShouldContain(HindsightLabels.Survivorship);
+    }
+
+    [Fact]
     public void The_read_side_drops_the_label_only_when_stored_sessions_do_not_carry_it()
     {
         var p = ReplayRig.Params(2) with { FiltersWithoutHistory = true };
