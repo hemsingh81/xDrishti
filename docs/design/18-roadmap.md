@@ -112,7 +112,7 @@ A due-diligence review on 2026-11-12 compared what is built with the owner's goa
 | HO-01 | [Hold-out epochs](../specs/HO-01-hold-out-epochs.md) | 3.5 d | CF-06 | Draft, owner decision (changes the CF-06 evidence rule) |
 | CS-01 | [Cost sheet derived from Dhan reports](../specs/CS-01-cost-sheet-derive-from-dhan-reports.md) | 2 d | P2-17 | Spec Approved |
 | CF-10e | [ML influence evidence sources](../specs/CF-10e-ml-influence-evidence-sources.md) | 6.5 d | CF-10; part a needs HO-01 | Spec Approved |
-| OPS-01 | [Evidence switches reachable](../specs/OPS-01-evidence-switches-reachable.md) | 1.5 d | CF-08, CF-04d | Spec Approved |
+| OPS-01 | [Evidence switches reachable](../specs/OPS-01-evidence-switches-reachable.md) | 1.5 d | CF-08, CF-04d | Built 2026-11-12, not deployed |
 | EV-01 | [Evidence preflight and first-evidence runbook](../specs/EV-01-evidence-preflight.md) | 1.5 d (runbook written) | none | Spec Approved |
 | SR-02 | [Replay baseline arm, start-date sweep, chart link](../specs/SR-02-replay-baseline-arm-start-date-sweep-and-chart-link.md) | 4.5 d | SR-01 | Spec Approved |
 | SR-03 | [Pre-registered system replay over a hold-out block](../specs/SR-03-pre-registered-system-replay-over-a-hold-out-block.md) | 3 d | HO-01 and ISS-25 | Draft, owner decision |

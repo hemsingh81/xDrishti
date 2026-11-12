@@ -14,9 +14,12 @@ describe('the Paper feature is read only', () => {
     expect(files.some(([name]) => name.endsWith('paperQueries.ts'))).toBe(true);
   });
 
-  it.each(files)('%s has no write call and no mutation', (_name, text) => {
-    expect(text).not.toMatch(/api\.(POST|PUT|PATCH|DELETE)\b/);
-    expect(text).not.toMatch(/\buseMutation\b|\bensureOk\b|\bmethod:\s*['"](POST|PUT|PATCH|DELETE)/);
+  it.each(files)('%s has no write call and no mutation', (name, text) => {
+    // OPS-01 (ADR 0278): shadowQueries.ts may hold exactly the one PUT of the owner's shadow switch, and nothing else.
+    const isShadow = name.endsWith('shadowQueries.ts');
+    const body = isShadow ? text.replace("api.PUT('/api/paper/shadow/settings'", '') : text;
+    expect(body).not.toMatch(/api\.(POST|PUT|PATCH|DELETE)\b/);
+    if (!isShadow) expect(text).not.toMatch(/\buseMutation\b|\bensureOk\b|\bmethod:\s*['"](POST|PUT|PATCH|DELETE)/);
     expect(text).not.toMatch(/@\/features\//);
   });
 });

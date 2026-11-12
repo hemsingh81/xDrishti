@@ -1,10 +1,12 @@
-import { Alert, Box, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { DataTable, MetricValue, formatCount, formatRate, formatRatio, type Column } from '@/shared/analytics';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { shadowSummaryQuery, type ShadowGroup, type ShadowSummary } from '../api/shadowQueries';
 import { toMetric } from '../lib/metric';
 import { SequentialBlock } from './SequentialState';
+import { ShadowSwitchDialog } from './ShadowSwitchDialog';
 
 const groupColumns: readonly Column<ShadowGroup>[] = [
   { kind: 'text', id: 'group', header: 'Group', render: (g) => g.group },
@@ -51,12 +53,31 @@ export function ShadowTab() {
 
 function Body({ view }: { view: ShadowSummary }) {
   const { counts, edge, chain, costs, sequential } = view;
+  const [switching, setSwitching] = useState(false);
   return (
     <Stack spacing={3}>
       <Alert severity="info">
         {view.statement} {view.separateCount}
       </Alert>
-      <Typography>Shadow record switch: {view.enabled ? 'ON' : 'OFF'}.</Typography>
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+        <Typography>Shadow record switch: {view.enabled ? 'ON' : 'OFF'}.</Typography>
+        <Button
+          variant="outlined"
+          onClick={() => {
+            setSwitching(true);
+          }}
+        >
+          {view.enabled ? 'Switch off…' : 'Switch on…'}
+        </Button>
+      </Stack>
+      {switching && (
+        <ShadowSwitchDialog
+          turnOn={!view.enabled}
+          onClose={() => {
+            setSwitching(false);
+          }}
+        />
+      )}
       {!view.hasRows && <Alert severity="info">{view.note ?? 'No shadow rows are stored yet.'}</Alert>}
       <Box component="section" aria-labelledby="shadow-sequential-heading">
         <Typography variant="h2" id="shadow-sequential-heading" sx={h2}>

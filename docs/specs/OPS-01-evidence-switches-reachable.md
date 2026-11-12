@@ -1,6 +1,6 @@
 # OPS-01 — Make the forward-evidence switches reachable
 
-- **Status:** Approved (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended). Not built.
+- **Status:** Built 2026-11-12, not deployed (approved: coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended).
 - **Phase / roadmap row:** OPS — operations, row OPS-01 (new; GAP-05)
 - **Size:** about 1.5 agent-days (estimate) · **Needs:** CF-08 (shadow switch, ADR 0211/0212), AU-17 (Auto, ADR 0252), CF-04 (history switches, ADR 0195/0270/0273), P8-19 (owner-act form pattern)
 - **Safety:** SAFETY light. It adds a UI for an existing owner act and compose variables for existing switches; every default stays OFF, no rule is loosened, nothing places an order.
@@ -47,3 +47,10 @@ An owner who sets a compose variable may forget it; the Evidence services block 
 ## Done when
 - [ ] ACs 1–6 have evidence; `scripts/check.sh` green; `scripts/gen-api.sh` unchanged; reviewer: no blockers
 - [ ] docs/design/17 and deploy/CLAUDE.md list the variables
+
+## As built (2026-11-12, branch feature/ops-01 on LC-01)
+- **Shadow form:** `ShadowSwitchDialog` on the Paper → Shadow tab ("Switch on…" / "Switch off…"): reason, fresh password, the "I acknowledge the gap" checkbox shown only after a 409 `paper.shadow_gap`; 401, 423, 429 and `paper.shadow_digest_unwritable` each have their own words; the password is cleared after every try. Same route, no new endpoint (AC 1, 2).
+- **Compose:** nine variables on `xd-api`, the seven of decision 3 plus `XD_HISTORY_LISTS_ENABLED` and `XD_SELECTION_LIST_FILTERS_ENABLED` (DATA-01's follow-up); all `false` or empty; `EvidenceComposeRulesTests` asserts each default and that each key appears once (AC 3, 4). Documented in docs/design/17 and deploy/CLAUDE.md. The two DATA-01 settings bind to nothing until that story lands.
+- **Auto block:** `EvidenceServices` on `/auto` from `GET /api/services`: shadow-write, shadow-grade, paper-capture, paper-review and cells-refresh read running (enabled), paused or missing; a failed read shows the error state, never running; links to Services and to the Paper Shadow tab; "Auto does not resume these" (AC 5).
+- **Deviations:** no read endpoint was added (none needed), so `Data:History:*` states are not on the block (configuration stays the place; EV-01 preflight shows them). The block lists five services (shadow-write, shadow-grade, paper-capture, paper-review, cells-refresh), not the spec's six (shadow-digest, history-eod, history-backfill are not shown; cells-refresh and paper-review are added). AC 6 (Auto ON/OFF leaves these services unchanged) rests on ADR 0252's fixed chain; no new integration test was added.
+- **ADR 0278** records the decision.

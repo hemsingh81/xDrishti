@@ -137,6 +137,19 @@ services:
       Filings__FilesPath: /data/filings/files
       # The NSE daily-history probe's raw files (CF-04, ADR 0195): a mounted 0700 folder (xd-api's /app is read-only). The fetch itself stays OFF (Data:History:Nse:Enabled) until the owner acts.
       Data__History__ProbeFolder: /data/history-probe
+      # The evidence fetch switches (OPS-01, ADR 0278): ALL OFF / empty by default; a variable is configuration, not an owner act, and gates fetches, never decisions. Nothing here places an order. The services themselves stay paused until the owner resumes them.
+      # NSE daily-history fetch, its deepening backfill, and the verified pre-seam admission to replay (CF-04, ADR 0195, 0270, 0273); the user agent is a descriptive name plus the owner's contact (empty = the client's own).
+      Data__History__Nse__Enabled: ${XD_HISTORY_NSE_ENABLED:-false}
+      Data__History__Nse__UserAgent: ${XD_HISTORY_NSE_USER_AGENT:-}
+      Data__History__Backfill__Enabled: ${XD_HISTORY_BACKFILL_ENABLED:-false}
+      Data__History__Replay__AdmitVerified: ${XD_REPLAY_ADMIT_VERIFIED:-false}
+      # The system-basket file fetch (Nifty 500 list, BK-01) and the ban/lot list fetch (BK-05, ADR 0254, 0256); empty user agent = the fetch refuses to run.
+      Baskets__System__Fetch__Enabled: ${XD_BASKETS_FETCH_ENABLED:-false}
+      Baskets__System__Fetch__UserAgent: ${XD_BASKETS_FETCH_USER_AGENT:-}
+      Baskets__System__Lists__FetchEnabled: ${XD_BASKETS_LISTS_FETCH_ENABLED:-false}
+      # DATA-01: the dated ban/surveillance list history and the filters that read it (settings land with that story; both OFF).
+      Data__History__Lists__Enabled: ${XD_HISTORY_LISTS_ENABLED:-false}
+      Selection__ListFilters__Enabled: ${XD_SELECTION_LIST_FILTERS_ENABLED:-false}
       Filings__LagMinutes: ${XD_FILINGS_LAG_MINUTES:-5}
       Filings__MaxFilesGb: ${XD_FILINGS_MAX_FILES_GB:-5}
       Filings__MinFreeGb: ${XD_FILINGS_MIN_FREE_GB:-20}

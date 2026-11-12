@@ -17,6 +17,7 @@ const WRITER_FEATURES = new Set([
   'learning',
   'live',
   'owner-acts',
+  'paper', // OPS-01, ADR 0278: only the owner's shadow switch (readOnly.test.ts in the feature holds it to that one PUT)
   'plans',
   'portfolio',
   'quality',
