@@ -5,6 +5,7 @@ using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Application.AutoSwitch;
 using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Lab;
@@ -13,7 +14,6 @@ using XDrishti.Application.Market.History;
 using XDrishti.Application.Paper;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Replay;
-using XDrishti.Application.Replay.Job;
 using XDrishti.Application.Shadow;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
@@ -39,6 +39,7 @@ internal sealed class GetEvidencePreflightHandler(
     IQueryHandler<GetAutoQuery, AutoView> auto,
     IQueryHandler<ShowHistoryQuery, IReadOnlyList<HistoryRow>> history,
     IBackfillSettings backfill,
+    ISimAllBackfillGate backfillGate,
     SystemReplayOptions replay,
     TimeProvider clock) : IQueryHandler<GetEvidencePreflightQuery, EvidencePreflightView>
 {
@@ -196,9 +197,12 @@ internal sealed class GetEvidencePreflightHandler(
         }
 
         var failed = rows.Count(r => r.ChunksFailed > 0);
-        var pending = rows.Count(r => r.Status != BackfillStatus.Done && r.ChunksFailed == 0);
+        var seams = rows.Count(r => r.Status is BackfillStatus.SeamUnresolved or BackfillStatus.SeamJump);
+        var pending = rows.Count(r => r.Status is BackfillStatus.None or BackfillStatus.Planned or BackfillStatus.Partial && r.ChunksFailed == 0);
         var verified = rows.Count(r => r.Verified == ShowHistoryHandler.Yes);
-        return (pending == 0 && failed == 0, $"{rows.Count} instruments: {verified} verified, {pending} pending, {failed} failed");
+        var counts = $"{rows.Count} instruments: {verified} verified, {pending} pending, {failed} failed chunks, {seams} with an unresolved seam or a seam jump (information only)";
+        var incomplete = await backfillGate.IncompleteReasonAsync(ct);
+        return (incomplete is null, (incomplete is null ? "complete (a replay may start); " : "a replay is refused: " + incomplete + " ") + counts);
     }
 
     private (bool? Met, string Reason) Memory()
@@ -210,8 +214,9 @@ internal sealed class GetEvidencePreflightHandler(
         }
 
         var ceiling = limit.Value * 3 / 4 - 256;
-        var largest = replay.MaxWindowMb * 1024L * 1024 / StartReplayHandler.BytesPerInstrument(replay);
-        return (replay.MaxWindowMb <= ceiling, $"Replay:MaxWindowMb {replay.MaxWindowMb} MiB against {ceiling} MiB (0.75 x mem_limit {limit} MiB - 256 MiB, from deploy/compose.yaml); largest scope {largest} instruments");
+        var path = host.ComposePath() ?? "deploy/compose.yaml";
+        var largest = replay.MaxWindowMb * 1024L * 1024 / replay.BytesPerInstrument;
+        return (replay.MaxWindowMb <= ceiling, $"Replay:MaxWindowMb {replay.MaxWindowMb} MiB against {ceiling} MiB (0.75 x mem_limit {limit} MiB - 256 MiB, mem_limit from {path}; Replay:MaxWindowMb from this host's configuration, xd-api may differ); largest scope {largest} instruments");
     }
 
     private (bool? Met, string Reason) Switches()

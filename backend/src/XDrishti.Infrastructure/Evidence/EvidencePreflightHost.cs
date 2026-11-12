@@ -12,7 +12,11 @@ internal sealed class EvidencePreflightHost(XDrishtiDbContext db, IConfiguration
 
     public long? ComposeApiMemLimitMib() => FindCompose() is { } path ? ComposeMemLimit.Mib(File.ReadAllText(path), "xd-api") : null;
 
-    public bool NseHistoryEnabled() => configuration.GetValue<bool>("Data:History:Nse:Enabled"); // the key alone: the history slice's own options type is reserved to that slice (architecture rule)
+    public string? ComposePath() => FindCompose();
+
+    public const string NseKey = "Data:History:Nse:Enabled";
+
+    public bool NseHistoryEnabled() => configuration.GetValue<bool>(NseKey); // the key alone: the history slice's own options type is reserved to that slice (architecture rule)
 
     private static string? FindCompose()
     {

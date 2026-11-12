@@ -12,6 +12,9 @@ public interface IEvidencePreflightHost
     /// <summary>The <c>mem_limit</c> of the <c>xd-api</c> service in <c>deploy/compose.yaml</c>, in MiB; null when the file is missing or the value cannot be parsed.</summary>
     long? ComposeApiMemLimitMib();
 
+    /// <summary>The <c>deploy/compose.yaml</c> that was read (its full path); null when none was found.</summary>
+    string? ComposePath();
+
     /// <summary><c>Data:History:Nse:Enabled</c> as this host's configuration binds it.</summary>
     bool NseHistoryEnabled();
 }

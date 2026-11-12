@@ -7,6 +7,7 @@ using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Application.AutoSwitch;
 using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Evidence;
@@ -40,6 +41,7 @@ public sealed class GetEvidencePreflightHandlerTests
     private readonly IQueryHandler<GetAutoQuery, AutoView> _auto = Substitute.For<IQueryHandler<GetAutoQuery, AutoView>>();
     private readonly IQueryHandler<ShowHistoryQuery, IReadOnlyList<HistoryRow>> _history = Substitute.For<IQueryHandler<ShowHistoryQuery, IReadOnlyList<HistoryRow>>>();
     private readonly IBackfillSettings _backfill = Substitute.For<IBackfillSettings>();
+    private readonly ISimAllBackfillGate _gate = Substitute.For<ISimAllBackfillGate>();
     private readonly SystemReplayOptions _replay = new();
 
     /// <summary>A world in which every item is MET.</summary>
@@ -49,6 +51,8 @@ public sealed class GetEvidencePreflightHandlerTests
         _host.NewestCompiledMigration().Returns("20261101_Last");
         _host.ComposeApiMemLimitMib().Returns(1024);
         _host.NseHistoryEnabled().Returns(true);
+        _host.ComposePath().Returns("/repo/deploy/compose.yaml");
+        _gate.IncompleteReasonAsync(Arg.Any<CancellationToken>()).Returns((string?)null);
         _backfill.AdmitVerified.Returns(true);
         _sheet.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(Result.Success(Sheet("confirmed")));
         _context.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(Context());
@@ -205,14 +209,44 @@ public sealed class GetEvidencePreflightHandlerTests
     }
 
     [Fact]
-    public async Task The_backfill_counts_verified_pending_and_failed_instruments()
+    public async Task An_incomplete_backfill_is_not_met_with_the_reason_of_the_replay_gate_and_the_counts()
     {
         _history.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs([Row("done", 0, "yes"), Row("partial", 0, "no_seam"), Row("partial", 2, "no_seam")]);
+        _gate.IncompleteReasonAsync(Arg.Any<CancellationToken>()).Returns("the 1-minute history backfill has unfinished chunks for 2 instruments.");
 
         var item = Item(await RunAsync(), GetEvidencePreflightHandler.BackfillItem);
 
         item.State.ShouldBe(GetEvidencePreflightHandler.NotMet);
-        item.Reason.ShouldContain("1 verified, 1 pending, 1 failed");
+        item.Reason.ShouldContain("unfinished chunks for 2 instruments");
+        item.Reason.ShouldContain("1 verified, 1 pending, 1 failed chunks");
+    }
+
+    [Fact]
+    public async Task A_row_with_no_chunks_and_a_known_seam_does_not_keep_the_backfill_from_being_met()
+    {
+        _history.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs([Row("none", 0, "no_seam"), Row("seam_unresolved", 0, "seam_unresolved"), Row("seam_jump", 0, "seam_jump"), Row("done", 0, "yes")]);
+
+        var item = Item(await RunAsync(), GetEvidencePreflightHandler.BackfillItem);
+
+        item.State.ShouldBe(GetEvidencePreflightHandler.Met);
+        item.Reason.ShouldContain("2 with an unresolved seam or a seam jump");
+    }
+
+    [Fact]
+    public async Task A_backfill_gate_that_throws_is_unavailable()
+    {
+        _gate.IncompleteReasonAsync(Arg.Any<CancellationToken>()).ThrowsAsync(new InvalidOperationException("x"));
+
+        Item(await RunAsync(), GetEvidencePreflightHandler.BackfillItem).State.ShouldBe(GetEvidencePreflightHandler.Unavailable);
+    }
+
+    [Fact]
+    public async Task The_memory_line_names_the_compose_file_read_and_the_source_of_the_window()
+    {
+        var item = Item(await RunAsync(), GetEvidencePreflightHandler.MemoryItem);
+
+        item.Reason.ShouldContain("/repo/deploy/compose.yaml");
+        item.Reason.ShouldContain("Replay:MaxWindowMb from this host's configuration");
     }
 
     [Fact]
@@ -314,7 +348,7 @@ public sealed class GetEvidencePreflightHandlerTests
     {
         // 12 Nov 2026 12:00 UTC is 17:30 India time: the 12th session has closed, so the last closed session is the 12th.
         var clock = new FakeTimeProvider(new DateTimeOffset(Today.Year, Today.Month, Today.Day, 12, 0, 0, TimeSpan.Zero));
-        return new GetEvidencePreflightHandler(_status, _host, _sheet, _context, _holdOut, _cells, _calendar, _models, _shadow, _schedules, _auto, _history, _backfill, _replay, clock);
+        return new GetEvidencePreflightHandler(_status, _host, _sheet, _context, _holdOut, _cells, _calendar, _models, _shadow, _schedules, _auto, _history, _backfill, _gate, _replay, clock);
     }
 
     private static ChargeSheetStatusView Sheet(string state) => new(true, state, "text", null, null, null, "meaning", []);

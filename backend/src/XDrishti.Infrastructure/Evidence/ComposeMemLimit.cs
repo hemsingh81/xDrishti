@@ -5,6 +5,7 @@ namespace XDrishti.Infrastructure.Evidence;
 /// <summary>Reads the <c>mem_limit</c> of one service from the text of a compose file, in MiB (<c>1g</c>, <c>512m</c>, <c>2048k</c>, a bare byte count). No YAML parser: the service block is the lines indented deeper than its name. Null when the service or the value is missing or unparseable.</summary>
 internal static class ComposeMemLimit
 {
+    // shortcut: a line scan, not a YAML parser; a service written with anchors, merge keys (<<:) or a flow-style mapping reads as no limit (null, so UNAVAILABLE), never as a wrong one. Replace with a YAML package if compose.yaml ever needs them.
     public static long? Mib(string compose, string service)
     {
         ArgumentNullException.ThrowIfNull(compose);
