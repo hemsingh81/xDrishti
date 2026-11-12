@@ -19,6 +19,7 @@ internal static class ReplayReadSupport
         [HindsightLabels.BeforeCosts] = GrossLabel,
         [HindsightLabels.LifecycleAsRecorded] = "Hindsight: learning mode used the cell lifecycle as recorded, not recomputed.",
         [HindsightLabels.FiltersWithoutHistory] = "The event, F&O-ban and surveillance filters were not applied: they have no history.",
+        [HindsightLabels.BaselineArm] = "The no-selection baseline takes every candidate of the system's own cells at equal risk: it is no choosing among the system's candidates, not random stocks.",
         [HindsightLabels.ResearchCells] = "Cells in the research state were allowed to be candidates.",
     };
 
@@ -48,7 +49,7 @@ internal static class ReplayReadSupport
     public static ReplayRunListItem ListItem(ReplayRunRow run)
     {
         var p = ParamsOf(run);
-        return new ReplayRunListItem(Labels(p), run.Id, run.PairId, run.CreatedAt, run.From, run.To, run.Mode, run.State, Completeness(run), run.LastEquity, run.LastDrawdown, run.TrialNumber, CostsLabel(p));
+        return new ReplayRunListItem(Labels(p), run.Id, run.PairId, run.CreatedAt, run.From, run.To, run.Mode, run.State, Completeness(run), run.LastEquity, run.LastDrawdown, run.TrialNumber, CostsLabel(p), run.Arm, run.SweepId);
     }
 
     /// <summary>The strategy of a cell key (its first part).</summary>

@@ -63,6 +63,41 @@ public sealed class ReplayStoreTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_sweep_is_stored_with_its_runs_claimed_oldest_first_one_at_a_time_cancelled_as_a_whole_and_a_run_keeps_its_arm()
+    {
+        var sweep = new NewReplaySweep(Guid.NewGuid(), """{"capital":1000000}""", [D1, D2], T0);
+        var runs = new[]
+        {
+            New(minutes: 0) with { SweepId = sweep.Id, Arm = "selection" },
+            New(minutes: 0) with { SweepId = sweep.Id, Arm = "baseline", CreatedAt = T0.AddTicks(10) },
+            New(minutes: 0) with { SweepId = sweep.Id, Arm = "selection", CreatedAt = T0.AddTicks(20) },
+        };
+        (await WithAsync((s, _) => s.InsertAsync(null, runs, Ct, sweep).AsTask())).Started.ShouldBeTrue();
+        await WithAsync(async (s, _) =>
+        {
+            await s.MarkRecordedAsync([.. runs.Select(r => r.Id)], Ct);
+            return 0;
+        });
+
+        var read = await WithAsync((_, r) => r.GetSweepAsync(sweep.Id, Ct).AsTask());
+        var stored = await WithAsync((_, r) => r.GetSweepRunsAsync(sweep.Id, Ct).AsTask());
+        var claimed = await WithAsync((s, _) => s.ClaimAsync(Ct).AsTask());
+        var second = await WithAsync((s, _) => s.ClaimAsync(Ct).AsTask());
+        var refused = await WithAsync((s, _) => s.InsertAsync(null, [New()], Ct).AsTask());
+        var touched = await WithAsync((s, _) => s.CancelSweepAsync(sweep.Id, T0, Ct).AsTask());
+        var after = await WithAsync((_, r) => r.GetSweepRunsAsync(sweep.Id, Ct).AsTask());
+
+        read!.Starts.ShouldBe([D1, D2]);
+        stored.Select(r => (r.Id, r.Arm, r.SweepId)).ShouldBe([.. runs.Select(r => (r.Id, r.Arm, (Guid?)sweep.Id))]);
+        claimed!.Id.ShouldBe(runs[0].Id);
+        second.ShouldBeNull(); // one at a time
+        refused.Started.ShouldBeFalse(); // a single replay while the sweep has queued runs is busy
+        touched.ShouldBe(3);
+        after.Select(r => r.State).ShouldBe(["cancelling", "cancelled", "cancelled"]);
+        (await WithAsync((s, _) => s.CancelSweepAsync(sweep.Id, T0, Ct).AsTask())).ShouldBe(1); // the one in flight is still cancelling
+    }
+
+    [Fact]
     public async Task One_replay_is_active_at_a_time_a_second_start_is_refused_and_stores_nothing()
     {
         var first = await QueueAsync();

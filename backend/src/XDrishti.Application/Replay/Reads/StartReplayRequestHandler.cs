@@ -23,18 +23,14 @@ public sealed record StartReplayRequest(
     string? Versions,
     IReadOnlyList<string>? Modes,
     bool FiltersWithoutHistory,
-    bool IncludeResearchCells) : ICommand;
+    bool IncludeResearchCells,
+    bool Baseline = false) : ICommand;
 
 /// <summary>Turns the request into the parameters of one run, or of a frozen and a learning run, and starts them through <see cref="StartReplayHandler"/>, which stores, hashes, checks the hold-out and the memory cap and queues them.</summary>
 internal sealed class StartReplayRequestHandler(IReplayFacts facts, IReplayReads reads, IAutoScopeStore autoScope, IRiskProfileStore profiles, ICommandHandler<StartReplayCommand, StartedReplay> start)
     : ICommandHandler<StartReplayRequest, StartedReplay>
 {
-    public const decimal DefaultCapital = 1_000_000m;
-
-    /// <summary>The most baskets and instruments one request may name (checked before anything is read).</summary>
-    public const int MaxBaskets = 200;
-
-    public const int MaxInstruments = 2000;
+    public const decimal DefaultCapital = ReplayRequestResolver.DefaultCapital;
 
     public async ValueTask<Result<StartedReplay>> HandleAsync(StartReplayRequest request, CancellationToken cancellationToken)
     {
@@ -55,80 +51,25 @@ internal sealed class StartReplayRequestHandler(IReplayFacts facts, IReplayReads
             }
         }
 
-        if (request.BasketIds is { Count: > MaxBaskets } || request.InstrumentIds is { Count: > MaxInstruments })
+        if (request.Baseline && (modes.Count != 1 || modes[0] != ReplayMode.Frozen))
         {
-            return Invalid($"at most {MaxBaskets} baskets and {MaxInstruments} instruments");
+            return Invalid("the baseline runs in frozen mode only");
         }
 
-        if (!TryRule(request.Versions, out var rule))
+        var resolved = await ReplayRequestResolver.ResolveAsync(facts, reads, autoScope, profiles, new ReplayCommon(request.BasketIds, request.InstrumentIds, request.Capital, request.RiskProfileId, request.To, request.Versions), cancellationToken);
+        if (resolved.IsFailure)
         {
-            return Invalid("versions is start or asOf");
+            return Result.Failure<StartedReplay>(resolved.Error);
         }
 
-        if (await reads.AnyRunningAsync(cancellationToken))
+        var r = resolved.Value;
+        var runs = modes.Select(mode => new ReplayParams(request.From, r.To, r.Scope, request.Capital ?? DefaultCapital, r.Profile, request.CostSheetId, r.Rule, mode, request.FiltersWithoutHistory, request.IncludeResearchCells)).ToList();
+        if (request.Baseline)
         {
-            return Result.Failure<StartedReplay>(Error.Conflict(StartReplayHandler.BusyCode, "A replay is queued or running; start another when it has finished or been cancelled."));
+            runs.Add(runs[0] with { Arm = ReplayArm.Baseline });
         }
 
-        DateOnly to;
-        if (request.To is { } given)
-        {
-            to = given;
-        }
-        else
-        {
-            try
-            {
-                to = await facts.LastReadableSessionAsync(cancellationToken);
-            }
-            catch (ReplayHoldOutException)
-            {
-                return Result.Failure<StartedReplay>(Error.Conflict(ReplayDriver.HoldOutCode, "No hold-out block is fixed, so the replay cannot know how far it may read."));
-            }
-        }
-
-        var scope = new ReplayScope([.. request.BasketIds ?? []], [.. request.InstrumentIds ?? []]);
-        if (scope.IsEmpty && await autoScope.LatestAsync(cancellationToken) is { } stored)
-        {
-            scope = new ReplayScope(stored.BasketIds, stored.InstrumentIds); // the baskets stay baskets: members are read as of each session, with the survivorship label
-        }
-
-        var profile = ReplayRiskProfile.Standard;
-        if (request.RiskProfileId is { } id)
-        {
-            if (await profiles.FindAsync(id, cancellationToken) is not { } found)
-            {
-                return Invalid("no such risk profile");
-            }
-
-            profile = From(found);
-        }
-        else if ((await profiles.ListAsync(cancellationToken)).FirstOrDefault(p => p.IsSeeded && string.Equals(p.Name, "Standard", StringComparison.OrdinalIgnoreCase)) is { } standard)
-        {
-            profile = From(standard);
-        }
-
-        var runs = modes.Select(mode => new ReplayParams(request.From, to, scope, request.Capital ?? DefaultCapital, profile, request.CostSheetId, rule, mode, request.FiltersWithoutHistory, request.IncludeResearchCells)).ToList();
         return await start.HandleAsync(new StartReplayCommand(runs), cancellationToken);
-    }
-
-    private static ReplayRiskProfile From(XDrishti.Domain.Accounts.RiskProfile p) =>
-        new((double)p.RiskPerTradePct, (double)p.MaxCapitalPerTradePct, (double)p.MaxTotalRiskPct, p.MaxPerSector, (double)p.DailyLossPct);
-
-    private static bool TryRule(string? text, out ReplayVersionRule rule)
-    {
-        rule = ReplayVersionRule.Start;
-        switch (text)
-        {
-            case null:
-            case "start":
-                return true;
-            case "asOf":
-                rule = ReplayVersionRule.AsOf;
-                return true;
-            default:
-                return false;
-        }
     }
 
     private static Result<StartedReplay> Invalid(string message) => Result.Failure<StartedReplay>(Error.Validation(ReplayDriver.InvalidCode, message));

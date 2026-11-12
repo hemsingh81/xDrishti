@@ -23,10 +23,14 @@ internal sealed class StartReplayHandler(ReplayDriver driver, ReplayInputHasher 
     public async ValueTask<Result<StartedReplay>> HandleAsync(StartReplayCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-        if (command.Runs is not { Count: 1 or 2 })
+        var sweep = command.SweepStarts;
+        if (sweep is null ? command.Runs is not { Count: 1 or 2 } : command.Runs is not { Count: >= ReplaySweepRules.MinStarts and <= ReplaySweepRules.MaxStarts } || command.Runs.Count != sweep.Count)
         {
-            return Result.Failure<StartedReplay>(Error.Validation(ReplayDriver.InvalidCode, "one run, or a frozen and a learning run, can be started at once"));
+            return Result.Failure<StartedReplay>(Error.Validation(ReplayDriver.InvalidCode, sweep is null ? "one run, or two linked runs (frozen and learning, or selection and baseline), can be started at once" : "a sweep has one run per start date, 2 to 12"));
         }
+
+        var sweepId = sweep is null ? (Guid?)null : Guid.CreateVersion7(time.GetUtcNow());
+        var problems = new List<string>();
 
         var now = time.GetUtcNow();
         var rows = new List<NewReplayRun>();
@@ -37,7 +41,19 @@ internal sealed class StartReplayHandler(ReplayDriver driver, ReplayInputHasher 
             var prepared = await driver.PrepareAsync(p, null, null, cancellationToken);
             if (prepared.IsFailure)
             {
+                if (sweep is not null && prepared.Error.Kind == ErrorKind.Validation)
+                {
+                    problems.Add("start " + p.From.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ": " + prepared.Error.Message);
+                    continue; // a sweep names every bad start at once
+                }
+
                 return Result.Failure<StartedReplay>(prepared.Error); // a request that cannot be used is refused (422, 409 hold-out) whatever the backfill is doing
+            }
+
+            if (sweep is not null && prepared.Value.Sessions.Count < ReplaySweepRules.MinSessions)
+            {
+                problems.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"start {p.From:yyyy-MM-dd}: only {prepared.Value.Sessions.Count} sessions before the end; a sweep start needs at least {ReplaySweepRules.MinSessions}"));
+                continue;
             }
 
             if (!backfillChecked && await backfill.IncompleteReasonAsync(cancellationToken) is { } incomplete)
@@ -59,12 +75,19 @@ internal sealed class StartReplayHandler(ReplayDriver driver, ReplayInputHasher 
             }
 
             var id = Guid.CreateVersion7(now);
-            rows.Add(new NewReplayRun(id, p.From, p.To, p.Mode == ReplayMode.Learning ? "learning" : "frozen", ReplayJson.Canonical(p), ReplayJson.Canonical(settings), ReplayJson.Canonical(versions), learning, input, scopeHash, prepared.Value.Sessions.Count, now));
+            var created = sweep is null ? now : now.AddTicks(rows.Count * 10L); // one microsecond apart: the job takes the runs of a sweep oldest first, so in date order
+            rows.Add(new NewReplayRun(id, p.From, p.To, p.Mode == ReplayMode.Learning ? "learning" : "frozen", ReplayJson.Canonical(p), ReplayJson.Canonical(settings), ReplayJson.Canonical(versions), learning, input, scopeHash, prepared.Value.Sessions.Count, created, p.Arm == ReplayArm.Baseline ? "baseline" : "selection", sweepId));
             uses.Add((id, p, versions, input));
         }
 
-        Guid? pair = rows.Count > 1 ? Guid.CreateVersion7(now) : null;
-        var inserted = await store.InsertAsync(pair, rows, cancellationToken);
+        if (problems.Count > 0)
+        {
+            return Result.Failure<StartedReplay>(Error.Validation(ReplayDriver.InvalidCode, string.Join("; ", problems)));
+        }
+
+        Guid? pair = sweep is null && rows.Count > 1 ? Guid.CreateVersion7(now) : null;
+        var newSweep = sweep is null ? null : new NewReplaySweep(sweepId!.Value, ReplayJson.Canonical(command.Runs[0] with { From = sweep[0] }), sweep, now);
+        var inserted = await store.InsertAsync(pair, rows, cancellationToken, newSweep);
         if (!inserted.Started)
         {
             return Result.Failure<StartedReplay>(Error.Conflict(BusyCode, "A replay is queued or running; start another when it has finished or been cancelled."));
@@ -101,6 +124,6 @@ internal sealed class StartReplayHandler(ReplayDriver driver, ReplayInputHasher 
             ReplayLog.Started(logger, run.Id, run.SessionsTotal, run.TrialNumber);
         }
 
-        return Result.Success(new StartedReplay([.. rows.Select(r => r.Id)], pair, inserted.Runs.Max(r => r.TrialNumber)));
+        return Result.Success(new StartedReplay([.. rows.Select(r => r.Id)], pair, inserted.Runs.Max(r => r.TrialNumber), sweepId));
     }
 }

@@ -27,6 +27,9 @@ public static class HindsightLabels
     /// <summary>Research-state cells were allowed to be candidates.</summary>
     public const string ResearchCells = "research_cells";
 
+    /// <summary>The run is the no-selection baseline (SR-02): every candidate of the system's own cells at equal risk, so it says "no choosing among the system's candidates", not "random stocks".</summary>
+    public const string BaselineArm = "baseline_no_selection";
+
     /// <summary>The labels that always apply, plus those the parameters add; the survivorship label is added per session by the facts.</summary>
     public static IReadOnlyList<string> For(ReplayParams p)
     {
@@ -57,6 +60,11 @@ public static class HindsightLabels
         if (p.IncludeResearchCells)
         {
             labels.Add(ResearchCells);
+        }
+
+        if (p.Arm == ReplayArm.Baseline)
+        {
+            labels.Add(BaselineArm);
         }
 
         return labels;

@@ -117,6 +117,14 @@ The replay answers three things:
 - It reads nothing past the hold-out clamp.
 - It adds no switch and places no order.
 
+## Backend as built (2026-11-12, ADR 0279; screens still to build)
+- **Status:** backend of parts a, b and c built on `feature/sr-02`; frontend and `scripts/check.sh` open.
+- **a. Baseline.** `ReplayArm` on `ReplayParams` (left out of the stored text when `Selection`, so old hashes hold); `BaselineSizer` (pure, uses the live `PerAccountAllocator` with r = min(risk, headroom / n)); a branch in `ReplaySessionRunner`; label `baseline_no_selection`; `ReplayPairComparison.CompareArms` (seeded `sr02|`); `POST /api/replay/runs` takes `baseline` (frozen only) and queues a selection and a baseline run with one `pairId`; `GET /api/replay/pairs/{id}` answers `selectionVsBaseline` (`frozen`, `learning` and the old answer fields are then null). Runs and list rows carry `arm` and `sweepId`.
+- **b. Sweep.** Migration `AddReplaySweeps` (Down included). `POST /api/replay/sweeps` (202 `{ runIds, pairId: null, trialNumber, sweepId }`), `GET /api/replay/sweeps/{id}`, `POST /api/replay/sweeps/{id}/cancel`. 422 names each bad start (fewer than 126 sessions, no cell statistics); 409 `replay.busy`. `ReplayFacts` now keeps one frozen snapshot per freeze date (the sweep prepares its runs on one instance).
+- **c. Chart.** `GET /api/replay/runs/{id}/trades/{tradeNo}/chart?timeframe&before&after`: P8-11 `chart` block, `markers` (entry, stop, exit), `limits`, derived `exitPrice` (`exitPriceDerived: true`); bars unadjusted, as the replay read them.
+- **Deviations.** (1) A symbol already open or repeated in a session is blocked as `capital` (`already_held`) in the baseline, so it is not doubled. (2) `exit_price` stays derived; no column was added. (3) The sweep is frozen and selection-arm only. (4) Sweep runs are one microsecond apart in `created_at` so the unchanged claim order is date order.
+- **Tests.** Domain (`ReplaySweepTests`, `ReplayArmComparisonTests`), Application (`BaselineSizerTests`, `ReplayBaselineArmTests`, `ReplaySweepHandlerTests`, `ReplayTradeChartTests`, `ReplayArmPairReadTests`, `ReplayExitPriceTests`), Architecture lists (write list, fence), integration (`ReplayStoreTests` sweep case, grants and migration lists).
+
 ## Done when
 - [ ] Every AC has evidence; `scripts/check.sh` green; reviewer: no blockers or majors.
 - [ ] Migration added and `gen-api` run; ADR 0272 amended (baseline, sweep, chart); roadmap row updated.
