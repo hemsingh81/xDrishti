@@ -24,6 +24,9 @@ public static class HindsightLabels
     /// <summary>The event, F&amp;O-ban and surveillance filters were not required: they have no history.</summary>
     public const string FiltersWithoutHistory = "filters_without_history";
 
+    /// <summary>The event filter was not required: it has no history. Added by the runner (not by <c>For</c>) when the dated lists feed the ban and surveillance filters, so that clearing <c>filters_without_history</c> does not hide it (DATA-01).</summary>
+    public const string EventFilterWithoutHistory = "event_filter_without_history";
+
     /// <summary>Research-state cells were allowed to be candidates.</summary>
     public const string ResearchCells = "research_cells";
 

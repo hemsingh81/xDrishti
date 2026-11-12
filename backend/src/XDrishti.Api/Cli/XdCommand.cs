@@ -199,6 +199,11 @@ internal static class XdCommand
             return await PlanRunCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 1 && args[0] == "evidence")
+        {
+            return await EvidencePreflightCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "auto" && args[1] == "check")
         {
             return await AutoCheckCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
@@ -277,6 +282,11 @@ internal static class XdCommand
         if (args.Count >= 2 && args[0] == "data" && args[1].StartsWith("eod-", StringComparison.Ordinal))
         {
             return await DataEodCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
+        }
+
+        if (args.Count >= 2 && args[0] == "data" && args[1].StartsWith("lists-", StringComparison.Ordinal))
+        {
+            return await DataListsCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
         }
 
         if (args.Count >= 2 && args[0] == "data" && args[1] is "backfill" or "probe-seam" or "history")
