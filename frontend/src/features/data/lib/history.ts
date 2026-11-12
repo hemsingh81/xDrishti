@@ -28,6 +28,9 @@ const refusals: Readonly<Record<string, string>> = {
   'data.dhan_not_available': 'The Dhan Data API fetch is not available.',
   'auth.invalid_credentials': 'That password is not right.',
   'auth.step_up_required': 'Enter your password to confirm this act.',
+  'history.owner_only': 'Only the owner can start this act.',
+  'services.run_now_unavailable':
+    'Run now is not available for this service. Start the backfill from the History tab with your password.',
   'auth.locked': 'Too many wrong passwords. Sign-in is locked for a while.',
 };
 

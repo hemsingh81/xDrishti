@@ -1,10 +1,10 @@
 import { Alert, Box, Button, Typography } from '@mui/material';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { Link as RouterLink } from 'react-router';
 import { PasswordReasonDialog } from '@/features/execution';
 import { formatNumber } from '@/shared/lib/format';
 import { useProbeSeam, useStartBackfill, type HistoryOverview } from '../../api/historyQueries';
-import { withActText } from '../../lib/history';
+import { actErrorText, withActText } from '../../lib/history';
 
 type Act = 'backfill' | 'probe';
 
@@ -14,16 +14,28 @@ const titles: Readonly<Record<Act, string>> = { backfill: 'Start backfill', prob
 export function HistoryActs({ data }: { data: HistoryOverview }) {
   const [open, setOpen] = useState<Act | null>(null);
   const [notice, setNotice] = useState<React.ReactNode>(null);
+  const [isError, setIsError] = useState(false);
   const backfill = useStartBackfill();
   const probe = useProbeSeam();
   const on = data.switch.enabled;
   const reasonId = 'history-switch-reason';
   const mutation = open === 'probe' ? probe : backfill;
 
+  const openRef = useRef<Act | null>(null);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+  // A request in flight keeps going when the dialog is closed: it is not reset, so its outcome still arrives as the notice.
   const close = () => {
     setOpen(null);
-    backfill.reset();
-    probe.reset();
+    if (!backfill.isPending) backfill.reset();
+    if (!probe.isPending) probe.reset();
+  };
+  const failed = (error: unknown) => {
+    if (openRef.current === null) {
+      setNotice(actErrorText(error));
+      setIsError(true);
+    }
   };
   const submit = ({ password }: { password: string }) => {
     if (open === 'probe') {
@@ -43,6 +55,7 @@ export function HistoryActs({ data }: { data: HistoryOverview }) {
           );
           close();
         },
+        onError: failed,
       });
     } else {
       backfill.mutate(password, {
@@ -59,6 +72,7 @@ export function HistoryActs({ data }: { data: HistoryOverview }) {
           );
           close();
         },
+        onError: failed,
       });
     }
   };
@@ -79,6 +93,7 @@ export function HistoryActs({ data }: { data: HistoryOverview }) {
             aria-describedby={reasonId}
             onClick={() => {
               setNotice(null);
+              setIsError(false);
               setOpen(act);
             }}
           >
@@ -88,7 +103,7 @@ export function HistoryActs({ data }: { data: HistoryOverview }) {
       </Box>
       {notice !== null && (
         <Alert
-          severity="success"
+          severity={isError ? 'error' : 'success'}
           onClose={() => {
             setNotice(null);
           }}

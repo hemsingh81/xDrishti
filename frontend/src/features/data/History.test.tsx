@@ -210,3 +210,46 @@ describe('Data History tab', () => {
     });
   });
 });
+
+describe('Data History tab: a request in flight and a phone', () => {
+  it('keeps the outcome of a probe whose dialog was closed', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    renderData({
+      search: '?tab=history',
+      handlers: [
+        serve(overview({ switch: on })),
+        http.post('/api/data/history/probe', async () => {
+          await gate;
+          return HttpResponse.json({
+            probed: 1,
+            passed: 1,
+            unresolved: 0,
+            noOverlap: 0,
+            failed: 0,
+            requests: 1,
+            lines: [],
+          });
+        }),
+      ],
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Probe seam' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Probe seam' });
+    await userEvent.type(within(dialog).getByLabelText(/password/i), 'pw');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Probe seam' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    release();
+    expect(await screen.findByText(/Probed 1 instruments: 1 passed/)).toBeInTheDocument();
+  });
+
+  it('keeps the table in its own scrolling box at 360 px', async () => {
+    window.innerWidth = 360;
+    renderHistory();
+    const table = await screen.findByRole('table', { name: 'History per instrument' });
+    const box = table.parentElement;
+    expect(box).toHaveClass('MuiTableContainer-root');
+    expect(getComputedStyle(box as Element).overflowX).toBe('auto');
+  });
+});
