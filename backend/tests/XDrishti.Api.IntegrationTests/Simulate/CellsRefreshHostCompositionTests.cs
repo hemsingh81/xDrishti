@@ -35,6 +35,8 @@ public sealed class CellsRefreshHostCompositionTests(ApiFactory factory)
         scope.ServiceProvider.GetService<ICommandHandler<RefreshCellStatsCommand, RefreshCellStatsOutcome>>().ShouldBeNull();
     }
 
+    // shortcut: mirrors the composition in XDrishti.Worker/Program.cs (without the heartbeat lines); if Program.cs gains
+    // registrations, move its setup into one shared method (as FeedHost.Configure does) and call it from both.
     [Fact]
     public void The_worker_composition_builds_with_the_container_validated()
     {
