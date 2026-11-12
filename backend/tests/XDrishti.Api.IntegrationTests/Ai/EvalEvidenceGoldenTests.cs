@@ -21,6 +21,8 @@ public sealed class EvalEvidenceGoldenTests(ApiFactory factory) : IAsyncLifetime
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    private static readonly string[] WrongMethods = ["POST", "PUT", "DELETE"];
+
     private WebApplicationFactory<Program> _eval = null!;
     private string _connection = string.Empty;
 
@@ -168,24 +170,40 @@ public sealed class EvalEvidenceGoldenTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task The_reports_only_host_answers_404_on_every_route_of_the_three_modules_but_the_six_evidence_gets()
+    public async Task The_reports_only_host_answers_404_on_every_api_route_that_is_neither_a_report_route_nor_one_of_the_six_evidence_gets_and_never_200_to_a_wrong_method()
     {
         using var client = _eval.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
         client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", factory.ServiceToken);
-        var id = Guid.NewGuid();
+        var endpoints = _eval.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints.OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>()
+            .Where(e => e.RoutePattern.RawText!.StartsWith("/api/", StringComparison.Ordinal) && !e.RoutePattern.RawText.StartsWith("/api/reports/", StringComparison.Ordinal)).ToList();
+        endpoints.ShouldNotBeEmpty();
+        var open = new List<string>();
 
-        foreach (var (method, path) in new[] { ("POST", "/api/replay/runs"), ("GET", $"/api/replay/runs/{id}/trades"), ("GET", $"/api/replay/runs/{id}/sessions"), ("PUT", "/api/paper/shadow/settings"), ("GET", "/api/confidence/readiness-settings"), ("PUT", "/api/confidence/readiness-settings") })
+        foreach (var endpoint in endpoints)
         {
-            using var response = await client.SendAsync(new HttpRequestMessage(new HttpMethod(method), new Uri(path, UriKind.Relative)), Ct);
+            var evidence = endpoint.Metadata.GetOrderedMetadata<Microsoft.AspNetCore.Authorization.IAuthorizeData>().Any(a => a.Policy == "AssistantEvidenceRead");
+            var path = System.Text.RegularExpressions.Regex.Replace(endpoint.RoutePattern.RawText!, @"\{[^}]*\}", m => m.Value.Contains("guid", StringComparison.Ordinal) ? Guid.NewGuid().ToString() : m.Value.Contains("int", StringComparison.Ordinal) ? "1" : "x");
+            foreach (var method in endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods)
+            {
+                using var response = await client.SendAsync(new HttpRequestMessage(new HttpMethod(method), new Uri(path, UriKind.Relative)), Ct);
+                if (evidence)
+                {
+                    open.Add($"{method} {endpoint.RoutePattern.RawText}");
+                    response.StatusCode.ShouldNotBe(System.Net.HttpStatusCode.Unauthorized, $"{method} {path}");
+                }
+                else
+                {
+                    response.StatusCode.ShouldBe(System.Net.HttpStatusCode.NotFound, $"{method} {path}");
+                }
+            }
 
-            response.StatusCode.ShouldBe(System.Net.HttpStatusCode.NotFound, $"{method} {path}");
+            foreach (var wrong in WrongMethods.Where(m => !endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods.Contains(m)))
+            {
+                using var response = await client.SendAsync(new HttpRequestMessage(new HttpMethod(wrong), new Uri(path, UriKind.Relative)), Ct);
+                response.StatusCode.ShouldBeOneOf(System.Net.HttpStatusCode.Unauthorized, System.Net.HttpStatusCode.MethodNotAllowed, System.Net.HttpStatusCode.NotFound);
+            }
         }
 
-        foreach (var path in new[] { "/api/replay/runs", "/api/confidence/scorecards", "/api/paper/shadow/summary" })
-        {
-            using var response = await client.GetAsync(new Uri(path, UriKind.Relative), Ct);
-
-            response.StatusCode.ShouldBe(System.Net.HttpStatusCode.OK, path);
-        }
+        open.Order(StringComparer.Ordinal).ShouldBe(["GET /api/confidence/scorecards", "GET /api/confidence/scorecards/{strategyId}/versions/{version:int}", "GET /api/paper/shadow/summary", "GET /api/replay/runs", "GET /api/replay/runs/{id:guid}", "GET /api/replay/runs/{id:guid}/equity"]);
     }
 }

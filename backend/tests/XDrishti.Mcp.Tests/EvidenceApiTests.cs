@@ -1,7 +1,12 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Net.Sockets;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using XDrishti.Application.Abstractions.Ai;
+using XDrishti.Infrastructure.Ai.ReadOnly;
 using XDrishti.Domain.Assistant;
 using XDrishti.Infrastructure.Ai.ReadOnly.BasketApi;
 using XDrishti.Infrastructure.Ai.ReadOnly.EvidenceApi;
@@ -168,6 +173,60 @@ public sealed class EvidenceApiTests
         log.Lines.ShouldNotBeEmpty();
         log.All().ShouldNotContain(Token);
         log.All().ShouldNotContain(Run);
+    }
+
+    [Fact]
+    public async Task A_redirect_is_never_followed_by_either_client_so_the_token_cannot_leave_the_allow_list()
+    {
+        var hits = new List<string>();
+        using var listener = new TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        using var stop = new CancellationTokenSource();
+        var server = Task.Run(async () =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                try
+                {
+                    using var peer = await listener.AcceptTcpClientAsync(stop.Token);
+                    var stream = peer.GetStream();
+                    var buffer = new byte[4096];
+                    var read = await stream.ReadAsync(buffer, stop.Token);
+                    lock (hits)
+                    {
+                        hits.Add(Encoding.ASCII.GetString(buffer, 0, read).Split(' ')[1]);
+                    }
+
+                    await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 302 Found\r\nLocation: /api/paper/shadow/summary\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), stop.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+            }
+        }, CancellationToken.None);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Mcp:Api:BaseUrl"] = $"http://127.0.0.1:{port}", ["Mcp:Api:Token"] = Token }).Build();
+        var services = new ServiceCollection().AddLogging();
+        services.AddAiBasketApi(configuration);
+        services.AddAiEvidenceApi();
+        await using var provider = services.BuildServiceProvider();
+
+        var evidence = await provider.GetRequiredService<IAiEvidenceReader>().GetEvidenceAsync("replay_list", null, null, null, Ct);
+        await using var scope = provider.CreateAsyncScope();
+        var ranking = await scope.ServiceProvider.GetRequiredService<XDrishti.Application.Abstractions.Messaging.IQueryHandler<XDrishti.Application.Reporting.GetBasketRankingQuery, XDrishti.Domain.Common.Result<XDrishti.Application.Reporting.BasketRankingView>>>()
+            .HandleAsync(new XDrishti.Application.Reporting.GetBasketRankingQuery($"{Guid.NewGuid()},{Guid.NewGuid()}", null, null, null), Ct);
+        await stop.CancelAsync();
+        listener.Stop();
+        await server;
+
+        evidence.ErrorCode.ShouldBe(ToolErrorCodes.Unavailable);
+        ranking.Error.Code.ShouldBe(ToolErrorCodes.Unavailable);
+        lock (hits)
+        {
+            hits.Count.ShouldBe(2, "one request per client, the Location was not followed");
+            hits.ShouldNotContain("/api/paper/shadow/summary");
+        }
     }
 
     [Theory]

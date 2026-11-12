@@ -269,7 +269,7 @@
   },
   {
     "Name": "lab_validate",
-    "Description": "Checks a strategy file (YAML text) with the Strategy Lab's own compiler: valid or not, the hash of the strategy, and located problems. Stores nothing.",
+    "Description": "Checks a strategy file (YAML text) with the Strategy Lab's own compiler: valid or not, the hash of the strategy, and located problems. Stores and runs nothing.",
     "Schema": {
       "type": "object",
       "properties": {
@@ -319,7 +319,7 @@
   },
   {
     "Name": "list_tables",
-    "Description": "Lists the views you may query with run_sql (name, row meaning, class C1 or C2, rows). C2 (portfolio) is empty while the portfolio context is off.",
+    "Description": "Lists the views you may query with run_sql (name, row meaning, class C1 or C2, approx. rows). C2 (portfolio) is empty while the portfolio context is off.",
     "Schema": {
       "type": "object",
       "properties": {

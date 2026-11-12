@@ -399,13 +399,13 @@ internal static class ApiSetup
 
     /// <summary>
     /// The reports-only instance maps the replay, readiness and shadow modules only so that their six evidence GETs exist (AI-01, ADR 0280); every other route of those modules (a start, a switch, a trades or sessions read) answers 404 here, before any authentication,
-    /// so that the eval API stays what BK-12b made it: report reads and the six evidence reads.
+    /// so that the eval API stays what BK-12b made it: report reads and the six evidence reads. Rule: under /api/ only /api/reports/ and the routes marked with the evidence policy answer; everything else is 404.
     /// </summary>
     private static Task ReportsOnlyGate(HttpContext context, RequestDelegate next)
     {
         var endpoint = context.GetEndpoint();
-        var evidenceModule = endpoint is RouteEndpoint { RoutePattern.RawText: { } raw } && (raw.StartsWith("/api/replay", StringComparison.Ordinal) || raw.StartsWith("/api/confidence", StringComparison.Ordinal) || raw.StartsWith("/api/paper", StringComparison.Ordinal));
-        if (evidenceModule && !endpoint!.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == ServiceReadAuthentication.AssistantEvidenceReadPolicy))
+        var outside = endpoint is RouteEndpoint { RoutePattern.RawText: { } raw } && raw.StartsWith("/api/", StringComparison.Ordinal) && !raw.StartsWith("/api/reports/", StringComparison.Ordinal);
+        if (outside && !endpoint!.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == ServiceReadAuthentication.AssistantEvidenceReadPolicy))
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return Task.CompletedTask;

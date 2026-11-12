@@ -68,6 +68,7 @@ public static class AiReadOnlyRegistration
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddTransient<BasketApiEndpointGuard>();
         services.AddHttpClient<BasketApiClient>((sp, client) => client.Timeout = TimeSpan.FromSeconds(sp.GetRequiredService<IOptions<BasketApiOptions>>().Value.TimeoutSeconds))
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, UseProxy = false, UseCookies = false }) // a redirect is never followed: the token must not travel past the allow-list
             .AddHttpMessageHandler<BasketApiEndpointGuard>();
         services.TryAddScoped<IQueryHandler<GetBasketProfileQuery, Result<BasketProfileView>>, ApiBasketProfileHandler>();
         services.TryAddScoped<IQueryHandler<GetBasketRankingQuery, Result<BasketRankingView>>, ApiBasketRankingHandler>();
@@ -83,6 +84,7 @@ public static class AiReadOnlyRegistration
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddTransient<EvidenceApiEndpointGuard>();
         services.AddHttpClient<EvidenceApiClient>((sp, client) => client.Timeout = TimeSpan.FromSeconds(sp.GetRequiredService<IOptions<BasketApiOptions>>().Value.TimeoutSeconds))
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, UseProxy = false, UseCookies = false })
             .AddHttpMessageHandler<EvidenceApiEndpointGuard>();
         services.TryAddTransient<IAiEvidenceReader, ApiEvidenceReader>();
         return services;

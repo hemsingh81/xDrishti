@@ -41,7 +41,7 @@ internal sealed class EvidenceApiClient(HttpClient http, IOptions<BasketApiOptio
             switch (response.StatusCode)
             {
                 case HttpStatusCode.OK:
-                    var body = await ReadCappedAsync(response.Content, settings.MaxResponseBytes, cancellationToken);
+                    var body = await CappedBody.ReadAsync(response.Content, settings.MaxResponseBytes, cancellationToken);
                     return body is null || JsonNode.Parse(body) is not { } node ? Result.Failure<JsonNode>(Unavailable) : Result.Success(node);
                 case HttpStatusCode.NotFound:
                     return Result.Failure<JsonNode>(Error.NotFound(NotFoundCode, "No stored result has that id."));
@@ -61,29 +61,5 @@ internal sealed class EvidenceApiClient(HttpClient http, IOptions<BasketApiOptio
             var elapsed = (long)time.GetElapsedTime(started).TotalMilliseconds;
             logger.ApiCall(route, status, elapsed);
         }
-    }
-
-    private static async Task<byte[]?> ReadCappedAsync(HttpContent content, int limit, CancellationToken cancellationToken)
-    {
-        if (content.Headers.ContentLength > limit)
-        {
-            return null;
-        }
-
-        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
-        using var buffer = new MemoryStream();
-        var chunk = new byte[8192];
-        int read;
-        while ((read = await stream.ReadAsync(chunk, cancellationToken)) > 0)
-        {
-            if (buffer.Length + read > limit)
-            {
-                return null;
-            }
-
-            buffer.Write(chunk, 0, read);
-        }
-
-        return buffer.ToArray();
     }
 }

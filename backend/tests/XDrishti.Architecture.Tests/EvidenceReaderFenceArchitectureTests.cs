@@ -294,7 +294,7 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
             "XDrishti.Application/Replay/Reads/StartReplayRequestHandler.cs",
             "XDrishti.Application/Replay/Reads/TradePairReads.cs",
             "XDrishti.Application/SimAll/SimAllRunner.cs",
-            "XDrishti.Infrastructure/Ai/Evaluation/FixtureSeeder.cs", // AI-01 (ADR 0280): writes the one synthetic replay run of the eval database (xdrishti_eval only, owner connection); reads nothing and is no evidence reader
+            "XDrishti.Infrastructure/Ai/Evaluation/FixtureSeeder.cs", // AI-01 (ADR 0280): writes the one synthetic replay run of the eval database (xdrishti_eval only, owner connection); reads only the emptiness check of the eval database and is no evidence reader
             "XDrishti.Infrastructure/DependencyInjection.cs",
             "XDrishti.Infrastructure/Replay/ReplayStore.cs",
         ]);

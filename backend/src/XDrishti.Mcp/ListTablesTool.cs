@@ -8,7 +8,7 @@ internal sealed class ListTablesTool(ToolRunner runner, IAiCatalog catalog) : Re
 {
     public static readonly ToolSpec Spec = new(
         "list_tables",
-        "Lists the views you may query with run_sql (name, row meaning, class C1 or C2, rows). C2 (portfolio) is empty while the portfolio context is off.",
+        "Lists the views you may query with run_sql (name, row meaning, class C1 or C2, approx. rows). C2 (portfolio) is empty while the portfolio context is off.",
         new ArgDef("prefix", ArgType.String, false, "Only views whose name starts with this text.", 1, 40, "^[a-z0-9_]+$"));
 
     private static readonly ToolColumn[] Columns = [new("name", false), new("description", false), new("grain", false), new("classes", false), new("approxRows", false), new("note", false)];
