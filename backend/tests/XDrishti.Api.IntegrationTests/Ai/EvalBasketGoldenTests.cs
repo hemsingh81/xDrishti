@@ -197,8 +197,9 @@ public sealed class EvalBasketGoldenTests(ApiFactory factory) : IAsyncLifetime
 
         var api = endpoints.Where(e => e.RoutePattern.RawText!.StartsWith("/api/", StringComparison.Ordinal)).ToList();
         api.ShouldNotBeEmpty();
-        api.ShouldAllBe(e => e.RoutePattern.RawText!.StartsWith("/api/reports/", StringComparison.Ordinal));
-        api.SelectMany(e => e.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods).Distinct().ShouldBe(["GET"]);
+        // AI-01 (ADR 0280): besides the report routes only the replay, readiness and shadow modules are mapped (for their six evidence GETs); the gate answers 404 for every other route of them (EvalEvidenceGoldenTests).
+        api.ShouldAllBe(e => e.RoutePattern.RawText!.StartsWith("/api/reports/", StringComparison.Ordinal) || e.RoutePattern.RawText.StartsWith("/api/replay", StringComparison.Ordinal) || e.RoutePattern.RawText.StartsWith("/api/confidence", StringComparison.Ordinal) || e.RoutePattern.RawText.StartsWith("/api/paper", StringComparison.Ordinal));
+        api.Where(e => e.RoutePattern.RawText!.StartsWith("/api/reports/", StringComparison.Ordinal)).SelectMany(e => e.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods).Distinct().ShouldBe(["GET"]);
         endpoints.ShouldNotContain(e => e.RoutePattern.RawText!.Contains("openapi", StringComparison.Ordinal) || e.RoutePattern.RawText.Contains("/hubs/", StringComparison.Ordinal) || e.RoutePattern.RawText.Contains("docs", StringComparison.Ordinal));
     }
 

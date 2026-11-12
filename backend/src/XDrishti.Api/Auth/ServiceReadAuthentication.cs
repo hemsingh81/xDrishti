@@ -11,6 +11,9 @@ internal static class ServiceReadAuthentication
     /// <summary>An owner session or the service principal; used by exactly the two basket report routes.</summary>
     public const string AssistantBasketReadPolicy = "AssistantBasketRead";
 
+    /// <summary>An owner session or the service principal; used by exactly the six evidence GETs (replay list, run and equity; readiness scorecard list and card; shadow summary), AI-01, ADR 0280.</summary>
+    public const string AssistantEvidenceReadPolicy = "AssistantEvidenceRead";
+
     /// <summary>The one claim of the service principal: the name of the service. Never a name identifier, e-mail or session id.</summary>
     public const string ServiceClaim = "xd:service";
 

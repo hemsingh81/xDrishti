@@ -298,6 +298,7 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
             "XDrishti.Application/Replay/Sweeps/ReplaySweepReads.cs", // SR-02 part B: the sweep's own read and cancel
             "XDrishti.Application/Replay/Sweeps/StartReplaySweepRequestHandler.cs",
             "XDrishti.Application/SimAll/SimAllRunner.cs",
+            "XDrishti.Infrastructure/Ai/Evaluation/FixtureSeeder.cs", // AI-01 (ADR 0280): writes the one synthetic replay run of the eval database (xdrishti_eval only, owner connection); reads only the emptiness check of the eval database and is no evidence reader
             "XDrishti.Infrastructure/DependencyInjection.cs",
             "XDrishti.Infrastructure/Replay/ReplayStore.cs",
         ]);

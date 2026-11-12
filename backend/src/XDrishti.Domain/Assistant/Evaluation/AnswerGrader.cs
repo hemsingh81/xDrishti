@@ -53,7 +53,8 @@ public static partial class AnswerGrader
         }
 
         // BK-12b AC 11: a basket question (BQ-, the addendum; the locked 30 are not touched) whose report tool says "tool.unavailable" (no eval API) was never asked of real data: not evaluable, not a pass (an honest-sounding answer cannot rescue it).
-        if (toolResults is not null && evalCase.Id.StartsWith("BQ-", StringComparison.Ordinal) && evalCase.ToolsExpected.Contains("get_report") && toolResults.Any(r => r.Contains("\"tool.unavailable\"", StringComparison.Ordinal)))
+        // AI-01: the same for an evidence question (EQ-, the evidence addendum) whose get_evidence says "tool.unavailable".
+        if (toolResults is not null && ((evalCase.Id.StartsWith("BQ-", StringComparison.Ordinal) && evalCase.ToolsExpected.Contains("get_report")) || (evalCase.Id.StartsWith("EQ-", StringComparison.Ordinal) && evalCase.ToolsExpected.Contains("get_evidence"))) && toolResults.Any(r => r.Contains("\"tool.unavailable\"", StringComparison.Ordinal)))
         {
             codes.Add(EvalCodes.ToolNotEvaluable);
             correct = false;

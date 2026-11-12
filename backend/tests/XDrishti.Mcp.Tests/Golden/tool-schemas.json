@@ -1,7 +1,7 @@
 [
   {
     "Name": "calc",
-    "Description": "Exact decimal arithmetic for derived numbers (differences, ratios, sums): numbers, + - * / ( ) and round, abs, min, max. Rounds half away from zero to places (default 4). Use it instead of computing yourself.",
+    "Description": "Exact decimal arithmetic for derived numbers (differences, ratios, sums): numbers, + - * / ( ) and round, abs, min, max. Rounds half away from zero. Use it instead of computing yourself.",
     "Schema": {
       "type": "object",
       "properties": {
@@ -25,12 +25,12 @@
   },
   {
     "Name": "describe_table",
-    "Description": "Describes one view returned by list_tables: grain, limits and every column (type, kind, class, unit, meaning). Read-only.",
+    "Description": "Describes one view returned by list_tables: grain, limits and every column (type, kind, class, unit, meaning).",
     "Schema": {
       "type": "object",
       "properties": {
         "name": {
-          "description": "View name as listed, for example instruments.",
+          "description": "View name.",
           "type": "string",
           "maxLength": 63,
           "pattern": "^[a-z0-9_]{1,63}$"
@@ -96,6 +96,41 @@
     }
   },
   {
+    "Name": "get_evidence",
+    "Description": "Stored replay (research only), readiness and shadow results. Quote their labels and states.",
+    "Schema": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "Result.",
+          "type": "string",
+          "maxLength": 20,
+          "pattern": "^(replay_list|replay_run|readiness_list|readiness_card|shadow_summary)$"
+        },
+        "id": {
+          "description": "Run id.",
+          "type": "string",
+          "maxLength": 36
+        },
+        "strategyId": {
+          "description": "Strategy.",
+          "type": "string",
+          "maxLength": 60
+        },
+        "version": {
+          "description": "Version.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999999
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ]
+    }
+  },
+  {
     "Name": "get_instrument",
     "Description": "Instrument master facts, daily bar coverage and quality, and the last daily bars of one symbol.",
     "Schema": {
@@ -122,7 +157,7 @@
   },
   {
     "Name": "get_learning",
-    "Description": "Stored learning records, newest first: lessons, hypotheses, changelog, experiments or models. Changes no state.",
+    "Description": "Stored learning records, newest first: lessons, hypotheses, changelog, experiments or models.",
     "Schema": {
       "type": "object",
       "properties": {
@@ -154,7 +189,7 @@
   },
   {
     "Name": "get_plan",
-    "Description": "Tickets of the stored daily plan for a date (default: newest): symbol, side, state, p-win lower bound, expected R, reasons, stored levels, grade. A plan is a proposal, not an order. Read-only.",
+    "Description": "Tickets of the stored daily plan for a date (default: newest): symbol, side, state, p-win lower bound, expected R, reasons, stored levels, grade. A plan is a proposal, not an order.",
     "Schema": {
       "type": "object",
       "properties": {
@@ -234,7 +269,7 @@
   },
   {
     "Name": "lab_validate",
-    "Description": "Checks a strategy file (YAML text) with the Strategy Lab's own compiler: valid or not, the hash of the strategy, and located problems. Stores nothing and runs nothing. Read-only.",
+    "Description": "Checks a strategy file (YAML text) with the Strategy Lab's own compiler: valid or not, the hash of the strategy, and located problems. Stores and runs nothing.",
     "Schema": {
       "type": "object",
       "properties": {
@@ -252,7 +287,7 @@
   },
   {
     "Name": "list_runs",
-    "Description": "Stored runs: sim = simulation runs for get_report (run key, strategy, window, default set marked); lab = Strategy Lab runs, newest first, with state and verdict.",
+    "Description": "Stored runs: sim = simulation runs for get_report (key, window); lab = Strategy Lab runs, newest first, with state and verdict.",
     "Schema": {
       "type": "object",
       "properties": {
@@ -284,7 +319,7 @@
   },
   {
     "Name": "list_tables",
-    "Description": "Lists the views you may query with run_sql (name, what a row is, class C1 or C2, approximate rows). Class C2 holds the owner's portfolio data and is empty while the portfolio context is off. Read-only.",
+    "Description": "Lists the views you may query with run_sql (name, row meaning, class C1 or C2, approx. rows). C2 (portfolio) is empty while the portfolio context is off.",
     "Schema": {
       "type": "object",
       "properties": {
@@ -366,7 +401,7 @@
   },
   {
     "Name": "run_sql",
-    "Description": "Runs one read-only SELECT (or WITH ... SELECT) over the views of list_tables and returns the rows. One statement, no comments, at most 4000 characters, filter by date or symbol. The answer is not checked by the report engine. Read-only.",
+    "Description": "Runs one read-only SELECT (or WITH ... SELECT) over the views of list_tables and returns the rows. One statement, no comments, at most 4000 characters, filter by date or symbol. Not checked by the report engine.",
     "Schema": {
       "type": "object",
       "properties": {

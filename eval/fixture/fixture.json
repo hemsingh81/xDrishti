@@ -528,5 +528,63 @@
     "to": 100
    }
   ]
+ },
+ "evidence": {
+  "replay": {
+   "from": "2026-02-02",
+   "to": "2026-02-04",
+   "capital": 1000000,
+   "filtersWithoutHistory": true,
+   "labels": [
+    "filters_without_history",
+    "survivorship"
+   ],
+   "equity": [
+    1000000,
+    1004000,
+    1012000
+   ],
+   "trades": [
+    {
+     "symbol": "EVA",
+     "side": "BUY",
+     "entry": "2026-02-02",
+     "exit": "2026-02-04",
+     "qty": 100,
+     "entryPrice": 100,
+     "stopPrice": 98,
+     "grossPnl": 8000,
+     "r": 1.6
+    },
+    {
+     "symbol": "EVD",
+     "side": "SELL",
+     "entry": "2026-02-03",
+     "exit": "2026-02-04",
+     "qty": 50,
+     "entryPrice": 200,
+     "stopPrice": 204,
+     "grossPnl": 4000,
+     "r": 0.8
+    }
+   ]
+  },
+  "shadow": {
+   "session": "2026-03-02",
+   "r": [
+    1.2,
+    -1.0,
+    0.8,
+    -1.0,
+    2.0,
+    -1.0,
+    1.5,
+    0.6,
+    -1.0,
+    1.1,
+    -0.4,
+    0.9
+   ]
+  }
  }
 }

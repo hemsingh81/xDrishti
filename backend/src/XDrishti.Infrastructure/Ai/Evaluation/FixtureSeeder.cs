@@ -30,7 +30,7 @@ public static class FixtureSeeder
     /// <summary>The tables that must be empty before the first seeding (one row anywhere is real data).</summary>
     private static readonly string[] MustBeEmpty =
     [
-        "research.sim_runs", "research.cell_stats", "research.lessons", "research.hypotheses", "market.instruments", "market.bars_agg", "market.baskets", "portfolio.holdings", "trading.plans", "accounts.broker_accounts", "accounts.portfolio_buckets", "ai.settings",
+        "research.sim_runs", "research.cell_stats", "research.lessons", "research.hypotheses", "market.instruments", "market.bars_agg", "market.baskets", "portfolio.holdings", "trading.plans", "accounts.broker_accounts", "accounts.portfolio_buckets", "ai.settings", "research.replay_runs", "paper.shadow_entries",
     ];
 
     public static async Task<SeedOutcome> SeedAsync(string ownerConnectionString, EvalFixture fixture, string fixtureText, string requiredDatabase, CancellationToken cancellationToken)
@@ -128,6 +128,10 @@ public static class FixtureSeeder
         await SeedPortfolioAsync(c, t, f, instruments, stamp, ct);
         await SeedCellAsync(c, t, f, stamp, ct);
         await SeedLearningAsync(c, t, f, orbRunKey!, stamp, ct);
+        if (f.Evidence is { } evidence)
+        {
+            await SeedEvidenceAsync(c, t, f, evidence, stamp, ct);
+        }
     }
 
     /// <summary>The stored daily bars of the fixture (BK-12b): a straight line of closes per series on weekday sessions, written as 1D rows at the India midnight like the real daily bars.</summary>
@@ -331,6 +335,119 @@ public static class FixtureSeeder
                     """,
                     ct, ("opening", NpgsqlDbType.Bigint, opening), ("state", NpgsqlDbType.Varchar, hypothesis.Status), ("rationale", NpgsqlDbType.Varchar, "Eval hypothesis " + hypothesis.Key), ("run", NpgsqlDbType.Char, baselineRunKey), ("stamp", NpgsqlDbType.TimestampTz, stamp.AddMinutes(1)));
             }
+        }
+    }
+
+    /// <summary>
+    /// The stored results of <c>get_evidence</c> (AI-01): version 1 of each fixture strategy (so a scorecard can be read), one completed replay run of three sessions with two closed gross trades (labelled before costs), and one shadow session whose candidates are all graded (gross R).
+    /// The scorecards themselves are derived on every read; with no other stored result most of their rows are unavailable, which is the honest state the questions ask about.
+    /// </summary>
+    private static async Task SeedEvidenceAsync(NpgsqlConnection c, NpgsqlTransaction t, EvalFixture f, FixtureEvidence evidence, DateTime stamp, CancellationToken ct)
+    {
+        foreach (var strategy in f.Runs.Select(r => r.Strategy).Distinct(StringComparer.Ordinal))
+        {
+            await Exec(
+                c, t,
+                "INSERT INTO lab.strategy_versions (strategy_id, version, schema_version, hash, source_text, canonical_json, created_at) VALUES (@id, 1, 1, @hash, 'synthetic strategy of the fixture', '{}', @stamp)",
+                ct, ("id", NpgsqlDbType.Varchar, strategy), ("hash", NpgsqlDbType.Char, Sha("eval-definition|" + strategy)), ("stamp", NpgsqlDbType.TimestampTz, stamp));
+        }
+
+        var replay = evidence.Replay;
+        var runId = Id("replay", "run");
+        var days = Enumerable.Range(0, replay.Equity.Count).Select(i => replay.From.AddDays(i)).ToList();
+        var parameters = string.Create(
+            CultureInfo.InvariantCulture,
+            $$"""{"capital":{{replay.Capital}},"costSheetId":null,"filtersWithoutHistory":{{(replay.FiltersWithoutHistory ? "true" : "false")}},"from":"{{replay.From:yyyy-MM-dd}}","includeResearchCells":false,"mode":"Frozen","profile":{"dailyLossPct":2,"maxCapitalPerTradePct":20,"maxPerSector":3,"maxTotalRiskPct":6,"riskPerTradePct":1},"scope":{"basketIds":[],"instrumentIds":[]},"to":"{{replay.To:yyyy-MM-dd}}","versionRule":"Start"}""");
+        await Exec(
+            c, t,
+            """
+            INSERT INTO research.replay_runs (id, pair_id, range_from, range_to, mode, params, settings_snapshot, versions, learning_sources, input_hash, scope_hash, result_hash, state, cursor_session, sessions_total, created_at, finished_at, recorded)
+            VALUES (@id, NULL, @from, @to, 'frozen', @params, '{}', '{}', NULL, @input, @scope, @result, 'completed', @cursor, @total, @stamp, @finished, true)
+            """,
+            ct, ("id", NpgsqlDbType.Uuid, runId), ("from", NpgsqlDbType.Date, replay.From), ("to", NpgsqlDbType.Date, replay.To), ("params", NpgsqlDbType.Jsonb, parameters), ("input", NpgsqlDbType.Char, Sha("eval-replay-input")), ("scope", NpgsqlDbType.Char, Sha("eval-replay-scope")),
+            ("result", NpgsqlDbType.Char, Sha("eval-replay-result")), ("cursor", NpgsqlDbType.Date, days[^1]), ("total", NpgsqlDbType.Integer, days.Count), ("stamp", NpgsqlDbType.TimestampTz, stamp.AddDays(-30)), ("finished", NpgsqlDbType.TimestampTz, stamp.AddDays(-30).AddMinutes(5)));
+        var labels = string.Join(',', replay.Labels.Select(l => "\"" + l + "\""));
+        for (var i = 0; i < days.Count; i++)
+        {
+            var record = $$"""{"labels":[{{labels}}],"session":"{{days[i]:yyyy-MM-dd}}"}""";
+            await Exec(
+                c, t,
+                "INSERT INTO research.replay_sessions (run_id, session, record, equity, drawdown, record_sha256) VALUES (@run, @session, @record, @equity, 0, @hash)",
+                ct, ("run", NpgsqlDbType.Uuid, runId), ("session", NpgsqlDbType.Date, days[i]), ("record", NpgsqlDbType.Jsonb, record), ("equity", NpgsqlDbType.Numeric, replay.Equity[i]), ("hash", NpgsqlDbType.Char, Sha("eval-replay-session|" + days[i].ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))));
+        }
+
+        for (var i = 0; i < replay.Trades.Count; i++)
+        {
+            var trade = replay.Trades[i];
+            await Exec(
+                c, t,
+                """
+                INSERT INTO research.replay_trades (run_id, trade_no, symbol, side, cell_key, qty, entry_session, entry_at, entry_price, stop_price, swing, trade_key, exit_session, exit_at, gross_pnl, charges, net_pnl, charge_sheet_id, r_sim)
+                VALUES (@run, @no, @symbol, @side, @cell, @qty, @entry, @entryAt, @price, @stop, false, @key, @exit, @exitAt, @gross, NULL, NULL, NULL, @r)
+                """,
+                ct, ("run", NpgsqlDbType.Uuid, runId), ("no", NpgsqlDbType.Bigint, (long)(i + 1)), ("symbol", NpgsqlDbType.Varchar, trade.Symbol), ("side", NpgsqlDbType.Varchar, trade.Side), ("cell", NpgsqlDbType.Text, $"ORB|15m|{trade.Side}|INTRADAY|*"), ("qty", NpgsqlDbType.Integer, trade.Qty),
+                ("entry", NpgsqlDbType.Date, trade.Entry), ("entryAt", NpgsqlDbType.TimestampTz, new DateTimeOffset(trade.Entry.ToDateTime(new TimeOnly(9, 30)), TimeSpan.FromMinutes(330)).ToUniversalTime()), ("price", NpgsqlDbType.Numeric, trade.EntryPrice), ("stop", NpgsqlDbType.Numeric, trade.StopPrice),
+                ("key", NpgsqlDbType.Text, $"ORB|{trade.Symbol}|{trade.Side}|{trade.Entry:yyyy-MM-dd}"), ("exit", NpgsqlDbType.Date, trade.Exit), ("exitAt", NpgsqlDbType.TimestampTz, new DateTimeOffset(trade.Exit.ToDateTime(new TimeOnly(15, 0)), TimeSpan.FromMinutes(330)).ToUniversalTime()),
+                ("gross", NpgsqlDbType.Numeric, trade.GrossPnl), ("r", NpgsqlDbType.Double, trade.R));
+        }
+
+        // The shadow record: one plan of one session with an item per candidate, an entry per item and a gross grade per entry; the owner's switch is ON in this database.
+        var shadow = evidence.Shadow;
+        // The tables stamp every row with their own clock and refuse a row written after the open of its session (ADR 0211); a synthetic past session cannot pass that, so the owner of the fixture database switches those user triggers off for this one transaction (they are on again before it commits).
+        var shadowTables = new[] { "paper.shadow_settings", "paper.shadow_sessions", "paper.shadow_entries", "paper.shadow_grades" };
+        foreach (var table in shadowTables)
+        {
+            await Exec(c, t, $"ALTER TABLE {table} DISABLE TRIGGER USER", ct);
+        }
+
+        await Exec(c, t, "INSERT INTO paper.shadow_settings (enabled, actor, reason, changed_at) VALUES (true, 'owner:eval-fixture@example.test', 'eval fixture database', @stamp)", ct, ("stamp", NpgsqlDbType.TimestampTz, stamp));
+        var planId = (long)(await Scalar(
+            c, t,
+            """
+            INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at)
+            VALUES (@key, @date, @cutoff, 1, @hash, 'stored cells, in-sample', false, 'a synthetic shadow plan of the fixture', 'in-sample only', 'eval-fixture', @stamp)
+            RETURNING id
+            """,
+            ct, ("key", NpgsqlDbType.Varchar, "eval-plan-shadow-" + shadow.Session.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("date", NpgsqlDbType.Date, shadow.Session), ("cutoff", NpgsqlDbType.TimestampTz, shadow.Session.ToDateTime(new TimeOnly(3, 0), DateTimeKind.Utc)),
+            ("hash", NpgsqlDbType.Char, Sha("eval-plan-shadow")), ("stamp", NpgsqlDbType.TimestampTz, stamp)))!;
+        await Exec(c, t, "INSERT INTO paper.shadow_sessions (session_date, n_rows, status, digest, prev_digest) VALUES (@session, @n, 'ok', @digest, NULL)", ct, ("session", NpgsqlDbType.Date, shadow.Session), ("n", NpgsqlDbType.Integer, shadow.R.Count), ("digest", NpgsqlDbType.Char, Sha("eval-shadow-digest")));
+        var symbols = f.Instruments.Where(i => i.Type == "share").Select(i => i.Symbol).ToList();
+        var groups = new[] { "primary", "reserve", "rejected" };
+        var entryIds = new List<long>();
+        for (var i = 0; i < shadow.R.Count; i++)
+        {
+            var symbol = symbols[i % symbols.Count];
+            var group = groups[i % groups.Length];
+            var itemId = (long)(await Scalar(
+                c, t,
+                """
+                INSERT INTO trading.plan_items (plan_id, item_rank, item_group, symbol, side, strategy_id, strategy_version_hash, trigger_text, stop_text, target_text, validity_text, reasons, cell_key, trades, data_range, p_win_basis, p_win, conservative_expectancy_r, unavailable)
+                VALUES (@plan, @rank, 'reserve', @symbol, 'BUY', 'VWAP_PULLBACK', @hash, 'above vwap', 'below vwap', 'at twice the risk', 'today', ARRAY['next in rank when a primary ticket is dropped']::text[], 'VWAP_PULLBACK|15m|BUY|INTRADAY|*', 16, '2026-01-05..2026-02-27', 'cell', 0.5, 0.01, ARRAY[]::text[])
+                RETURNING id
+                """,
+                ct, ("plan", NpgsqlDbType.Bigint, planId), ("rank", NpgsqlDbType.Integer, i + 1), ("symbol", NpgsqlDbType.Varchar, symbol), ("hash", NpgsqlDbType.Char, Sha("eval-definition|VWAP_PULLBACK"))))!;
+            entryIds.Add((long)(await Scalar(
+                c, t,
+                """
+                INSERT INTO paper.shadow_entries (session_date, plan_id, plan_item_id, trade_key, ticket_group, cell_key, strategy_hash, symbol, side, entry_limit, stop, target, time_rule, counts_for_edge, row_hash, written_at)
+                VALUES (@session, @plan, @item, @key, @group, 'VWAP_PULLBACK|15m|BUY|INTRADAY|*', @hash, @symbol, 'BUY', 100, 98, 104, 'intraday', true, @row, @written)
+                RETURNING id
+                """,
+                ct, ("session", NpgsqlDbType.Date, shadow.Session), ("plan", NpgsqlDbType.Bigint, planId), ("item", NpgsqlDbType.Bigint, itemId), ("key", NpgsqlDbType.Varchar, $"VWAP_PULLBACK|{symbol}|BUY|{shadow.Session:yyyy-MM-dd}|{i + 1}"), ("group", NpgsqlDbType.Varchar, group),
+                ("hash", NpgsqlDbType.Char, Sha("eval-definition|VWAP_PULLBACK")), ("symbol", NpgsqlDbType.Varchar, symbol), ("row", NpgsqlDbType.Char, Sha("eval-shadow-row|" + i.ToString(CultureInfo.InvariantCulture))), ("written", NpgsqlDbType.TimestampTz, shadow.Session.ToDateTime(new TimeOnly(2, 30), DateTimeKind.Utc))))!);
+        }
+
+        for (var i = 0; i < entryIds.Count; i++)
+        {
+            await Exec(
+                c, t,
+                "INSERT INTO paper.shadow_grades (entry_id, status, r_sim, r_basis, r_gross, entry_at, exit_at, exit_reason, engine_version, sheet_id) VALUES (@entry, 'graded', @r, 'gross', @r, @at, @at, @reason, 'eval-fixture', NULL)",
+                ct, ("entry", NpgsqlDbType.Bigint, entryIds[i]), ("r", NpgsqlDbType.Double, shadow.R[i]), ("at", NpgsqlDbType.TimestampTz, shadow.Session.ToDateTime(new TimeOnly(5, 0), DateTimeKind.Utc)), ("reason", NpgsqlDbType.Varchar, shadow.R[i] > 0 ? "target" : "stop"));
+        }
+
+        foreach (var table in shadowTables)
+        {
+            await Exec(c, t, $"ALTER TABLE {table} ENABLE TRIGGER USER", ct);
         }
     }
 

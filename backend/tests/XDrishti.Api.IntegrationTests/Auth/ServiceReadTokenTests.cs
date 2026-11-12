@@ -22,6 +22,9 @@ public sealed partial class ServiceReadTokenTests(ApiFactory factory)
     private const string ProfileName = "GetBasketProfile";
     private const string RankingName = "GetBasketRanking";
 
+    /// <summary>AI-01 (ADR 0280): the six evidence GETs of policy AssistantEvidenceRead; the route count is pinned at 2 + 6.</summary>
+    private static readonly string[] EvidenceNames = ["ListReplayRuns", "GetReplayRun", "GetReplayEquity", "ListScorecards", "GetScorecard", "GetShadowSummary"];
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private HttpClient ClientWith(string? token)
@@ -81,7 +84,7 @@ public sealed partial class ServiceReadTokenTests(ApiFactory factory)
             using var request = new HttpRequestMessage(new HttpMethod(method), new Uri(path, UriKind.Relative));
             using var response = await client.SendAsync(request, Ct);
             var name = endpoint.Metadata.GetMetadata<IEndpointNameMetadata>()?.EndpointName;
-            if (name is ProfileName or RankingName)
+            if (name is ProfileName or RankingName || (name is not null && EvidenceNames.Contains(name)))
             {
                 opened.Add($"{method} {name} {(int)response.StatusCode}");
             }
@@ -92,8 +95,37 @@ public sealed partial class ServiceReadTokenTests(ApiFactory factory)
         }
 
         wrong.ShouldBeEmpty();
-        opened.ShouldBe([$"GET {ProfileName} 422", $"GET {RankingName} 422"], ignoreOrder: true); // past the guard, into the handlers: a malformed id, a ranking of fewer than two baskets
+        opened.Count.ShouldBe(2 + 6, "the token opens exactly the two basket routes and the six evidence GETs");
+        opened.Where(o => o.Contains(ProfileName, StringComparison.Ordinal) || o.Contains(RankingName, StringComparison.Ordinal)).ShouldBe([$"GET {ProfileName} 422", $"GET {RankingName} 422"], ignoreOrder: true); // past the guard, into the handlers: a malformed id, a ranking of fewer than two baskets
+        opened.Select(o => o.Split(' ')[1]).Order(StringComparer.Ordinal).ShouldBe([.. EvidenceNames.Append(ProfileName).Append(RankingName).Order(StringComparer.Ordinal)]);
+        opened.ShouldNotContain(o => o.EndsWith(" 401", StringComparison.Ordinal) || o.EndsWith(" 403", StringComparison.Ordinal), "an opened route answered from its handler, not from the guard");
         anonymous.Distinct().Order().ShouldBe(["/api/auth/login", "/api/auth/session", "/api/brokers/dhan/callback", "/api/docs/favicon.svg", "/api/docs/scalar.aspnetcore.js", "/api/docs/scalar.js", "/health/live", "/health/ready"]);
+    }
+
+    [Fact]
+    public async Task The_evidence_policy_is_on_exactly_the_six_gets_and_on_no_write_route()
+    {
+        var marked = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>()
+            .Where(e => e.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == "AssistantEvidenceRead"))
+            .Select(e => $"{string.Join('/', e.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods)} {e.RoutePattern.RawText}").Order(StringComparer.Ordinal).ToList();
+
+        marked.ShouldBe(
+            [
+                "GET /api/confidence/scorecards",
+                "GET /api/confidence/scorecards/{strategyId}/versions/{version:int}",
+                "GET /api/paper/shadow/summary",
+                "GET /api/replay/runs",
+                "GET /api/replay/runs/{id:guid}",
+                "GET /api/replay/runs/{id:guid}/equity",
+            ]);
+
+        foreach (var (path, method) in new[] { ("/api/replay/runs", HttpMethod.Post), ("/api/paper/shadow/settings", HttpMethod.Put), ("/api/replay/runs/" + Guid.NewGuid() + "/trades", HttpMethod.Get), ("/api/replay/runs/" + Guid.NewGuid() + "/sessions", HttpMethod.Get), ("/api/confidence/readiness-settings", HttpMethod.Get) })
+        {
+            using var client = ClientWith(factory.ServiceToken);
+            using var response = await client.SendAsync(new HttpRequestMessage(method, new Uri(path, UriKind.Relative)), Ct);
+
+            response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized, $"{method} {path}");
+        }
     }
 
     [Fact]
@@ -203,6 +235,7 @@ public sealed partial class ServiceReadTokenTests(ApiFactory factory)
         var names = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
             .SelectMany(e => e.Metadata.GetOrderedMetadata<IAuthorizeData>()).Select(a => a.Policy).Where(p => !string.IsNullOrEmpty(p)).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Cast<string>().ToList();
         names.ShouldContain("AssistantBasketRead");
+        names.ShouldContain("AssistantEvidenceRead");
         var policies = new Dictionary<string, AuthorizationPolicy>();
         foreach (var name in names)
         {
@@ -232,7 +265,7 @@ public sealed partial class ServiceReadTokenTests(ApiFactory factory)
             }
         }
 
-        passed.ShouldBe(["AssistantBasketRead"]);
+        passed.Order(StringComparer.Ordinal).ShouldBe(["AssistantBasketRead", "AssistantEvidenceRead"]);
         principal!.Claims.Select(c => (c.Type, c.Value)).ShouldBe([("xd:service", "mcp")]);
         principal.FindFirst(ClaimTypes.NameIdentifier).ShouldBeNull();
         principal.FindFirst(ClaimTypes.Email).ShouldBeNull();

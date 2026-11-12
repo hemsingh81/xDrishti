@@ -16,7 +16,7 @@ internal sealed partial class RunSqlTool(ToolRunner runner, IAiSqlRunner sql, IO
 
     public static readonly ToolSpec Spec = new(
         "run_sql",
-        "Runs one read-only SELECT (or WITH ... SELECT) over the views of list_tables and returns the rows. One statement, no comments, at most 4000 characters, filter by date or symbol. The answer is not checked by the report engine. Read-only.",
+        "Runs one read-only SELECT (or WITH ... SELECT) over the views of list_tables and returns the rows. One statement, no comments, at most 4000 characters, filter by date or symbol. Not checked by the report engine.",
         new ArgDef("sql", ArgType.String, true, "The query text.", 1, ToolLimits.MaxSqlChars),
         new ArgDef("maxRows", ArgType.Integer, false, "Rows to return, 1 to 200 (default 50).", 1, ToolLimits.MaxRows));
 

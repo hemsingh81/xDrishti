@@ -27,16 +27,19 @@ internal sealed class ReplayEndpoints : IEndpointModule
         group.MapGet("/runs", ListAsync)
             .WithName("ListReplayRuns")
             .WithSummary("The replay runs, newest first (skip, take 1 to 200, default 50): id, created, range, mode, state, completeness, final equity, max drawdown, trial number, costs label, hindsight labels. Read only.")
+            .RequireAuthorization(ServiceReadAuthentication.AssistantEvidenceReadPolicy)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         group.MapGet("/runs/{id:guid}", GetAsync)
             .WithName("GetReplayRun")
             .WithSummary("One replay run, readable while it runs: the hindsight labels first, completeness (complete, sessions done of total, the as-of session), the costs label (\"before costs (charge sheet not filled, ISS-25)\" when gross), trial number, input and result hashes, the settings snapshot, and the figures so far (return, CAGR, max drawdown, Sharpe of daily returns, exposure, trades, hit rate, mean R, contribution per strategy). Read only.")
+            .RequireAuthorization(ServiceReadAuthentication.AssistantEvidenceReadPolicy)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapGet("/runs/{id:guid}/equity", EquityAsync)
             .WithName("GetReplayEquity")
             .WithSummary("The daily equity, drawdown, cash line and the benchmark (Nifty 500, or the index chosen for the basket reports) rebased to the capital, between from and to (dates, optional). Read only.")
+            .RequireAuthorization(ServiceReadAuthentication.AssistantEvidenceReadPolicy)
             .ProducesRejections(conflict: false);
 
         group.MapGet("/runs/{id:guid}/sessions", SessionsAsync)

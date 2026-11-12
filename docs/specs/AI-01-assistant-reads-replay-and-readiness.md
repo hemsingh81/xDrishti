@@ -1,6 +1,6 @@
 # AI-01 — The assistant reads replay, readiness and shadow results
 
-- **Status:** Approved (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended). Not built.
+- **Status:** Built 2026-11-12, not deployed; the owner re-accepts the eval baseline. Approved (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended).
 - **Phase / roadmap row:** AI — assistant, row AI-01 (new; GAP-10)
 - **Size:** about 2 agent-days (estimate) · **Needs:** P9-02 tool server, BK-12b service token (ADR 0267), SR-01 replay API (ADR 0272), CF-11 readiness (ADR 0221), CF-08 shadow summary (ADR 0212), P9-09 eval (ADR 0143)
 - **Safety:** not a SAFETY slice. GET routes only, through the read-only service token; no write route accepts the token. The eval baseline re-acceptance is the owner's act.
@@ -46,5 +46,13 @@ Integration: token accepted on six, refused elsewhere. Unit: tool argument valid
 Widening the token's reach: kept to six named GETs and pinned by test; revoking the token still closes all eight. Replay figures quoted out of context: AC 3 keeps the fence in every answer.
 
 ## Done when
-- [ ] ACs 1–6 have evidence; `scripts/check.sh` green; reviewer: no blockers
-- [ ] ADR 0267 amended (the token's route list); owner re-accepts the eval baseline
+- [x] ACs 1–6 have evidence (see As built); `scripts/check.sh` not run by the builder (main runs the gate); reviewer pass pending
+- [x] ADR 0267 amended (the token's route list), new ADR 0280
+- [ ] Owner re-accepts the eval baseline (owner act: `scripts/eval-db.sh reset`, run, `scripts/xd-eval.sh accept RUN`)
+
+## As built (2026-11-12)
+- **Policy and routes:** `AssistantEvidenceRead` (`ServiceReadAuthentication.AssistantEvidenceReadPolicy`, registered in `ApiSetup.AddAuth`) on the six GETs (`ListReplayRuns`, `GetReplayRun`, `GetReplayEquity`, `ListScorecards`, `GetScorecard`, `GetShadowSummary`); `ReplayEndpoints.cs` gains only the three `.RequireAuthorization(...)` lines. AC 1: `ServiceReadTokenTests` (route count 2 + 6 with every other endpoint and method 401; the policy list pinned by name; the principal passes exactly the two policies; writes and sessions/trades 401). No summary text changed, so the contract is unchanged (`gen-api` first step run, no diff).
+- **Tool:** `get_evidence` (`XDrishti.Mcp/GetEvidenceTool.cs`) over `IAiEvidenceReader` (`Application/Abstractions/Ai`), implemented by `ApiEvidenceReader` + `EvidenceApiClient` + `EvidenceApiEndpointGuard` (`Infrastructure/Ai/ReadOnly/EvidenceApi`, registered by `AddAiEvidenceApi`, same `Mcp:Api` settings and token). AC 2 and 3: `EvidenceApiTests` (33 cases: labels and fence verbatim, five routes, bad arguments call nothing, no address or token, 401/403/5xx, 404, 422, transport error, timeout, oversize, non-JSON, no token or id in the log, guard table). The schema budget is kept at 2,300 (see ADR 0280 consequences); `McpToolCatalogTests` golden regenerated (17 tools incl. `make_chart`).
+- **Eval:** `eval/fixture/fixture.json` gains `evidence` (one replay run, two strategy versions, one shadow session of 12 graded candidates), seeded by `FixtureSeeder.SeedEvidenceAsync`; `eval/sets/evidence-questions.jsonl` EQ-01..EQ-04; `AnswerGrader` marks an EQ question with `tool.unavailable` not evaluable. `EvalEvidenceGoldenTests` (real API over the seeded fixture, reports-only host) holds the numbers; `EvidenceQuestionsTests` (Domain) grades scripted answers. The eval was NOT run and no baseline accepted.
+- **Reports-only host:** `Api:ReportsOnly` now also maps the replay, readiness and shadow modules, behind `ReportsOnlyGate` (404 for every route of them except the six, before authentication); `EvalBasketGoldenTests` route assertion updated accordingly.
+- **Deviations:** (1) the fixture run is gross, so EQ-01 asks for "its result and labels" with the before-costs label, not a net result; (2) `survivorship` is in the run answer (`replay_run`) only, as the API derives it from the sessions; the list carries the labels of the parameters; (3) the question set is an addendum file like `basket-questions.jsonl` and is not yet wired into `xd-eval.sh run --set evidence` (the runner reads the locked sets only; wiring it changes the eval fingerprint and is the owner's call); (4) output is one `data` object (`kind`, `fence`, `body`) rather than rows with a `state` column, because the API body is passed on unchanged and each item already carries its own `state`; (5) descriptions of eight other tools were shortened to fit the schema budget. (6) two architecture rules over the replay tables gained the fixture seeder as a named exemption (insert-only, eval database only; ADR 0280).
