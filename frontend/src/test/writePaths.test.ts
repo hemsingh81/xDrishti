@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findWrites } from './writeScan';
+import { findWrites, withoutShadowSwitch } from './writeScan';
 
 // P8-18 criterion 15: the one place that says which features may write to the server. A feature in neither list is
 // read-only, so a new feature that writes fails here until someone adds it to WRITER_FEATURES on purpose.
@@ -17,7 +17,6 @@ const WRITER_FEATURES = new Set([
   'learning',
   'live',
   'owner-acts',
-  'paper', // OPS-01, ADR 0278: only the owner's shadow switch (readOnly.test.ts in the feature holds it to that one PUT)
   'plans',
   'portfolio',
   'quality',
@@ -55,6 +54,20 @@ describe('the scanner sees a planted write', () => {
   });
 });
 
+describe('the one narrow exception: the Paper shadow switch (OPS-01, ADR 0278)', () => {
+  const file = '../features/paper/api/shadowQueries.ts';
+  const put = "unwrap(await api.PUT('/api/paper/shadow/settings', { body }))";
+  const text = `const m = useMutation({ mutationFn: async (body) => ${put} });`;
+  it('lets exactly that PUT and its one useMutation through', () => {
+    expect(findWrites(withoutShadowSwitch(file, text))).toEqual([]);
+  });
+  it('still catches any other write in that file, or the same text in any other file', () => {
+    expect(findWrites(withoutShadowSwitch(file, `${text} api.POST('/api/x');`))).not.toEqual([]);
+    expect(findWrites(withoutShadowSwitch(file, `${text} ${text}`))).not.toEqual([]);
+    expect(findWrites(withoutShadowSwitch('../features/paper/api/other.ts', text))).not.toEqual([]);
+  });
+});
+
 describe('write paths are only in the features that may write', () => {
   it('finds the feature sources', () => {
     expect(byFeature.size).toBeGreaterThan(10);
@@ -64,7 +77,9 @@ describe('write paths are only in the features that may write', () => {
   it.each([...byFeature.entries()].filter(([feature]) => !WRITER_FEATURES.has(feature)))(
     '%s is read only',
     (_feature, files) => {
-      const findings = files.map(([path, text]) => ({ path, found: findWrites(text) })).filter((x) => x.found.length);
+      const findings = files
+        .map(([path, text]) => ({ path, found: findWrites(withoutShadowSwitch(path, text)) }))
+        .filter((x) => x.found.length);
       expect(findings).toEqual([]);
     },
   );

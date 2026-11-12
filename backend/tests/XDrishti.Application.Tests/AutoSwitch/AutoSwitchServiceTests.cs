@@ -94,6 +94,33 @@ public sealed class AutoSwitchServiceTests
     }
 
     [Fact]
+    public async Task Turning_auto_on_and_off_leaves_the_forward_evidence_services_as_they_were_but_cells_refresh_is_resumed()
+    {
+        // OPS-01 (ADR 0278): the evidence services are not in the chain; the cells refresh is.
+        string[] evidence = ["shadow-write", "shadow-grade", "shadow-digest", "paper-capture", "paper-review", "history-eod", "history-backfill"];
+        foreach (var id in evidence)
+        {
+            _h.Enabled[id] = false;
+        }
+
+        _h.Enabled["shadow-digest"] = true; // an owner's own choice stays as it was too
+        var service = _h.Service();
+
+        await service.TurnOnAsync(new TurnAutoOnCommand(Owner, true), Ct);
+
+        _h.Enabled["cells-refresh"].ShouldBeTrue();
+        evidence.Where(id => id != "shadow-digest").ShouldAllBe(id => !_h.Enabled[id]);
+        _h.Enabled["shadow-digest"].ShouldBeTrue();
+        _h.Rows[0].Changed.ShouldBe(AutoSwitchHarness.Chain);
+
+        await service.TurnOffAsync(new TurnAutoOffCommand(Owner), Ct);
+
+        evidence.Where(id => id != "shadow-digest").ShouldAllBe(id => !_h.Enabled[id]);
+        _h.Enabled["shadow-digest"].ShouldBeTrue();
+        _h.Enabled["cells-refresh"].ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Turning_off_leaves_a_service_the_owner_already_paused_alone_and_does_not_resume_anything()
     {
         var service = _h.Service();

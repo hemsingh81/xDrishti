@@ -48,6 +48,7 @@ const passwordCheckPaths = new Set<string>([
   '/api/hypotheses/{id}/move',
   '/api/changelog/{id}/revert',
   '/api/services/{id}/resume',
+  '/api/paper/shadow/settings',
   '/api/learning/ml-settings',
   '/api/assistant/settings',
   '/api/live-trading/compliance',

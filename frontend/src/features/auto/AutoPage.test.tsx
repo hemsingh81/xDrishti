@@ -202,6 +202,8 @@ describe('Auto page', () => {
           items: [
             buildServiceView({ id: 'shadow-write', enabled: true }),
             buildServiceView({ id: 'shadow-grade', enabled: false }),
+            buildServiceView({ id: 'paper-review', enabled: true, status: 'failed' }),
+            buildServiceView({ id: 'cells-refresh', enabled: true }),
           ],
         }),
       ),
@@ -211,7 +213,14 @@ describe('Auto page', () => {
     expect(within(list).getByText(/Shadow write: running/)).toBeInTheDocument();
     expect(within(list).getByText(/Shadow grade: paused/)).toBeInTheDocument();
     expect(within(list).getByText(/Paper capture: missing/)).toBeInTheDocument();
-    expect(within(list).getByText(/Cells refresh: missing/)).toBeInTheDocument();
+    expect(within(list).getByText(/Shadow digest: missing/)).toBeInTheDocument();
+    expect(within(list).getByText(/History backfill: missing/)).toBeInTheDocument();
+    expect(within(list).getByText(/Paper review: failed/)).toBeInTheDocument();
+    expect(await within(list).findByText(/Shadow record switch: OFF/)).toBeInTheDocument();
+    const resumed = screen.getByRole('list', { name: 'Resumed by Auto' });
+    expect(within(resumed).getByText(/Cells refresh: running/)).toBeInTheDocument();
+    expect(within(resumed).getByText(/restarts the paper count/)).toBeInTheDocument();
+    expect(within(list).queryByText(/Cells refresh/)).not.toBeInTheDocument();
     expect(screen.getByText(/Auto does not resume these/)).toBeInTheDocument();
     expect(within(list).queryByRole('button')).not.toBeInTheDocument();
   });
