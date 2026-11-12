@@ -575,6 +575,34 @@ The ingest is the service `filings-ingest` of the scheduler in `xd-api` ([ADR 01
 
 `exclude.results_within_days` (and the same word in the alerts and the pre-trade checks) is read **in trading sessions** counted to the event session of the next results meeting as known at the decision instant ([ADR 0181](../adr/0181-the-results-calendar-keeps-each-meeting-row-with-its-own-intimation-time-counts-days-in-trading-sessions-to-an-event-session-and-answers-unavailable-for-an-instrument-with-no-entry.md), P15-04): a Saturday or holiday meeting counts on the next session, a meeting published after the instant is not known, and an instrument with no entry is `unavailable`, not "far away". The same `filings-ingest` run loads the board-meeting and shareholding csv files (counts per file and per run, no new setting). P15-06 ([ADR 0182](../adr/0182-the-event-risk-filter-reads-the-results-calendar-in-the-simulator-and-behind-an-owner-switch-in-the-plan-and-the-results-loss-tag-describes-the-past-and-unavailable-is-never-a-pass.md)) wires the number in behind `smart_rules.event_filter.enabled` (default OFF; the owner changes it, and `results_within_days` (default 2, 0 to 10) and `approval` (`manual` default, or `auto`), only with `PUT /api/selection/event-filter` and a fresh password; every change is a row of `filings.event_filter_decisions`, the newest row wins, no row or an unreadable table is OFF). ON: the plan selection excludes a candidate with `0 <= days <= N` and holds one with no entry (unless the owner listed `event` as optional); the plan check "results within N days" gets its days (its limit 3 is unchanged); the execution check stays `unavailable`. With `approval = auto` the system may turn the filter on only from a stored protocol-F KEEP verdict for the current rule version, records it as `auto` and never as an owner decision, and turns an automatically enabled filter off when the verdict stops being KEEP; until P15-10 supplies a verdict it cannot fire.
 
+### History backfill (`Data:History:*`, CF-04, [ADR 0270](../adr/0270-the-dhan-one-minute-backfill-writes-only-before-each-instruments-first-csv-bar-through-a-resumable-chunk-ledger-and-pre-seam-bars-stay-out-of-every-run.md), [ADR 0273](../adr/0273-pre-seam-bars-enter-a-run-only-for-an-instrument-proven-verified-through-a-stored-basis-with-the-switch-off-by-default-and-the-seam-by-date.md))
+
+Deployment settings (`Data__History__...`), bounds checked at start-up. Every fetch and every use of backfilled bars is **OFF by default**; turning one on is the owner's act (NSE terms and allow-list for the NSE files).
+
+| Option | Meaning | Default |
+|--------|---------|---------|
+| `Data:History:Nse:Enabled` | Daily bhavcopy and corporate-action fetches from NSE (Part A). Siblings: `Series` (EQ), `MaxPerDay` 2000, `DelayMs` 1500, `Years` 10, `UserAgent` (empty; set by the owner) | `false` |
+| `Data:History:Backfill:Enabled` | Dhan 1-minute backfill before each instrument's first CSV bar (Part B). Shown read-only on Data > History | `false` |
+| `Data:History:Backfill:Years` / `ChunkDays` / `MaxRetries` | Depth, chunk length and retries per chunk | `5` / `90` / `3` |
+| `Data:History:Backfill:DiskHeadroomFactor` / `BytesPerRowEstimate` | Disk guard inputs (estimated bytes per row, headroom factor) | `2` / `60` |
+| `Data:History:Backfill:RunWindow` | `HH:mm-HH:mm` India time in which the `history-backfill` service runs (every trigger) | `20:00-06:00` |
+| `Data:History:Replay:AdmitVerified` | Lets pre-seam backfilled bars enter a run for an instrument proven verified (CF-04d); with it OFF pre-seam bars stay out of every run | `false` |
+
+### System replay (`Replay:*`, SR-01, [ADR 0272](../adr/0272-the-system-replay-is-research-only-fenced-from-evidence-and-hindsight-labelled-and-runs-the-live-pieces-over-as-of-facts-in-memory.md))
+
+Internal settings (AU-08 descriptors); a value out of range fails start-up.
+
+| Option | Meaning | Default | Range |
+|--------|---------|---------|-------|
+| `Replay:IncompleteDataShare` | A session whose bars are missing for more than this share of the universe is `data_missing`: no new trades | `0.2` | 0 to 1 |
+| `Replay:ReadAheadSessions` | Sessions of bars read ahead of the cut in one chunk of the rolling window | `40` | 1 to 250 |
+| `Replay:MaxWindowMb` | The most memory the bars of one replay may need; a larger scope is refused (`replay.invalid`). 300 allows 53 instruments. Raise it together with the `mem_limit` of `xd-api` (1g today) | `300` | 64 to 4096 |
+| `Replay:MinFreeGb` / `RunInMarketHours` / `PollInterval` | The job's yield rules: free disk floor, whether it runs 09:00 to 15:45 IST on trading days, queue look interval | `40` / `false` / 5 s | 10 to 500 |
+
+### The Auto switch (`auto.enabled`, AU-17, [ADR 0252](../adr/0252-the-auto-switch-resumes-five-chain-services-follows-the-stored-switch-for-the-builder-and-restores-only-what-it-resumed.md))
+
+A stored owner switch (`auto.enabled` in `platform.app_settings`; no row, or an unreadable one, is OFF). ON needs a fresh password and passing preconditions; OFF needs only the session. It resumes the services `eod`, `portfolio-broker-history`, `weekly`, `nightly` and `suggestions`, and places no order.
+
 ## 4. Most-used settings
 
 | Setting | Meaning | Default |

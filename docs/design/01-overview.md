@@ -16,7 +16,7 @@ timeframes (5m … 1h, 1D, 1W, 1M) are aggregated from 1-minute bars.
 **Every evening it:**
 1. fetches the day's 1-minute data for all tracked instruments and aggregates all timeframes,
 2. syncs your broker accounts and grades how previous recommendations played out,
-3. updates what it has learned about every *setup cell* (strategy × timeframe × side × style × exit × regime),
+3. updates what it has learned about every *setup cell* (strategy × timeframe × side × style × exit × regime) — today by your CLI (`xd learn cells`); a scheduled refresh is LC-01 ([doc 18](18-roadmap.md), Gap programme),
 4. scans your **baskets** (e.g. MyChoice, Best stocks) for tomorrow's candidate trades,
 5. estimates each candidate's probability of success and expected reward (in R-multiples),
 6. keeps only the best few that fit your risk limits (e.g. max 3 new entries), sized per broker account,
@@ -29,7 +29,9 @@ timeframes (5m … 1h, 1D, 1W, 1M) are aggregated from 1-minute bars.
 - monitor your **portfolio** across accounts — when each trade was added, return %, **XIRR**, total value —
   grouped by basket, account, strategy or sector,
 - evaluate results **by basket, by instrument, by individual trade or across all trades**,
-- submit your own strategies in the **Strategy Lab** and get an honest, tested verdict.
+- submit your own strategies in the **Strategy Lab** and get an honest, tested verdict,
+- **replay the whole system from a past date** (System replay, `/simulation/replay`, SR-01, [ADR 0272](../adr/0272-the-system-replay-is-research-only-fenced-from-evidence-and-hindsight-labelled-and-runs-the-live-pieces-over-as-of-facts-in-memory.md)): the plans it would have made, what it took and blocked, an equity curve against Nifty 500, frozen or learning. Research only, hindsight-labelled, no orders,
+- read the **Simulation reports** (`/reports/simulation`, AU-15): what the simulate-everything job found, as training data only.
 
 You execute (or skip) the trades. The system learns from every outcome.
 
@@ -92,7 +94,7 @@ entered **in the application** (ADR 0002), never in the repository.
 
 | # | Question | Decision | Status |
 |---|----------|----------|--------|
-| Q1 | **CSV format** — one sample file to set up the import profile (column names, timestamp format, bar start or end, raw or adjusted prices) | Not provided yet | **Open** — story P0-14 stays blocked; needed before P1-07 |
+| Q1 | **CSV format** — one sample file to set up the import profile (column names, timestamp format, bar start or end, raw or adjusted prices) | Provided: the owner's 214 one-minute files were imported (ISS-19 in the [roadmap](18-roadmap.md)) | **Settled** — the loader reads that format (doc 05 §3); no sample file is outstanding |
 | Q2 | Trading capital and risk per trade | Defaults stay: **0.5% per trade, 1.5% daily loss limit** ([doc 16](16-configuration.md)). Capital is entered per account in the accounts wizard | Decided in P1-16 |
 | Q3 | Initial baskets and their purpose | Working names as configured in [doc 16](16-configuration.md): **Best stocks** (intraday + swing), **MyChoice** (intraday), **MyLongTerm** (swing, BUY only); baskets are created in the app | Decided in P1-15 (baskets are app data, not a blocker) |
 | Q4 | Several accounts: replicate or distribute | **Replicate** (default; `allocation.mode` stays configurable) | Decided |
@@ -136,3 +138,5 @@ entered **in the application** (ADR 0002), never in the repository.
 | [19 Risks & compliance](19-risks-and-compliance.md) | Pitfalls, safeguards, SEBI notes |
 | [20 Extended modules](20-extended-modules.md) | Auto-execution, options, tick/depth data, fundamentals |
 | [21 Glossary](21-glossary.md) | Terms |
+
+Where to find the newer screens: the **System replay** (`/simulation/replay`) and the **Simulation reports** (`/reports/simulation`) are described in [doc 13](13-reports-and-ui.md) and [doc 11](11-strategy-lab.md); how the replay relates to learning is in [doc 09](09-learning-engine.md) §17.
