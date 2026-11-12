@@ -26,6 +26,8 @@ import { UpdateData } from './UpdateData';
 
 // The Filings tab (P15-11) loads in its own chunk.
 const FilingsPanel = lazy(() => import('./filings/FilingsPanel'));
+// The History tab (CF-04e) too.
+const HistoryPanel = lazy(() => import('./history/HistoryPanel'));
 
 /**
  * The Data & import screen, one screen of information: a slim header with Update data, the status ribbon (last tick,
@@ -98,6 +100,11 @@ function DataContent() {
             {tab === 'filings' && (
               <Suspense fallback={<LoadingState label="Loading filings" />}>
                 <FilingsPanel />
+              </Suspense>
+            )}
+            {tab === 'history' && (
+              <Suspense fallback={<LoadingState label="Loading history" />}>
+                <HistoryPanel />
               </Suspense>
             )}
           </DataTabPanel>

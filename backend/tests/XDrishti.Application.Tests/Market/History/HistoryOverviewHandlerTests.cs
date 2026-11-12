@@ -68,7 +68,7 @@ public sealed class HistoryOverviewHandlerTests
 
         var view = await handler.HandleAsync(new GetHistoryOverviewQuery(), Ct);
 
-        view.Totals.Depth.ShouldBe(new HistoryDepthView(1, 1, 1, 1));
+        view.Totals.Years.ShouldBe(new HistoryDepthView(1, 1, 1, 1));
         view.Switch.Enabled.ShouldBeFalse();
         view.Switch.Editable.ShouldBeFalse();
         view.Switch.Reason.ShouldNotBeNullOrEmpty();

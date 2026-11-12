@@ -44670,7 +44670,7 @@
           "instruments",
           "byStatus",
           "chunks",
-          "depth"
+          "years"
         ],
         "type": "object",
         "properties": {
@@ -44684,7 +44684,7 @@
           "chunks": {
             "$ref": "#/components/schemas/HistoryChunksView"
           },
-          "depth": {
+          "years": {
             "$ref": "#/components/schemas/HistoryDepthView"
           }
         }

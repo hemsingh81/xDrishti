@@ -28,7 +28,7 @@ public sealed record HistoryByStatusView(
 
 public sealed record HistoryDepthView(int Under2, int From2to3, int From3to5, int From5);
 
-public sealed record HistoryTotalsView(int Instruments, HistoryByStatusView ByStatus, HistoryChunksView Chunks, HistoryDepthView Depth);
+public sealed record HistoryTotalsView(int Instruments, HistoryByStatusView ByStatus, HistoryChunksView Chunks, HistoryDepthView Years);
 
 public sealed record HistoryDailyView(DateOnly From, DateOnly To);
 

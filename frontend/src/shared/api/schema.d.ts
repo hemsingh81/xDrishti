@@ -14286,7 +14286,7 @@ export interface components {
       instruments: number;
       byStatus: components['schemas']['HistoryByStatusView'];
       chunks: components['schemas']['HistoryChunksView'];
-      depth: components['schemas']['HistoryDepthView'];
+      years: components['schemas']['HistoryDepthView'];
     };
     /** @description The locked block as served. */
     HoldOutBlockView: {
