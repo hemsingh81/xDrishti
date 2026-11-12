@@ -8,6 +8,7 @@ using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Market.Actions;
+using XDrishti.Application.Market.History;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
@@ -101,6 +102,7 @@ public sealed class ExtractTradeFeaturesHandlerTests
         Run(trade);
         var seam = new DateTimeOffset(2024, 4, 2, 9, 15, 0, TimeSpan.FromMinutes(330));
         _seams.Cuts[FabricatedRun.IdA] = seam;
+        _runs.ReadRecordTextAsync(Key, Ct).Returns("{\"instruments\":[]}");
         var before = seam.AddDays(-1).ToUnixTimeSeconds();
         _bars.ReadAsync(FabricatedRun.IdA, Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Ct).Returns(new[] { new Bar(before, 1, 1, 1, 1, 1), new Bar(seam.ToUnixTimeSeconds(), 1, 1, 1, 1, 1), new Bar(seam.ToUnixTimeSeconds() + 60, 1, 1, 1, 1, 1) });
         IReadOnlyList<Bar>? seen = null;
@@ -185,6 +187,25 @@ public sealed class ExtractTradeFeaturesHandlerTests
         var (bars, factors) = seen();
         bars.ShouldNotBeNull().Select(b => b.EpochSeconds).ShouldBe([XSeam.ToUnixTimeSeconds()], "the pre-seam bar the engine never saw is not in the lookback");
         factors.ShouldNotBeNull().FactorAt(new DateOnly(2024, 5, 2)).ShouldBe(0.5, "the plain factors, as the run had them");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("not json")]
+    [InlineData("{\"no_instruments\":1}")]
+    public async Task An_unreadable_run_record_makes_every_instrument_with_a_seam_row_stale_and_one_without_is_read_plain_CF_04d(string? text)
+    {
+        var trade = FabricatedRun.Trade(FabricatedRun.IdA, "NSE:A", Side.Buy, Day);
+        var handler = WorldOf(trade, admittedNow: true, recordSaysAdmitted: false, out var seen);
+        _runs.ReadRecordTextAsync(Key, Ct).Returns(text);
+
+        var result = await handler.HandleAsync(new ExtractTradeFeaturesCommand(Key), Ct);
+
+        result.Value.Stale.ShouldBe(1);
+        seen().Bars.ShouldBeNull();
+        RunPreSeam.Parse(text).ShouldBeNull();
+        RunPreSeam.Parse("{\"instruments\":[]}").ShouldNotBeNull().ShouldBeEmpty();
     }
 
     [Fact]

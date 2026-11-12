@@ -57,7 +57,7 @@ internal sealed class ExtractTradeFeaturesHandler(
         {
             var outcome = await ExtractAsync(runs.StreamTradesAsync(runKey, false, cancellationToken), runKey, RunPreSeam.Parse(await runs.ReadRecordTextAsync(runKey, cancellationToken)), bars, seams, adjustments, calendars, extractor, store, time, cancellationToken);
             var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
-            FeatureLog.Extracted(logger, runKey[..12], outcome.Trades, outcome.Stored, outcome.NoBars, elapsedMs);
+            FeatureLog.Extracted(logger, runKey[..12], outcome.Trades, outcome.Stored, outcome.NoBars, outcome.Stale, elapsedMs);
             return Result.Success(outcome);
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
@@ -70,7 +70,7 @@ internal sealed class ExtractTradeFeaturesHandler(
     /// <summary>
     /// The extraction itself, shared with the training from the simulation (AU-13): the trades of one run come from the caller (evidence or training reader), and a trade is described to the extractor by its decision instant, side, stop and target only.
     /// </summary>
-    internal static async ValueTask<TradeFeaturesOutcome> ExtractAsync(IAsyncEnumerable<RunTrade> runTrades, string runKey, IReadOnlyDictionary<Guid, PreSeamRecord> recorded, IBarStore bars, IBackfillSeams seams, IAdjustmentFactors adjustments, ITradingCalendar calendars, ITradeFeatureExtractor extractor, ITradeFeatureStore store, TimeProvider time, CancellationToken cancellationToken)
+    internal static async ValueTask<TradeFeaturesOutcome> ExtractAsync(IAsyncEnumerable<RunTrade> runTrades, string runKey, IReadOnlyDictionary<Guid, PreSeamRecord>? recorded, IBarStore bars, IBackfillSeams seams, IAdjustmentFactors adjustments, ITradingCalendar calendars, ITradeFeatureExtractor extractor, ITradeFeatureStore store, TimeProvider time, CancellationToken cancellationToken)
     {
         var trades = new List<SimTradeView>();
         await foreach (var runTrade in runTrades.WithCancellation(cancellationToken))
@@ -87,7 +87,7 @@ internal sealed class ExtractTradeFeaturesHandler(
         {
             var last = group.Max(t => SessionClock.DateOf(t.DecisionEpochSeconds));
             // the features follow what the stored run did (CF-04d): an instrument the run admitted must still be admitted on the same basis, else its trades are stale and skipped; any other instrument is read cut with the plain factors whatever the switch says now
-            var read = await SeamAwareBars.ReadRecordedAsync(bars, seams, group.Key, await adjustments.GetAsync(group.Key, cancellationToken), await adjustments.CsvAdjustedThroughAsync(group.Key, cancellationToken), recorded.GetValueOrDefault(group.Key), SimulationBounds.From, SimulationBounds.Until(last), cancellationToken);
+            var read = await SeamAwareBars.ReadRecordedAsync(bars, seams, group.Key, await adjustments.GetAsync(group.Key, cancellationToken), await adjustments.CsvAdjustedThroughAsync(group.Key, cancellationToken), recorded, SimulationBounds.From, SimulationBounds.Until(last), cancellationToken);
             if (read is null)
             {
                 stale += group.Count();

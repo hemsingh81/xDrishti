@@ -470,8 +470,13 @@ public sealed class RunSimulationDatabaseTests(ApiFactory factory) : DataTestBas
 
         others.Value.BackfillAdmission.ShouldNotBeNull().Admitted.ShouldBe(0, "the switch is on and the three have seam rows: the label says nothing was admitted");
         Sinks(others.Value with { BackfillAdmission = null }).ShouldBe(Sinks(othersOff.Value), "but for the admission counts, the record text of a run that admits nothing is Part B's, byte for byte");
+        var seamLines = RunAssembler.KeyText(RunHeaderOf(run), run.Instruments, run.CalendarExceptions).Split('\n').Where(l => l.StartsWith("seam=", StringComparison.Ordinal)).ToList();
+        seamLines.ShouldBe(["seam=" + x.ToString("D") + "|" + D2.ToString("yyyy-MM-dd") + "|" + byId[x].PreSeam!.BasisSha256], "exactly one seam= line, for X only");
+        RunAssembler.KeyText(RunHeaderOf(off.Value), off.Value.Instruments, off.Value.CalendarExceptions).ShouldNotContain("seam=");
         RunLabels.Of(off.Value, FillRules.Create(0.1, SlippageConfig.None).Value).Lines.ShouldNotContain(l => l.StartsWith("backfill:", StringComparison.Ordinal));
     }
+
+    private static RunHeader RunHeaderOf(SimulationRun run) => new(run.Strategy, run.EngineVersion, run.From, run.To, run.Options, run.AcknowledgeCsvAdjusted, run.Fills, run.Universe, new XDrishti.Domain.Market.Calendar.TradingCalendar([]), run.Costs, null, run.EventFilter, run.ResultsDays, RunPurpose.Research, run.RelativeStrength, run.UniverseBasis);
 
     private static string Sinks(SimulationRun run)
     {

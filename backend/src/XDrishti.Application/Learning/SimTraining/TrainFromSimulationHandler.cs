@@ -215,7 +215,12 @@ internal sealed class TrainFromSimulationHandler(
                 continue;
             }
 
-            await ExtractTradeFeaturesHandler.ExtractAsync(Replay(kept), run.RunKey, RunPreSeam.Parse(await reader.ReadRecordTextAsync(run.RunKey, cancellationToken)), bars, seams, adjustments, calendars, extractor, features, time, cancellationToken);
+            var extracted = await ExtractTradeFeaturesHandler.ExtractAsync(Replay(kept), run.RunKey, XDrishti.Application.Market.History.RunPreSeam.Parse(await reader.ReadRecordTextAsync(run.RunKey, cancellationToken)), bars, seams, adjustments, calendars, extractor, features, time, cancellationToken);
+            if (extracted.Stale > 0)
+            {
+                SimTrainingLog.StaleTrades(logger, run.RunKey[..12], extracted.Stale);
+            }
+
             var decisionOf = kept.ToDictionary(t => t.Key, t => t.DecisionEpochSeconds, StringComparer.Ordinal);
             matching.AddRange((await features.ReadAsync([run.RunKey], TradeFeatureCatalog.Version, cancellationToken)).Where(f => decisionOf.TryGetValue(f.TradeKey, out var at) && at == f.DecisionEpochSeconds));
             trades.AddRange(kept);

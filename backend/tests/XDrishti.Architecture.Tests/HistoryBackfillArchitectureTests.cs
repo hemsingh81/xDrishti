@@ -67,16 +67,8 @@ public sealed class HistoryBackfillArchitectureTests
         reader.ShouldContain("SeamAwareBars.ReadForRunAsync");
     }
 
-    // CF-04d decision 6: only these three readers may admit bars from before the seam (the run reader, which the trade cards and AU-12 share, the feature extraction that training uses, and the trade replay). Every other reader keeps the high-water cut.
-    private static readonly string[] AdmittingReaders =
-    [
-        "XDrishti.Application.Learning.ExtractTradeFeaturesHandler",
-        "XDrishti.Application.Reporting.GetTradeReplayHandler",
-        "XDrishti.Application.Research.InstrumentInputReader",
-    ];
-
-    [Fact]
-    public void Only_the_run_reader_the_feature_extraction_and_the_trade_replay_may_admit_pre_seam_bars()
+    // CF-04d decision 6: the run reader decides admission afresh (ReadForRunAsync, only from InstrumentInputReader.ReadAsync); the readers that follow a stored run (the cards through the same reader, the feature extraction that training uses, the trade replay) go through ReadRecordedAsync.
+    private static SortedSet<string> CallersOf(string method)
     {
         var callers = new SortedSet<string>(StringComparer.Ordinal);
         using var module = Mono.Cecil.ModuleDefinition.ReadModule(typeof(XDrishti.Application.DependencyInjection).Assembly.Location);
@@ -88,13 +80,34 @@ public sealed class HistoryBackfillArchitectureTests
                 root = root.DeclaringType;
             }
 
-            if (root.FullName != "XDrishti.Application.Market.History.SeamAwareBars" && type.Methods.Where(m => m.HasBody).SelectMany(m => m.Body.Instructions).Any(i => i.Operand is Mono.Cecil.MethodReference call && (call.Name is "ReadForRunAsync" or "ReadRecordedAsync") && call.DeclaringType.FullName == "XDrishti.Application.Market.History.SeamAwareBars"))
+            if (root.FullName == "XDrishti.Application.Market.History.SeamAwareBars")
             {
-                callers.Add(root.FullName);
+                continue;
+            }
+
+            foreach (var m in type.Methods.Where(x => x.HasBody))
+            {
+                if (m.Body.Instructions.Any(i => i.Operand is Mono.Cecil.MethodReference call && call.Name == method && call.DeclaringType.FullName == "XDrishti.Application.Market.History.SeamAwareBars"))
+                {
+                    // an async method's body is its state machine's MoveNext: name the enclosing type and the outer method it was made from
+                    callers.Add(root.FullName + "." + (type.DeclaringType is null ? m.Name : type.Name.Split('>')[0].TrimStart('<')));
+                }
             }
         }
 
-        callers.ToList().ShouldBe(AdmittingReaders, ignoreOrder: true, customMessage: "a reader that admits pre-seam bars must be one of the three named in CF-04d (ADR 0273); every other reader reads through SeamAwareBars.ReadAsync");
+        return callers;
+    }
+
+    [Fact]
+    public void The_fresh_admission_read_is_made_only_by_the_run_reader_and_the_stored_run_reads_only_by_the_stored_run_readers()
+    {
+        CallersOf("ReadForRunAsync").ToList().ShouldBe(["XDrishti.Application.Research.InstrumentInputReader.ReadAsync"], "only the run reader decides admission afresh (CF-04d, ADR 0273)");
+        CallersOf("ReadRecordedAsync").ToList().ShouldBe(
+        [
+            "XDrishti.Application.Learning.ExtractTradeFeaturesHandler.ExtractAsync",
+            "XDrishti.Application.Reporting.GetTradeReplayHandler.HandleAsync",
+            "XDrishti.Application.Research.InstrumentInputReader.ReadRecordedAsync",
+        ], ignoreOrder: true, customMessage: "a reader that follows a stored run reads through ReadRecordedAsync and never decides afresh");
     }
 
     [Fact]

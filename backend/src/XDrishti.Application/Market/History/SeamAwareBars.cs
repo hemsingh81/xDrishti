@@ -76,4 +76,19 @@ public static class SeamAwareBars
         var read = await ReadForRunAsync(bars, seams, instrumentId, factors, csvAdjustedThrough, from, to, cancellationToken);
         return read.Decision.Admitted == recorded ? read : null;
     }
+
+    /// <summary>
+    /// <see cref="ReadRecordedAsync(IBarStore, IBackfillSeams, Guid, AdjustmentFactors, DateOnly?, PreSeamRecord?, DateTimeOffset, DateTimeOffset, CancellationToken)"/> for a reader that has the whole stored record text parsed (<see cref="RunPreSeam"/>). A record that could not be read
+    /// (<paramref name="recorded"/> null) is not "admitted nothing": an instrument that has a seam row is stale (null), one without is read plain.
+    /// </summary>
+    public static async ValueTask<RunBars?> ReadRecordedAsync(IBarStore bars, IBackfillSeams seams, Guid instrumentId, AdjustmentFactors factors, DateOnly? csvAdjustedThrough, IReadOnlyDictionary<Guid, PreSeamRecord>? recorded, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(seams);
+        if (recorded is null && await seams.SeamOfAsync(instrumentId, cancellationToken) is not null)
+        {
+            return null;
+        }
+
+        return await ReadRecordedAsync(bars, seams, instrumentId, factors, csvAdjustedThrough, recorded?.GetValueOrDefault(instrumentId), from, to, cancellationToken);
+    }
 }

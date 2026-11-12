@@ -60,8 +60,8 @@ internal sealed class GetTradeReplayHandler(
         var trade = stored.Trade;
         var tradingCalendar = await calendar.GetAsync(cancellationToken);
         var window = TradeReplayWindow.Compute(tradingCalendar, trade.TradeDate, SessionClock.DateOf(trade.ExitEpochSeconds), before, after);
-        var recorded = XDrishti.Application.Learning.RunPreSeam.Parse(await runs.ReadRecordTextAsync(query.RunKey, cancellationToken));
-        var read = await XDrishti.Application.Market.History.SeamAwareBars.ReadRecordedAsync(bars, seams, trade.InstrumentId, await adjustments.GetAsync(trade.InstrumentId, cancellationToken), await adjustments.CsvAdjustedThroughAsync(trade.InstrumentId, cancellationToken), recorded.GetValueOrDefault(trade.InstrumentId), DateTimeOffset.FromUnixTimeSeconds(window.FromEpoch), DateTimeOffset.FromUnixTimeSeconds(window.ToEpoch), cancellationToken);
+        var recorded = XDrishti.Application.Market.History.RunPreSeam.Parse(await runs.ReadRecordTextAsync(query.RunKey, cancellationToken));
+        var read = await XDrishti.Application.Market.History.SeamAwareBars.ReadRecordedAsync(bars, seams, trade.InstrumentId, await adjustments.GetAsync(trade.InstrumentId, cancellationToken), await adjustments.CsvAdjustedThroughAsync(trade.InstrumentId, cancellationToken), recorded, DateTimeOffset.FromUnixTimeSeconds(window.FromEpoch), DateTimeOffset.FromUnixTimeSeconds(window.ToEpoch), cancellationToken);
         if (read is null)
         {
             return Result.Failure<TradeReplayView>(ReportErrors.AdmissionChanged());

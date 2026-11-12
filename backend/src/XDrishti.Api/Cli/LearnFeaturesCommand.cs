@@ -51,7 +51,7 @@ internal static class LearnFeaturesCommand
                 }
 
                 var o = result.Value;
-                await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"features of run {runKey[..Math.Min(12, runKey.Length)]}: {o.Trades} trades, {o.Stored} new rows, {o.NoBars} without bars"));
+                await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"features of run {runKey[..Math.Min(12, runKey.Length)]}: {o.Trades} trades, {o.Stored} new rows, {o.NoBars} without bars, {o.Stale} stale (pre-seam admission lost)"));
             }
 
             return XdCommand.Done;
