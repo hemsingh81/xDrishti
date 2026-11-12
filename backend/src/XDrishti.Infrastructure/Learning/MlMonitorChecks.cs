@@ -15,6 +15,14 @@ internal sealed class MlMonitorChecks(NpgsqlDataSource dataSource) : IMlMonitorC
         return await select.ExecuteScalarAsync(cancellationToken) is not null;
     }
 
+    public async ValueTask<StoredMlMonitorCheck?> LatestAsync(long modelId, CancellationToken cancellationToken)
+    {
+        await using var select = dataSource.CreateCommand("SELECT checked_on, verdicts::text FROM research.ml_monitor_checks WHERE model_id = @model ORDER BY checked_on DESC LIMIT 1");
+        select.Parameters.AddWithValue("model", NpgsqlDbType.Bigint, modelId);
+        await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? new StoredMlMonitorCheck(DateOnly.FromDateTime(reader.GetDateTime(0)), reader.GetString(1)) : null;
+    }
+
     public async ValueTask<bool> InsertAsync(NewMlMonitorCheck check, DateOnly day, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(check);

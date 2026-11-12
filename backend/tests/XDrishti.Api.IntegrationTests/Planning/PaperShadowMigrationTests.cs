@@ -34,10 +34,40 @@ public sealed class PaperShadowMigrationTests(ApiFactory factory)
     private const int ObjectCount = 4 + 5 + 4;
 
     private const string Objects = """
-        SELECT (SELECT count(*) FROM pg_tables WHERE schemaname = 'paper' AND tablename LIKE 'shadow\_%')
-             + (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'paper' AND (p.proname LIKE '%shadow%'))
-             + (SELECT count(*) FROM pg_trigger WHERE tgname LIKE 'trg\_shadow\_%' AND NOT tgisinternal)
+        SELECT (SELECT count(*) FROM pg_tables WHERE schemaname = 'paper' AND tablename LIKE 'shadow\_%' AND tablename <> 'shadow_scores')
+             + (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'paper' AND (p.proname LIKE '%shadow%' AND p.proname <> 'guard_shadow_score'))
+             + (SELECT count(*) FROM pg_trigger WHERE tgname LIKE 'trg\_shadow\_%' AND tgname <> 'trg_shadow_scores_guard' AND NOT tgisinternal)
         """;
+
+    private const string ScoreObjects = """
+        SELECT (SELECT count(*) FROM pg_tables WHERE schemaname = 'paper' AND tablename = 'shadow_scores')
+             + (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'paper' AND p.proname = 'guard_shadow_score')
+             + (SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_shadow_scores_guard' AND NOT tgisinternal)
+        """;
+
+    [Fact]
+    public async Task The_shadow_scores_migration_Down_removes_exactly_its_table_function_and_trigger_and_Up_restores_them_leaving_the_first_migrations_objects_whole()
+    {
+        // CF-10e part 10e-1 (ADR 0281): the objects of AddShadowScores are counted apart from those of AddPaperShadow
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_paper_shadow_scores_probe", Ct);
+        using var scope = scratch.Host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>();
+        var migrator = db.GetService<IMigrator>();
+        await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+        await connection.OpenAsync(Ct);
+
+        (await CountAsync(connection, ScoreObjects)).ShouldBe(3, "one table, one guard function and one trigger");
+
+        await migrator.MigrateAsync("20261112120000_AddListDays", Ct);
+
+        (await CountAsync(connection, ScoreObjects)).ShouldBe(0);
+        (await CountAsync(connection, Objects)).ShouldBe(ObjectCount, "the objects of the first shadow migration are untouched");
+
+        await migrator.MigrateAsync(null, Ct);
+
+        (await CountAsync(connection, ScoreObjects)).ShouldBe(3);
+        (await CountAsync(connection, Objects)).ShouldBe(ObjectCount);
+    }
 
     [Fact]
     public async Task The_migration_agrees_with_the_model_and_Down_and_Up_again_remove_and_restore_every_object()

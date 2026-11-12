@@ -34,6 +34,24 @@ internal sealed class HistoryOptions
     [ValidateObjectMembers]
     public ReplayOptions Replay { get; set; } = new();
 
+    [Required]
+    [ValidateObjectMembers]
+    public ListsOptions Lists { get; set; } = new();
+
+    /// <summary>The dated ban-list archive (DATA-01, ADR 0274). OFF by default.</summary>
+    internal sealed class ListsOptions
+    {
+        /// <summary><c>Data:History:Lists:Enabled</c>, default false: with it off the probe and the backfill make no request at all.</summary>
+        public bool Enabled { get; set; }
+
+        [Range(1, 10_000)]
+        public int MaxPerDay { get; set; } = 500;
+
+        /// <summary>The wait between two requests, in milliseconds.</summary>
+        [Range(250, 60_000)]
+        public int DelayMs { get; set; } = 1_500;
+    }
+
     /// <summary>What a simulation does with backfilled pre-seam bars (CF-04d, ADR 0273).</summary>
     internal sealed class ReplayOptions
     {

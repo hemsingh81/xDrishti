@@ -26,7 +26,10 @@ internal sealed class FakeModelRegistry(ChangelogHandlersTests.FakeChangelog log
     public ValueTask<IReadOnlyList<StoredModel>> ListAsync(ModelRole? role, int limit, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<StoredModel>>([.. Models.Values.Where(m => role is null || m.Role == role).OrderByDescending(m => m.Id).Take(limit)]);
 
-    public ValueTask<IReadOnlyList<StoredDesignation>> DesignationsAsync(long id, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public ValueTask<bool> AnyChampionEverAsync(CancellationToken cancellationToken) => ValueTask.FromResult(Designations.Any(d => d.Role == ModelRole.Champion) || Models.Values.Any(m => m.Role == ModelRole.Champion));
+
+    public ValueTask<IReadOnlyList<StoredDesignation>> DesignationsAsync(long id, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<StoredDesignation>>([.. Designations.Where(d => d.Id == id).Select((d, i) => new StoredDesignation(i + 1, d.Id, d.Role, d.Reason, DateTimeOffset.UnixEpoch, d.Actor))]);
 
     /// <summary>Runs inside <see cref="DesignateAsync"/> as the write starts (before the role is read under the lock), to let another caller change the role first.</summary>
     public Action<long>? BeforeDesignate { get; set; }

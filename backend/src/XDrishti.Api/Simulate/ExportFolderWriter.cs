@@ -52,7 +52,7 @@ internal sealed class ExportFolderWriter
     private static bool Exists(string path) => Directory.Exists(path) || File.Exists(path) || ExportPaths.IsLink(path);
 
     /// <summary>Creates a folder owner-only at creation (no umask window); an existing folder is left as it is.</summary>
-    private static void CreateDirectory(string path)
+    internal static void CreateDirectory(string path)
     {
         if (OperatingSystem.IsWindows())
         {
@@ -63,7 +63,7 @@ internal sealed class ExportFolderWriter
     }
 
     /// <summary>Opens a new file owner-only at creation; it must not exist.</summary>
-    private static FileStream OpenNew(string path)
+    internal static FileStream OpenNew(string path)
     {
         if (OperatingSystem.IsWindows())
         {

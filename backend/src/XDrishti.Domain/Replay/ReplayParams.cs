@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace XDrishti.Domain.Replay;
 
 /// <summary>
@@ -13,7 +15,8 @@ namespace XDrishti.Domain.Replay;
 /// <param name="Mode">Frozen or learning.</param>
 /// <param name="FiltersWithoutHistory">Off by default (the live behaviour). On: the event, F&amp;O-ban and surveillance filters, which have no history, do not hold candidates back (label <c>filters_without_history</c>).</param>
 /// <param name="IncludeResearchCells">Off by default. On: a cell in the research state (or with no recorded state) can be a candidate, as the changelog is empty before October 2026 (label <c>research_cells</c>).</param>
-public sealed record ReplayParams(DateOnly From, DateOnly To, ReplayScope Scope, decimal Capital, ReplayRiskProfile Profile, string? CostSheetId, ReplayVersionRule VersionRule, ReplayMode Mode, bool FiltersWithoutHistory = false, bool IncludeResearchCells = false)
+/// <param name="Arm">Selection (the default; left out of the stored text, so a run from before SR-02 keeps its hash) or the no-selection baseline (SR-02; frozen mode only).</param>
+public sealed record ReplayParams(DateOnly From, DateOnly To, ReplayScope Scope, decimal Capital, ReplayRiskProfile Profile, string? CostSheetId, ReplayVersionRule VersionRule, ReplayMode Mode, bool FiltersWithoutHistory = false, bool IncludeResearchCells = false, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] ReplayArm Arm = ReplayArm.Selection)
 {
     /// <summary>The problems of the values; empty when they are usable (From not after To, a scope, a positive capital, a usable profile).</summary>
     public IReadOnlyList<string> Problems()
@@ -43,9 +46,14 @@ public sealed record ReplayParams(DateOnly From, DateOnly To, ReplayScope Scope,
             p.AddRange(Profile.Problems());
         }
 
-        if (!Enum.IsDefined(VersionRule) || !Enum.IsDefined(Mode))
+        if (!Enum.IsDefined(VersionRule) || !Enum.IsDefined(Mode) || !Enum.IsDefined(Arm))
         {
-            p.Add("version rule or mode is not known");
+            p.Add("version rule, mode or arm is not known");
+        }
+
+        if (Arm == ReplayArm.Baseline && Mode != ReplayMode.Frozen)
+        {
+            p.Add("the baseline arm runs in frozen mode only");
         }
 
         return p;

@@ -4949,7 +4949,7 @@ export interface paths {
     /** The replay runs, newest first (skip, take 1 to 200, default 50): id, created, range, mode, state, completeness, final equity, max drawdown, trial number, costs label, hindsight labels. Read only. */
     get: operations['ListReplayRuns'];
     put?: never;
-    /** Start a replay of the whole system from a chosen date: body from, to (default the last readable session before the hold-out and its embargo), scope {basketIds, instrumentIds} (empty: the stored auto scope, its baskets read as of each session; at most 200 baskets and 2000 instruments), capital (default 1000000), riskProfileId (default the seeded standard profile), costs (null or gross, else the id of a stored charge sheet), versions (start or asOf, default start: today's active versions, labelled hindsight), modes (frozen and/or learning, default frozen; both give two linked runs and a pairId), filtersWithoutHistory and includeResearchCells (both default false; each is a labelled hindsight). 202 with runIds and pairId. 422 replay.invalid (bad input, an empty snapshot, the memory cap); 409 replay.busy (a replay is active, or the 1-minute backfill is incomplete), replay.holdout (to reaches the hold-out; the last allowed date is in the message) */
+    /** Start a replay of the whole system from a chosen date: body from, to (default the last readable session before the hold-out and its embargo), scope {basketIds, instrumentIds} (empty: the stored auto scope, its baskets read as of each session; at most 200 baskets and 2000 instruments), capital (default 1000000), riskProfileId (default the seeded standard profile), costs (null or gross, else the id of a stored charge sheet), versions (start or asOf, default start: today's active versions, labelled hindsight), modes (frozen and/or learning, default frozen; both give two linked runs and a pairId), filtersWithoutHistory and includeResearchCells (both default false; each is a labelled hindsight), baseline (default false; frozen mode only: also runs the no-selection baseline, one request and one pairId, compared by GET /pairs/{pairId} as selectionVsBaseline). 202 with runIds and pairId. 422 replay.invalid (bad input, an empty snapshot, the memory cap); 409 replay.busy (a replay is active, or the 1-minute backfill is incomplete), replay.holdout (to reaches the hold-out; the last allowed date is in the message) */
     post: operations['StartReplay'];
     delete?: never;
     options?: never;
@@ -5053,6 +5053,74 @@ export interface paths {
     get: operations['GetReplayPair'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/runs/{id}/trades/{tradeNo}/chart': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One replay trade on its bars (query timeframe 1m, 5m, 15m, 1h or 1D, default 5m; before and after in sessions): the P8-11 chart block (bars, coherence) and the markers of entry, stop and exit, from the session before the entry to the session after the exit through the hold-out clamp (a window past it is cut and says so in limits). The exit price is derived from the gross result. At most 5,000 bars. 404 replay.not_found; 422 bad query or too many bars. Read only. */
+    get: operations['GetReplayTradeChart'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/sweeps': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start a start-date sweep: body starts (2 to 12 distinct dates), to (the shared end, default the last readable session), scope, capital, riskProfileId, costs, versions, filtersWithoutHistory, includeResearchCells as for a start; frozen mode, selection arm. One queued run per start, run one at a time in date order; each is one trial-ledger look ("this sweep adds N replay looks"). 202 with sweepId and runIds. 422 replay.invalid (count, duplicates, a start within 126 sessions of the end or without cell statistics as of it: each bad date is named); 409 replay.busy (any replay is active), replay.holdout */
+    post: operations['StartReplaySweep'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/sweeps/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** A sweep: hindsight labels, looks added, one row per start in date order (run id, state, CAGR, max drawdown, final equity, trades, beats the benchmark) and the spread over the completed starts (min, median and max of CAGR and of max drawdown, the share with CAGR above 0, the share beating the benchmark), and complete. Read only. */
+    get: operations['GetReplaySweep'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/sweeps/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Stop a sweep: the run in flight after its session and every queued run. The trial-ledger rows stay. 202 with how many runs were stopped. 404 replay.sweep_not_found; 409 replay.not_active when it has finished. */
+    post: operations['CancelReplaySweep'];
     delete?: never;
     options?: never;
     head?: never;
@@ -21332,6 +21400,38 @@ export interface components {
       rejected: number;
       aggregateNote?: null | string;
     };
+    /**
+     * @description The selection run against the no-selection baseline of one request (SR-02, D2), computed on read by the same paired day bootstrap as the frozen-versus-learning pair. string? ReplayArmComparisonView.Answer is null while a run is not complete, with the reason; the probabilities are null with too little history.
+     *     string ReplayArmComparisonView.Label says what the baseline is (no choosing among the system's candidates, not random stocks) and string ReplayArmComparisonView.Shortcut that equity is realised only.
+     */
+    ReplayArmComparisonView: {
+      selection: components['schemas']['ReplayRunListItem'];
+      baseline: components['schemas']['ReplayRunListItem'];
+      answer: null | string;
+      reason: null | string;
+      /** Format: int32 */
+      days: null | number;
+      /** Format: int32 */
+      informativeDays: null | number;
+      /** Format: double */
+      meanDailyDifference: null | number;
+      /** Format: double */
+      probabilitySelectionBetter: null | number;
+      /** Format: double */
+      probabilityBaselineBetter: null | number;
+      /** Format: double */
+      low: null | number;
+      /** Format: double */
+      high: null | number;
+      /** Format: double */
+      cut: null | number;
+      /** Format: double */
+      hurtsBar: null | number;
+      /** Format: int32 */
+      minDays: null | number;
+      label: string;
+      shortcut: string;
+    };
     /** @description One bar: `t` is the epoch seconds of its start. */
     ReplayBarView: {
       /** Format: int64 */
@@ -21393,6 +21493,14 @@ export interface components {
       cellKey: string;
       /** Format: int32 */
       rank: number;
+    };
+    /** @description One mark on the replay-trade chart: the entry, the stop level or the exit. */
+    ReplayChartMarkerView: {
+      kind: string;
+      /** Format: date-time */
+      at: null | string;
+      /** Format: double */
+      price: number;
     };
     /** @description The bars of the replay window at one timeframe, adjusted for the corporate actions applied now, with the coherence of the stored entry against them. */
     ReplayChartView: {
@@ -21571,13 +21679,13 @@ export interface components {
       stopPrice: number;
       swing: boolean;
     };
-    /** @description The frozen-versus-learning comparison of a pair (AC 9), computed on read from the two stored runs. string? ReplayPairView.Answer is null while a run is not complete, with the reason. */
+    /** @description The comparison of a pair (AC 9): frozen versus learning, or (a baseline pair) ReplayArmComparisonView? ReplayPairView.SelectionVsBaseline with ReplayRunListItem? ReplayPairView.Frozen and ReplayRunListItem? ReplayPairView.Learning null. Computed on read from the stored runs. string? ReplayPairView.Answer is null while a run is not complete, with the reason. */
     ReplayPairView: {
       hindsight: components['schemas']['ReplayLabelView'][];
       /** Format: uuid */
       pairId: string;
-      frozen: components['schemas']['ReplayRunListItem'];
-      learning: components['schemas']['ReplayRunListItem'];
+      frozen: null | components['schemas']['ReplayRunListItem'];
+      learning: null | components['schemas']['ReplayRunListItem'];
       answer: null | string;
       reason: null | string;
       /** Format: int32 */
@@ -21600,6 +21708,7 @@ export interface components {
       hurtsBar: null | number;
       /** Format: int32 */
       minDays: null | number;
+      selectionVsBaseline?: null | components['schemas']['ReplayArmComparisonView'];
     };
     /** @description One row of the list of runs. */
     ReplayRunListItem: {
@@ -21624,6 +21733,10 @@ export interface components {
       /** Format: int32 */
       trialNumber: number;
       costsLabel: string;
+      /** @default selection */
+      arm: string;
+      /** Format: uuid */
+      sweepId?: null | string;
     };
     /** @description The summary of one run: settings snapshot, hashes, hindsight labels first, completeness, figures and the costs label. */
     ReplayRunView: {
@@ -21654,6 +21767,10 @@ export interface components {
       settingsSnapshot: components['schemas']['JsonElement'];
       figures: null | components['schemas']['ReplayFigures'];
       contribution: components['schemas']['ReplayStrategyContribution'][];
+      /** @default selection */
+      arm: string;
+      /** Format: uuid */
+      sweepId?: null | string;
     };
     /** @description The baskets and instruments a replay covers; both empty means the owner's stored auto scope, its baskets' members read as of each session. */
     ReplayScopeBody: {
@@ -21734,6 +21851,8 @@ export interface components {
       filtersWithoutHistory: boolean;
       /** @default false */
       includeResearchCells: boolean;
+      /** @default false */
+      baseline: boolean;
     };
     /** @description What one strategy contributed: closed trades, result in rupees (net, or gross when the run is) and the sum of R. */
     ReplayStrategyContribution: {
@@ -21744,6 +21863,121 @@ export interface components {
       result: number;
       /** Format: double */
       sumR: number;
+    };
+    /** @description The answer of a cancel of a sweep: how many runs were stopped or cancelled. */
+    ReplaySweepCancelView: {
+      /** Format: int32 */
+      runsStopped: number;
+    };
+    /** @description One start of a sweep: its run and the figures so far (each null where it cannot be told yet). */
+    ReplaySweepRunView: {
+      /** Format: uuid */
+      runId: string;
+      /** Format: date */
+      from: string;
+      state: string;
+      /** Format: int32 */
+      sessionsDone: number;
+      /** Format: int32 */
+      sessionsTotal: number;
+      /** Format: double */
+      finalEquity: null | number;
+      /** Format: double */
+      cagr: null | number;
+      /** Format: double */
+      maxDrawdownPct: null | number;
+      /** Format: int32 */
+      trades: null | number;
+      beatsBenchmark: null | boolean;
+      failReason: null | string;
+    };
+    /** @description The spread of a sweep (SR-02, D3): min, median and max of CAGR and of max drawdown, the share of starts with a CAGR above 0 and the share that beat the benchmark. Each is null where no start gave the figure. */
+    ReplaySweepSpread: {
+      /** Format: int32 */
+      starts: number;
+      cagr: null | components['schemas']['SweepSpread'];
+      maxDrawdownPct: null | components['schemas']['SweepSpread'];
+      /** Format: double */
+      shareCagrPositive: null | number;
+      /** Format: double */
+      shareBeatingBenchmark: null | number;
+    };
+    /** @description The body of the start of a start-date sweep (SR-02): 2 to 12 start dates that share the end date `to` (default the last readable session) and every other parameter of a start (frozen mode, selection arm). */
+    ReplaySweepStartBody: {
+      starts: string[];
+      /** Format: date */
+      to: null | string;
+      scope: null | components['schemas']['ReplayScopeBody'];
+      /** Format: double */
+      capital: null | number;
+      /** Format: uuid */
+      riskProfileId: null | string;
+      costs: null | string;
+      versions: null | string;
+      /** @default false */
+      filtersWithoutHistory: boolean;
+      /** @default false */
+      includeResearchCells: boolean;
+    };
+    /**
+     * @description A sweep (SR-02): the hindsight labels first, "this sweep adds N replay looks", one row per start in date order, and the spread over the finished starts (min, median and max of CAGR and max drawdown, the share with CAGR above 0, the share beating the benchmark).
+     *     string ReplaySweepView.State is running while any run is active, else completed, cancelled or failed; bool ReplaySweepView.Complete is true only when every start completed.
+     */
+    ReplaySweepView: {
+      hindsight: components['schemas']['ReplayLabelView'][];
+      /** Format: uuid */
+      sweepId: string;
+      /** Format: date */
+      to: string;
+      /** Format: date-time */
+      createdAt: string;
+      state: string;
+      complete: boolean;
+      /** Format: int32 */
+      looksAdded: number;
+      /** Format: int32 */
+      completedStarts: number;
+      costsLabel: string;
+      starts: components['schemas']['ReplaySweepRunView'][];
+      spread: components['schemas']['ReplaySweepSpread'];
+    };
+    /**
+     * @description One replay trade on its bars (SR-02, D4): the P8-11 `chart` block (bars, coherence), the markers and the trade's own figures. The bars are the 1-minute bars as the replay read them (through the hold-out clamp), not adjusted for later corporate actions.
+     *     bool ReplayTradeChartView.ExitPriceDerived is true because the exit price is not stored: it is the entry plus the gross result over the quantity (exact for gross figures).
+     */
+    ReplayTradeChartView: {
+      hindsight: components['schemas']['ReplayLabelView'][];
+      /** Format: uuid */
+      runId: string;
+      /** Format: int64 */
+      tradeNo: number;
+      symbol: string;
+      side: string;
+      /** Format: int32 */
+      qty: number;
+      /** Format: date */
+      entrySession: string;
+      /** Format: date-time */
+      entryAt: string;
+      /** Format: double */
+      entryPrice: number;
+      /** Format: double */
+      stopPrice: number;
+      /** Format: date */
+      exitSession: null | string;
+      /** Format: date-time */
+      exitAt: null | string;
+      /** Format: double */
+      exitPrice: null | number;
+      exitPriceDerived: boolean;
+      /** Format: double */
+      grossPnl: null | number;
+      /** Format: double */
+      netPnl: null | number;
+      costsLabel: string;
+      chart: components['schemas']['ReplayChartView'];
+      markers: components['schemas']['ReplayChartMarkerView'][];
+      limits: string[];
     };
     /** @description The trades of a run. */
     ReplayTradeListView: {
@@ -24035,6 +24269,11 @@ export interface components {
        * @description How many replays have looked at this range, this one included (AC 12): "the 7th replay of this range".
        */
       trialNumber: number;
+      /**
+       * Format: uuid
+       * @description The id the runs of a sweep share; null otherwise.
+       */
+      sweepId?: null | string;
     };
     /** @description Body of `POST /api/auth/step-up`. */
     StepUpRequest: {
@@ -24245,6 +24484,15 @@ export interface components {
       /** Format: double */
       totalR: null | number;
       error: null | string;
+    };
+    /** @description The least, the middle and the greatest of a figure over the starts. */
+    SweepSpread: {
+      /** Format: double */
+      min: number;
+      /** Format: double */
+      median: number;
+      /** Format: double */
+      max: number;
     };
     /**
      * @description Body of "Sync now" (optional). Confirm: true applies an answer that would close all or most open holdings, which is otherwise refused with
@@ -37998,6 +38246,164 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReplayTradeChart: {
+    parameters: {
+      query?: {
+        timeframe?: string;
+        before?: number;
+        after?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+        tradeNo: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReplayTradeChartView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  StartReplaySweep: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReplaySweepStartBody'];
+      };
+    };
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StartedReplay'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReplaySweep: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReplaySweepView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  CancelReplaySweep: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReplaySweepCancelView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

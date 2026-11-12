@@ -40,6 +40,8 @@ internal sealed class ListWorld
 
     public FakeMasterReader Master { get; } = new();
 
+    public XDrishti.Application.Abstractions.Market.Lists.IListDayStore Days { get; } = NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Market.Lists.IListDayStore>();
+
     public FakeTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 10, 26, 19, 5, 0, TimeSpan.FromMinutes(330)));
 
     public static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -48,7 +50,7 @@ internal sealed class ListWorld
 
     public static Guid LotsId => ListBaskets.LotSizes.Id;
 
-    public RunBasketFetchHandler Fetch => new(Settings, Store, Fetcher, Baskets, Applier, RunLock, ListSettings, new ListFileProcessor(Store, Baskets, Master), LotApplier, Clock, NullLogger<RunBasketFetchHandler>.Instance);
+    public RunBasketFetchHandler Fetch => new(Settings, Store, Fetcher, Baskets, Applier, RunLock, ListSettings, new ListFileProcessor(Store, Baskets, Master), LotApplier, Clock, NullLogger<RunBasketFetchHandler>.Instance, Days);
 
     public RefreshFlagListsHandler Refresh => new(Store, Master, Baskets, Applier, Clock, NullLogger<RefreshFlagListsHandler>.Instance);
 
