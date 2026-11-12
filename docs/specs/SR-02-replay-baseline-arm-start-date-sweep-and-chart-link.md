@@ -1,6 +1,6 @@
 # SR-02 — System replay: a no-selection baseline arm, a start-date sweep and the trade chart link
 
-- **Status:** Approved (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended). Not built.
+- **Status:** Built 2026-11-12, not deployed (approved as the coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended).
 - **Phase / roadmap row:** SR — System replay, row SR-02 (GAP-07 of the 2026-11-12 due-diligence review)
 - **Size:** about 4.5 agent-days (estimate, uncalibrated): **a** baseline arm and comparison 2 d · **b** start-date sweep 1.5 d · **c** replay-trade chart 1 d. The three parts are independent.
 - **Needs:** SR-01 (built, ADR 0272), P8-11 trade chart (built), CF-06 trial ledger. Net figures need ISS-25, as in SR-01.
@@ -118,12 +118,20 @@ The replay answers three things:
 - It adds no switch and places no order.
 
 ## Backend as built (2026-11-12, ADR 0279; screens still to build)
-- **Status:** backend of parts a, b and c built on `feature/sr-02`; frontend and `scripts/check.sh` open.
+- **Status:** backend of parts a, b and c built on `feature/sr-02`; frontend built (below); `scripts/check.sh` open.
 - **a. Baseline.** `ReplayArm` on `ReplayParams` (left out of the stored text when `Selection`, so old hashes hold); `BaselineSizer` (pure, uses the live `PerAccountAllocator` with r = min(risk, headroom / n)); a branch in `ReplaySessionRunner`; label `baseline_no_selection`; `ReplayPairComparison.CompareArms` (seeded `sr02|`); `POST /api/replay/runs` takes `baseline` (frozen only) and queues a selection and a baseline run with one `pairId`; `GET /api/replay/pairs/{id}` answers `selectionVsBaseline` (`frozen`, `learning` and the old answer fields are then null). Runs and list rows carry `arm` and `sweepId`.
 - **b. Sweep.** Migration `AddReplaySweeps` (Down included). `POST /api/replay/sweeps` (202 `{ runIds, pairId: null, trialNumber, sweepId }`), `GET /api/replay/sweeps/{id}`, `POST /api/replay/sweeps/{id}/cancel`. 422 names each bad start (fewer than 126 sessions, no cell statistics); 409 `replay.busy`. `ReplayFacts` now keeps one frozen snapshot per freeze date (the sweep prepares its runs on one instance).
 - **c. Chart.** `GET /api/replay/runs/{id}/trades/{tradeNo}/chart?timeframe&before&after`: P8-11 `chart` block, `markers` (entry, stop, exit), `limits`, derived `exitPrice` (`exitPriceDerived: true`); bars unadjusted, as the replay read them.
 - **Deviations.** (1) A symbol already open or repeated in a session is blocked as `capital` (`already_held`) in the baseline, so it is not doubled. (2) `exit_price` stays derived; no column was added. (3) The sweep is frozen and selection-arm only. (4) Sweep runs are one microsecond apart in `created_at` so the unchanged claim order is date order.
 - **Tests.** Domain (`ReplaySweepTests`, `ReplayArmComparisonTests`), Application (`BaselineSizerTests`, `ReplayBaselineArmTests`, `ReplaySweepHandlerTests`, `ReplayTradeChartTests`, `ReplayArmPairReadTests`, `ReplayExitPriceTests`), Architecture lists (write list, fence), integration (`ReplayStoreTests` sweep case, grants and migration lists).
+
+## Frontend as built (2026-11-12)
+- **Breaking type change.** `ReplayPairView.frozen` and `.learning` are nullable; `pairInterval` polls a baseline pair by the arms of `selectionVsBaseline`.
+- **a. Baseline.** A "With no-selection baseline" checkbox on the start form (frozen mode only; sends `baseline: true`). The equity chart draws the other arm of a pair as a solid line. `ArmComparisonCard` (replaces the frozen-against-learning card for a baseline pair): hindsight labels, "not random stocks" label, the realised-only shortcut, paired days, informative days (n), P both ways, the answer in plain words, and the `reason` when `answer` is null. The run picker marks a baseline run.
+- **b. Sweep.** A "New start-date sweep" form (every quarter x n, or explicit dates; shared end date, capital, risk profile, costs) posting `POST /api/replay/sweeps`; it says "this sweep adds N replay looks" before sending. `SweepCard` (`?sweep=<id>`, or the sweep of the chosen run): looks first, state, per-start table (state with sessions done, CAGR, max drawdown, final equity, trades, beats benchmark, link to the run), spread of the completed starts, a cancel button while running; polls every 3 s while running. 422 `replay.invalid` shows its per-start reasons, 409 `replay.busy` says a replay is running.
+- **c. Chart.** Trade symbols link to the lazy route `/simulation/replay/:runId/trades/:tradeNo` (`ReplayTradeChartPage`): `PriceChart` with entry and stop levels and entry and exit marks, the "exit price is derived" note, the trade facts and the `limits`; timeframe tabs; 404 and no-bars states.
+- **Deviations.** (1) The sweep form fixes the scope (auto), versions (today's active) and the two filter options (off), as the sweep is frozen and selection-arm only; only dates, end, capital, risk profile and costs are chosen. (2) No sweep list: a sweep opens from its address or from any of its runs. (3) The new route has no navigation entry (a detail route, like P8-11), and no e2e matrix row.
+- **Tests.** `ReplayBaseline.test.tsx`, `ReplaySweep.test.tsx`, `ReplayTradeChart.test.tsx` (Vitest + MSW); fixtures `src/test/replaySr02Fixtures.ts`.
 
 ## Done when
 - [ ] Every AC has evidence; `scripts/check.sh` green; reviewer: no blockers or majors.

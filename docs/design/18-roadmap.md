@@ -114,7 +114,7 @@ A due-diligence review on 2026-11-12 compared what is built with the owner's goa
 | CF-10e | [ML influence evidence sources](../specs/CF-10e-ml-influence-evidence-sources.md) | 6.5 d | CF-10; part a needs HO-01 | Spec Approved |
 | OPS-01 | [Evidence switches reachable](../specs/OPS-01-evidence-switches-reachable.md) | 1.5 d | CF-08, CF-04d | Spec Approved |
 | EV-01 | [Evidence preflight and first-evidence runbook](../specs/EV-01-evidence-preflight.md) | 1.5 d (runbook written) | none | Spec Approved |
-| SR-02 | [Replay baseline arm, start-date sweep, chart link](../specs/SR-02-replay-baseline-arm-start-date-sweep-and-chart-link.md) | 4.5 d | SR-01 | Backend built 2026-11-12 (ADR 0279), not deployed; screens open |
+| SR-02 | [Replay baseline arm, start-date sweep, chart link](../specs/SR-02-replay-baseline-arm-start-date-sweep-and-chart-link.md) | 4.5 d | SR-01 | Built 2026-11-12 (ADR 0279; backend and screens), not deployed |
 | SR-03 | [Pre-registered system replay over a hold-out block](../specs/SR-03-pre-registered-system-replay-over-a-hold-out-block.md) | 3 d | HO-01 and ISS-25 | Draft, owner decision |
 | DATA-01 | [Dated NSE ban and surveillance lists](../specs/DATA-01-dated-nse-ban-and-surveillance-lists.md) | 3 d | BK-01 pattern; the owner's NSE terms | Spec Approved |
 | AI-01 | [Assistant reads replay and readiness](../specs/AI-01-assistant-reads-replay-and-readiness.md) | 2 d | BK-12b | Spec Approved |
