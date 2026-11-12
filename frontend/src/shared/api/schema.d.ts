@@ -4898,7 +4898,7 @@ export interface paths {
     /** The replay runs, newest first (skip, take 1 to 200, default 50): id, created, range, mode, state, completeness, final equity, max drawdown, trial number, costs label, hindsight labels. Read only. */
     get: operations['ListReplayRuns'];
     put?: never;
-    /** Start a replay of the whole system from a chosen date: body from, to (default the last readable session before the hold-out and its embargo), scope {basketIds, instrumentIds} (empty: the stored auto scope with its baskets as of from), capital (default 1000000), riskProfileId (default the seeded standard profile), costs (null or gross, else the id of a stored charge sheet), versions (start or asOf, default asOf), modes (frozen and/or learning, default frozen; both give two linked runs and a pairId), filtersWithoutHistory and includeResearchCells (both default false; each is a labelled hindsight). 202 with runIds and pairId. 422 replay.invalid (bad input, an empty snapshot, the memory cap); 409 replay.busy (a replay is active, or the 1-minute backfill is incomplete), replay.holdout (to reaches the hold-out; the last allowed date is in the message) */
+    /** Start a replay of the whole system from a chosen date: body from, to (default the last readable session before the hold-out and its embargo), scope {basketIds, instrumentIds} (empty: the stored auto scope, its baskets read as of each session; at most 200 baskets and 2000 instruments), capital (default 1000000), riskProfileId (default the seeded standard profile), costs (null or gross, else the id of a stored charge sheet), versions (start or asOf, default start: today's active versions, labelled hindsight), modes (frozen and/or learning, default frozen; both give two linked runs and a pairId), filtersWithoutHistory and includeResearchCells (both default false; each is a labelled hindsight). 202 with runIds and pairId. 422 replay.invalid (bad input, an empty snapshot, the memory cap); 409 replay.busy (a replay is active, or the 1-minute backfill is incomplete), replay.holdout (to reaches the hold-out; the last allowed date is in the message) */
     post: operations['StartReplay'];
     delete?: never;
     options?: never;
@@ -4981,7 +4981,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The trades of the replay book in booking order, each with a barsRoute to the instrument's day bars where its symbol names one instrument. Read only. */
+    /** The trades of the replay book in booking order, with the strategy, entry, exit, costs and R of each. Read only. */
     get: operations['ListReplayTrades'];
     put?: never;
     post?: never;
@@ -21182,7 +21182,7 @@ export interface components {
       reason: string;
       detail: string;
     };
-    /** @description One trade of the replay book. string? ReplayBookTradeView.BarsRoute opens the instrument's day bars when the symbol matches exactly one instrument (P8-11 addresses the trades of a stored simulation run by its key, which a replay trade is not). */
+    /** @description One trade of the replay book. */
     ReplayBookTradeView: {
       /** Format: int64 */
       tradeNo: number;
@@ -21209,7 +21209,6 @@ export interface components {
       netPnl: null | number;
       /** Format: double */
       r: null | number;
-      barsRoute: null | string;
     };
     /** @description The answer of a cancel: the new state, cancelled for a run that had not started and cancelling for one that is running. */
     ReplayCancelView: {
@@ -21301,6 +21300,7 @@ export interface components {
     };
     /** @description The equity curve of a run against its benchmark (Nifty 500 unless the owner chose another index for the basket reports). */
     ReplayEquityView: {
+      hindsight: components['schemas']['ReplayLabelView'][];
       /** Format: uuid */
       runId: string;
       completeness: components['schemas']['ReplayCompleteness'];
@@ -21401,6 +21401,7 @@ export interface components {
     };
     /** @description The frozen-versus-learning comparison of a pair (AC 9), computed on read from the two stored runs. string? ReplayPairView.Answer is null while a run is not complete, with the reason. */
     ReplayPairView: {
+      hindsight: components['schemas']['ReplayLabelView'][];
       /** Format: uuid */
       pairId: string;
       frozen: components['schemas']['ReplayRunListItem'];
@@ -21430,6 +21431,7 @@ export interface components {
     };
     /** @description One row of the list of runs. */
     ReplayRunListItem: {
+      hindsight: components['schemas']['ReplayLabelView'][];
       /** Format: uuid */
       id: string;
       /** Format: uuid */
@@ -21450,7 +21452,6 @@ export interface components {
       /** Format: int32 */
       trialNumber: number;
       costsLabel: string;
-      hindsight: components['schemas']['ReplayLabelView'][];
     };
     /** @description The summary of one run: settings snapshot, hashes, hindsight labels first, completeness, figures and the costs label. */
     ReplayRunView: {
@@ -21506,10 +21507,11 @@ export interface components {
       drawdownPct: null | number;
       /** Format: int32 */
       openPositions: number;
-      labels: string[];
+      labels: components['schemas']['ReplayLabelView'][];
     };
     /** @description The sessions of a run, one row each. */
     ReplaySessionListView: {
+      hindsight: components['schemas']['ReplayLabelView'][];
       /** Format: uuid */
       runId: string;
       completeness: components['schemas']['ReplayCompleteness'];
@@ -21518,6 +21520,7 @@ export interface components {
     };
     /** @description The full record of one session. */
     ReplaySessionView: {
+      hindsight: components['schemas']['ReplayLabelView'][];
       /** Format: uuid */
       runId: string;
       /** Format: date */
@@ -21537,12 +21540,11 @@ export interface components {
       openRiskPct: null | number;
       /** Format: int32 */
       openPositions: number;
-      labels: string[];
       notes: string[];
       openBookComplete: boolean;
       openBook: components['schemas']['ReplayOpenPositionView'][];
     };
-    /** @description The body of the start of a replay (SR-01 part C). Defaults: to is the last readable session before the hold-out and its embargo, capital 1000000, the seeded standard profile, gross costs (costs null or "gross"; otherwise the id of a stored charge sheet), versions asOf, modes frozen. */
+    /** @description The body of the start of a replay (SR-01 part C). Defaults: to is the last readable session before the hold-out and its embargo, capital 1000000, the seeded standard profile, gross costs (costs null or "gross"; otherwise the id of a stored charge sheet), versions start (the version active today, a labelled hindsight), modes frozen. */
     ReplayStartBody: {
       /** Format: date */
       from: string;
@@ -21573,6 +21575,7 @@ export interface components {
     };
     /** @description The trades of a run. */
     ReplayTradeListView: {
+      hindsight: components['schemas']['ReplayLabelView'][];
       /** Format: uuid */
       runId: string;
       completeness: components['schemas']['ReplayCompleteness'];

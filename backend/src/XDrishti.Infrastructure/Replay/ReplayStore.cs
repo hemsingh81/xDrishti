@@ -16,8 +16,9 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
         SELECT r.id, r.pair_id, r.range_from, r.range_to, r.mode, r.params::text, r.settings_snapshot::text, r.versions::text, r.learning_sources, r.input_hash, r.scope_hash, r.result_hash, r.state, r.cursor_session,
                (SELECT count(*)::int FROM research.replay_sessions s WHERE s.run_id = r.id), r.sessions_total,
                (SELECT count(*)::int FROM research.replay_runs o WHERE o.range_from = r.range_from AND o.range_to = r.range_to AND (o.created_at, o.id) <= (r.created_at, r.id)),
-               r.created_at, r.finished_at, r.fail_reason
+               r.created_at, r.finished_at, r.fail_reason, l.equity, l.drawdown
         FROM research.replay_runs r
+        LEFT JOIN LATERAL (SELECT s.equity, s.drawdown FROM research.replay_sessions s WHERE s.run_id = r.id AND s.session = r.cursor_session) l ON true
         """;
 
     private const string TradeInsert = """
@@ -259,6 +260,39 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
         return rows;
     }
 
+    public async ValueTask<IReadOnlyList<ReplayEquityRow>> EquityAsync(Guid runId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("""
+            SELECT session, equity, drawdown, COALESCE((record->>'openPositions')::int, 0) FROM research.replay_sessions
+            WHERE run_id = @id AND (@from::date IS NULL OR session >= @from) AND (@to::date IS NULL OR session <= @to) ORDER BY session
+            """);
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, runId);
+        command.Parameters.AddWithValue("from", NpgsqlDbType.Date, (object?)from ?? DBNull.Value);
+        command.Parameters.AddWithValue("to", NpgsqlDbType.Date, (object?)to ?? DBNull.Value);
+        var rows = new List<ReplayEquityRow>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new ReplayEquityRow(Day(reader, 0)!.Value, reader.GetDecimal(1), Money(reader, 2), reader.GetInt32(3)));
+        }
+
+        return rows;
+    }
+
+    public async ValueTask<IReadOnlyList<string>> LabelsAsync(Guid runId, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT DISTINCT l FROM research.replay_sessions s, jsonb_array_elements_text(s.record->'labels') AS l WHERE s.run_id = @id ORDER BY l");
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, runId);
+        var rows = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(reader.GetString(0));
+        }
+
+        return rows;
+    }
+
     public async ValueTask<ReplaySessionRow?> SessionAsync(Guid runId, DateOnly session, CancellationToken cancellationToken) =>
         OneOf(await SessionsAsync(runId, session, session, cancellationToken));
 
@@ -336,7 +370,7 @@ internal sealed class ReplayStore(NpgsqlDataSource dataSource) : IReplayStore, I
             rows.Add(new ReplayRunRow(
                 reader.GetGuid(0), reader.IsDBNull(1) ? null : reader.GetGuid(1), Day(reader, 2)!.Value, Day(reader, 3)!.Value, reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.IsDBNull(8) ? null : reader.GetString(8), reader.GetString(9), reader.GetString(10),
                 reader.IsDBNull(11) ? null : reader.GetString(11), reader.GetString(12), Day(reader, 13), reader.GetInt32(14), reader.GetInt32(15), reader.GetInt32(16), reader.GetFieldValue<DateTimeOffset>(17),
-                reader.IsDBNull(18) ? null : reader.GetFieldValue<DateTimeOffset>(18), reader.IsDBNull(19) ? null : reader.GetString(19)));
+                reader.IsDBNull(18) ? null : reader.GetFieldValue<DateTimeOffset>(18), reader.IsDBNull(19) ? null : reader.GetString(19), Money(reader, 20), Money(reader, 21)));
         }
 
         return rows;

@@ -16805,7 +16805,7 @@
         "tags": [
           "Replay"
         ],
-        "summary": "Start a replay of the whole system from a chosen date: body from, to (default the last readable session before the hold-out and its embargo), scope {basketIds, instrumentIds} (empty: the stored auto scope with its baskets as of from), capital (default 1000000), riskProfileId (default the seeded standard profile), costs (null or gross, else the id of a stored charge sheet), versions (start or asOf, default asOf), modes (frozen and/or learning, default frozen; both give two linked runs and a pairId), filtersWithoutHistory and includeResearchCells (both default false; each is a labelled hindsight). 202 with runIds and pairId. 422 replay.invalid (bad input, an empty snapshot, the memory cap); 409 replay.busy (a replay is active, or the 1-minute backfill is incomplete), replay.holdout (to reaches the hold-out; the last allowed date is in the message)",
+        "summary": "Start a replay of the whole system from a chosen date: body from, to (default the last readable session before the hold-out and its embargo), scope {basketIds, instrumentIds} (empty: the stored auto scope, its baskets read as of each session; at most 200 baskets and 2000 instruments), capital (default 1000000), riskProfileId (default the seeded standard profile), costs (null or gross, else the id of a stored charge sheet), versions (start or asOf, default start: today's active versions, labelled hindsight), modes (frozen and/or learning, default frozen; both give two linked runs and a pairId), filtersWithoutHistory and includeResearchCells (both default false; each is a labelled hindsight). 202 with runIds and pairId. 422 replay.invalid (bad input, an empty snapshot, the memory cap); 409 replay.busy (a replay is active, or the 1-minute backfill is incomplete), replay.holdout (to reaches the hold-out; the last allowed date is in the message)",
         "operationId": "StartReplay",
         "requestBody": {
           "content": {
@@ -17147,7 +17147,7 @@
         "tags": [
           "Replay"
         ],
-        "summary": "The trades of the replay book in booking order, each with a barsRoute to the instrument's day bars where its symbol names one instrument. Read only.",
+        "summary": "The trades of the replay book in booking order, with the strategy, entry, exit, costs and R of each. Read only.",
         "operationId": "ListReplayTrades",
         "parameters": [
           {
@@ -63189,8 +63189,7 @@
           "grossPnl",
           "charges",
           "netPnl",
-          "r",
-          "barsRoute"
+          "r"
         ],
         "type": "object",
         "properties": {
@@ -63263,15 +63262,9 @@
               "number"
             ],
             "format": "double"
-          },
-          "barsRoute": {
-            "type": [
-              "null",
-              "string"
-            ]
           }
         },
-        "description": "One trade of the replay book. string? ReplayBookTradeView.BarsRoute opens the instrument's day bars when the symbol matches exactly one instrument (P8-11 addresses the trades of a stored simulation run by its key, which a replay trade is not)."
+        "description": "One trade of the replay book."
       },
       "ReplayCancelView": {
         "required": [
@@ -63513,6 +63506,7 @@
       },
       "ReplayEquityView": {
         "required": [
+          "hindsight",
           "runId",
           "completeness",
           "costsLabel",
@@ -63524,6 +63518,12 @@
         ],
         "type": "object",
         "properties": {
+          "hindsight": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayLabelView"
+            }
+          },
           "runId": {
             "type": "string",
             "format": "uuid"
@@ -63848,6 +63848,7 @@
       },
       "ReplayPairView": {
         "required": [
+          "hindsight",
           "pairId",
           "frozen",
           "learning",
@@ -63866,6 +63867,12 @@
         ],
         "type": "object",
         "properties": {
+          "hindsight": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayLabelView"
+            }
+          },
           "pairId": {
             "type": "string",
             "format": "uuid"
@@ -63963,6 +63970,7 @@
       },
       "ReplayRunListItem": {
         "required": [
+          "hindsight",
           "id",
           "pairId",
           "createdAt",
@@ -63974,11 +63982,16 @@
           "finalEquity",
           "maxDrawdownPct",
           "trialNumber",
-          "costsLabel",
-          "hindsight"
+          "costsLabel"
         ],
         "type": "object",
         "properties": {
+          "hindsight": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayLabelView"
+            }
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -64031,12 +64044,6 @@
           },
           "costsLabel": {
             "type": "string"
-          },
-          "hindsight": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ReplayLabelView"
-            }
           }
         },
         "description": "One row of the list of runs."
@@ -64246,7 +64253,7 @@
           "labels": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/ReplayLabelView"
             }
           }
         },
@@ -64254,6 +64261,7 @@
       },
       "ReplaySessionListView": {
         "required": [
+          "hindsight",
           "runId",
           "completeness",
           "costsLabel",
@@ -64261,6 +64269,12 @@
         ],
         "type": "object",
         "properties": {
+          "hindsight": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayLabelView"
+            }
+          },
           "runId": {
             "type": "string",
             "format": "uuid"
@@ -64282,6 +64296,7 @@
       },
       "ReplaySessionView": {
         "required": [
+          "hindsight",
           "runId",
           "session",
           "costsLabel",
@@ -64295,13 +64310,18 @@
           "drawdownPct",
           "openRiskPct",
           "openPositions",
-          "labels",
           "notes",
           "openBookComplete",
           "openBook"
         ],
         "type": "object",
         "properties": {
+          "hindsight": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayLabelView"
+            }
+          },
           "runId": {
             "type": "string",
             "format": "uuid"
@@ -64370,12 +64390,6 @@
           "openPositions": {
             "type": "integer",
             "format": "int32"
-          },
-          "labels": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
           },
           "notes": {
             "type": "array",
@@ -64473,7 +64487,7 @@
             "default": false
           }
         },
-        "description": "The body of the start of a replay (SR-01 part C). Defaults: to is the last readable session before the hold-out and its embargo, capital 1000000, the seeded standard profile, gross costs (costs null or \"gross\"; otherwise the id of a stored charge sheet), versions asOf, modes frozen."
+        "description": "The body of the start of a replay (SR-01 part C). Defaults: to is the last readable session before the hold-out and its embargo, capital 1000000, the seeded standard profile, gross costs (costs null or \"gross\"; otherwise the id of a stored charge sheet), versions start (the version active today, a labelled hindsight), modes frozen."
       },
       "ReplayStrategyContribution": {
         "required": [
@@ -64504,6 +64518,7 @@
       },
       "ReplayTradeListView": {
         "required": [
+          "hindsight",
           "runId",
           "completeness",
           "costsLabel",
@@ -64511,6 +64526,12 @@
         ],
         "type": "object",
         "properties": {
+          "hindsight": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayLabelView"
+            }
+          },
           "runId": {
             "type": "string",
             "format": "uuid"

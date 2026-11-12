@@ -19,7 +19,7 @@ internal sealed class ReplayEndpoints : IEndpointModule
 
         group.MapPost("/runs", StartAsync)
             .WithName("StartReplay")
-            .WithSummary("Start a replay of the whole system from a chosen date: body from, to (default the last readable session before the hold-out and its embargo), scope {basketIds, instrumentIds} (empty: the stored auto scope with its baskets as of from), capital (default 1000000), riskProfileId (default the seeded standard profile), costs (null or gross, else the id of a stored charge sheet), versions (start or asOf, default asOf), modes (frozen and/or learning, default frozen; both give two linked runs and a pairId), filtersWithoutHistory and includeResearchCells (both default false; each is a labelled hindsight). 202 with runIds and pairId. 422 replay.invalid (bad input, an empty snapshot, the memory cap); 409 replay.busy (a replay is active, or the 1-minute backfill is incomplete), replay.holdout (to reaches the hold-out; the last allowed date is in the message)")
+            .WithSummary("Start a replay of the whole system from a chosen date: body from, to (default the last readable session before the hold-out and its embargo), scope {basketIds, instrumentIds} (empty: the stored auto scope, its baskets read as of each session; at most 200 baskets and 2000 instruments), capital (default 1000000), riskProfileId (default the seeded standard profile), costs (null or gross, else the id of a stored charge sheet), versions (start or asOf, default start: today's active versions, labelled hindsight), modes (frozen and/or learning, default frozen; both give two linked runs and a pairId), filtersWithoutHistory and includeResearchCells (both default false; each is a labelled hindsight). 202 with runIds and pairId. 422 replay.invalid (bad input, an empty snapshot, the memory cap); 409 replay.busy (a replay is active, or the 1-minute backfill is incomplete), replay.holdout (to reaches the hold-out; the last allowed date is in the message)")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
@@ -50,7 +50,7 @@ internal sealed class ReplayEndpoints : IEndpointModule
 
         group.MapGet("/runs/{id:guid}/trades", TradesAsync)
             .WithName("ListReplayTrades")
-            .WithSummary("The trades of the replay book in booking order, each with a barsRoute to the instrument's day bars where its symbol names one instrument. Read only.")
+            .WithSummary("The trades of the replay book in booking order, with the strategy, entry, exit, costs and R of each. Read only.")
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapGet("/pairs/{pairId:guid}", PairAsync)

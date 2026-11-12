@@ -25,7 +25,20 @@ public sealed class ReplayApiTests(ApiFactory factory) : DataTestBase(factory)
     {
         await base.InitializeAsync();
         await using var connection = await OpenAsync();
-        await ExecuteAsync(connection, "DELETE FROM research.replay_trades; DELETE FROM research.replay_sessions; DELETE FROM research.replay_runs;");
+        await ExecuteAsync(connection, "DELETE FROM research.replay_trades; DELETE FROM research.replay_sessions; DELETE FROM research.replay_runs; DELETE FROM lab.test_ledger WHERE trial_kind = 'system_replay';");
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        Factory.ReplayStart.Facts = null;
+        Factory.ReplayStart.Gate = null;
+        await base.DisposeAsync();
+    }
+
+    private void StubStart(int members = 2, bool cells = true)
+    {
+        Factory.ReplayStart.Facts = new StubReplayFacts { Members = members, Cells = cells };
+        Factory.ReplayStart.Gate = new CompleteBackfill();
     }
 
     private static NewReplayRun New(string mode = "frozen", string? sheet = null, int minutes = 0)
@@ -106,14 +119,19 @@ public sealed class ReplayApiTests(ApiFactory factory) : DataTestBase(factory)
     }
 
     [Fact]
-    public async Task A_start_without_the_csrf_token_is_refused()
+    public async Task A_start_and_a_cancel_without_the_csrf_token_are_403_auth_csrf_invalid()
     {
         using var noToken = Factory.CreateAnonymousClient();
         noToken.DefaultRequestHeaders.Add("Cookie", Owner.CookieHeader);
 
-        using var response = await noToken.PostAsJsonAsync(new Uri("/api/replay/runs", UriKind.Relative), new { from = "2026-10-05", to = "2026-10-06" }, Ct);
+        using var start = await noToken.PostAsJsonAsync(new Uri("/api/replay/runs", UriKind.Relative), new { from = "2026-10-05", to = "2026-10-06" }, Ct);
+        using var cancel = await noToken.PostAsync(new Uri($"/api/replay/runs/{Guid.NewGuid()}/cancel", UriKind.Relative), null, Ct);
 
-        response.StatusCode.ShouldBeOneOf(HttpStatusCode.Forbidden, HttpStatusCode.BadRequest);
+        foreach (var response in new[] { start, cancel })
+        {
+            response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+            (await response.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("code").GetString().ShouldBe("auth.csrf_invalid");
+        }
     }
 
     [Fact]
@@ -238,5 +256,64 @@ public sealed class ReplayApiTests(ApiFactory factory) : DataTestBase(factory)
         answered.GetProperty("days").GetInt32().ShouldBe(2);
         answered.GetProperty("frozen").GetProperty("mode").GetString().ShouldBe("frozen");
         answered.GetProperty("learning").GetProperty("mode").GetString().ShouldBe("learning");
+    }
+
+    [Fact]
+    public async Task A_start_answers_202_stores_the_run_and_its_ledger_rows_and_gives_a_pair_for_both_modes()
+    {
+        StubStart();
+        var scope = new { basketIds = new[] { Guid.NewGuid() } };
+
+        using var one = await Client.PostAsJsonAsync(new Uri("/api/replay/runs", UriKind.Relative), new { from = "2026-06-22", scope }, Ct);
+
+        one.StatusCode.ShouldBe(HttpStatusCode.Accepted, await one.Content.ReadAsStringAsync(Ct));
+        var started = await one.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        var id = started.GetProperty("runIds")[0].GetGuid();
+        started.GetProperty("pairId").ValueKind.ShouldBe(JsonValueKind.Null);
+        var run = await GetAsync($"/api/replay/runs/{id}");
+        run.GetProperty("state").GetString().ShouldBe("queued");
+        run.GetProperty("to").GetString().ShouldBe("2026-06-30"); // the default end: the last readable session
+        run.GetProperty("hindsight").EnumerateArray().Select(l => l.GetProperty("code").GetString()).ShouldContain("versions_start"); // the default rule is start
+        (await ScalarAsync<long>("SELECT count(*) FROM lab.test_ledger WHERE trial_kind = 'system_replay'")).ShouldBe(1);
+        using var cancel = await Client.PostAsync(new Uri($"/api/replay/runs/{id}/cancel", UriKind.Relative), null, Ct);
+        cancel.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        using var both = await Client.PostAsJsonAsync(new Uri("/api/replay/runs", UriKind.Relative), new { from = "2026-06-22", scope, modes = (string[])["frozen", "learning"] }, Ct);
+
+        both.StatusCode.ShouldBe(HttpStatusCode.Accepted, await both.Content.ReadAsStringAsync(Ct));
+        var pair = await both.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        pair.GetProperty("runIds").GetArrayLength().ShouldBe(2);
+        var pairId = pair.GetProperty("pairId").GetGuid();
+        (await GetAsync($"/api/replay/pairs/{pairId}")).GetProperty("frozen").GetProperty("mode").GetString().ShouldBe("frozen");
+    }
+
+    [Fact]
+    public async Task No_cell_statistics_as_of_the_start_is_422_replay_invalid()
+    {
+        StubStart(cells: false);
+
+        var code = await PostCodeAsync("/api/replay/runs", new { from = "2026-06-22", scope = new { basketIds = new[] { Guid.NewGuid() } } }, HttpStatusCode.UnprocessableEntity);
+
+        code.ShouldBe("replay.invalid");
+        (await ScalarAsync<long>("SELECT count(*) FROM research.replay_runs")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_scope_above_the_memory_cap_is_422_replay_invalid_and_stores_nothing()
+    {
+        StubStart(members: 200); // the cap is 53 instruments at the default 300 MiB
+
+        var code = await PostCodeAsync("/api/replay/runs", new { from = "2026-06-22", scope = new { basketIds = new[] { Guid.NewGuid() } } }, HttpStatusCode.UnprocessableEntity);
+
+        code.ShouldBe("replay.invalid");
+        (await ScalarAsync<long>("SELECT count(*) FROM research.replay_runs")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task More_baskets_than_the_cap_is_422_replay_invalid()
+    {
+        var code = await PostCodeAsync("/api/replay/runs", new { from = "2026-06-22", scope = new { basketIds = Enumerable.Range(0, 201).Select(_ => Guid.NewGuid()).ToArray() } }, HttpStatusCode.UnprocessableEntity);
+
+        code.ShouldBe("replay.invalid");
     }
 }

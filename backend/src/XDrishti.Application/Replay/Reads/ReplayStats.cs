@@ -7,15 +7,15 @@ internal static class ReplayStats
 {
     private const double TradingDays = 252;
 
-    /// <summary>The figures; null when no session is stored.</summary>
-    public static ReplayFigures? Figures(decimal capital, DateOnly from, IReadOnlyList<(DateOnly Session, decimal Equity, int OpenPositions)> days, decimal? maxDrawdownPct, IReadOnlyList<ReplayTradeRow> trades)
+    /// <summary>The figures; null when no session is stored. The final equity, the maximum drawdown and the closed-trade count are the ledger's (<see cref="ReplaySummary"/>, <c>PaperLedger</c>, AC 7); the daily series is the stored one.</summary>
+    public static ReplayFigures? Figures(decimal capital, DateOnly from, IReadOnlyList<ReplayEquityRow> days, ReplaySummary? summary, IReadOnlyList<ReplayTradeRow> trades)
     {
         if (days.Count == 0 || capital <= 0)
         {
             return null;
         }
 
-        var final = days[^1].Equity;
+        var final = summary?.Figures.Equity ?? days[^1].Equity;
         var years = (days[^1].Session.DayNumber - from.DayNumber + 1) / 365.25;
         double? cagr = days.Count < 2 || years <= 0 || final <= 0 ? null : Math.Pow((double)(final / capital), 1 / years) - 1;
 
@@ -39,7 +39,7 @@ internal static class ReplayStats
         double? hit = closed.Count == 0 ? null : closed.Count(t => (t.NetPnl ?? t.GrossPnl ?? 0m) > 0) / (double)closed.Count;
         var withR = closed.Where(t => t.RSim is not null).ToList();
         double? meanR = withR.Count == 0 ? null : withR.Average(t => t.RSim!.Value);
-        return new ReplayFigures(capital, final, Math.Round((final - capital) / capital * 100, 4), cagr, maxDrawdownPct, sharpe, days.Count(d => d.OpenPositions > 0) / (double)days.Count, trades.Count, closed.Count, hit, meanR);
+        return new ReplayFigures(capital, final, Math.Round((final - capital) / capital * 100, 4), cagr, summary?.Figures.MaxDrawdownPct ?? days[^1].Drawdown, sharpe, days.Count(d => d.OpenPositions > 0) / (double)days.Count, trades.Count, closed.Count, hit, meanR);
     }
 
     /// <summary>The result of the closed trades per strategy, by strategy name.</summary>
