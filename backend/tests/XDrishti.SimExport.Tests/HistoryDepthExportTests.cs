@@ -34,4 +34,21 @@ public sealed class HistoryDepthExportTests
         RunReadme.Text(RunLabels.Of(run, FillRules.Default), "r").ShouldContain("survivorship: members as of today");
         Sinks.Render(s => SimExportJson.WriteRecord(s, run)).ShouldNotContain("depth");
     }
+
+    [Fact]
+    public void The_pre_seam_members_and_the_backfill_label_appear_only_for_an_admitted_run_CF_04d()
+    {
+        var plain = FabricatedRun.Standard();
+        var admitted = plain with { BackfillAdmission = new BackfillAdmissionRecord(1, []), Instruments = [.. plain.Instruments.Select((i, n) => n == 0 ? i with { PreSeam = new PreSeamRecord(new DateOnly(2024, 4, 2), new string('a', 64)) } : i)] };
+
+        var plainRecord = Sinks.Render(s => SimExportJson.WriteRecord(s, plain));
+        var record = Sinks.Render(s => SimExportJson.WriteRecord(s, admitted));
+
+        plainRecord.ShouldNotContain("pre_seam");
+        plainRecord.ShouldNotContain("backfill_admission");
+        record.ShouldContain("\"pre_seam\":{\"seam_date\":\"2024-04-02\"");
+        record.ShouldContain("\"backfill_admission\":{\"admitted\":1");
+        RunJson(admitted).ShouldContain("backfill: pre-seam bars admitted for 1 instruments");
+        RunJson(plain).ShouldNotContain("backfill:");
+    }
 }

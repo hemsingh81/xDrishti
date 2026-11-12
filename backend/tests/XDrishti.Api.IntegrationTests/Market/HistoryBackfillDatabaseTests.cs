@@ -15,7 +15,10 @@ using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.History;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Market;
+using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Market.History;
+using XDrishti.Infrastructure.Market.Eod;
 using XDrishti.Infrastructure.Persistence;
 
 namespace XDrishti.Api.IntegrationTests.Market;
@@ -50,6 +53,8 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
     private sealed class FixedSettings : IBackfillSettings
     {
         public bool Enabled => true;
+
+        public bool AdmitVerified => true;
 
         public int Years => 5;
 
@@ -232,7 +237,7 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
 
         (await seams.SeamOfAsync(id, Ct)).ShouldBe(Seam, "the high-water mark stays at the latest seam ever recorded: raw Dhan bars before it are not admitted");
         (await store.ListSeamsAsync([id], Ct))[id].SeamAt.ShouldBe(Seam.AddDays(-30));
-        (await ScalarAsync<DateTime>("SELECT market.backfill_cut(@id)", ("id", id))).ShouldBe(Seam.UtcDateTime);
+        (await ScalarAsync<DateTime>("SELECT market.backfill_cut(@id)", ("id", id))).ShouldBe(new DateTimeOffset(2024, 4, 1, 0, 0, 0, IndiaTime.Offset).UtcDateTime, "the cut is India midnight of the seam date (CF-04d)");
 
         await store.SaveSeamAsync(new SeamRecord(id, Seam.AddDays(10).ToUniversalTime(), "none", null, null, null, null, false, null), Ct);
 
@@ -299,6 +304,134 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
         static async Task<long> Count(NpgsqlDataSource data)
         {
             await using var command = data.CreateCommand("SELECT count(*) FROM information_schema.tables WHERE table_schema = 'market' AND table_name IN ('backfill_chunks', 'backfill_seams')");
+            return Convert.ToInt64(await command.ExecuteScalarAsync(Ct), System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    // CF-04d: the admission facts on the real store, the date-based seam and the migration
+
+    private static readonly DateTimeOffset XSeam = new(2024, 4, 2, 9, 15, 0, IndiaTime.Offset);
+
+    private static BackfillStore SwitchedOn(IServiceScope scope) => new(scope.ServiceProvider.GetRequiredService<NpgsqlDataSource>(), new FixedSettings());
+
+    [Fact]
+    public async Task A_dhan_answer_with_bars_on_the_seam_day_stores_only_the_days_before_and_the_seam_day_bucket_is_returned_by_the_daily_reader()
+    {
+        var id = await SeedAsync("SDAY");
+        await LoadCsvAsync(id, At(XSeam, 300), At(XSeam.AddMinutes(1), 301));
+        var lastDay = new DateTimeOffset(2024, 4, 1, 15, 29, 0, IndiaTime.Offset);
+        var source = new Source(t =>
+            t.Windows[0].To == new DateTimeOffset(2024, 4, 2, 0, 0, 0, IndiaTime.Offset)
+                ? [At(lastDay, 250), At(new DateTimeOffset(2024, 4, 2, 9, 14, 0, IndiaTime.Offset), 999), At(XSeam, 999)]
+                : []);
+        using var scope = Factory.Services.CreateScope();
+
+        var result = await Handler(scope, id, source).HandleAsync(new RunBackfillCommand(), Ct);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
+        result.Value.BeyondSeam.ShouldBe(2, "the 09:14 minute of the seam day is dropped as well: the seam day is a pure CSV day");
+        (await ScalarAsync<long>("SELECT count(*) FROM market.bars_1m WHERE instrument_id = @id AND source = 'dhan'", ("id", id))).ShouldBe(1);
+        await using (var connection = await OpenAsync())
+        {
+            foreach (var day in new[] { new DateTimeOffset(2024, 4, 1, 0, 0, 0, IndiaTime.Offset), new DateTimeOffset(2024, 4, 2, 0, 0, 0, IndiaTime.Offset) })
+            {
+                await ExecuteAsync(connection, "INSERT INTO market.bars_agg (instrument_id, timeframe, ts, open, high, low, close, volume, bars, complete) VALUES (@id, '1D', @ts, 1, 2, 1, 1, 10, 375, true)", ("id", id), ("ts", day.ToUniversalTime()));
+            }
+        }
+
+        var daily = await scope.ServiceProvider.GetRequiredService<IBarQueries>().ReadDailyBarsAsync(id, new DateOnly(2024, 1, 1), new DateOnly(2024, 12, 31), Ct);
+
+        daily.Select(d => d.Date).ShouldBe([new DateOnly(2024, 4, 2)], "the seam day bucket starts at India midnight and is no longer dropped; the day before is cut");
+    }
+
+    [Fact]
+    public async Task The_admission_facts_read_the_seam_row_the_current_seam_the_unfinished_chunks_and_a_dhan_bar_in_a_window_and_a_switch_that_is_off_reads_nothing()
+    {
+        var id = await SeedAsync("FACT");
+        await LoadCsvAsync(id, At(XSeam, 300));
+        using var scope = Factory.Services.CreateScope();
+        var store = SwitchedOn(scope);
+        var off = scope.ServiceProvider.GetRequiredService<IBackfillSeams>();   // the real settings: the switch is off
+        await store.SaveSeamAsync(new SeamRecord(id, XSeam.ToUniversalTime(), "passed", null, 1, 100, null, false, 0.8, new string('a', 64), new string('b', 64)), Ct);
+        await store.PlanChunksAsync(id, [(new DateOnly(2024, 1, 2), new DateOnly(2024, 4, 2))], Ct);
+
+        var facts = (await store.AdmissionFactsAsync(id, false, Ct)).ShouldNotBeNull();
+
+        facts.SwitchOn.ShouldBeTrue();
+        facts.Record.ShouldNotBeNull().ProbeBasis.ShouldBe(new string('a', 64));
+        facts.Record.ContinuityBasis.ShouldBe(new string('b', 64));
+        facts.CurrentSeam.ShouldBe(XSeam);
+        facts.HighWater.ShouldBe(XSeam);
+        facts.UnfinishedChunks.ShouldBeTrue("a planned chunk");
+        await store.SaveChunkAsync(new ChunkRecord(id, new DateOnly(2024, 1, 2), new DateOnly(2024, 4, 2), "done", 1, 1, null), Ct);
+        (await store.AdmissionFactsAsync(id, false, Ct))!.UnfinishedChunks.ShouldBeFalse();
+        (await off.AdmissionFactsAsync(id, false, Ct)).ShouldBe(SeamAdmissionFacts.Off, "a run with the switch off reads nothing");
+        (await off.AdmissionFactsAsync(id, true, Ct))!.Record.ShouldNotBeNull();   // a report reads them anyway
+
+        var from = new DateTimeOffset(2024, 4, 2, 0, 0, 0, IndiaTime.Offset);
+        var to = new DateTimeOffset(2024, 6, 1, 0, 0, 0, IndiaTime.Offset);
+        (await store.HasDhanBarsAsync(id, from, to, Ct)).ShouldBeFalse();
+        await using (var session = await scope.ServiceProvider.GetRequiredService<IBarStore>().BeginMergeAsync(id, BarSource.Dhan, Ct))
+        {
+            await session.AddAsync([At(new DateTimeOffset(2024, 6, 3, 10, 0, 0, IndiaTime.Offset), 270)], Ct);
+            await session.CompleteAsync(null, Ct);
+        }
+
+        (await store.HasDhanBarsAsync(id, from, to, Ct)).ShouldBeFalse("2024-06-03 is after the window");
+        (await store.HasDhanBarsAsync(id, from, to.AddDays(5), Ct)).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_csv_import_that_reaches_before_the_recorded_seam_reads_seam_moved_the_cut_stays_and_a_re_probe_does_not_admit_it()
+    {
+        var id = await SeedAsync("MOVE");
+        await LoadCsvAsync(id, At(XSeam, 300));
+        using var scope = Factory.Services.CreateScope();
+        var store = SwitchedOn(scope);
+        var factors = AdjustmentFactors.None;
+        var basis = SeamBasis.Of(XSeam, factors.Actions, null);
+        await store.SaveSeamAsync(new SeamRecord(id, XSeam.ToUniversalTime(), "passed", null, 1, 100, null, false, 0.8, basis, basis), Ct);
+        (await PreSeamAdmission.DecideAsync(store, id, factors, null, false, Ct)).Reason.ShouldBeNull("the chunks are not planned, so none is unfinished: verified");
+
+        var march = new DateTimeOffset(2024, 3, 1, 9, 15, 0, IndiaTime.Offset);
+        await LoadCsvAsync(id, At(march, 280));
+
+        (await PreSeamAdmission.DecideAsync(store, id, factors, null, false, Ct)).Reason.ShouldBe(SeamVerification.SeamMoved);
+        (await ScalarAsync<DateTime>("SELECT market.backfill_cut(@id)", ("id", id))).ShouldBe(new DateTimeOffset(2024, 4, 2, 0, 0, 0, IndiaTime.Offset).UtcDateTime, "the cut stays at the old seam date: the new March CSV bars stay out as well");
+
+        // a passing re-probe on the new seam writes the new seam and its basis, but the high-water mark stays: still excluded
+        var newBasis = SeamBasis.Of(march, factors.Actions, null);
+        await store.SaveSeamAsync(new SeamRecord(id, march.ToUniversalTime(), "passed", null, 1, 100, null, false, 0.8, newBasis, newBasis), Ct);
+
+        (await PreSeamAdmission.DecideAsync(store, id, factors, null, false, Ct)).Reason.ShouldBe(SeamVerification.SeamMoved);
+    }
+
+    [Fact]
+    public async Task Down_of_the_basis_migration_drops_both_columns_and_restores_the_instant_cut_and_up_again_adds_them()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(Factory, "xd_seam_basis_down_probe", Ct);
+        using var scope = scratch.Host.Services.CreateScope();
+        var migrator = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>().GetService<IMigrator>();
+        await using var source = NpgsqlDataSource.Create(scratch.ConnectionString);
+
+        await migrator.MigrateAsync(null, Ct);
+        (await Columns(source)).ShouldBe(2);
+
+        await migrator.MigrateAsync("20261111195451_AddSystemReplay", Ct);
+
+        (await Columns(source)).ShouldBe(0);
+        await using (var cut = source.CreateCommand("SELECT pg_get_functiondef('market.backfill_cut(uuid)'::regprocedure)"))
+        {
+            (await cut.ExecuteScalarAsync(Ct)).ShouldBeOfType<string>().ShouldNotContain("Asia/Kolkata");
+        }
+
+        await migrator.MigrateAsync(null, Ct);
+
+        (await Columns(source)).ShouldBe(2);
+
+        static async Task<long> Columns(NpgsqlDataSource data)
+        {
+            await using var command = data.CreateCommand("SELECT count(*) FROM information_schema.columns WHERE table_schema = 'market' AND table_name = 'backfill_seams' AND column_name IN ('probe_basis', 'continuity_basis')");
             return Convert.ToInt64(await command.ExecuteScalarAsync(Ct), System.Globalization.CultureInfo.InvariantCulture);
         }
     }

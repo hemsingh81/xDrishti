@@ -64,7 +64,49 @@ public sealed class HistoryBackfillArchitectureTests
     {
         var reader = File.ReadAllText(Path.Combine(Src, "XDrishti.Application", "Research", "InstrumentInputReader.cs"));
 
-        reader.ShouldContain("SeamAwareBars.ReadAsync");
+        reader.ShouldContain("SeamAwareBars.ReadForRunAsync");
+    }
+
+    // CF-04d decision 6: only these three readers may admit bars from before the seam (the run reader, which the trade cards and AU-12 share, the feature extraction that training uses, and the trade replay). Every other reader keeps the high-water cut.
+    private static readonly string[] AdmittingReaders =
+    [
+        "XDrishti.Application.Learning.ExtractTradeFeaturesHandler",
+        "XDrishti.Application.Reporting.GetTradeReplayHandler",
+        "XDrishti.Application.Research.InstrumentInputReader",
+    ];
+
+    [Fact]
+    public void Only_the_run_reader_the_feature_extraction_and_the_trade_replay_may_admit_pre_seam_bars()
+    {
+        var callers = new SortedSet<string>(StringComparer.Ordinal);
+        using var module = Mono.Cecil.ModuleDefinition.ReadModule(typeof(XDrishti.Application.DependencyInjection).Assembly.Location);
+        foreach (var type in module.GetTypes())
+        {
+            var root = type;
+            while (root.DeclaringType is not null)
+            {
+                root = root.DeclaringType;
+            }
+
+            if (type.Methods.Where(m => m.HasBody).SelectMany(m => m.Body.Instructions).Any(i => i.Operand is Mono.Cecil.MethodReference call && call.Name == "ReadForRunAsync" && call.DeclaringType.FullName == "XDrishti.Application.Market.History.SeamAwareBars"))
+            {
+                callers.Add(root.FullName);
+            }
+        }
+
+        callers.ToList().ShouldBe(AdmittingReaders, ignoreOrder: true, customMessage: "a reader that admits pre-seam bars must be one of the three named in CF-04d (ADR 0273); every other reader reads through SeamAwareBars.ReadAsync");
+    }
+
+    [Fact]
+    public void The_admission_facts_are_read_only_from_the_seam_aware_read_and_the_history_report()
+    {
+        var offenders = SourceFiles()
+            .Where(f => Path.GetFileName(f) is not ("PreSeamAdmission.cs" or "IBackfillStore.cs" or "BackfillStore.cs"))
+            .Where(f => File.ReadAllText(f).Contains("AdmissionFactsAsync", StringComparison.Ordinal))
+            .Select(f => Path.GetRelativePath(Src, f))
+            .ToList();
+
+        offenders.ShouldBeEmpty("PreSeamAdmission is the one place that turns the stored facts into a decision");
     }
 
     [Fact]

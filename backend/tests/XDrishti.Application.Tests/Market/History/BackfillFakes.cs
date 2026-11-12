@@ -7,6 +7,8 @@ internal sealed class FakeBackfillSettings : IBackfillSettings
 {
     public bool Enabled { get; set; } = true;
 
+    public bool AdmitVerified { get; set; }
+
     public int Years { get; set; } = 5;
 
     public int ChunkDays { get; set; } = 90;
@@ -120,11 +122,24 @@ internal sealed class FakeDisk(long? free) : IFreeDiskProbe
     public long? FreeBytes() => free;
 }
 
-/// <summary>The high-water seams in memory; an instrument without an entry has none (every bar is read).</summary>
+/// <summary>
+/// The high-water seams in memory; an instrument without an entry has none (every bar is read). <see cref="Facts"/> are the stored facts of the admission rule (CF-04d); an instrument without entry answers like a switch that is off. <see cref="DhanInSpan"/> says
+/// for which instruments a dhan bar is stored inside the CSV span.
+/// </summary>
 internal sealed class FakeSeams : IBackfillSeams
 {
     public Dictionary<Guid, DateTimeOffset> Cuts { get; } = [];
 
+    public Dictionary<Guid, SeamAdmissionFacts> Facts { get; } = [];
+
+    public HashSet<Guid> DhanInSpan { get; } = [];
+
     public ValueTask<DateTimeOffset?> SeamOfAsync(Guid instrumentId, CancellationToken cancellationToken) =>
         ValueTask.FromResult<DateTimeOffset?>(Cuts.TryGetValue(instrumentId, out var cut) ? cut : null);
+
+    public ValueTask<SeamAdmissionFacts?> AdmissionFactsAsync(Guid instrumentId, bool forReport, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<SeamAdmissionFacts?>(Facts.TryGetValue(instrumentId, out var facts) ? facts : SeamAdmissionFacts.Off);
+
+    public ValueTask<bool> HasDhanBarsAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(DhanInSpan.Contains(instrumentId));
 }

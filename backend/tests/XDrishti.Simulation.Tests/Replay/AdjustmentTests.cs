@@ -123,4 +123,31 @@ public sealed class AdjustmentTests
 
         Rep.Replay(Bare, bars, ReplayDays.D1, ReplayDays.D2, factors: Rep.Split(ReplayDays.D2, 1, 2)).Record.Adjustments.ShouldAllBe(a => !a.OnCsvBars);
     }
+
+    // CF-04d decision 5, acceptance criterion 1: hand instrument X (split 1:5 ex 2023-03-10, bonus 1:1 ex 2024-08-01, seam 2024-04-02, CSV adjusted through 2026-04-30)
+    [Fact]
+    public void The_source_aware_mode_feeds_the_dhan_bars_adjusted_and_the_csv_bars_as_stored_and_the_record_carries_the_pre_seam_facts()
+    {
+        var split = new AppliedAction(new DateOnly(2023, 3, 10), CorporateActionKind.Split, 1, 5, 0.2m);
+        var bonus = new AppliedAction(new DateOnly(2024, 8, 1), CorporateActionKind.Bonus, 1, 1, 0.5m);
+        var seam = new DateOnly(2024, 4, 2);
+        var through = new DateOnly(2026, 4, 30);
+        var dhanDay = new DateOnly(2022, 12, 1);
+        var csvDay = new DateOnly(2024, 5, 2);
+        var bars = ReplayDays.Join(Day.Dense(dhanDay).Start(2500.00).Bars(), Day.Dense(seam).Start(252.10).Bars(), Day.Dense(csvDay).Start(260.00).Bars());
+        var plain = AdjustmentFactors.From([split, bonus]);
+        var preSeam = new PreSeamRecord(seam, new string('c', 64));
+        var input = Rep.Input(bars, dhanDay, csvDay, factors: plain.SourceAware(seam, through), csvAdjustedThrough: through) with { PreSeam = preSeam };
+        IReadOnlyList<Bar>? fed = null;
+
+        var replay = InstrumentReplayer.ReplayCore(Bare, input, (list, _) => fed ??= list);
+
+        fed.ShouldNotBeNull();
+        fed[0].Open.ShouldBe(250.00);
+        fed[0].Volume.ShouldBe(Day.Dense(dhanDay).Start(2500.00).Bars()[0].Volume * 10);
+        fed[375].Open.ShouldBe(252.10, "the CSV bar of the seam day stays as stored");
+        fed[750].Open.ShouldBe(260.00, "plain factors would give 130.00");
+        replay.Record.PreSeam.ShouldBe(preSeam);
+        replay.Record.BarsSha256.ShouldBe(BarStreamHash.Compute(bars), "the hash covers the raw pre-seam bars");
+    }
 }

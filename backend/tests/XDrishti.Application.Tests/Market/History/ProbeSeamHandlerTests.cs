@@ -82,6 +82,26 @@ public sealed class ProbeSeamHandlerTests
     }
 
     [Fact]
+    public async Task A_pass_stores_the_basis_it_rests_on_and_a_later_fail_clears_it_CF_04d()
+    {
+        var world = new World();
+        var split = new AppliedAction(new DateOnly(2026, 6, 15), CorporateActionKind.Split, 1, 2, 0.5m);
+        world.Adjustments.GetAsync(world.Id, Arg.Any<CancellationToken>()).Returns(AdjustmentFactors.From([split]));
+        world.Source.Respond = t => new IntradayResult(t.InstrumentId, [At(0, 100.00), At(1, 100.10), At(2, 99.95)], 1);
+        var seam = world.Store.CurrentSeams[world.Id];
+
+        await world.Handler().HandleAsync(new ProbeSeamCommand(), Ct);
+
+        world.Store.Records[world.Id].ProbeBasis.ShouldBe(SeamBasis.Of(seam, [split], null));
+        world.Source.Respond = t => new IntradayResult(t.InstrumentId, [At(0, 20.00), At(1, 20.02), At(2, 19.98)], 1);
+
+        await world.Handler().HandleAsync(new ProbeSeamCommand(), Ct);
+
+        world.Store.Records[world.Id].ProbeStatus.ShouldBe(ProbeStatus.Unresolved);
+        world.Store.Records[world.Id].ProbeBasis.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Dhan_bars_at_one_fifth_of_the_csv_fail_the_probe_and_the_instrument_is_seam_unresolved()
     {
         var world = new World();

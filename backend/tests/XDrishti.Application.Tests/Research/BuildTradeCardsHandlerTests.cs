@@ -174,6 +174,39 @@ public sealed class BuildTradeCardsHandlerTests
         error.Fields!.Single().Code.ShouldBe("bars_changed");
     }
 
+    // CF-04d acceptance criterion 7: the cards read the bars an admitted run read; once the admission is revoked they refuse.
+    private static (BuildTradeCardsHandler Handler, World World, XDrishti.Application.Tests.Market.History.FakeSeams Seams) AdmittedWorld(bool admitted)
+    {
+        var world = new World();
+        var id = world.Ids[0];
+        var seam = new DateTimeOffset(D2.Year, D2.Month, D2.Day, 9, 15, 0, XDrishti.Domain.Market.IndiaTime.Offset);
+        var seams = new XDrishti.Application.Tests.Market.History.FakeSeams();
+        seams.Cuts[id] = seam;
+        world.Fixture.Factors.GetAsync(id, Arg.Any<CancellationToken>()).Returns(AdjustmentFactors.None);
+        if (admitted)
+        {
+            var basis = XDrishti.Domain.Market.History.SeamBasis.Of(seam, [], null);
+            seams.Facts[id] = new XDrishti.Application.Abstractions.Market.History.SeamAdmissionFacts(true, new XDrishti.Application.Abstractions.Market.History.SeamRecord(id, seam, XDrishti.Domain.Market.History.ProbeStatus.Passed, null, 1, 100, null, false, 0, basis, basis), seam, seam, false);
+        }
+
+        var handler = new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine(), seams);
+        return (handler, world, seams);
+    }
+
+    [Fact]
+    public async Task The_cards_of_an_admitted_run_reproduce_it_and_refuse_once_the_admission_is_revoked()
+    {
+        var (admitted, world, _) = AdmittedWorld(true);
+        var ok = await admitted.HandleAsync(new BuildTradeCardsQuery(world.Run, world.Keys(0)), Ct);
+        var (revoked, world2, _) = AdmittedWorld(false);
+
+        var stale = await revoked.HandleAsync(new BuildTradeCardsQuery(world2.Run, world2.Keys(0)), Ct);
+
+        ok.IsSuccess.ShouldBeTrue();
+        stale.IsFailure.ShouldBeTrue();
+        stale.Error.Code.ShouldBe("simulation.cards_stale");
+    }
+
     [Fact]
     public async Task An_action_added_since_the_run_is_stale()
     {

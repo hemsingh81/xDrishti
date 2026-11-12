@@ -270,6 +270,43 @@ public sealed class RunBackfillHandlerTests
     }
 
     [Fact]
+    public async Task The_continuity_check_writes_its_basis_on_every_run_even_when_no_jump_is_found_CF_04d()
+    {
+        var world = new World();
+        world.Bars.Stored[world.Id] = [At(Seam, open: 252.10, close: 252.10)];
+        var respond = world.Source.Respond;
+        world.Source.Respond = t => t.Windows[0].To == new DateTimeOffset(2024, 4, 1, 0, 0, 0, IndiaTime.Offset)
+            ? new IntradayResult(t.InstrumentId, [At(new DateTimeOffset(2024, 3, 28, 15, 29, 0, IndiaTime.Offset), open: 250, close: 250)], 1)
+            : respond(t);
+
+        await world.Handler().HandleAsync(new RunBackfillCommand(), Ct);
+
+        var record = world.Store.Records[world.Id];
+        record.SeamJump.ShouldBeFalse();
+        record.ContinuityBasis.ShouldBe(SeamBasis.Of(Seam, [], null));
+        record.JumpPct.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task With_nothing_left_to_fetch_the_check_runs_again_on_the_new_basis_and_needs_no_dhan_connection_CF_04d()
+    {
+        var world = new World();
+        world.Bars.Stored[world.Id] = [At(new DateTimeOffset(2024, 3, 28, 15, 29, 0, IndiaTime.Offset), open: 250, close: 250), At(Seam, open: 252.10, close: 252.10)];
+        await world.Handler().HandleAsync(new RunBackfillCommand(), Ct);
+        var first = world.Store.Records[world.Id].ContinuityBasis;
+        var split = new AppliedAction(new DateOnly(2026, 6, 15), CorporateActionKind.Split, 1, 2, 0.5m);
+        world.Adjustments.GetAsync(world.Id, Arg.Any<CancellationToken>()).Returns(AdjustmentFactors.From([split]));
+        world.Source.Plans.Clear();
+
+        var result = await world.Handler().HandleAsync(new RunBackfillCommand(), Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        world.Source.Plans.ShouldBeEmpty();
+        world.Store.Records[world.Id].ContinuityBasis.ShouldBe(SeamBasis.Of(Seam, [split], null));
+        world.Store.Records[world.Id].ContinuityBasis.ShouldNotBe(first);
+    }
+
+    [Fact]
     public async Task A_refused_token_stops_the_run_with_dhan_not_connected_and_leaves_the_chunk_planned()
     {
         var world = new World();

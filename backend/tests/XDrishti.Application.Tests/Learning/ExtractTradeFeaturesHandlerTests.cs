@@ -4,6 +4,7 @@ using NSubstitute;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
+using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Market.Actions;
@@ -11,6 +12,7 @@ using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
+using XDrishti.Domain.Market.History;
 using XDrishti.Domain.Research;
 using XDrishti.Tests.Shared;
 
@@ -97,15 +99,45 @@ public sealed class ExtractTradeFeaturesHandlerTests
     {
         var trade = FabricatedRun.Trade(FabricatedRun.IdA, "NSE:A", Side.Buy, Day);
         Run(trade);
-        _seams.Cuts[FabricatedRun.IdA] = DateTimeOffset.FromUnixTimeSeconds(1_000);
-        _bars.ReadAsync(FabricatedRun.IdA, Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Ct).Returns(new[] { new Bar(500, 1, 1, 1, 1, 1), new Bar(1_000, 1, 1, 1, 1, 1), new Bar(1_060, 1, 1, 1, 1, 1) });
+        var seam = new DateTimeOffset(2024, 4, 2, 9, 15, 0, TimeSpan.FromMinutes(330));
+        _seams.Cuts[FabricatedRun.IdA] = seam;
+        var before = seam.AddDays(-1).ToUnixTimeSeconds();
+        _bars.ReadAsync(FabricatedRun.IdA, Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Ct).Returns(new[] { new Bar(before, 1, 1, 1, 1, 1), new Bar(seam.ToUnixTimeSeconds(), 1, 1, 1, 1, 1), new Bar(seam.ToUnixTimeSeconds() + 60, 1, 1, 1, 1, 1) });
         IReadOnlyList<Bar>? seen = null;
         _extractor.Extract(Arg.Do<IReadOnlyList<Bar>>(b => seen = b), Arg.Any<AdjustmentFactors>(), Arg.Any<TradingCalendar>(), Arg.Any<IReadOnlyList<TradeFeatureDecision>>())
             .Returns(new Dictionary<string, double[]> { [trade.Key] = Values() });
 
         await Handler().HandleAsync(new ExtractTradeFeaturesCommand(Key), Ct);
 
-        seen.ShouldNotBeNull().Select(b => b.EpochSeconds).ShouldBe([1_000L, 1_060L]);
+        seen.ShouldNotBeNull().Select(b => b.EpochSeconds).ShouldBe([seam.ToUnixTimeSeconds(), seam.ToUnixTimeSeconds() + 60]);
+    }
+
+    [Fact]
+    public async Task An_admitted_instrument_gives_the_extractor_its_pre_seam_bars_and_the_source_aware_factors_as_the_run_saw_them_CF_04d()
+    {
+        var trade = FabricatedRun.Trade(FabricatedRun.IdA, "NSE:A", Side.Buy, Day);
+        Run(trade);
+        var handler = Handler();   // sets the defaults of the fakes; the setup below follows it
+        var seam = new DateTimeOffset(2024, 4, 2, 9, 15, 0, TimeSpan.FromMinutes(330));
+        var split = new AppliedAction(new DateOnly(2024, 8, 1), CorporateActionKind.Bonus, 1, 1, 0.5m);
+        var through = new DateOnly(2026, 4, 30);
+        var basis = SeamBasis.Of(seam, [split], through);
+        _seams.Cuts[FabricatedRun.IdA] = seam;
+        _seams.Facts[FabricatedRun.IdA] = new SeamAdmissionFacts(true, new SeamRecord(FabricatedRun.IdA, seam, ProbeStatus.Passed, null, 1, 100, null, false, 0, basis, basis), seam, seam, false);
+        _factors.GetAsync(FabricatedRun.IdA, Ct).Returns(AdjustmentFactors.From([split]));
+        _factors.CsvAdjustedThroughAsync(FabricatedRun.IdA, Ct).Returns(through);
+        var before = seam.AddDays(-1).ToUnixTimeSeconds();
+        _bars.ReadAsync(FabricatedRun.IdA, Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Ct).Returns(new[] { new Bar(before, 1, 1, 1, 1, 1), new Bar(seam.ToUnixTimeSeconds(), 1, 1, 1, 1, 1) });
+        IReadOnlyList<Bar>? seen = null;
+        AdjustmentFactors? factorsSeen = null;
+        _extractor.Extract(Arg.Do<IReadOnlyList<Bar>>(b => seen = b), Arg.Do<AdjustmentFactors>(f => factorsSeen = f), Arg.Any<TradingCalendar>(), Arg.Any<IReadOnlyList<TradeFeatureDecision>>())
+            .Returns(new Dictionary<string, double[]> { [trade.Key] = Values() });
+
+        await handler.HandleAsync(new ExtractTradeFeaturesCommand(Key), Ct);
+
+        seen.ShouldNotBeNull().Select(b => b.EpochSeconds).ShouldBe([before, seam.ToUnixTimeSeconds()]);
+        factorsSeen.ShouldNotBeNull().FactorAt(new DateOnly(2024, 4, 1)).ShouldBe(0.5);
+        factorsSeen.FactorAt(new DateOnly(2024, 5, 2)).ShouldBe(1.0, "a CSV bar inside the span is not adjusted again");
     }
 
     [Fact]

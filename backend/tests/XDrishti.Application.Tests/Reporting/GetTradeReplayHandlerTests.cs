@@ -34,6 +34,7 @@ public sealed class GetTradeReplayHandlerTests
     private readonly IAdjustmentFactors _adjustments = Substitute.For<IAdjustmentFactors>();
     private readonly ITradingCalendar _calendar = Substitute.For<ITradingCalendar>();
     private readonly IChargeSheetConfirmationSource _confirmations = Substitute.For<IChargeSheetConfirmationSource>();
+    private readonly XDrishti.Application.Tests.Market.History.FakeSeams _seams = new();
     private IReadOnlyList<Bar> _stored = [];
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -50,7 +51,7 @@ public sealed class GetTradeReplayHandlerTests
     }
 
     private GetTradeReplayHandler Handler() =>
-        new(_runs, _features, _bars, new XDrishti.Application.Tests.Market.History.FakeSeams(), _queries, _adjustments, _calendar, _confirmations, new FakeTimeProvider(DateTimeOffset.UnixEpoch), NullLogger<GetTradeReplayHandler>.Instance);
+        new(_runs, _features, _bars, _seams, _queries, _adjustments, _calendar, _confirmations, new FakeTimeProvider(DateTimeOffset.UnixEpoch), NullLogger<GetTradeReplayHandler>.Instance);
 
     private void Store(SimTrade trade) =>
         _runs.ReadTradeAsync(Run, false, 0, Arg.Any<CancellationToken>()).Returns(new ValueTask<RunTrade?>(new RunTrade(trade, [FabricatedRun.Basket])));
@@ -106,6 +107,26 @@ public sealed class GetTradeReplayHandlerTests
         view.Chart.Bars[0].O.ShouldBe(100.5);
         view.Chart.Coherence.State.ShouldBe("ok");
         view.Chart.AdjustedThrough.ShouldBe(Monday.AddDays(8));
+    }
+
+    [Fact]
+    public async Task A_pre_seam_trade_of_an_admitted_instrument_is_drawn_on_the_adjusted_raw_bars_as_the_run_fed_them_and_cut_when_not_admitted_CF_04d()
+    {
+        _stored = Session(Monday, 201);
+        var split = new AppliedAction(Monday.AddDays(8), CorporateActionKind.Split, 1, 2, 0.5m);
+        _adjustments.GetAsync(Id, Arg.Any<CancellationToken>()).Returns(new ValueTask<AdjustmentFactors>(AdjustmentFactors.From([split])));
+        var seam = new DateTimeOffset(Monday.AddDays(3).ToDateTime(new TimeOnly(9, 15)), XDrishti.Domain.Market.IndiaTime.Offset);
+        _seams.Cuts[Id] = seam;
+        var basis = XDrishti.Domain.Market.History.SeamBasis.Of(seam, [split], null);
+        _seams.Facts[Id] = new XDrishti.Application.Abstractions.Market.History.SeamAdmissionFacts(true, new XDrishti.Application.Abstractions.Market.History.SeamRecord(Id, seam, XDrishti.Domain.Market.History.ProbeStatus.Passed, null, 1, 100, null, false, 0, basis, basis), seam, seam, false);
+
+        var admitted = await OkAsync("1m");
+        _seams.Facts.Clear();
+        var cut = await OkAsync("1m");
+
+        admitted.Chart.Bars[0].O.ShouldBe(100.5);
+        admitted.Chart.Coherence.State.ShouldBe("ok");
+        cut.Chart.Bars.ShouldBeEmpty("the plain read leaves out every bar before the seam date");
     }
 
     [Fact]
