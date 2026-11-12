@@ -105,7 +105,7 @@ is refused (`replay.busy`) while the history backfill is incomplete. A replay is
 3. Auto screen `/auto` → set the scope, then **Auto ON** (fresh password). Preconditions: scope set, Data account
    connected, charge sheet confirmed, every chain service registered [ADR 0252 §2]. Auto resumes only `eod`,
    `portfolio-broker-history`, `weekly`, `nightly`, `suggestions` [ADR 0252 §1], **not** the step-2 services.
-4. Until LC-01 exists (a planned slice; no spec in docs yet), run step 8 again at least every 5 sessions. That
+4. Until LC-01 is built ([spec](../specs/LC-01-scheduled-cell-statistics-refresh.md), not built), run step 8 again at least every 5 sessions. That
    interval is guidance: selection only refuses statistics not dated before the decision [EligibilityFilters.cs:69-78].
 
 ## 12. Read the verdicts

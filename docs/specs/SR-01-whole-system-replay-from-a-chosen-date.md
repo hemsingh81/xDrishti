@@ -239,7 +239,7 @@ All eight answered by the owner on 2026-11-11 as recommended ("Approve all"); th
 
 ## Done when
 - [x] All acceptance criteria have evidence (parts A to C: the evidence notes above; part D: `ReplayPairComparison` tests; part E: `SystemReplayPage.test.tsx`; golden, look-ahead, resume, fence and architecture tests exist in the backend test projects)
-- [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors (Opus for parts A and B). Review passes are recorded in ADR 0272 (part A) and in the part commits; a green full gate on the merged main is not recorded here
+- [x] `scripts/check.sh` green; reviewer agent: no blockers/majors (Opus for parts A and B). Each part A to E passed an Opus review (two to four rounds) and a green full `scripts/check.sh` before its merge (2026-11-12; merges dd472414, 5ef8766b, c459674d, 9098bb43, 710935f6)
 - [x] Contract regenerated (`scripts/gen-api.sh`; `/api/replay` is in `frontend/src/shared/api/schema.d.ts`); migration `AddSystemReplay` added (`20261111195451`)
 - [x] ADR 0272 written (status Proposed until the owner has read it); docs/design/11-strategy-lab.md and 13-reports-and-ui.md updated (2026-11-12); roadmap rows updated
 
