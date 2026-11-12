@@ -8,7 +8,7 @@ internal sealed class ListRunsTool(ToolRunner runner, IAiReportReader reports, I
 {
     public static readonly ToolSpec Spec = new(
         "list_runs",
-        "Stored runs: sim = simulation runs for get_report (run key, strategy, window, default set marked); lab = Strategy Lab runs, newest first, with state and verdict.",
+        "Stored runs: sim = simulation runs for get_report (key, window); lab = Strategy Lab runs, newest first, with state and verdict.",
         new ArgDef("kind", ArgType.String, true, "sim or lab.", 3, 3, "^(sim|lab)$"),
         new ArgDef("strategy", ArgType.String, false, "Lab only: strategy id.", 1, 64, "^[A-Za-z][A-Za-z0-9_]*$"),
         new ArgDef("limit", ArgType.Integer, false, "Lab only: 1 to 20, default 10.", 1, 20));

@@ -8,7 +8,7 @@ internal sealed class GetLearningTool(ToolRunner runner, IAiDataReader data, ILo
 {
     public static readonly ToolSpec Spec = new(
         "get_learning",
-        "Stored learning records, newest first: lessons, hypotheses, changelog, experiments or models. Changes no state.",
+        "Stored learning records, newest first: lessons, hypotheses, changelog, experiments or models.",
         new ArgDef("kind", ArgType.String, true, "Which records.", 6, 11, "^(lessons|hypotheses|changelog|experiments|models)$"),
         new ArgDef("status", ArgType.String, false, "State filter.", 1, 40, "^[A-Za-z0-9_\\-]{1,40}$"),
         new ArgDef("limit", ArgType.Integer, false, "1 to 20, default 10.", 1, 20));

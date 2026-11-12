@@ -44,7 +44,7 @@ internal sealed class BasketApiClient(HttpClient http, IOptions<BasketApiOptions
             switch (response.StatusCode)
             {
                 case HttpStatusCode.OK:
-                    var body = await ReadCappedAsync(response.Content, settings.MaxResponseBytes, cancellationToken);
+                    var body = await CappedBody.ReadAsync(response.Content, settings.MaxResponseBytes, cancellationToken);
                     return body is null || JsonSerializer.Deserialize<TView>(body, Json) is not { } view ? Result.Failure<TView>(Unavailable) : Result.Success(view);
                 case HttpStatusCode.NotFound:
                     return Result.Failure<TView>(Error.NotFound("basket.unknown", "No basket has that name or id."));
@@ -66,36 +66,11 @@ internal sealed class BasketApiClient(HttpClient http, IOptions<BasketApiOptions
         }
     }
 
-    /// <summary>The body, or null when it is larger than <paramref name="limit"/> bytes (the declared length is checked first, the read is cut at the limit whatever the header says).</summary>
-    private static async Task<byte[]?> ReadCappedAsync(HttpContent content, int limit, CancellationToken cancellationToken)
-    {
-        if (content.Headers.ContentLength > limit)
-        {
-            return null;
-        }
-
-        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
-        using var buffer = new MemoryStream();
-        var chunk = new byte[8192];
-        int read;
-        while ((read = await stream.ReadAsync(chunk, cancellationToken)) > 0)
-        {
-            if (buffer.Length + read > limit)
-            {
-                return null;
-            }
-
-            buffer.Write(chunk, 0, read);
-        }
-
-        return buffer.ToArray();
-    }
-
     /// <summary>The refusal of the API, with its detail as untrusted text (cleaned and cut like any text from outside); a body that cannot be read gives the fixed refusal.</summary>
     private static async Task<string> InvalidTextAsync(HttpContent content, CancellationToken cancellationToken)
     {
         const string Prefix = "The report query was refused";
-        var body = await ReadCappedAsync(content, MaxProblemBytes, cancellationToken);
+        var body = await CappedBody.ReadAsync(content, MaxProblemBytes, cancellationToken);
         if (body is null)
         {
             return Prefix + ".";

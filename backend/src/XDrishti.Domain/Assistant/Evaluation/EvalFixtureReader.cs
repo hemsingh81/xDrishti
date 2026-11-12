@@ -40,7 +40,8 @@ public static class EvalFixtureReader
                     [.. learning.GetProperty("hypotheses").EnumerateArray().Select(l => new FixtureStatusItem(Str(l, "key"), Str(l, "status")))]),
                 root.TryGetProperty("bars", out var bars)
                     ? new FixtureBars(Date(bars, "start"), bars.GetProperty("sessions").GetInt32(), [.. bars.GetProperty("series").EnumerateArray().Select(x => new FixtureSeries(Str(x, "symbol"), x.GetProperty("from").GetDouble(), x.GetProperty("to").GetDouble()))])
-                    : null);
+                    : null,
+                root.TryGetProperty("evidence", out var evidence) ? Evidence(evidence) : null);
             var problem = Check(fixture);
             return problem is null ? Result.Success(fixture) : Result.Failure<EvalFixture>(new Error(InvalidCode, problem, ErrorKind.Validation));
         }
@@ -73,6 +74,11 @@ public static class EvalFixtureReader
             return "the bars are not valid (sessions 2 to 400, a listed symbol once, positive prices)";
         }
 
+        if (f.Evidence is { } ev && (ev.Replay.Equity.Count == 0 || ev.Replay.Trades.Any(t => !symbols.Contains(t.Symbol) || t.Side is not ("BUY" or "SELL")) || ev.Shadow.R.Count is < 10 or > 200))
+        {
+            return "the evidence is not valid (an equity point per session, listed symbols, BUY or SELL, 10 to 200 shadow R values)";
+        }
+
         var signals = f.Runs.SelectMany(r => r.Trades.Select(t => (r.Strategy, t.Symbol, t.Side, t.Entry))).ToList();
         if (signals.Distinct().Count() != signals.Count)
         {
@@ -80,6 +86,18 @@ public static class EvalFixtureReader
         }
 
         return f.Runs.Any(r => r.Trades.Any(t => t.Side is not ("BUY" or "SELL"))) ? "a trade side is not BUY or SELL" : null;
+    }
+
+    private static FixtureEvidence Evidence(JsonElement e)
+    {
+        var replay = e.GetProperty("replay");
+        var shadow = e.GetProperty("shadow");
+        return new FixtureEvidence(
+            new FixtureReplay(
+                Date(replay, "from"), Date(replay, "to"), replay.GetProperty("capital").GetDecimal(), replay.GetProperty("filtersWithoutHistory").GetBoolean(), Strings(replay, "labels"),
+                [.. replay.GetProperty("equity").EnumerateArray().Select(x => x.GetDecimal())],
+                [.. replay.GetProperty("trades").EnumerateArray().Select(t => new FixtureReplayTrade(Str(t, "symbol"), Str(t, "side"), Date(t, "entry"), Date(t, "exit"), t.GetProperty("qty").GetInt32(), t.GetProperty("entryPrice").GetDecimal(), t.GetProperty("stopPrice").GetDecimal(), t.GetProperty("grossPnl").GetDecimal(), t.GetProperty("r").GetDouble()))]),
+            new FixtureShadow(Date(shadow, "session"), [.. shadow.GetProperty("r").EnumerateArray().Select(x => x.GetDouble())]));
     }
 
     private static FixtureRun Run(JsonElement r) =>

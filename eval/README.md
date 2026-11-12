@@ -8,6 +8,7 @@ One measurement of whether the local model and the current prompts are good enou
 | `sets/data-questions.jsonl` | The 30 data questions with their expected answers (numbers as exact fractions, grading rounds). |
 | `sets/announcements.schema.json` | The row format of the event set D (200 labelled announcements; until they exist the set is `not_evaluable`). The labelled text is in the git-ignored `data/eval/sets/announcements.jsonl`; only `sets/announcements.manifest.json` (ids and hashes, no text) is committed. |
 | `sets/announcement-baseline.json` | The pre-registered category baseline of set D (P15-07): exchange category to `material` or `non_material`, committed before the first sample. |
+| `sets/evidence-questions.jsonl` | AI-01 addendum (ADR 0280): EQ-01..EQ-04 over the fixture's replay run, scorecards and shadow session (`get_evidence`); kept apart from the locked 30, like the basket questions. |
 | `thresholds.json` | The pass thresholds of doc 14 section 5, in a file so a change is reviewed. |
 
 Grading is code (no model judge): exact normalised numbers, words, honest-state phrases, a conflict check in the sentences that carry the answer, and a check that every figure is in a tool result, the question or the allowed list. Rates are printed with Wilson 95 % intervals; two runs are compared with an exact sign test on the discordant cases. 30 cases cannot separate 27 from 24 correct.

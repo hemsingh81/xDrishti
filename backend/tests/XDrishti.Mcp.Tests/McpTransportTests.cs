@@ -170,14 +170,14 @@ public sealed class McpTransportTests
     }
 
     [Fact]
-    public async Task The_tool_list_is_exactly_the_fifteen_tools_with_schemas_that_forbid_extra_properties_and_read_only_annotations()
+    public async Task The_tool_list_is_exactly_the_sixteen_tools_with_schemas_that_forbid_extra_properties_and_read_only_annotations()
     {
         await using var host = await TestMcpHost.StartAsync();
         await using var client = await ConnectAsync(host);
 
         var tools = await client.ListToolsAsync(cancellationToken: Ct);
 
-        tools.Select(t => t.Name).Order().ShouldBe(["calc", "describe_table", "get_basket", "get_cell", "get_instrument", "get_learning", "get_plan", "get_portfolio", "get_report", "get_system_status", "lab_validate", "list_runs", "list_tables", "run_sql", "search_notes"]);
+        tools.Select(t => t.Name).Order().ShouldBe(["calc", "describe_table", "get_basket", "get_cell", "get_evidence", "get_instrument", "get_learning", "get_plan", "get_portfolio", "get_report", "get_system_status", "lab_validate", "list_runs", "list_tables", "run_sql", "search_notes"]);
         foreach (var tool in tools)
         {
             var schema = tool.ProtocolTool.InputSchema;

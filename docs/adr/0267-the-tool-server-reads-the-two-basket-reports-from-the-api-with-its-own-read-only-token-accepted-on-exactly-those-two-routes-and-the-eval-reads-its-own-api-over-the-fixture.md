@@ -28,3 +28,5 @@
 - The assistant can read the two basket reports with the figures the screens show, without any new database grant. The attack surface added is one bearer token that opens two read-only GET routes of an already owner-only API.
 - A rotation of `mcp_api_token` needs a restart of `xd-api` and `xd-mcp`.
 - UNVERIFIED in a running container: that `xd-api-eval` starts under `Production` with `Api:ReportsOnly` and no broker secret (proved on the test host with the keys emptied and no hosted service, not under Podman), and its 300 to 500 MB.
+
+- **Amended by [ADR 0280](0280-the-assistant-reads-the-stored-replay-readiness-and-shadow-results-through-one-tool-over-six-more-read-only-gets-of-the-same-service-token-and-the-labels-travel-unchanged.md) (AI-01, 2026-11-12).** The token's route list is now eight: these two (policy `AssistantBasketRead`) and six evidence GETs (policy `AssistantEvidenceRead`). Everything else here stands.

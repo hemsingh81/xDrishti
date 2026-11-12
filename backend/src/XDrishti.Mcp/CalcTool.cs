@@ -8,7 +8,7 @@ internal sealed class CalcTool(ToolRunner runner, ILogger<CalcTool> logger) : Re
 {
     public static readonly ToolSpec Spec = new(
         "calc",
-        "Exact decimal arithmetic for derived numbers (differences, ratios, sums): numbers, + - * / ( ) and round, abs, min, max. Rounds half away from zero to places (default 4). Use it instead of computing yourself.",
+        "Exact decimal arithmetic for derived numbers (differences, ratios, sums): numbers, + - * / ( ) and round, abs, min, max. Rounds half away from zero. Use it instead of computing yourself.",
         new ArgDef("expression", ArgType.String, true, "For example (0.8-0.6)*100.", 1, Calc.MaxChars),
         new ArgDef("places", ArgType.Integer, false, "0 to 8, default 4.", 0, Calc.MaxPlaces));
 

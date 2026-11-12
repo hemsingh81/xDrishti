@@ -15,7 +15,8 @@ public sealed record EvalFixture(
     FixturePortfolio Portfolio,
     FixtureCellStats CellStats,
     FixtureLearning Learning,
-    FixtureBars? Bars = null)
+    FixtureBars? Bars = null,
+    FixtureEvidence? Evidence = null)
 {
     /// <summary>The fixture hash: lower-case hex SHA-256 of the file's bytes.</summary>
     public static string HashOf(ReadOnlySpan<byte> bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
@@ -51,6 +52,18 @@ public sealed record FixtureBars(DateOnly Start, int Sessions, IReadOnlyList<Fix
 }
 
 public sealed record FixtureSeries(string Symbol, double From, double To);
+
+/// <summary>One closed trade of the fixture's replay run (AI-01): gross figures only, so that the run is labelled before costs.</summary>
+public sealed record FixtureReplayTrade(string Symbol, string Side, DateOnly Entry, DateOnly Exit, int Qty, decimal EntryPrice, decimal StopPrice, decimal GrossPnl, double R);
+
+/// <summary>The one replay run of the fixture (AI-01): its range, capital, the equity at each session close, the hindsight labels beyond the ones the parameters give (<c>survivorship</c>) and its trades.</summary>
+public sealed record FixtureReplay(DateOnly From, DateOnly To, decimal Capital, bool FiltersWithoutHistory, IReadOnlyList<string> Labels, IReadOnlyList<decimal> Equity, IReadOnlyList<FixtureReplayTrade> Trades);
+
+/// <summary>The shadow record of the fixture (AI-01): one session whose candidates were all graded, with the gross R of each.</summary>
+public sealed record FixtureShadow(DateOnly Session, IReadOnlyList<double> R);
+
+/// <summary>The stored research results of the fixture that <c>get_evidence</c> reads (AI-01).</summary>
+public sealed record FixtureEvidence(FixtureReplay Replay, FixtureShadow Shadow);
 
 public sealed record FixtureBasket(string Name, IReadOnlyList<string> Symbols);
 

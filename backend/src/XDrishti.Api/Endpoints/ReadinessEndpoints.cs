@@ -21,11 +21,13 @@ internal sealed class ReadinessEndpoints : IEndpointModule
         group.MapGet("/scorecards", ListAsync)
             .WithName("ListScorecards")
             .WithSummary("The readiness system card (the minimum of the integrity and the weighted mean of the strategy scores, equal weights labelled when the plan exposes no risk share) and one line per Lab strategy at its latest version, weakest first: score, label, weakest sub-score, rows passed of 15, hard fails, gates R and S. Derived on every read, no order. An input that does not exist is unavailable, which is never a pass.")
+            .RequireAuthorization(ServiceReadAuthentication.AssistantEvidenceReadPolicy)
             .ProducesProblem(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/scorecards/{strategyId}/versions/{version:int}", GetAsync)
             .WithName("GetScorecard")
             .WithSummary("The scorecard of one strategy version: the 15-row edge checklist (value, threshold, producer, pass / fail / unavailable), the six sub-scores with what would move each, the hard fails by name, the label, gates R and S with the rows that stop them, what the card is waiting for, the settings hash and the newest daily snapshots. Derived on every read. 400 confidence.readiness_invalid, 404 confidence.scorecard_not_found")
+            .RequireAuthorization(ServiceReadAuthentication.AssistantEvidenceReadPolicy)
             .ProducesRejections(conflict: false);
 
         group.MapGet("/readiness-settings", GetSettingsAsync)

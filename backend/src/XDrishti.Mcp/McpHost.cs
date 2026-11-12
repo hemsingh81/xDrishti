@@ -22,12 +22,14 @@ internal static class McpHost
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddAiReadOnly(builder.Configuration);
         builder.Services.AddAiBasketApi(builder.Configuration); // basket_profile and basket_ranking over the API's two read-only routes (BK-12b); the reader resolves the handlers from a scope
+        builder.Services.AddAiEvidenceApi(); // get_evidence over the API's six evidence GETs (AI-01), the same token
         builder.Services.AddSingleton<ToolRunner>();
         builder.Services.AddSingleton<ListTablesTool>();
         builder.Services.AddSingleton<DescribeTableTool>();
         builder.Services.AddSingleton<RunSqlTool>();
         builder.Services.AddSingleton<LabValidateTool>();
         builder.Services.AddSingleton<GetReportTool>();
+        builder.Services.AddSingleton<GetEvidenceTool>();
         builder.Services.AddSingleton<ListRunsTool>();
         builder.Services.AddSingleton<GetPlanTool>();
         builder.Services.AddSingleton<GetCellTool>();
@@ -43,6 +45,7 @@ internal static class McpHost
         AddTool<RunSqlTool>(builder.Services, "Run a read-only query");
         AddTool<LabValidateTool>(builder.Services, "Validate a strategy file");
         AddTool<GetReportTool>(builder.Services, "Report engine figures");
+        AddTool<GetEvidenceTool>(builder.Services, "Stored replay, readiness and shadow results");
         AddTool<ListRunsTool>(builder.Services, "List stored runs");
         AddTool<GetPlanTool>(builder.Services, "Daily plan");
         AddTool<GetCellTool>(builder.Services, "Cell statistics");

@@ -171,7 +171,11 @@ public sealed partial class ReplayArchitectureTests
         var namers = Directory.EnumerateFiles(Src(), "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal) && Regex.IsMatch(string.Join("\n", File.ReadAllLines(f).Where(l => !l.TrimStart().StartsWith("//", StringComparison.Ordinal))), @"replay_(runs|sessions|sweeps|trades)\b"))
             .Select(f => Path.GetRelativePath(Src(), f).Replace('\\', '/')).ToList();
-        namers.ShouldBe(["XDrishti.Infrastructure/Replay/ReplayStore.cs"]);
+        // AI-01 (ADR 0280), the one named exemption: the eval fixture seeder writes the synthetic replay run of the eval database (owner connection, one transaction, only the database xdrishti_eval, never a service); it may INSERT into the three tables and do nothing else to them.
+        namers.ShouldBe(["XDrishti.Infrastructure/Ai/Evaluation/FixtureSeeder.cs", "XDrishti.Infrastructure/Replay/ReplayStore.cs"], ignoreOrder: true);
+        var seeder = File.ReadAllText(Path.Combine(Src(), "XDrishti.Infrastructure", "Ai", "Evaluation", "FixtureSeeder.cs"));
+        SqlWrite().Matches(seeder).Select(m => m.Groups["table"].Value.ToLowerInvariant()).Where(t => t.StartsWith("research.replay_", StringComparison.Ordinal)).Distinct().Order(StringComparer.Ordinal).ToList().ShouldBe(["research.replay_runs", "research.replay_sessions", "research.replay_trades"], "the seeder inserts the run, its sessions and its trades; it writes no sweep");
+        Regex.IsMatch(seeder, @"(UPDATE|DELETE\s+FROM|TRUNCATE)\s+research\.replay_", RegexOptions.IgnoreCase).ShouldBeFalse("the seeder only inserts the replay rows");
         SqlWrite().IsMatch("INSERT INTO research.replay_runs (a)").ShouldBeTrue("the scan does see a write");
         SqlWrite().IsMatch("UPDATE research.replay_runs SET").ShouldBeTrue();
         SqlWrite().IsMatch("SELECT 1 FROM research.replay_runs").ShouldBeFalse("a read is not a write");
