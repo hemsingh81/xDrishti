@@ -13,6 +13,7 @@ using XDrishti.Application.Reporting;
 using XDrishti.Domain.Common;
 using XDrishti.Infrastructure.Ai.ReadOnly.BasketApi;
 using XDrishti.Infrastructure.Ai.ReadOnly.DataReader;
+using XDrishti.Infrastructure.Ai.ReadOnly.EvidenceApi;
 using XDrishti.Infrastructure.Lab;
 using XDrishti.Infrastructure.Research;
 
@@ -70,6 +71,20 @@ public static class AiReadOnlyRegistration
             .AddHttpMessageHandler<BasketApiEndpointGuard>();
         services.TryAddScoped<IQueryHandler<GetBasketProfileQuery, Result<BasketProfileView>>, ApiBasketProfileHandler>();
         services.TryAddScoped<IQueryHandler<GetBasketRankingQuery, Result<BasketRankingView>>, ApiBasketRankingHandler>();
+        return services;
+    }
+
+    /// <summary>
+    /// <c>get_evidence</c> over the API (AI-01, ADR 0280): the same settings (<c>Mcp:Api</c>) and the same service token as the basket reports, an allow-list of exactly the five evidence paths. Call it after <see cref="AddAiBasketApi"/> (the options are shared). With no address or token the reader answers <c>tool.unavailable</c> and calls nothing.
+    /// </summary>
+    public static IServiceCollection AddAiEvidenceApi(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddTransient<EvidenceApiEndpointGuard>();
+        services.AddHttpClient<EvidenceApiClient>((sp, client) => client.Timeout = TimeSpan.FromSeconds(sp.GetRequiredService<IOptions<BasketApiOptions>>().Value.TimeoutSeconds))
+            .AddHttpMessageHandler<EvidenceApiEndpointGuard>();
+        services.TryAddTransient<IAiEvidenceReader, ApiEvidenceReader>();
         return services;
     }
 

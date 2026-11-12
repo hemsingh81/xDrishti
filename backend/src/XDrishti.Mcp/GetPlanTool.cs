@@ -8,7 +8,7 @@ internal sealed class GetPlanTool(ToolRunner runner, IAiDataReader data, ILogger
 {
     public static readonly ToolSpec Spec = new(
         "get_plan",
-        "Tickets of the stored daily plan for a date (default: newest): symbol, side, state, p-win lower bound, expected R, reasons, stored levels, grade. A plan is a proposal, not an order. Read-only.",
+        "Tickets of the stored daily plan for a date (default: newest): symbol, side, state, p-win lower bound, expected R, reasons, stored levels, grade. A plan is a proposal, not an order.",
         new ArgDef("date", ArgType.String, false, "yyyy-MM-dd.", 10, 10, "^\\d{4}-\\d{2}-\\d{2}$"),
         new ArgDef("accountLabel", ArgType.String, false, "Account label.", 1, 100));
 

@@ -11,7 +11,7 @@ internal sealed class LabValidateTool(ToolRunner runner, IAiLabValidator validat
 
     public static readonly ToolSpec Spec = new(
         "lab_validate",
-        "Checks a strategy file (YAML text) with the Strategy Lab's own compiler: valid or not, the hash of the strategy, and located problems. Stores nothing and runs nothing. Read-only.",
+        "Checks a strategy file (YAML text) with the Strategy Lab's own compiler: valid or not, the hash of the strategy, and located problems. Stores nothing.",
         new ArgDef("yaml", ArgType.String, true, "The strategy file text.", 1, ToolLimits.MaxYamlChars));
 
     protected override Task<ToolOutcome> RunAsync(ToolArguments arguments, CancellationToken cancellationToken)

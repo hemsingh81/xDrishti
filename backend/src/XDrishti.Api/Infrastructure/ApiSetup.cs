@@ -353,6 +353,11 @@ internal static class ApiSetup
 
         app.UseMiddleware<HubOriginMiddleware>(); // before the session is looked at: another origin gets its 403 without touching it
         app.UseRateLimiter();
+        if (app.Configuration.GetValue<bool>(ReportsOnlyKey))
+        {
+            app.Use(ReportsOnlyGate);
+        }
+
         app.UseAuthentication();
         app.UseMiddleware<CsrfProtectionMiddleware>();
         app.UseAuthorization();
@@ -384,12 +389,29 @@ internal static class ApiSetup
         }
 
         var api = app.MapGroup("/api");
-        foreach (var module in app.Services.GetServices<IEndpointModule>().Where(m => !reportsOnly || m is ReportsEndpoints))
+        foreach (var module in app.Services.GetServices<IEndpointModule>().Where(m => !reportsOnly || m is ReportsEndpoints or ReplayEndpoints or ReadinessEndpoints or PaperShadowEndpoints))
         {
             module.Map(api);
         }
 
         return app;
+    }
+
+    /// <summary>
+    /// The reports-only instance maps the replay, readiness and shadow modules only so that their six evidence GETs exist (AI-01, ADR 0280); every other route of those modules (a start, a switch, a trades or sessions read) answers 404 here, before any authentication,
+    /// so that the eval API stays what BK-12b made it: report reads and the six evidence reads.
+    /// </summary>
+    private static Task ReportsOnlyGate(HttpContext context, RequestDelegate next)
+    {
+        var endpoint = context.GetEndpoint();
+        var evidenceModule = endpoint is RouteEndpoint { RoutePattern.RawText: { } raw } && (raw.StartsWith("/api/replay", StringComparison.Ordinal) || raw.StartsWith("/api/confidence", StringComparison.Ordinal) || raw.StartsWith("/api/paper", StringComparison.Ordinal));
+        if (evidenceModule && !endpoint!.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == ServiceReadAuthentication.AssistantEvidenceReadPolicy))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return Task.CompletedTask;
+        }
+
+        return next(context);
     }
 
     private static void AddAuth(this IServiceCollection services)
@@ -409,6 +431,9 @@ internal static class ApiSetup
 
             // The two basket report routes alone: an owner session or the tool server's token (the session scheme first: it writes the 401).
             o.AddPolicy(ServiceReadAuthentication.AssistantBasketReadPolicy, new AuthorizationPolicyBuilder(SessionAuthentication.Scheme, ServiceReadAuthentication.Scheme).RequireAuthenticatedUser().Build());
+
+            // The six evidence GETs alone (AI-01, ADR 0280): the same two schemes, a policy of their own so that each route list is pinned apart.
+            o.AddPolicy(ServiceReadAuthentication.AssistantEvidenceReadPolicy, new AuthorizationPolicyBuilder(SessionAuthentication.Scheme, ServiceReadAuthentication.Scheme).RequireAuthenticatedUser().Build());
         });
 
         // The proxy (Caddy, container network) is trusted to tell the real client address and scheme.

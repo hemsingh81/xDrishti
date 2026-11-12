@@ -90,9 +90,9 @@ public sealed class McpArchitectureTests
     public void Each_tool_takes_only_read_ports_in_its_constructor()
     {
         var tools = Mcp.GetTypes().Where(t => t.IsClass && !t.IsAbstract && t.BaseType?.Name == "ReadOnlyTool").ToList();
-        tools.Select(t => t.Name).Order().ShouldBe(["CalcTool", "DescribeTableTool", "GetBasketTool", "GetCellTool", "GetInstrumentTool", "GetLearningTool", "GetPlanTool", "GetPortfolioTool", "GetReportTool", "GetSystemStatusTool", "LabValidateTool", "ListRunsTool", "ListTablesTool", "RunSqlTool", "SearchNotesTool"]);
+        tools.Select(t => t.Name).Order().ShouldBe(["CalcTool", "DescribeTableTool", "GetBasketTool", "GetCellTool", "GetEvidenceTool", "GetInstrumentTool", "GetLearningTool", "GetPlanTool", "GetPortfolioTool", "GetReportTool", "GetSystemStatusTool", "LabValidateTool", "ListRunsTool", "ListTablesTool", "RunSqlTool", "SearchNotesTool"]);
 
-        var allowed = new[] { "ToolRunner", "IAiCatalog", "IAiSqlRunner", "IAiLabValidator", "IAiReportReader", "IAiDataReader", "ILogger`1", "IOptions`1" };
+        var allowed = new[] { "ToolRunner", "IAiCatalog", "IAiSqlRunner", "IAiLabValidator", "IAiReportReader", "IAiDataReader", "IAiEvidenceReader", "ILogger`1", "IOptions`1" };
         foreach (var tool in tools)
         {
             var parameters = tool.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Single().GetParameters();
@@ -100,7 +100,7 @@ public sealed class McpArchitectureTests
         }
 
         // The two data ports of the typed tools have only read verbs (get, list, search): no member is a write.
-        foreach (var port in new[] { typeof(XDrishti.Application.Abstractions.Ai.IAiReportReader), typeof(XDrishti.Application.Abstractions.Ai.IAiDataReader) })
+        foreach (var port in new[] { typeof(XDrishti.Application.Abstractions.Ai.IAiReportReader), typeof(XDrishti.Application.Abstractions.Ai.IAiDataReader), typeof(XDrishti.Application.Abstractions.Ai.IAiEvidenceReader) })
         {
             port.GetMethods().Select(m => m.Name).ShouldAllBe(n => n.StartsWith("Get", StringComparison.Ordinal) || n.StartsWith("List", StringComparison.Ordinal) || n.StartsWith("Search", StringComparison.Ordinal), port.Name);
         }
@@ -147,6 +147,29 @@ public sealed class McpArchitectureTests
         guard.ShouldContain("\"/api/reports/baskets/{id}/profile\", \"/api/reports/baskets/ranking\"");
         System.Text.RegularExpressions.Regex.Count(guard, "/api/").ShouldBe(System.Text.RegularExpressions.Regex.Count(guard, "/api/reports/baskets/"), "no route but the two basket report routes is named");
         Mcp.GetTypes().ShouldNotContain(t => t.Name.Contains("DbContext", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_evidence_client_is_a_get_only_client_with_an_allow_list_of_exactly_the_five_evidence_paths()
+    {
+        // AI-01 (ADR 0280): the evidence folder writes nothing, reaches no database and names no route but the five evidence ones.
+        var folder = Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Ai", "ReadOnly", "EvidenceApi", "EvidenceApiEndpointGuard.cs"))!;
+        var sources = Directory.GetFiles(folder, "*.cs").Select(f => (Name: Path.GetFileName(f), Text: File.ReadAllText(f))).ToList();
+
+        sources.Count.ShouldBeGreaterThanOrEqualTo(3);
+        foreach (var (name, text) in sources)
+        {
+            foreach (var word in new[] { "DbContext", "ICommandHandler", "HttpMethod.Post", "HttpMethod.Put", "HttpMethod.Delete", "HttpMethod.Patch", "PostAsync", "PutAsync", "DeleteAsync", "PatchAsync", "Npgsql" })
+            {
+                text.ShouldNotContain(word, customMessage: name);
+            }
+        }
+
+        var guard = sources.Single(s => s.Name == "EvidenceApiEndpointGuard.cs").Text;
+        guard.ShouldContain("method == HttpMethod.Get");
+        var routes = System.Text.RegularExpressions.Regex.Matches(guard, "\"?/api/[a-z/\\[\\]A-Z0-9_.{}-]*").Select(m => m.Value.TrimStart('"')).Distinct().Order(StringComparer.Ordinal).ToList();
+        routes.Count(r => r.StartsWith("/api/replay/runs", StringComparison.Ordinal)).ShouldBeGreaterThan(0);
+        routes.ShouldAllBe(r => r.StartsWith("/api/replay/runs", StringComparison.Ordinal) || r.StartsWith("/api/confidence/scorecards", StringComparison.Ordinal) || r.StartsWith("/api/paper/shadow/summary", StringComparison.Ordinal), "no route but the evidence routes is named");
     }
 
     [Fact]

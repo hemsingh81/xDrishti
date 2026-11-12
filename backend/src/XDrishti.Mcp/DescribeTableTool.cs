@@ -9,8 +9,8 @@ internal sealed class DescribeTableTool(ToolRunner runner, IAiCatalog catalog) :
 {
     public static readonly ToolSpec Spec = new(
         "describe_table",
-        "Describes one view returned by list_tables: grain, limits and every column (type, kind, class, unit, meaning). Read-only.",
-        new ArgDef("name", ArgType.String, true, "View name as listed, for example instruments.", 1, 63, "^[a-z0-9_]{1,63}$"));
+        "Describes one view returned by list_tables: grain, limits and every column (type, kind, class, unit, meaning).",
+        new ArgDef("name", ArgType.String, true, "View name.", 1, 63, "^[a-z0-9_]{1,63}$"));
 
     private static readonly ToolColumn[] Columns = [new("name", false), new("type", false), new("kind", false), new("class", false), new("unit", false), new("description", false)];
 

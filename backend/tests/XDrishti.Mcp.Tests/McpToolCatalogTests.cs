@@ -33,12 +33,12 @@ public sealed class McpToolCatalogTests
         var snapshot = await catalog.ListAsync(Ct);
 
         snapshot.State.ShouldBe(ToolCatalogState.Ready);
-        snapshot.Tools.Select(t => t.Name).Order().ShouldBe(["calc", "describe_table", "get_basket", "get_cell", "get_instrument", "get_learning", "get_plan", "get_portfolio", "get_report", "get_system_status", "lab_validate", "list_runs", "list_tables", "run_sql", "search_notes"]);
+        snapshot.Tools.Select(t => t.Name).Order().ShouldBe(["calc", "describe_table", "get_basket", "get_cell", "get_evidence", "get_instrument", "get_learning", "get_plan", "get_portfolio", "get_report", "get_system_status", "lab_validate", "list_runs", "list_tables", "run_sql", "search_notes"]);
         snapshot.Tools.ShouldAllBe(t => t.Description.Length > 0 && JsonDocument.Parse(t.InputSchemaJson).RootElement.ValueKind == JsonValueKind.Object);
 
         // The 16 tools the model sees (these 15 and the local make_chart) fit the schema budget, each description is at most 40 words, and the whole list equals the golden file (spec P9-05 AC 15 and 16).
         var all = snapshot.Tools.Append(ChartTool.Descriptor).OrderBy(t => t.Name, StringComparer.Ordinal).ToList();
-        all.Count.ShouldBe(16);
+        all.Count.ShouldBe(17); // AI-01 adds get_evidence
         ContextBudget.SchemaTokens(all).ShouldBeLessThanOrEqualTo(ContextBudget.SchemaTokenLimit);
         all.ShouldAllBe(t => t.Description.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length <= 40, "descriptions are at most 40 words");
         var golden = JsonSerializer.Serialize(all.Select(t => new { t.Name, t.Description, Schema = JsonDocument.Parse(t.InputSchemaJson).RootElement }), GoldenOptions).ReplaceLineEndings("\n") + "\n";
@@ -74,6 +74,21 @@ public sealed class McpToolCatalogTests
         var facts = ToolResultReader.Read(call.Text);
         facts.Parsed.ShouldBeTrue();
         facts.Ok.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Get_evidence_with_no_api_configured_answers_tool_unavailable_and_a_bad_kind_is_invalid_arguments()
+    {
+        await using var host = await StartAsync();
+        using var catalog = Catalog($"{host.Address}/mcp", TestMcpHost.ApiToken);
+
+        var unavailable = await catalog.CallAsync("get_evidence", """{"kind":"shadow_summary"}""", Ct);
+        var bad = await catalog.CallAsync("get_evidence", """{"kind":"replay_trades"}""", Ct);
+        var extra = await catalog.CallAsync("get_evidence", """{"kind":"replay_list","sql":"x"}""", Ct);
+
+        ToolResultReader.Read(unavailable.Text).ErrorCode.ShouldBe("tool.unavailable");
+        ToolResultReader.Read(bad.Text).ErrorCode.ShouldBe("tool.invalid_arguments");
+        ToolResultReader.Read(extra.Text).ErrorCode.ShouldBe("tool.invalid_arguments");
     }
 
     [Fact]

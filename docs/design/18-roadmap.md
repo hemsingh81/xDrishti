@@ -117,7 +117,7 @@ A due-diligence review on 2026-11-12 compared what is built with the owner's goa
 | SR-02 | [Replay baseline arm, start-date sweep, chart link](../specs/SR-02-replay-baseline-arm-start-date-sweep-and-chart-link.md) | 4.5 d | SR-01 | Spec Approved |
 | SR-03 | [Pre-registered system replay over a hold-out block](../specs/SR-03-pre-registered-system-replay-over-a-hold-out-block.md) | 3 d | HO-01 and ISS-25 | Draft, owner decision |
 | DATA-01 | [Dated NSE ban and surveillance lists](../specs/DATA-01-dated-nse-ban-and-surveillance-lists.md) | 3 d | BK-01 pattern; the owner's NSE terms | Spec Approved |
-| AI-01 | [Assistant reads replay and readiness](../specs/AI-01-assistant-reads-replay-and-readiness.md) | 2 d | BK-12b | Spec Approved |
+| AI-01 | [Assistant reads replay and readiness](../specs/AI-01-assistant-reads-replay-and-readiness.md) | 2 d | BK-12b | Built 2026-11-12, not deployed; the owner re-accepts the eval baseline |
 | GAP-09 | (no story) the owner chooses and pre-registers the frozen "evidence set" of strategy versions before switching shadow on | none | none | Owner decision, see Open owner decisions 8 |
 
 ## P3 slices
