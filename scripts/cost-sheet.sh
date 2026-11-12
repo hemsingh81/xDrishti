@@ -21,12 +21,16 @@ fi
 unset password
 # every argument that is an existing file becomes an absolute path (the script changes directory below)
 args=()
+prev=""
 for arg in "$@"; do
-  if [[ -f "$arg" ]]; then
+  if [[ "$prev" == "--out" && "$arg" != /* ]]; then
+    args+=("$PWD/$arg")   # a relative --out is relative to where you stand, not to the project the script changes into
+  elif [[ -f "$arg" ]]; then
     args+=("$(cd "$(dirname "$arg")" && pwd)/$(basename "$arg")")
   else
     args+=("$arg")
   fi
+  prev="$arg"
 done
 # derive writes under the repository's data/ unless --out says otherwise (the script changes directory below)
 if [[ "${args[0]:-}" == "derive" ]]; then

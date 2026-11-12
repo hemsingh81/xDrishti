@@ -17,6 +17,11 @@ internal static class CostDeriveText
         Line(text, "sheet written (mode 0600): " + path);
         Line(text, "residuals written (mode 0600): " + residualsPath);
         Line(text, "files read: " + N(d.Files) + "; rows kept: " + N(d.RowsRead) + "; rows the reader refused: " + N(d.RowsRefused) + "; rows repeated (counted once): " + N(d.RowsRepeated) + "; rows not used (no class, or an adjustment): " + N(d.Unclassified));
+        if (d.OneSidedWithBrokerage > 0)
+        {
+            Line(text, "one-sided NSE bills with brokerage above 0 (not used; delivery brokerage cannot be taken as 0): " + N(d.OneSidedWithBrokerage));
+        }
+
         foreach (var skip in d.Skipped)
         {
             Line(text, "skipped " + skip.Reason + ": " + N(skip.Rows) + " rows");
@@ -31,13 +36,18 @@ internal static class CostDeriveText
             Line(text, "  " + line.Class + " " + line.Line + ": " + Rate(line));
             if (line.Unstable)
             {
-                Line(text, "    unstable: the rate moves by more than 5 % of its median between " + Date(line.From!.Value) + " and " + Date(line.To!.Value) + "; a budget change needs your effective date");
+                Line(text, "    unstable: the rate moved by more than 5 % of its median between " + Date(line.From!.Value) + " and " + Date(line.To!.Value) + "; a budget change needs your effective date");
             }
         }
 
         if (d.Lines.Any(l => l.Rate is null))
         {
-            Line(text, "  unavailable lines are null in the file: fill them from your contract note before loading (the loader refuses a null).");
+            Line(text, "  unavailable lines are null in the file: fill them from your tariff before loading (the loader refuses a null).");
+        }
+
+        foreach (var note in d.Assumed)
+        {
+            Line(text, "assumed, not derived: " + note);
         }
 
         Line(text, string.Empty);
@@ -60,6 +70,11 @@ internal static class CostDeriveText
             : "verdict: DOES NOT MEET the rule (at least 95 % of bills within 1 rupee on both sets"
                 + (d.CheckSet.Bills == 0 ? "; there are no newer bills to check on" : string.Empty)
                 + "). Do not rely on this sheet as it is.");
+        if (d.Lines.Any(l => l.Rate is null))
+        {
+            Line(text, "the file has null (unavailable) lines: it cannot be loaded until you fill them from your tariff, and the residuals above price a null line as 0.");
+        }
+
         return text.ToString();
     }
 
@@ -70,13 +85,13 @@ internal static class CostDeriveText
     {
         if (line.Rate is null)
         {
-            return "unavailable (no bill has this line above 0)";
+            return "unavailable: " + (line.Note ?? "no bill has this line above 0") + "; fill from your tariff";
         }
 
         var unit = line.Line == "sebi" ? " rupees per crore" : " %";
         if (line.Implied is null)
         {
-            return R(line.Rate.Value) + (line.Line == "dp charge" ? " rupees (not a column of the report; any DP charge is inside the other line)" : " (every bill of the class has this cell at 0)");
+            return R(line.Rate.Value) + (line.Line == "dp charge" ? " rupees (assumed: no DP charge on an intraday bill)" : line.Line == "brokerage cap" ? " rupees per leg (" + line.Note + ")" : " (every one-sided NSE bill has this cell at 0)");
         }
 
         return R(line.Rate.Value) + unit + " (min " + R(line.Implied.Minimum) + ", max " + R(line.Implied.Maximum) + ", over " + N(line.Implied.Rows) + " bills)";

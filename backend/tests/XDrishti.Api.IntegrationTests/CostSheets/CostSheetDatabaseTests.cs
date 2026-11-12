@@ -414,7 +414,11 @@ public sealed class CostSheetDatabaseTests(ApiFactory factory) : DataTestBase(fa
 
         outcome.Exit.ShouldBe(0, outcome.Error);
         (await CountsAsync()).ShouldBe(before, "derive stores nothing");
-        CostSheetJson.Parse(await File.ReadAllTextAsync(output, Ct)).IsSuccess.ShouldBeTrue();
+        var written = await File.ReadAllTextAsync(output, Ct);
+        CostSheetJson.Parse(written).IsFailure.ShouldBeTrue("the unproven cap and the delivery DP charge are null: it cannot be loaded as it is");
+        CostSheetJson.Parse(written.Replace("\"brokerage_cap\": null", "\"brokerage_cap\": 2.4", StringComparison.Ordinal).Replace("\"dp_charge_per_sell\": null", "\"dp_charge_per_sell\": 0", StringComparison.Ordinal)).IsSuccess.ShouldBeTrue();
+        outcome.Out.ShouldContain("assumed, not derived: rounding half_away_from_zero");
+        outcome.Out.ShouldContain("unavailable: not a column of the report");
         File.ReadAllLines(output + ".residuals.csv").Length.ShouldBe(21, "a header and the twenty bills");
         if (!OperatingSystem.IsWindows())
         {

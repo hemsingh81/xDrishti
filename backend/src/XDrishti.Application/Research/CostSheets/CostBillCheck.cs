@@ -231,7 +231,22 @@ internal static class CostBillCheck
     /// </summary>
     internal static CostCheckImplied? Implied(List<Compared> members, int line)
     {
-        var rates = new List<decimal>();
+        var rates = ImpliedRates(members, line).Select(r => r.Rate).ToList();
+        if (rates.Count == 0)
+        {
+            return null;
+        }
+
+        rates.Sort();
+        var middle = rates.Count / 2;
+        var median = rates.Count % 2 == 1 ? rates[middle] : Math.Round((rates[middle - 1] + rates[middle]) / 2m, 6, MidpointRounding.AwayFromZero);
+        return new CostCheckImplied(rates[0], median, rates[^1], rates.Count);
+    }
+
+    /// <summary>The implied rate of each row of the members whose cell for the line is above 0 (the rate <see cref="Implied"/> summarises), with its row.</summary>
+    internal static List<(Compared Member, decimal Rate)> ImpliedRates(List<Compared> members, int line)
+    {
+        var rates = new List<(Compared, decimal)>();
         foreach (var member in members)
         {
             var cell = member.Billed[line];
@@ -270,19 +285,11 @@ internal static class CostBillCheck
 
             if (basis > 0m)
             {
-                rates.Add(Math.Round(cell * scale / basis, 6, MidpointRounding.AwayFromZero));
+                rates.Add((member, Math.Round(cell * scale / basis, 6, MidpointRounding.AwayFromZero)));
             }
         }
 
-        if (rates.Count == 0)
-        {
-            return null;
-        }
-
-        rates.Sort();
-        var middle = rates.Count / 2;
-        var median = rates.Count % 2 == 1 ? rates[middle] : Math.Round((rates[middle - 1] + rates[middle]) / 2m, 6, MidpointRounding.AwayFromZero);
-        return new CostCheckImplied(rates[0], median, rates[^1], rates.Count);
+        return rates;
     }
 
     private sealed record Classified(CostSegment Segment, ChargeSchedule? Schedule, string? Problem)

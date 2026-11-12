@@ -196,11 +196,21 @@ internal static class CostSheetCommand
 
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            ExportFolderWriter.CreateDirectory(Path.GetDirectoryName(path)!);
             await WriteOwnerOnlyAsync(path, derivation.Json, cancellationToken);
-            await WriteOwnerOnlyAsync(residuals, derivation.ResidualsCsv, cancellationToken);
+            try
+            {
+                await WriteOwnerOnlyAsync(residuals, derivation.ResidualsCsv, cancellationToken);
+            }
+            catch (Exception failure) when (failure is IOException or UnauthorizedAccessException or OperationCanceledException)
+            {
+                // never leave a sheet without its residuals
+                File.Delete(path);
+                File.Delete(residuals);
+                throw;
+            }
         }
-        catch (Exception failure) when (failure is IOException or UnauthorizedAccessException)
+        catch (Exception failure) when (failure is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
         {
             return await RefuseAsync(console, ["the output cannot be written: " + SimulateCommand.Describe(failure)]);
         }
@@ -212,13 +222,7 @@ internal static class CostSheetCommand
 
     private static async Task WriteOwnerOnlyAsync(string path, string text, CancellationToken cancellationToken)
     {
-        var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
-        if (!OperatingSystem.IsWindows())
-        {
-            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-        }
-
-        await using var stream = new FileStream(path, options);
+        await using var stream = ExportFolderWriter.OpenNew(path);
         await stream.WriteAsync(Encoding.UTF8.GetBytes(text), cancellationToken);
     }
 

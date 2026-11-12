@@ -52,11 +52,17 @@ Bills without intraday rows (ISS-05) give an intraday sheet of `unavailable` lin
 
 ## As built (2026-11-12)
 - **Code:** `Application/Research/CostSheets/` — `DeriveCostSheetQuery`, `DeriveCostSheetHandler`, `CostSheetDeriver` (classify, split, medians, residuals, sheet text), `CostDerivation` (answer records), `ReportRowReader` (the file reading and de-duplication moved out of `CheckCostSheetHandler`, now shared); `CostBillCheck.Implied` and `Compare` are now internal and reused unchanged. Host: `Api/CostSheet/` — action `derive` in `CostSheetOptions`/`CostSheetCommand`, `CostDeriveText`, log event 4497. Script: `scripts/cost-sheet.sh` line for `derive`, default output `data/cost-sheets/derived-<date>.json`.
-- **Tests:** `DeriveCostSheetTests` (9, hand-worked), `CostSheetVerbTests` (option lines), `CostSheetDatabaseTests.Derive_writes_one_owner_only_sheet...` (table counts unchanged, mode 0600, no overwrite, no identifier).
-- **Deviations from the text above, each deliberate:**
-  1. Two files are written, both 0600: the sheet and `<out>.residuals.csv` (AC 4 requires the csv; "one file" in AC 1 is read as one sheet file). Neither is overwritten: an existing output refuses (exit 1).
-  2. Fields the seven report cells cannot show are written, not derived, and the printout says so: delivery brokerage 0 (a delivery bill is, by classification, one with brokerage 0), brokerage minimum 0, brokerage cap = the largest billed brokerage of the derive bills, intraday STT on the buy side 0, delivery STT on both sides = the implied rate, DP charge 0 (not a report column; inside Oth. charges). A class with no derive bill is null throughout.
-  3. GST is one rate for the schedule, taken over the bills of both classes.
-  4. A one-sided NSE row with a brokerage cell above 0 fits no class and is not used (it cannot be told from delivery); a row with a negative Oth. cell is an adjustment and is not used, as in `check`.
-  5. The split is by date: the cut moves forward so a day is never split; the check set may be empty (then the verdict does not pass).
-  6. The verdict MEETS needs at least 95 % on both sets; it never changes the sheet's `unchecked` state.
+- **Tests:** `DeriveCostSheetTests` (9, hand-worked), `DeriveBrokerageTests` (a known sheet with a per-leg cap of 20.00 and a minimum of 5.00 priced through `CostModel` at several sizes and three rounding rules), `CostSheetVerbTests` (option lines), `CostSheetDatabaseTests.Derive_writes_one_owner_only_sheet...` (table counts unchanged, mode 0600, no overwrite, no identifier).
+- **The rule (review 2026-11-12): a derived sheet never understates a cost.** What the bills prove is written; what they cannot prove is `null` (printed `unavailable: ...; fill from your tariff`), so the sheet cannot be loaded until the owner fills it.
+  - *Brokerage cap* (per leg, as `CostModel` applies it): written only when bills of at least two different turnovers show exactly the same largest whole-bill brokerage, a bill below it exists, and every bill at that amount is larger than every bill below it; the per-leg cap is half of it (an intraday bill has two legs). Otherwise null.
+  - *Brokerage rate*: the median over the bills below the cap only (all bills when no cap is proven); null (and flagged unstable, with the dates where the rate moved) when it moves by more than 5 %, for instance when a minimum binds on small bills.
+  - *Delivery brokerage*: 0 only when no one-sided NSE bill has brokerage above 0; otherwise null, and the count is printed on its own line (not among "rows not used"). *Delivery DP charge*: null always (not a report column). Intraday DP charge 0.
+  - *Assumed, not derived* (one printed line each, the owner checks them against the tariff): the brokerage minimum 0, the intraday buy-side STT 0, the delivery buy STT equal to its sell STT, the intraday DP charge 0, the rounding rule half-away-from-zero.
+  - GST is one rate, weighted: the sum of the GST cells over the sum of their bases (brokerage, SEBI, transaction), over the bills of both classes.
+  - The residuals price a null line as 0 (and a rate without a proven cap as uncapped), and the printout says so; a sheet with null lines is never presented as ready.
+- **Other deviations from the text above, each deliberate:**
+  1. Two files are written, both 0600 (the sheet and `<out>.residuals.csv`, which AC 4 requires), through `ExportFolderWriter.OpenNew`/`CreateDirectory`; an existing output refuses (exit 1); if the residuals cannot be written the sheet is deleted.
+  2. A one-sided NSE row with brokerage above 0 fits no class (counted separately, see above); a row with a negative Oth. cell is an adjustment and is not used, as in `check`.
+  3. The split is by date: the cut moves forward so a day is never split; the check set may be empty (then the verdict does not pass).
+  4. The verdict MEETS needs at least 95 % on both sets; it never changes the sheet's `unchecked` state, and a sheet with null lines is reported as not loadable.
+  5. `scripts/cost-sheet.sh` makes a relative `--out` absolute against the caller's directory; the default stays under `data/cost-sheets/` (git-ignored).

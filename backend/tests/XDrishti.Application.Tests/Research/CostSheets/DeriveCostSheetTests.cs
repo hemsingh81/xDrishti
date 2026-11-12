@@ -50,14 +50,24 @@ public sealed class DeriveCostSheetTests
         derived.Lines.Single(l => l.Class == CostBillCheck.DeliveryName && l.Line == "stt").Rate.ShouldBe(0.1m);
         derived.Lines.Single(l => l.Class == CostBillCheck.DeliveryName && l.Line == "sebi").Rate.ShouldBe(100m);
         derived.Lines.ShouldAllBe(l => !l.Unstable);
+        derived.Lines.Single(l => l.Class == CostBillCheck.IntradayName && l.Line == "brokerage cap").Rate.ShouldBeNull();
+        derived.Lines.Single(l => l.Class == CostBillCheck.DeliveryName && l.Line == "dp charge").Rate.ShouldBeNull("the delivery DP charge is for the owner to enter");
+        derived.Assumed.ShouldContain(a => a.StartsWith(CostBillCheck.IntradayName + " brokerage_min 0", StringComparison.Ordinal));
+        derived.Assumed.ShouldContain(a => a.StartsWith(CostBillCheck.IntradayName + " stt_buy_pct 0", StringComparison.Ordinal));
+        derived.Assumed.ShouldContain(a => a.StartsWith(CostBillCheck.DeliveryName + " stt_buy_pct = stt_sell_pct", StringComparison.Ordinal));
+        derived.Assumed.ShouldContain(a => a.StartsWith("rounding half_away_from_zero", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task The_text_round_trips_through_the_parser_and_holds_the_hand_rates_and_no_checked_note()
+    public async Task The_text_holds_the_hand_rates_and_no_checked_note_and_loads_once_the_two_unproven_values_are_filled()
     {
         var derived = await OkAsync(BothClasses());
 
-        var sheet = CostSheetJson.Parse(derived.Json);
+        derived.Json.ShouldContain("\"brokerage_cap\": null", Case.Sensitive, "all ten bills show one brokerage at one size: no cap is proven");
+        derived.Json.ShouldContain("\"dp_charge_per_sell\": null", Case.Sensitive, "the delivery DP charge is not in the report");
+        CostSheetJson.Parse(derived.Json).IsFailure.ShouldBeTrue("a null cannot be loaded");
+        var filled = derived.Json.Replace("\"brokerage_cap\": null", "\"brokerage_cap\": 2.4", StringComparison.Ordinal).Replace("\"dp_charge_per_sell\": null", "\"dp_charge_per_sell\": 0", StringComparison.Ordinal);
+        var sheet = CostSheetJson.Parse(filled);
 
         sheet.IsSuccess.ShouldBeTrue(sheet.IsFailure ? sheet.Error.Code + ": " + string.Join("; ", sheet.Error.Fields?.Select(f => f.Field + " " + f.Message) ?? []) : string.Empty);
         sheet.Value.Id.ShouldBe("derived-2026-10-15");
@@ -67,7 +77,7 @@ public sealed class DeriveCostSheetTests
         schedule.EffectiveFrom.ShouldBe(new DateOnly(2026, 4, 1));
         schedule.GstPct.ShouldBe(17.5m);
         var intraday = schedule.IntradayEquity;
-        (intraday.BrokeragePct, intraday.BrokerageCap, intraday.BrokerageMin, intraday.SttBuyPct, intraday.SttSellPct).ShouldBe((0.024m, 4.8m, 0m, 0m, 0.025m));
+        (intraday.BrokeragePct, intraday.BrokerageCap, intraday.BrokerageMin, intraday.SttBuyPct, intraday.SttSellPct).ShouldBe((0.024m, 2.4m, 0m, 0m, 0.025m));
         (intraday.ExchangeTxnPct, intraday.SebiPerCrore, intraday.StampBuyPct, intraday.OtherPct).ShouldBe((0.003m, 100m, 0.003m, 0.001m));
         var delivery = schedule.Delivery;
         (delivery.BrokeragePct, delivery.BrokerageCap, delivery.SttBuyPct, delivery.SttSellPct, delivery.StampBuyPct, delivery.OtherPct).ShouldBe((0m, 0m, 0.1m, 0.1m, 0.015m, 0.001m));
@@ -128,7 +138,7 @@ public sealed class DeriveCostSheetTests
 
         var stt = derived.Lines.Single(l => l.Line == "stt");
         stt.Unstable.ShouldBeTrue();
-        (stt.From, stt.To).ShouldBe((new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 7)));
+        (stt.From, stt.To).ShouldBe((new DateOnly(2026, 4, 2), new DateOnly(2026, 4, 3)), "where the rate moved: the two bills with STT 12.00");
         stt.Rate.ShouldBe(0.1m, "the median, not the mean");
         derived.Lines.Where(l => l.Line != "stt").ShouldAllBe(l => !l.Unstable);
         derived.DeriveSet.Passes.ShouldBeFalse("two of the seven bills are 2.00 off");
@@ -148,7 +158,10 @@ public sealed class DeriveCostSheetTests
 
         var derived = await OkAsync(rows);
 
-        derived.Unclassified.ShouldBe(2, "a one-sided row with brokerage and an adjustment line");
+        derived.Unclassified.ShouldBe(1, "the adjustment line");
+        derived.OneSidedWithBrokerage.ShouldBe(1, "counted on its own, not under the rows not used");
+        derived.Lines.Single(l => l.Class == CostBillCheck.DeliveryName && l.Line == "brokerage").Rate.ShouldBeNull("a one-sided bill with brokerage: delivery brokerage is not 0 for certain");
+        derived.Json.ShouldContain("\"brokerage_pct\": null", Case.Sensitive);
         derived.Skipped.Select(s => (s.Reason, s.Rows)).ShouldBe([("derivatives", 1)]);
         (derived.DeriveSet.Bills + derived.CheckSet.Bills).ShouldBe(2);
     }
