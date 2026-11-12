@@ -19,7 +19,7 @@ internal sealed class HistoryEndpoints : IEndpointModule
 
         group.MapGet("/", GetAsync)
             .WithName("GetDataHistory")
-            .WithSummary("The history card: the switch Data:History:Backfill:Enabled (read-only: no route turns it on) with the reason it is off, the run window and whether it is open now, whether the history-backfill service runs, the span of the daily files, totals (instruments by backfill status, chunks, depth buckets by years of stored bars) and per instrument (symbol order) the first stored bar, the first CSV bar (the seam), the backfill status, chunks, the seam probe and the seam jump. Reads only: no request to Dhan. No password");
+            .WithSummary("The history card: the switch Data:History:Backfill:Enabled (read-only: no route turns it on) with the reason it is off, the run window and whether it is open now, whether the history-backfill service runs, the span of the daily files, totals (instruments by backfill status, chunks, buckets by years of stored bars) and per instrument (symbol order) the first stored bar, the first CSV bar (the seam), the backfill status, chunks, the seam probe and the seam jump. Reads only: no request to Dhan. No password");
 
         group.MapPost("/backfill", StartAsync)
             .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy) // a password is checked here, so the sign-in limit applies
