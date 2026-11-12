@@ -199,6 +199,11 @@ internal static class XdCommand
             return await PlanRunCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 1 && args[0] == "evidence")
+        {
+            return await EvidencePreflightCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "auto" && args[1] == "check")
         {
             return await AutoCheckCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
