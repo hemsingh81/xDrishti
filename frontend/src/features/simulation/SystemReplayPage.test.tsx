@@ -49,6 +49,8 @@ const run = (over: Partial<Run> = {}): Run => ({
   hindsight: [
     { code: 'settings_now', text: 'Settings are as of today.' },
     { code: 'survivorship', text: 'Only stocks listed today.' },
+    // a gross run always carries before_costs, whose text is the costs label: the banner shows it once (getByText fails on two)
+    { code: 'before_costs', text: COSTS },
   ],
   id: RUN,
   pairId: null,

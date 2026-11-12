@@ -65,7 +65,7 @@ export function SystemReplayPage() {
                 color="inherit"
                 sx={{ font: 'inherit', p: 0, minHeight: 44, textTransform: 'none' }}
               >
-                {open ? 'New replay (hide)' : 'New replay'}
+                New replay
               </Button>
             </Typography>
             <Collapse in={open} unmountOnExit id="replay-start-panel">
