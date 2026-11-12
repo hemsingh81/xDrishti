@@ -13,6 +13,9 @@ public static class ListArchive
     /// <summary>Source value of a back-filled row, to tell it from a forward (daily) one.</summary>
     public const string SourceArchive = "archive";
 
+    /// <summary>Source value of a row written from the daily forward fetch of the ban file.</summary>
+    public const string SourceDaily = "daily";
+
     public static string BanPath(DateOnly date) => $"/archives/fo/sec_ban/fo_secban_{date:ddMMyyyy}.csv";
 }
 

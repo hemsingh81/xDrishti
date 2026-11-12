@@ -64,6 +64,33 @@ public sealed class ListFilterPlanTests
     }
 
     [Fact]
+    public async Task With_the_switch_off_the_plan_hash_and_basis_are_the_literal_values_of_the_builder_before_the_change()
+    {
+        var plan = (await Build(enabled: false, _ => Flags(true, true)).Builder.BuildAsync(WiredPlanFixture.Request, Ct)).Value;
+
+        // computed on main b8d060f9, the builder without any list filter
+        plan.InputHash.ShouldBe("0e5cbaae83e18db124003392934e1f0fdc82fe3f26d80fa42331816a6611b171");
+        plan.Basis.ShouldBe("Proposed, provisional: no order exists, nothing here is approved. Cell statistics only (shrunk replayed-history estimates); tickets are conditional on tomorrow's bars; sizes use the close as entry. Open book: assumed empty by owner setting (positions held elsewhere are not counted). market gate unavailable (vix, breadth, events not known): the plan is NOT treated as a normal day; judge the market yourself equity throttle inactive: 0 real taken trades closed before the decision date, 20 needed");
+    }
+
+    [Fact]
+    public async Task With_no_candidates_the_filters_are_not_reported_as_applied()
+    {
+        var built = Build(true, _ => Flags(true, true));
+        var none = Substitute.For<ITicketSource>();
+        none.ReadAsync(WiredPlanFixture.Session, WiredPlanFixture.ForDate, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(new TicketSourceResult([], 0, 0, []))));
+        var context = Substitute.For<IPlanContextSource>();
+        context.ReadAsync(Arg.Any<PlanContextRequest>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(WiredPlanFixture.Context())));
+        var settings = Substitute.For<IListFilterSettings>();
+        settings.Enabled.Returns(true);
+        var builder = new SelectionPlanBuilder(none, context, NullLogger<SelectionPlanBuilder>.Instance, BanRequired, null, null, null, null, null, null, new PlanListFilter(settings, built.Port, NullLogger<PlanListFilter>.Instance));
+
+        var plan = (await builder.BuildAsync(WiredPlanFixture.Request, Ct)).Value;
+
+        plan.Items.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task With_the_switch_on_a_banned_share_is_rejected_with_fno_ban_and_the_others_are_not()
     {
         var built = Build(true, found => Flags(true, true, banned: [found.First(c => c.Draft.Symbol == "AAA").InstrumentId!.Value]));

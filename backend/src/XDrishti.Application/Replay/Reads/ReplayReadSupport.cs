@@ -19,6 +19,7 @@ internal static class ReplayReadSupport
         [HindsightLabels.BeforeCosts] = GrossLabel,
         [HindsightLabels.LifecycleAsRecorded] = "Hindsight: learning mode used the cell lifecycle as recorded, not recomputed.",
         [HindsightLabels.FiltersWithoutHistory] = "The event filter, and the F&O-ban and surveillance filters on the sessions without a stored dated list row, were not applied: they have no history.",
+        [HindsightLabels.EventFilterWithoutHistory] = "The event filter was not applied: it has no history.",
         [HindsightLabels.ResearchCells] = "Cells in the research state were allowed to be candidates.",
     };
 

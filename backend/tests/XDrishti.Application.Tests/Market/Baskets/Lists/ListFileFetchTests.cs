@@ -1,3 +1,4 @@
+using NSubstitute;
 using XDrishti.Application.Abstractions.Market.Baskets;
 using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Tests.Market.Baskets.Systems;
@@ -219,6 +220,25 @@ public sealed class ListFileFetchTests
 
         second.Outcome.ShouldBe(FetchOutcomes.Unchanged);
         _w.Applier.Applied.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_good_ban_file_also_writes_the_dated_day_row_and_a_file_with_an_unmatched_symbol_writes_none()
+    {
+        var sail = _w.Share("SAIL");
+        _w.BanSource();
+        _w.Serve(ListWorld.Ban("SAIL"));
+
+        await _w.RunOneAsync();
+
+        await _w.Days.Received(1).InsertAsync(ListBaskets.Ban.Id, new DateOnly(2026, 10, 27), Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.Single() == sail), "daily", TestContext.Current.CancellationToken);
+
+        _w.Days.ClearReceivedCalls();
+        _w.BanSource(checkedAt: null);
+        _w.Serve(ListWorld.Ban("SAIL", "GHOSTCO"));
+        await _w.RunOneAsync();
+
+        await _w.Days.DidNotReceiveWithAnyArgs().InsertAsync(default, default, default!, default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]

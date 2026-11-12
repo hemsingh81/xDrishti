@@ -122,6 +122,9 @@ public sealed class ReplayReviewTests
         var off = await ReplayRig.Create(offWorld, lists: Lists(false, _ => true)).Driver.RunAsync(ReplayRig.Params(2) with { FiltersWithoutHistory = true }, Ct);
 
         all.Value.Labels.ShouldNotContain(HindsightLabels.FiltersWithoutHistory);
+        all.Value.Labels.ShouldContain(HindsightLabels.EventFilterWithoutHistory, "the event filter has no history either way");
+        off.Value.Sessions.SelectMany(x => x.Notes).ShouldNotContain(n => n.StartsWith("filters_without_history", StringComparison.Ordinal), "switch off: the record is what it was");
+        off.Value.Labels.ShouldNotContain(HindsightLabels.EventFilterWithoutHistory);
         all.Value.Sessions[0].Taken.Select(t => t.Symbol).ShouldBe(["AAA"], "a covered day without a ban lets the share through even though the lists are required");
         partial.Value.Labels.ShouldContain(HindsightLabels.FiltersWithoutHistory);
         partial.Value.Sessions[0].Labels.ShouldNotContain(HindsightLabels.FiltersWithoutHistory);

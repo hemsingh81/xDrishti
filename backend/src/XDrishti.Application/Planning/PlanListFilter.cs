@@ -46,6 +46,9 @@ internal static partial class ListFilterLog
     [LoggerMessage(EventId = 3140, Level = LogLevel.Warning, Message = "plan.list_filters read failed for {ForDate}: {FailureType}; ban and surveillance are unavailable")]
     public static partial void ReadFailed(ILogger logger, DateOnly forDate, string failureType);
 
+    [LoggerMessage(EventId = 3143, Level = LogLevel.Warning, Message = "lists.day not recorded for {TradeDate}: {FailureType}; the date stays uncovered")]
+    public static partial void DayNotRecorded(ILogger logger, DateOnly tradeDate, string failureType);
+
     [LoggerMessage(EventId = 3141, Level = LogLevel.Information, Message = "plan.list_filters for {ForDate}: ban covered {BanCovered}, surveillance covered {SurveillanceCovered}, {Banned} banned, {Surveilled} surveilled")]
     public static partial void Applied(ILogger logger, DateOnly forDate, bool banCovered, bool surveillanceCovered, int banned, int surveilled);
 }

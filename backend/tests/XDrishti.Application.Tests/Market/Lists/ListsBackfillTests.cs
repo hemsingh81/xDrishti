@@ -140,6 +140,50 @@ public sealed class ListsBackfillTests
     }
 
     [Fact]
+    public async Task The_first_failed_request_stops_the_run_and_says_why_and_nothing_after_it_is_asked()
+    {
+        var rig = new Rig();
+        rig.File(Monday, Ban(Monday));
+        rig.Source.FetchBanAsync(Monday.AddDays(1), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(ListArchiveFetch.Failed("NSE answered HTTP 429")));
+
+        var result = await rig.Handler.HandleAsync(new ListsBackfillCommand(Monday, Monday.AddDays(4)), Ct);
+
+        result.Value.Requested.ShouldBe(2);
+        result.Value.Failed.ShouldBe(1);
+        result.Value.Stored.ShouldBe(1);
+        result.Value.Stopped.ShouldNotBeNull().ShouldContain("429");
+        result.Value.Text.ShouldContain("stopped: fetch_failed");
+        await rig.Source.DidNotReceive().FetchBanAsync(Monday.AddDays(2), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task The_wait_between_two_requests_is_applied_and_none_before_the_first()
+    {
+        var rig = new Rig();
+        rig.Settings.Delay.Returns(TimeSpan.FromSeconds(1));
+        rig.Source.FetchBanAsync(default, default).ReturnsForAnyArgs(ValueTask.FromResult(ListArchiveFetch.Absent()));
+
+        var run = rig.Handler.HandleAsync(new ListsBackfillCommand(Monday, Monday.AddDays(1)), Ct).AsTask();
+
+        run.IsCompleted.ShouldBeFalse("the second request waits for the delay");
+        await rig.Source.Received(1).FetchBanAsync(Arg.Any<DateOnly>(), Arg.Any<CancellationToken>());
+        rig.Clock.Advance(TimeSpan.FromSeconds(1));
+        (await run).Value.Requested.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_dry_run_matches_the_catalogue_and_reports_a_day_it_would_reject()
+    {
+        var rig = new Rig();
+        rig.File(Monday, Ban(Monday, "AAA", "ZZZ"));
+        rig.Match = _ => [new MasterInstrument(Guid.NewGuid(), "AAA", null, null)];
+
+        var result = await rig.Handler.HandleAsync(new ListsBackfillCommand(Monday, Monday, DryRun: true), Ct);
+
+        result.Value.Rejected.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task A_dry_run_fetches_and_parses_but_stores_nothing()
     {
         var rig = new Rig();

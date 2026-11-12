@@ -62,20 +62,20 @@ internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates 
         var labels = HindsightLabels.For(p).Where(l => l != HindsightLabels.FiltersWithoutHistory).ToList();
 
         // DATA-01: the ban and surveillance filters are fed from the dated lists (switch ON). The label stays unless both lists have a stored row for this session; the event filter has no history either way.
-        var listsCovered = listFilter is not null && (await listFilter.ReadAsync([], forDate, session, cancellationToken)).Covered;
+        var listFacts = listFilter is null ? PlanListFacts.Inactive : await listFilter.ReadAsync([], forDate, session, cancellationToken);
+        var listsCovered = listFacts.Covered;
+        if (p.FiltersWithoutHistory && listFacts.Active)
+        {
+            labels.Add(HindsightLabels.EventFilterWithoutHistory);
+        }
+
         if (p.FiltersWithoutHistory && !listsCovered)
         {
             labels.Add(HindsightLabels.FiltersWithoutHistory);
-            notes.Add("filters_without_history: no stored ban or surveillance row for " + session.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-        }
-        else if (p.FiltersWithoutHistory)
-        {
-            notes.Add("event_filter_without_history");
-        }
-
-        if (set.Survivorship)
-        {
-            labels.Add(HindsightLabels.Survivorship);
+            if (listFacts.Active)
+            {
+                notes.Add("filters_without_history: no stored ban or surveillance row for " + session.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)); // with the switch off the record is unchanged
+            }
         }
 
         var share = set.Universe == 0 ? 0.0 : set.IncompleteBars / (double)set.Universe;

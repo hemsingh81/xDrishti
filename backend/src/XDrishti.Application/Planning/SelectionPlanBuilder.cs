@@ -94,7 +94,7 @@ internal sealed class SelectionPlanBuilder(
         if (lists.Active)
         {
             candidates = [.. candidates.Select(c => c with { OnFnoBan = lists.BanFor(ids.GetValueOrDefault(c.Symbol)), UnderSurveillance = lists.SurveillanceFor(ids.GetValueOrDefault(c.Symbol)) })];
-            answered = candidates.All(c => c.OnFnoBan is not null && c.UnderSurveillance is not null);
+            answered = candidates.Count > 0 && candidates.All(c => c.OnFnoBan is not null && c.UnderSurveillance is not null);
             var banned = candidates.Count(c => c.OnFnoBan == true);
             var surveilled = candidates.Count(c => c.UnderSurveillance == true);
             ListFilterLog.Applied(logger, request.ForDate, lists.Flags.BanCovered, lists.Flags.SurveillanceCovered, banned, surveilled);

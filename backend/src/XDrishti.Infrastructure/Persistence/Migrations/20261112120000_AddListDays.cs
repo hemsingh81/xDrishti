@@ -21,7 +21,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     loaded_at timestamptz NOT NULL,
                     CONSTRAINT pk_list_day_coverage PRIMARY KEY (basket_id, trade_date),
                     CONSTRAINT fk_list_day_coverage_baskets FOREIGN KEY (basket_id) REFERENCES market.baskets (id),
-                    CONSTRAINT ck_list_day_coverage_source CHECK (source IN ('archive')),
+                    CONSTRAINT ck_list_day_coverage_source CHECK (source IN ('archive', 'daily')),
                     CONSTRAINT ck_list_day_coverage_count CHECK (member_count >= 0)
                 )
                 """);

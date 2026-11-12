@@ -11,9 +11,9 @@ namespace XDrishti.Application.Market.Lists;
 /// <summary><c>xd data lists-backfill --from --to [--dry-run]</c>: loads the dated ban files of the weekdays in the range that are not stored yet. A dry run fetches and parses but stores nothing.</summary>
 public sealed record ListsBackfillCommand(DateOnly From, DateOnly To, bool DryRun = false) : ICommand;
 
-public sealed record ListsBackfillSummary(int Requested, int Stored, int AlreadyStored, int Absent, int Rejected, int Failed, bool Capped, bool DryRun)
+public sealed record ListsBackfillSummary(int Requested, int Stored, int AlreadyStored, int Absent, int Rejected, int Failed, bool Capped, bool DryRun, string? Stopped = null)
 {
-    public string Text => string.Create(CultureInfo.InvariantCulture, $"{(DryRun ? "dry run: " : string.Empty)}requested {Requested}, stored {Stored}, already stored {AlreadyStored}, no file {Absent}, rejected {Rejected}, failed {Failed}{(Capped ? ", stopped at the per-run cap (run again)" : string.Empty)}");
+    public string Text => string.Create(CultureInfo.InvariantCulture, $"{(DryRun ? "dry run: " : string.Empty)}requested {Requested}, stored {Stored}, already stored {AlreadyStored}, no file {Absent}, rejected {Rejected}, failed {Failed}{(Capped ? ", stopped at the per-run cap (run again)" : string.Empty)}{(Stopped is null ? string.Empty : ", stopped: " + Stopped)}");
 }
 
 internal sealed class ListsBackfillHandler(IListHistorySettings settings, IListArchiveSource source, IListDayStore store, IBasketSourceStore instruments, TimeProvider clock) : ICommandHandler<ListsBackfillCommand, ListsBackfillSummary>
@@ -37,6 +37,7 @@ internal sealed class ListsBackfillHandler(IListHistorySettings settings, IListA
         var covered = await store.CoveredAsync(ListBaskets.Ban.Id, command.From, command.To, cancellationToken);
         int requested = 0, stored = 0, already = 0, absent = 0, rejected = 0, failed = 0;
         var capped = false;
+        string? stopped = null;
         for (var day = command.From; day <= command.To; day = day.AddDays(1))
         {
             if (day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
@@ -72,7 +73,13 @@ internal sealed class ListsBackfillHandler(IListHistorySettings settings, IListA
                     continue;
                 case ListFetchStatus.Failed:
                     failed++;
-                    continue;
+                    stopped = "fetch_failed: " + (fetch.Message ?? "the request failed"); // a refusal or timeout is not worked around: stop, report, run again later
+                    break;
+            }
+
+            if (stopped is not null)
+            {
+                break;
             }
 
             var file = BanListParser.Parse(System.Text.Encoding.UTF8.GetString(fetch.Content!));
@@ -82,17 +89,17 @@ internal sealed class ListsBackfillHandler(IListHistorySettings settings, IListA
                 continue;
             }
 
-            if (command.DryRun)
-            {
-                continue;
-            }
-
             var ids = (await instruments.FindInstrumentsAsync([], file.Symbols, cancellationToken))
                 .GroupBy(i => i.Symbol, StringComparer.OrdinalIgnoreCase).Select(g => g.OrderBy(c => c.RetiredAt is not null).First().Id).ToList();
             if (ids.Count < file.Symbols.Count)
             {
                 rejected++; // a banned symbol the catalogue cannot match would read "not banned": the day is not stored
                 continue;
+            }
+
+            if (command.DryRun)
+            {
+                continue; // fetched, parsed and matched against the catalogue (read-only); nothing stored
             }
 
             if (await store.InsertAsync(ListBaskets.Ban.Id, day, ids, ListArchive.SourceArchive, cancellationToken))
@@ -105,6 +112,6 @@ internal sealed class ListsBackfillHandler(IListHistorySettings settings, IListA
             }
         }
 
-        return Result.Success(new ListsBackfillSummary(requested, stored, already, absent, rejected, failed, capped, command.DryRun));
+        return Result.Success(new ListsBackfillSummary(requested, stored, already, absent, rejected, failed, capped, command.DryRun, stopped));
     }
 }

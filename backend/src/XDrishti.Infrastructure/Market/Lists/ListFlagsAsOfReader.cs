@@ -1,14 +1,13 @@
 using Npgsql;
 using NpgsqlTypes;
 using XDrishti.Application.Abstractions.Market.Lists;
-using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Baskets.Lists;
 
 namespace XDrishti.Infrastructure.Market.Lists;
 
 /// <summary>
-/// The as-of port (DATA-01, ADR 0274) over our own tables, no network. The F&amp;O-ban list for a date is covered when a back-filled day row exists for it (members from <c>list_day_members</c>), or when the date lies in the forward span of the daily fetch
-/// (the day after the first good check through <c>known_through</c>; members from the dated stays). The ASM/GSM list is covered in the span from the first to the last good check of the master (no archive). Any other date is not covered: unavailable, never "not banned".
+/// The as-of port (DATA-01, ADR 0274) over our own tables, no network. The F&amp;O-ban list is covered on a date only when a dated day row exists for it (written by the backfill, or by the daily fetch of that trade date's file); members come from <c>list_day_members</c>.
+/// The ASM/GSM list is covered on a date only when a good master refresh was recorded on that India date (no archive); members come from the dated stays. Any other date is not covered: unavailable, never "not banned".
 /// </summary>
 internal sealed class ListFlagsAsOfReader(NpgsqlDataSource dataSource) : IListFlagsAsOf
 {
@@ -43,48 +42,23 @@ internal sealed class ListFlagsAsOfReader(NpgsqlDataSource dataSource) : IListFl
             }
         }
 
-        var (first, last) = await FetchSpanAsync(ListBaskets.Ban.Id, cancellationToken);
-        DateOnly? through = null;
-        await using (var command = dataSource.CreateCommand("SELECT known_through FROM market.basket_sources WHERE basket_id = @basket"))
+        return (false, []); // no stored row for the date: unavailable, never "not banned"
+    }
+
+    // Covered only on a date a good master refresh was recorded for (an applied or unchanged fetch row of that India date): a gap day is unavailable, not "not flagged".
+    private async ValueTask<(bool Covered, HashSet<Guid> Members)> SurveillanceAsync(Guid[] ids, DateOnly date, CancellationToken cancellationToken)
+    {
+        await using (var command = dataSource.CreateCommand("SELECT 1 FROM market.basket_fetches WHERE basket_id = @basket AND outcome IN ('applied', 'unchanged') AND (fetched_at AT TIME ZONE 'Asia/Kolkata')::date = @date LIMIT 1"))
         {
-            command.Parameters.AddWithValue("basket", NpgsqlDbType.Uuid, ListBaskets.Ban.Id);
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            if (await reader.ReadAsync(cancellationToken) && !reader.IsDBNull(0))
+            command.Parameters.AddWithValue("basket", NpgsqlDbType.Uuid, ListBaskets.AsmGsm.Id);
+            command.Parameters.AddWithValue("date", date);
+            if (await command.ExecuteScalarAsync(cancellationToken) is null)
             {
-                through = reader.GetFieldValue<DateOnly>(0);
+                return (false, []);
             }
         }
 
-        if (first is null || last is null || through is null || date < first.Value.AddDays(1) || date > through.Value)
-        {
-            return (false, []);
-        }
-
-        return (true, await StayMembersAsync(ListBaskets.Ban.Id, ids, date, cancellationToken));
-    }
-
-    private async ValueTask<(bool Covered, HashSet<Guid> Members)> SurveillanceAsync(Guid[] ids, DateOnly date, CancellationToken cancellationToken)
-    {
-        var (first, last) = await FetchSpanAsync(ListBaskets.AsmGsm.Id, cancellationToken);
-        if (first is null || last is null || date < first.Value || date > last.Value)
-        {
-            return (false, []);
-        }
-
         return (true, await StayMembersAsync(ListBaskets.AsmGsm.Id, ids, date, cancellationToken));
-    }
-
-    private async ValueTask<(DateOnly? First, DateOnly? Last)> FetchSpanAsync(Guid basketId, CancellationToken cancellationToken)
-    {
-        await using var command = dataSource.CreateCommand("SELECT min(fetched_at), max(fetched_at) FROM market.basket_fetches WHERE basket_id = @basket AND outcome IN ('applied', 'unchanged')");
-        command.Parameters.AddWithValue("basket", NpgsqlDbType.Uuid, basketId);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (await reader.ReadAsync(cancellationToken) && !reader.IsDBNull(0))
-        {
-            return (IndiaTime.Today(reader.GetFieldValue<DateTimeOffset>(0)), IndiaTime.Today(reader.GetFieldValue<DateTimeOffset>(1)));
-        }
-
-        return (null, null);
     }
 
     private async ValueTask<HashSet<Guid>> StayMembersAsync(Guid basketId, Guid[] ids, DateOnly date, CancellationToken cancellationToken)

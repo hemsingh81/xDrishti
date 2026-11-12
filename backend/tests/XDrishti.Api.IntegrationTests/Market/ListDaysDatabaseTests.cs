@@ -80,7 +80,7 @@ public sealed class ListDaysDatabaseTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task The_forward_fetched_surveillance_stays_answer_inside_the_checked_span_and_not_outside()
+    public async Task The_forward_surveillance_list_answers_only_on_a_date_a_good_refresh_was_recorded_for_never_on_a_gap_day()
     {
         await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_list_days_forward_probe", Ct);
         await using var source = NpgsqlDataSource.Create(scratch.ConnectionString);
@@ -89,9 +89,9 @@ public sealed class ListDaysDatabaseTests(ApiFactory factory)
         var clean = await InstrumentAsync(source, "BBB");
         await using (var seed = source.CreateCommand("""
             INSERT INTO market.basket_fetches (id, basket_id, fetched_at, rows, outcome, added, removed, unmatched, warnings, forced, actor)
-            SELECT gen_random_uuid(), @asm, t, 1, 'applied', 0, 0, 0, '[]'::jsonb, false, 'system' FROM (VALUES ('2026-11-02 04:00:00+00'::timestamptz), ('2026-11-06 04:00:00+00'::timestamptz)) v(t);
-            INSERT INTO market.basket_members (id, basket_id, instrument_id, valid_from, position, added_by)
-            VALUES (gen_random_uuid(), @asm, @flagged, '2026-11-02 04:00:00+00', 0, 'system');
+            SELECT gen_random_uuid(), @asm, t, 1, 'applied', 0, 0, 0, '[]'::jsonb, false, 'system' FROM (VALUES ('2026-11-02 04:00:00+00'::timestamptz), ('2026-11-03 04:00:00+00'::timestamptz), ('2026-11-06 04:00:00+00'::timestamptz)) v(t);
+            INSERT INTO market.basket_members (id, basket_id, instrument_id, valid_from, valid_to, position, added_by, removed_by)
+            VALUES (gen_random_uuid(), @asm, @flagged, '2026-11-02 04:00:00+00', '2026-11-03 04:00:00+00', 0, 'system', 'system');
             """))
         {
             seed.Parameters.AddWithValue("asm", ListBaskets.AsmGsm.Id);
@@ -99,12 +99,34 @@ public sealed class ListDaysDatabaseTests(ApiFactory factory)
             await seed.ExecuteNonQueryAsync(Ct);
         }
 
-        var inside = await reader.ForAsync([flagged, clean], new DateOnly(2026, 11, 3), new DateOnly(2026, 11, 4), Ct);
-        var after = await reader.ForAsync([flagged, clean], new DateOnly(2026, 11, 3), new DateOnly(2026, 11, 9), Ct);
+        var first = await reader.ForAsync([flagged, clean], new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 2), Ct);
+        var boundary = await reader.ForAsync([flagged, clean], new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 3), Ct);
+        var gap = await reader.ForAsync([flagged, clean], new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 4), Ct);
+        var after = await reader.ForAsync([flagged, clean], new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 9), Ct);
 
-        inside.UnderSurveillance(flagged).ShouldBe(true);
-        inside.UnderSurveillance(clean).ShouldBe(false);
-        after.UnderSurveillance(flagged).ShouldBeNull("past the last good check the list is unknown");
+        first.UnderSurveillance(flagged).ShouldBe(true);
+        first.UnderSurveillance(clean).ShouldBe(false);
+        boundary.UnderSurveillance(flagged).ShouldBe(false, "the stay ended on 11-03: valid_to is exclusive");
+        gap.SurveillanceCovered.ShouldBeFalse("no refresh was recorded for 11-04");
+        gap.UnderSurveillance(flagged).ShouldBeNull();
+        after.UnderSurveillance(flagged).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_ban_on_the_first_day_and_none_the_next_reads_true_then_false_and_a_gap_day_reads_unavailable()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_list_days_boundary_probe", Ct);
+        await using var source = NpgsqlDataSource.Create(scratch.ConnectionString);
+        var store = new ListDayStore(source);
+        var reader = new ListFlagsAsOfReader(source);
+        var id = await InstrumentAsync(source, "AAA");
+        var d = new DateOnly(2026, 11, 2);
+        await store.InsertAsync(ListBaskets.Ban.Id, d, [id], "daily", Ct);
+        await store.InsertAsync(ListBaskets.Ban.Id, d.AddDays(1), [], "daily", Ct);
+
+        (await reader.ForAsync([id], d, d, Ct)).OnBan(id).ShouldBe(true);
+        (await reader.ForAsync([id], d.AddDays(1), d, Ct)).OnBan(id).ShouldBe(false);
+        (await reader.ForAsync([id], d.AddDays(2), d, Ct)).OnBan(id).ShouldBeNull("no file was stored for that date, so it is not 'not banned'");
     }
 
     [Fact]
