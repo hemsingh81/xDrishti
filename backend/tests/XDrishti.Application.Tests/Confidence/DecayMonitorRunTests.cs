@@ -120,7 +120,7 @@ public sealed class DecayMonitorRunTests
         var d = DecayMonitorService.Definition;
 
         d.Id.ShouldBe("decay-monitor");
-        d.Defaults.Enabled.ShouldBeFalse();
+        d.Defaults.Enabled.ShouldBeTrue();
         d.Defaults.Schedule.ShouldBe(Schedule.Daily(new TimeOnly(18, 0)));
         d.Constraints.MustFollow.ShouldBe([ShadowGradeService.Id]);
         var subjects = new[] { XDrishti.Application.Market.Bars.Eod.EodService.Definition, ShadowGradeService.Definition, d }.Select(x => new RuleSubject(x, x.Defaults)).ToList();

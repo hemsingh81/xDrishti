@@ -1,6 +1,6 @@
 namespace XDrishti.Api.IntegrationTests.Ops;
 
-/// <summary>Spec OPS-01 criterion 3 and ADR 0278: the evidence fetch and admission switches have a compose variable each, and with none set every one renders false or empty (the default after <c>:-</c>).</summary>
+/// <summary>Spec OPS-01 criterion 3 and ADR 0278: the evidence fetch and admission switches have a compose variable each, and with none set every one renders false or empty (the default after <c>:-</c>), except the list filter, which AM-01a (ADR 0282) defaults to true.</summary>
 public sealed class EvidenceComposeRulesTests
 {
     private static readonly string Compose = File.ReadAllText(FindUp("deploy", "compose.yaml"));
@@ -28,8 +28,8 @@ public sealed class EvidenceComposeRulesTests
     [InlineData("Baskets__System__Fetch__UserAgent", "XD_BASKETS_FETCH_USER_AGENT", "")]
     [InlineData("Baskets__System__Lists__FetchEnabled", "XD_BASKETS_LISTS_FETCH_ENABLED", "false")]
     [InlineData("Data__History__Lists__Enabled", "XD_HISTORY_LISTS_ENABLED", "false")]
-    [InlineData("Selection__ListFilters__Enabled", "XD_SELECTION_LIST_FILTERS_ENABLED", "false")]
-    public void Each_evidence_switch_has_a_variable_that_defaults_off_or_empty(string key, string variable, string fallback)
+    [InlineData("Selection__ListFilters__Enabled", "XD_SELECTION_LIST_FILTERS_ENABLED", "true")]
+    public void Each_evidence_switch_has_a_variable_with_its_default(string key, string variable, string fallback)
     {
         Compose.ShouldContain($"      {key}: ${{{variable}:-{fallback}}}");
         (Compose.Split($"{key}:").Length - 1).ShouldBe(1);

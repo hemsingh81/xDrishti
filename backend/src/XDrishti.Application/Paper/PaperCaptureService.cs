@@ -8,7 +8,7 @@ namespace XDrishti.Application.Paper;
 
 /// <summary>
 /// The paper capture as a service (<see cref="Id"/>, spec P10-01, ADR 0116): every trading day at 17:00, after the end-of-day data run and before the nightly plan, it carries out <see cref="CapturePaperFillsCommand"/>: every armed ticket of a closed
-/// session becomes a timed, priced paper trade per account, replayed on the stored official bars. It starts <b>paused</b>; switching it on is the owner's act. It places no order, calls no broker and moves no ticket.
+/// session becomes a timed, priced paper trade per account, replayed on the stored official bars. It starts <b>enabled</b> (ADR 0282); switching it on is the owner's act. It places no order, calls no broker and moves no ticket.
 /// </summary>
 public sealed class PaperCaptureService(IServiceScopeFactory scopes) : IScheduledService
 {
@@ -21,7 +21,7 @@ public sealed class PaperCaptureService(IServiceScopeFactory scopes) : ISchedule
         "At 17:00, after the end-of-day data run, replays every ticket you approved and that was armed, on the stored official 1-minute bars with the grading rules, and records one paper trade per account at your size: entry, exit, rupees and R. The record is simulated: no order was placed and none exists. A failed run is shown here with its reason.",
         "xd-api",
         [ScheduleType.Daily],
-        new ServiceSettings(false, Schedule.Daily(new TimeOnly(17, 0)), 0, 15, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
+        new ServiceSettings(true, Schedule.Daily(new TimeOnly(17, 0)), 0, 15, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
         new ServiceConstraints
         {

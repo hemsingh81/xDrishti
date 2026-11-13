@@ -22,7 +22,7 @@ public sealed class PaperCaptureServiceTests
         var d = PaperCaptureService.Definition;
 
         d.Id.ShouldBe("paper-capture");
-        d.Defaults.Enabled.ShouldBeFalse();
+        d.Defaults.Enabled.ShouldBeTrue();
         d.Defaults.Schedule.ShouldBe(Schedule.Daily(new TimeOnly(17, 0)));
         d.Constraints.MustFollow.ShouldBe([EodService.Id]);
         d.Constraints.StartNotBefore.ShouldBe(new TimeOnly(16, 30));

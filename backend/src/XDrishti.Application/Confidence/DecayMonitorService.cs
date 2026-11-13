@@ -9,7 +9,7 @@ namespace XDrishti.Application.Confidence;
 /// <summary>
 /// The decay monitor as a service (<see cref="Id"/>, spec CF-12 part 12b, ADR 0219): every trading day at 18:00, after the shadow grading of 17:30, it carries out <see cref="EvaluateDecayCommand"/>: each strategy with shadow edge candidates in the current paper epoch is
 /// evaluated once for the day, a firing kill rule writes a proposal (and a bell notice is derived from it), and only when the owner's stored setting <c>confidence.kill.auto</c> (default OFF) is ON are the proposals that are not proposal-only applied, as the actor <c>auto</c>.
-/// It starts <b>paused</b>. A failed strategy records nothing for the day and the run reports the failure. It re-enables nothing, calls no broker and places no order.
+/// It starts <b>enabled</b> (ADR 0282). A failed strategy records nothing for the day and the run reports the failure. It re-enables nothing, calls no broker and places no order.
 /// </summary>
 public sealed class DecayMonitorService(IServiceScopeFactory scopes) : IScheduledService
 {
@@ -22,7 +22,7 @@ public sealed class DecayMonitorService(IServiceScopeFactory scopes) : ISchedule
         "At 18:00, after the shadow grading, evaluates each strategy's forward edge series once a day against the kill rules (cost stress, drawdown, decay twice in a row, and the CF-09 failure boundary as a proposal-only input) and writes a proposal and a bell notice for each rule that fires. It pauses nothing unless the owner's setting confidence.kill.auto is ON (it is OFF by default), and then only for the rules that are not proposal-only. Re-enabling a paused cell is always the owner's act. The series is simulated: no order was placed and none exists.",
         "xd-api",
         [ScheduleType.Daily],
-        new ServiceSettings(false, Schedule.Daily(new TimeOnly(18, 0)), 0, 15, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
+        new ServiceSettings(true, Schedule.Daily(new TimeOnly(18, 0)), 0, 15, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
         new ServiceConstraints
         {

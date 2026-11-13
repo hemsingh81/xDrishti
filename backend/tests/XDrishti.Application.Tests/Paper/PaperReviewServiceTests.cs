@@ -22,7 +22,7 @@ public sealed class PaperReviewServiceTests
         var d = PaperReviewService.Definition;
 
         d.Id.ShouldBe("paper-review");
-        d.Defaults.Enabled.ShouldBeFalse();
+        d.Defaults.Enabled.ShouldBeTrue();
         d.Defaults.Schedule.ShouldBe(Schedule.Weekly(DayOfWeek.Saturday, new TimeOnly(10, 30)));
         d.Constraints.MustFollow.ShouldBe([WeeklyService.Id]);
         new PaperReviewService(Substitute.For<IServiceScopeFactory>()).FirstStartSettings().ShouldBeNull();

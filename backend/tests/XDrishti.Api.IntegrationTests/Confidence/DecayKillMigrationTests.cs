@@ -59,7 +59,7 @@ public sealed class DecayKillMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await CountAsync(connection, "SELECT count(*) FROM confidence.kill_settings")).ShouldBe(0);
+        (await CountAsync(connection, "SELECT count(*) FROM confidence.kill_settings")).ShouldBe(1, "up again seeds the one system row; the owner row went with the schema");
         await using var again = new NpgsqlCommand("INSERT INTO confidence.kill_settings (auto, actor, reason) VALUES (false, 'owner:me@x.test', 'again')", connection);
         (await again.ExecuteNonQueryAsync(Ct)).ShouldBe(1);
     }
