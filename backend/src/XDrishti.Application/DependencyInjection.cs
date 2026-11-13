@@ -861,11 +861,10 @@ public static class DependencyInjection
         return services;
     }
 
-    /// <summary>The handler of the scheduled cell-statistics refresh (LC-01, ADR 0277) and its request planner: only the host that runs the services (the API) calls this; the host also registers <see cref="IRunRecordWriter"/>. The service itself, the gate text and the notice need none of it, so every other host (CLI, worker, feed) stays valid without it.</summary>
+    /// <summary>The handler of the scheduled cell-statistics refresh (LC-01, ADR 0277) (its request planner is registered for every host, because the model's hold-out look needs it too): only the host that runs the services (the API) calls this; the host also registers <see cref="IRunRecordWriter"/>. The service itself, the gate text and the notice need none of it, so every other host (CLI, worker, feed) stays valid without it.</summary>
     public static IServiceCollection AddCellsRefreshRunner(this IServiceCollection services)
     {
         services.AddScoped<ICommandHandler<RefreshCellStatsCommand, RefreshCellStatsOutcome>, RefreshCellStatsHandler>();
-        services.AddScoped<ISourceRequestPlanner, ReplaySourceRequestPlanner>();
         return services;
     }
 
@@ -1003,6 +1002,7 @@ public static class DependencyInjection
         services.AddScoped<IBellNoticeSource, PromotionNotices>(); // an automatic promotion stays on the bell for three days as a resolved notice (CF-10 part 10d-1)
         services.AddScoped<IBellNoticeSource, RollbackProposalNotices>(); // the open rollback proposals as bell notices, derived on read (CF-10 part 10d-1)
         services.AddScoped<ModelHoldOutLooks>(); // the one look a model family takes at the locked hold-out (CF-10 part 10c-2, ADR 0217)
+        services.AddScoped<ISourceRequestPlanner, ReplaySourceRequestPlanner>(); // rebuilds the exact request of a stored run: the cells refresh (LC-01) and the model's hold-out look (CF-10e part 3) both need it, so every host has it
         services.AddScoped<IModelHoldOutPass, ModelHoldOutPass>(); // the second reader of the hold-out block: the model's strategy versions, once (CF-10e part 3, ADR 0285)
         services.AddScoped<ModelHoldOutScorer>();
         services.AddScoped<ModelHoldOutCandidates>();
