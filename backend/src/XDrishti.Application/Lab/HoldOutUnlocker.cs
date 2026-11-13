@@ -123,7 +123,7 @@ internal sealed class HoldOutUnlocker(
     }
 
     private async ValueTask<HoldOutBlock?> BlockAsync(CancellationToken cancellationToken) =>
-        await guard.HistoryAsync(cancellationToken) is { } history ? await guard.EnsureAsync(history.First, history.Last, cancellationToken) : null;
+        await store.CurrentAsync(cancellationToken) ?? (await guard.HistoryAsync(cancellationToken) is { } history ? await guard.EnsureAsync(history.First, history.Last, cancellationToken) : null);
 
     private static StoredUnlock Row(LabRun run, string mode, string actor, DateTimeOffset now, HoldOutResultView view, bool reused, bool predated, HoldOutBlock block) =>
         new(run.StrategyId, run.Version, StrategyKind, mode, actor, now, view.SettingHash, reused, block.Start, run.Id, view, predated ? null : HoldOutHorizon.NotPredated);

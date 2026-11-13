@@ -131,7 +131,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
             Text(p, "universe_verdict", uh?.Verdict);
             p.AddWithValue("universe_first_n", NpgsqlDbType.Integer, uh is null ? DBNull.Value : (object)uh.FirstN);
             p.AddWithValue("universe_second_n", NpgsqlDbType.Integer, uh is null ? DBNull.Value : (object)uh.SecondN);
-            Text(p, "seen_holdout",snapshot.SeenHoldOut is { } seen && seen.TryGetValue(row.Cell.Key, out var label) ? label : null);
+            Text(p, "seen_holdout", snapshot.SeenHoldOut is { } seen && seen.TryGetValue(row.Cell.Key, out var label) ? label : null);
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 

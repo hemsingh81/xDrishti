@@ -496,7 +496,7 @@ public sealed class KillArchitectureTests
     {
         Types.InAssembly(Application).That().HaveName("GetPlanNoticesHandler").Should().HaveDependencyOn("XDrishti.Application.Abstractions.Planning.IBellNoticeSource").GetResult().IsSuccessful.ShouldBeTrue();
         Types.InAssembly(Application).That().HaveName("GetPlanNoticesHandler").Should().NotHaveDependencyOnAny(KillTypes).GetResult().IsSuccessful.ShouldBeTrue();
-        Dependents(Application, "XDrishti.Application.Abstractions.Planning.IBellNoticeSource").ShouldBe(["XDrishti.Application.Confidence.KillProposalNotices", "XDrishti.Application.DependencyInjection", "XDrishti.Application.LearnedSettings.LearnedSettingsRegistration", "XDrishti.Application.LearnedSettings.LearnedTighteningNotices", "XDrishti.Application.Learning.PromotionNotices", "XDrishti.Application.Learning.RollbackProposalNotices", "XDrishti.Application.Planning.GetPlanNoticesHandler"]);
+        Dependents(Application, "XDrishti.Application.Abstractions.Planning.IBellNoticeSource").ShouldBe(["XDrishti.Application.Confidence.KillProposalNotices", "XDrishti.Application.DependencyInjection", "XDrishti.Application.Lab.HoldOutStalledNotices", "XDrishti.Application.LearnedSettings.LearnedSettingsRegistration", "XDrishti.Application.LearnedSettings.LearnedTighteningNotices", "XDrishti.Application.Learning.PromotionNotices", "XDrishti.Application.Learning.RollbackProposalNotices", "XDrishti.Application.Planning.GetPlanNoticesHandler"]);
     }
 
     // ---- (4) no order ----

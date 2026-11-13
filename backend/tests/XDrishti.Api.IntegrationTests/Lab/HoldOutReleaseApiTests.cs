@@ -91,7 +91,7 @@ public sealed class HoldOutReleaseApiTests(ApiFactory factory) : DataTestBase(fa
         (await CodeAsync(refused, Ct)).ShouldBe("lab.holdout_unlooked");
         done.StatusCode.ShouldBe(HttpStatusCode.OK, await done.Content.ReadAsStringAsync(Ct));
         var block = await done.Content.ReadFromJsonAsync<JsonElement>(Ct);
-        (block.GetProperty("state").GetString(), block.GetProperty("mode").GetString(), block.GetProperty("freshLook").GetBoolean()).ShouldBe(("released", "owner", false));
+        (block.GetProperty("state").GetString(), block.GetProperty("mode").GetString(), block.GetProperty("looks").GetProperty("strategy").GetProperty("state").GetString()).ShouldBe(("released", "owner", "none"));
         (await ScalarAsync<long>("SELECT count(*) FROM lab.holdout_releases WHERE block_start = '2026-02-02' AND NOT looked AND mode = 'owner' AND next_block_start = '2026-10-01'")).ShouldBe(1);
         (await ScalarAsync<string>("SELECT history_last::text || ' ' || prev_start::text FROM lab.holdout_blocks WHERE start_date = '2026-10-01'")).ShouldBe("2027-03-30 2026-02-02");
         using var view = await client.GetAsync(new Uri("/api/lab/holdout", UriKind.Relative), Ct);

@@ -34,7 +34,8 @@ public sealed class LabHoldOutArchitectureTests
         var users = Types.InAssembly(Application).That().HaveDependencyOn("XDrishti.Application.Lab.HoldOutUnlocker").GetTypes()
             .Select(t => t.Name.Split('`')[0]).Where(n => !n.StartsWith('<')).Distinct().Order(StringComparer.Ordinal).ToList();
 
-        users.ShouldBe(["DependencyInjection", "HoldOutJobRunner", "HoldOutUnlocker", "LabRunner", "UnlockHoldOutHandler"]);
+        // HO-01b: the seal step queues the auto look through the cheap CheckAsync only (it never calls UnlockAsync; the look itself still runs in the queued job)
+        users.ShouldBe(["DependencyInjection", "HoldOutJobRunner", "HoldOutUnlocker", "LabRunner", "StrategyAutoLookStep", "UnlockHoldOutHandler"]);
     }
 
     [Fact]
