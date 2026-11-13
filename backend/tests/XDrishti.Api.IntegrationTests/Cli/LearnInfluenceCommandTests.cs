@@ -122,7 +122,7 @@ public sealed class LearnInfluenceCommandTests
         output.ShouldContain("not_champion: The model is not the champion.");
         output.ShouldContain("hold-out: kept (family model-family:v3, block start none)");
         output.ShouldContain("odds: unavailable: there is no hold-out score for this model");
-        output.ShouldContain("interval: unavailable: this version has no source for an interval of the hold-out probability. Unavailable is not a finding and not a pass.");
+        output.ShouldContain("interval: unavailable: the model has no stored hold-out figures, or too few trade days for an interval. Unavailable is not a finding and not a pass.");
         output.ShouldContain("effect of the take rule on realised R: unavailable (not a pass)");
         output.ShouldContain("ml.influence.enabled: OFF (no model may influence a decision)");
         output.ShouldContain("ml.auto_promote: OFF (promotion is the owner's act)");

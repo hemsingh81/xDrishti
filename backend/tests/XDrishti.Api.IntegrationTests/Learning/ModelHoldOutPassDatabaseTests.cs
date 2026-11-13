@@ -67,7 +67,7 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
     private async Task CleanAsync()
     {
         await using var connection = await OpenAsync();
-        await ExecuteAsync(connection, "DELETE FROM research.ml_holdout_scores; DELETE FROM lab.holdout_unlocks; DELETE FROM lab.holdout_releases; DELETE FROM lab.holdout_blocks; DELETE FROM research.cell_stats; DELETE FROM research.ml_switch_settings; DELETE FROM research.ml_influence_checks; DELETE FROM research.rollback_proposals; DELETE FROM research.ml_monitor_checks; DELETE FROM research.model_designations; DELETE FROM research.model_versions; DELETE FROM research.training_sets; DELETE FROM market.basket_members; DELETE FROM market.baskets");
+        await ExecuteAsync(connection, "DELETE FROM research.ml_holdout_scores; DELETE FROM lab.holdout_unlocks; DELETE FROM lab.holdout_releases; DELETE FROM lab.holdout_blocks; DELETE FROM research.cell_stats; DELETE FROM research.ml_switch_settings; DELETE FROM research.ml_influence_checks; DELETE FROM research.rollback_proposals; DELETE FROM research.ml_monitor_checks; DELETE FROM research.model_designations; DELETE FROM research.model_versions; DELETE FROM research.training_sets; DELETE FROM market.basket_members; DELETE FROM market.baskets; DELETE FROM lab.strategy_versions WHERE strategy_id IN (SELECT id FROM lab.strategies WHERE built_in); DELETE FROM lab.strategies WHERE built_in");
     }
 
     // ---- the world ----
