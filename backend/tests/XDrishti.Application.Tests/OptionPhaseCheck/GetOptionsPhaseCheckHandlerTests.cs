@@ -363,6 +363,17 @@ public sealed class GetOptionsPhaseCheckHandlerTests
     }
 
     [Fact]
+    public async Task The_dropped_basis_family_is_refused_in_cut_as_unknown()
+    {
+        var rig = new Rig();
+
+        var result = await rig.Handler().HandleAsync(new OptionsPhaseCheckQuery(["basis:carry-1"]), TestContext.Current.CancellationToken);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("options.unknown_family");
+    }
+
+    [Fact]
     public async Task A_cut_family_is_listed_and_not_read()
     {
         var rig = new Rig();

@@ -154,6 +154,17 @@ public sealed class OptionsPhaseCheckTests
         report.Families.ShouldAllBe(f => f.Status == OptionsPhaseCheck.StatusNone);
     }
 
+    [Theory]
+    [InlineData("pairs:intraday-1")]
+    [InlineData("ext:iv-1")]
+    public void A_family_with_no_stored_evaluation_fails_closed_and_keeps_the_check_open(string family)
+    {
+        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == family ? Family(f) : Dropped(f)), NoCut);
+
+        report.Verdict.ShouldBe(PhaseVerdicts.NotEvaluable);
+        report.Open.ShouldHaveSingleItem().ShouldContain($"{family} (none): no P14 evaluation stored");
+    }
+
     [Fact]
     public void The_basis_carry_family_is_not_a_family_and_the_six_decide_the_exit_without_a_cut()
     {

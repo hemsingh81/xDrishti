@@ -96,8 +96,7 @@ stateDiagram-v2
 - New learning dimension **instrument expression** (cash / future / option_buy / debit_spread …).
 - Simulation from historical option prices; Black-Scholes with recorded IV only as fallback; premium and
   underlying-based exits; exit before expiry by default; liquidity filters (index options first).
-- "Slow" statistical arbitrage: `PAIRS` (cointegration mean reversion) on 5m+ (the `BASIS` cash-futures family was dropped, [ADR 0289](../adr/0289-basis-carry-family-is-dropped-from-p14.md))
-  bars — two-leg, so practical with module A.
+- "Slow" statistical arbitrage: `PAIRS` (cointegration mean reversion) on 5m+ bars — two-leg, so practical with module A. The `BASIS` cash-futures family was dropped ([ADR 0289](../adr/0289-basis-carry-family-is-dropped-from-p14.md)).
 
 ## D. Fundamentals & events
 
