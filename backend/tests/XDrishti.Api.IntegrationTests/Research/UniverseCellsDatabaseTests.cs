@@ -31,6 +31,17 @@ public sealed class UniverseCellsDatabaseTests(ApiFactory factory) : DataTestBas
         await ExecuteAsync(connection, "DELETE FROM research.cell_stats");
     }
 
+    /// <summary>The snapshots written here have no stored source runs: they must not outlive the class (the paper configuration reading fails closed on a source it cannot read, ADR 0286).</summary>
+    public override async ValueTask DisposeAsync()
+    {
+        await using (var connection = await OpenAsync())
+        {
+            await ExecuteAsync(connection, "DELETE FROM research.cell_stats");
+        }
+
+        await base.DisposeAsync();
+    }
+
     private static Task Bar(NpgsqlConnection connection, Guid id, DateOnly day, double close, long volume) =>
         ExecuteAsync(
             connection,
