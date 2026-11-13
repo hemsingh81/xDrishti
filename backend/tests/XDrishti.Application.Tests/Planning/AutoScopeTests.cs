@@ -38,7 +38,7 @@ public sealed class AutoScopeTests
 
     private sealed class FixedScope(ResolvedAutoScope? scope) : IAutoScopeSource
     {
-        public ValueTask<ResolvedAutoScope?> ResolveAsync(CancellationToken cancellationToken) => ValueTask.FromResult(scope);
+        public ValueTask<ResolvedAutoScope?> ResolveAsync(DateOnly? asOf, CancellationToken cancellationToken) => ValueTask.FromResult(scope);
     }
 
     private static SelectionPlanBuilder BuilderWith(IReadOnlyList<TicketCandidate> found, IAutoScopeSource? scope)
@@ -157,6 +157,51 @@ public sealed class AutoScopeTests
         var resolved = await new AutoScopeResolver(store, baskets).ResolveAsync(day, Ct);
 
         resolved!.InstrumentIds.ShouldBe([then, stock], ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task The_plan_session_decides_the_members_one_removed_before_it_and_one_added_after_it_are_left_out_and_one_valid_on_it_stays()
+    {
+        var basket = Guid.NewGuid();
+        var removedBefore = Guid.NewGuid();
+        var addedAfter = Guid.NewGuid();
+        var valid = Guid.NewGuid();
+        var session = new DateOnly(2025, 3, 3);
+        var store = new MemoryScopes();
+        await store.AppendAsync(AutoScope.Create([basket], []).Value, Owner, DateTimeOffset.UnixEpoch, Ct);
+        var baskets = Substitute.For<IBasketQueries>();
+        // the basket query reconstructs membership at the cutoff from valid_from / valid_to; only the session's own cutoff answers
+        baskets.MembersAsync(basket, BasketMember.CutoffAfter(session), null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketMembers?>(Members(basket, null, Member(valid, null))));
+        baskets.MembersAsync(basket, null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketMembers?>(Members(basket, null, Member(addedAfter, null))));
+
+        var resolved = await new AutoScopeResolver(store, baskets).ResolveAsync(session, Ct);
+
+        resolved!.InstrumentIds.ShouldBe([valid]);
+        resolved.InstrumentIds.ShouldNotContain(removedBefore);
+        resolved.InstrumentIds.ShouldNotContain(addedAfter);
+        resolved.BasketsBeforeKnownSince.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_system_basket_asked_before_its_known_since_date_uses_the_first_known_members_and_is_flagged()
+    {
+        var basket = Guid.NewGuid();
+        var first = Guid.NewGuid();
+        var session = new DateOnly(2025, 3, 3);
+        var store = new MemoryScopes();
+        await store.AppendAsync(AutoScope.Create([basket], []).Value, Owner, DateTimeOffset.UnixEpoch, Ct);
+        var baskets = Substitute.For<IBasketQueries>();
+        baskets.MembersAsync(basket, BasketMember.CutoffAfter(session), null, Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult<BasketMembers?>(Members(basket, null, Member(first, null)) with { MembersKnownSince = new DateOnly(2025, 6, 1) }));
+
+        var before = await new AutoScopeResolver(store, baskets).ResolveAsync(session, Ct);
+
+        before!.InstrumentIds.ShouldBe([first]);
+        before.BasketsBeforeKnownSince.ShouldBe([basket]);
+
+        baskets.MembersAsync(basket, BasketMember.CutoffAfter(new DateOnly(2025, 6, 2)), null, Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult<BasketMembers?>(Members(basket, null, Member(first, null)) with { MembersKnownSince = new DateOnly(2025, 6, 1) }));
+        (await new AutoScopeResolver(store, baskets).ResolveAsync(new DateOnly(2025, 6, 2), Ct))!.BasketsBeforeKnownSince.ShouldBeNull();
     }
 
     // Only the fields the code under test reads are set; the other fields of these wide records are not looked at.

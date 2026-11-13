@@ -64,7 +64,12 @@ internal sealed class SelectionPlanBuilder(
         }
 
         var found = read.Value;
-        var scope = scopeSource is null ? null : await scopeSource.ResolveAsync(cancellationToken); // AU-16: the owner's scope is a filter on the candidates; nothing after it changes
+        var scope = scopeSource is null ? null : await scopeSource.ResolveAsync(request.ForDate, cancellationToken); // AU-16: the owner's scope is a filter on the candidates; its baskets are expanded as of the plan session (ADR 0287)
+        if (scope?.BasketsBeforeKnownSince is { Count: > 0 } unproven)
+        {
+            PlanWiringLog.ScopeMembersBeforeKnownSince(logger, request.ForDate, unproven.Count);
+        }
+
         // One ticket per (symbol, cell): a duplicate from the source is ignored, never an exception.
         var drafts = new Dictionary<(string, string), TicketDraft>();
         var ids = new Dictionary<string, Guid?>(StringComparer.OrdinalIgnoreCase);
