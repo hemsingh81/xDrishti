@@ -35,6 +35,9 @@ public sealed record LedgerRow(
 
     /// <summary>True for a scheduled cell-statistics refresh row (LC-01, ADR 0277): one row per newly stored refresh run. Counted in the total of looks (<c>TrialCounts.CellsRefreshes</c>), never a variant hash: the readers that take hashes skip it.</summary>
     public bool IsCellsRefresh => string.Equals(TrialKind, XDrishti.Domain.Learning.CellsRefreshRules.TrialKind, StringComparison.Ordinal);
+
+    /// <summary>True for an evidence-set registration row (AM-01b, ADR 0282): a version registered as part of an edge epoch's evidence set. It is a registration, not a look: it is not a variant and not a trial, so every reader that takes hashes or counts looks from the listing skips it.</summary>
+    public bool IsEvidenceSet => string.Equals(TrialKind, XDrishti.Domain.Shadow.EvidenceSetRules.TrialKind, StringComparison.Ordinal);
 }
 
 /// <summary>

@@ -165,6 +165,10 @@ public sealed class PaperShadowGradeEndToEndTests(ApiFactory factory) : DataTest
             await using (var connection = await OpenAsync())
             {
                 await ExecuteAsync(connection, "INSERT INTO paper.shadow_settings (enabled, actor, reason) VALUES (true, 'owner:test@example.com', 'test')");
+                await ExecuteAsync(
+                    connection,
+                    "INSERT INTO paper.evidence_sets (edge_epoch, versions, set_hash, mode, actor, reason) VALUES ((SELECT COALESCE(max(id), 0) FROM paper.epochs), to_jsonb(ARRAY[@hash::text]), repeat('d', 64), 'owner', 'owner:test@example.com', 'test')",
+                    ("hash", hash)); // AM-01b: the evidence set of the epoch in force names the version of the plan item
             }
 
             var written = await WithAsync(p => p.GetRequiredService<ICommandHandler<WriteShadowCommand, ShadowWriteOutcome>>().HandleAsync(new WriteShadowCommand(null), Ct).AsTask());

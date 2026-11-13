@@ -29,14 +29,18 @@ export function findWrites(text: string): string[] {
 }
 
 /**
- * OPS-01 (ADR 0278): the single narrow exception to "Paper is read only", the owner's shadow switch. Removes exactly one
- * `api.PUT('/api/paper/shadow/settings'` and one `useMutation` from `features/paper/api/shadowQueries.ts`; any second
- * write, or the same text anywhere else, is left in and found.
+ * OPS-01 (ADR 0278) and AM-01b (ADR 0282): the narrow exceptions to "Paper is read only", the owner's shadow switch and the owner's
+ * replacement of the evidence set. Removes exactly one `api.PUT('/api/paper/shadow/settings'` and one `useMutation` from
+ * `features/paper/api/shadowQueries.ts`, and, only when the file names it, one `api.PUT('/api/paper/shadow/evidence-set'` with its one
+ * further `useMutation`; any other write, or the same text anywhere else, is left in and found.
  */
 export function withoutShadowSwitch(path: string, text: string): string {
   if (!path.endsWith('features/paper/api/shadowQueries.ts')) return text;
-  return text
+  const evidence = "api.PUT('/api/paper/shadow/evidence-set'";
+  let result = text
     .replace("api.PUT('/api/paper/shadow/settings'", '(')
     .replace('useMutation(', '(')
     .replace('useMutation, ', '');
+  if (result.includes(evidence)) result = result.replace(evidence, '(').replace('useMutation(', '(');
+  return result;
 }

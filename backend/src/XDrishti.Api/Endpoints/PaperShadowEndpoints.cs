@@ -30,6 +30,43 @@ internal sealed class PaperShadowEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status423Locked)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+        group.MapGet("/evidence-set", EvidenceSetAsync)
+            .WithName("GetShadowEvidenceSet")
+            .WithSummary("The frozen evidence set of the current edge epoch of the shadow record (spec AM-01 GAP-09, ADR 0282): the strategy versions whose shadow rows count for the edge count and the readiness forward rows, its state (pending: none stored, the first shadow write registers the default, the versions of the eligible cells from a fresh configuration reading; open: stored, no shadow row of the epoch yet, the owner may replace it; frozen: never replaceable), who or what froze it (mode auto = system:default, owner, or backfill = the migration's set for rows that already existed, NOT a pre-registration) and why. Rows of other versions are still written and graded, labelled outside_set, and left out of the edge figures. Read only (a session; not one of the assistant's evidence GETs); no order exists");
+
+        group.MapPut("/evidence-set", ReplaceEvidenceSetAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy) // a password is checked here, so the sign-in limit applies
+            .WithName("ReplaceShadowEvidenceSet")
+            .WithSummary("Replace the evidence set of the current edge epoch as the owner, before the first shadow write of the epoch and never after. Stores one audited row and registers the versions in the trial ledger (a registration, not a look). Needs a session, the CSRF token and the password in the body, checked on EVERY change. 401 auth.invalid_credentials, 423 auth.locked, 403 paper.evidence_set_owner_only, 400 paper.evidence_set_reason_invalid, 400 paper.evidence_set_versions_invalid, 400 paper.evidence_set_unknown_version, 409 paper.evidence_set_frozen (a shadow row of the epoch exists), 429 auth.rate_limited")
+            .ProducesRejections(conflict: true, notFound: false)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status423Locked)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+    }
+
+    private static async Task<Ok<EvidenceSetView>> EvidenceSetAsync(IQueryHandler<GetEvidenceSetQuery, EvidenceSetView> handler, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await handler.HandleAsync(new GetEvidenceSetQuery(), cancellationToken));
+
+    private static async Task<Results<Ok<EvidenceSetReplaced>, ProblemHttpResult>> ReplaceEvidenceSetAsync(
+        EvidenceSetRequest request,
+        HttpContext http,
+        ICommandHandler<StepUpCommand, StepUpResult> passwordCheck,
+        ICommandHandler<ReplaceEvidenceSetCommand, EvidenceSetReplaced> handler,
+        CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+
+        // A fresh password for this change (OwnerAct), then the owner from the session; nothing in the body can name the actor.
+        var owner = await OwnerAct.AuthorizeAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new ReplaceEvidenceSetCommand(owner.Value, request.Versions ?? [], request.Reason ?? string.Empty), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Ok<ShadowSummaryView>> SummaryAsync(IQueryHandler<GetShadowSummaryQuery, ShadowSummaryView> handler, CancellationToken cancellationToken) =>

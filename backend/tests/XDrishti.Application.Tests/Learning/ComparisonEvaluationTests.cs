@@ -59,6 +59,26 @@ public sealed class ComparisonEvaluationTests
     }
 
     [Fact]
+    public async Task Evidence_set_registration_rows_of_the_family_change_neither_the_trial_hashes_nor_the_stored_inputs()
+    {
+        var data = Rows(Fu, true, 1);
+        var source = new TrainingSource([Run(Fu, data.Rows.Count, "xbrl-1")], data);
+        var plain = NewRig();
+        await Evaluation(plain, source, "xbrl-1").RunAsync("ext:fu-1", false, Ct);
+
+        var registered = NewRig();
+        for (var i = 0; i < 4; i++)
+        {
+            registered.Ledger.Rows.Add(new XDrishti.Application.Abstractions.Lab.LedgerRow(Guid.NewGuid(), new string('k', 64), "ext:fu-1", 1, new string((char)('b' + i), 64), null, "u", new DateOnly(2025, 5, 1), new DateOnly(2026, 4, 30), "evidence_set", DateTimeOffset.UnixEpoch, XDrishti.Domain.Shadow.EvidenceSetRules.TrialKind));
+        }
+
+        await Evaluation(registered, source, "xbrl-1").RunAsync("ext:fu-1", false, Ct);
+
+        registered.Store.Records.Single().Trials.ShouldBe(plain.Store.Records.Single().Trials);
+        registered.Store.Records.Single().InputsJson.ShouldBe(plain.Store.Records.Single().InputsJson);
+    }
+
+    [Fact]
     public async Task The_same_planted_effect_with_a_verified_parser_is_a_keep_and_the_trial_is_counted_before_the_verdict_is_stored()
     {
         var rig = NewRig();

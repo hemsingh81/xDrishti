@@ -37,6 +37,8 @@ public sealed class GetEvidencePreflightHandlerTests
     private readonly ITradingCalendar _calendar = Substitute.For<ITradingCalendar>();
     private readonly IModelRegistry _models = Substitute.For<IModelRegistry>();
     private readonly IQueryHandler<GetShadowSummaryQuery, ShadowSummaryView> _shadow = Substitute.For<IQueryHandler<GetShadowSummaryQuery, ShadowSummaryView>>();
+
+    private readonly IQueryHandler<GetEvidenceSetQuery, EvidenceSetView> _evidenceSet = Substitute.For<IQueryHandler<GetEvidenceSetQuery, EvidenceSetView>>();
     private readonly IServiceScheduleReader _schedules = Substitute.For<IServiceScheduleReader>();
     private readonly IQueryHandler<GetAutoQuery, AutoView> _auto = Substitute.For<IQueryHandler<GetAutoQuery, AutoView>>();
     private readonly IQueryHandler<ShowHistoryQuery, IReadOnlyList<HistoryRow>> _history = Substitute.For<IQueryHandler<ShowHistoryQuery, IReadOnlyList<HistoryRow>>>();
@@ -187,6 +189,17 @@ public sealed class GetEvidencePreflightHandlerTests
         _shadow.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(Shadow(false));
 
         Item(await RunAsync(), GetEvidencePreflightHandler.ShadowItem).State.ShouldBe(GetEvidencePreflightHandler.NotMet);
+    }
+
+    [Fact]
+    public async Task A_shadow_switch_that_is_on_but_has_no_nameable_evidence_set_is_not_met_and_says_it_writes_nothing()
+    {
+        _evidenceSet.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(new EvidenceSetView(null, "pending", [], null, null, null, null, null, null, true, "n"));
+
+        var item = Item(await RunAsync(), GetEvidencePreflightHandler.ShadowItem);
+
+        item.State.ShouldBe(GetEvidencePreflightHandler.NotMet);
+        item.Reason.ShouldContain("writing nothing");
     }
 
     [Fact]
@@ -349,7 +362,7 @@ public sealed class GetEvidencePreflightHandlerTests
     {
         // 12 Nov 2026 12:00 UTC is 17:30 India time: the 12th session has closed, so the last closed session is the 12th.
         var clock = new FakeTimeProvider(new DateTimeOffset(Today.Year, Today.Month, Today.Day, 12, 0, 0, TimeSpan.Zero));
-        return new GetEvidencePreflightHandler(_status, _host, _sheet, _context, _holdOut, _cells, _calendar, _models, _shadow, _schedules, _auto, _history, _backfill, _gate, _replay, clock);
+        return new GetEvidencePreflightHandler(_status, _host, _sheet, _context, _holdOut, _cells, _calendar, _models, _shadow, _evidenceSet, _schedules, _auto, _history, _backfill, _gate, _replay, clock);
     }
 
     private static ChargeSheetStatusView Sheet(string state) => new(true, state, "text", null, null, null, "meaning", []);

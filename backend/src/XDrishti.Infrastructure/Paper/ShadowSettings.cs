@@ -4,7 +4,7 @@ using XDrishti.Application.Abstractions.Shadow;
 namespace XDrishti.Infrastructure.Paper;
 
 /// <summary>
-/// The switch <c>paper.shadow.enabled</c> (spec CF-08, D7): the newest row of <c>paper.shadow_settings</c>, OFF when there is none (<see cref="IShadowSettings"/>), and its append (<see cref="IShadowSwitchStore"/>). Select and insert only; the database stamps the
+/// The switch <c>paper.shadow.enabled</c> (spec CF-08, D7): the newest row of <c>paper.shadow_settings</c>, OFF when there is none (<see cref="IShadowSettings"/>; the one seed row of ADR 0282 is written by a migration, sealed by the stamp trigger), and its append (<see cref="IShadowSwitchStore"/>). Select and insert only; the database stamps the
 /// time and the id, drawn under a lock so that the highest id is the last to commit (the P7-12 pattern).
 /// </summary>
 internal sealed class ShadowSettings(NpgsqlDataSource dataSource) : IShadowSettings, IShadowSwitchStore

@@ -8,7 +8,7 @@ namespace XDrishti.Application.Shadow;
 
 /// <summary>
 /// The shadow writer as a service (<see cref="Id"/>, spec CF-08, ADR 0211): every trading day at 19:00, after the nightly plan and well before the 09:00 cut-off, it carries out <see cref="WriteShadowCommand"/>: every candidate of the stored plan becomes a row of the
-/// shadow record, written once and stamped by the database. It starts <b>paused</b>, and even when switched on it writes nothing until the owner's setting <c>paper.shadow.enabled</c> (default OFF) is ON. It places no order, calls no broker, moves no ticket.
+/// shadow record, written once and stamped by the database. It starts <b>enabled</b> (ADR 0282) and writes only while the setting <c>paper.shadow.enabled</c> is ON (default ON from the seed row of ADR 0282) and an evidence set exists for the epoch (spec AM-01 GAP-09). It places no order, calls no broker, moves no ticket.
 /// </summary>
 public sealed class ShadowWriteService(IServiceScopeFactory scopes) : IScheduledService
 {
@@ -18,10 +18,10 @@ public sealed class ShadowWriteService(IServiceScopeFactory scopes) : IScheduled
     public static readonly ServiceDefinition Definition = new(
         Id,
         "Shadow record",
-        "At 19:00, after the nightly plan, records every candidate of the plan (primary, reserve and rejected) before the session opens, so that it can be graded after the close as edge evidence. It writes only when the setting paper.shadow.enabled is ON (it is OFF by default), never after 09:00 of the session, and never back-fills a night it missed. The record is simulated: no order was placed and none exists.",
+        "At 19:00, after the nightly plan, records every candidate of the plan (primary, reserve and rejected) before the session opens, so that it can be graded after the close as edge evidence. It writes only when the setting paper.shadow.enabled is ON (it is ON by default, ADR 0282), never after 09:00 of the session, and never back-fills a night it missed. The record is simulated: no order was placed and none exists.",
         "xd-api",
         [ScheduleType.Daily],
-        new ServiceSettings(false, Schedule.Daily(new TimeOnly(19, 0)), 0, 10, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
+        new ServiceSettings(true, Schedule.Daily(new TimeOnly(19, 0)), 0, 10, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
         new ServiceConstraints
         {

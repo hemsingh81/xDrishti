@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link as RouterLink } from 'react-router';
 import { servicesListQuery, type Schemas } from '@/shared/api';
 import { ErrorState, LoadingState } from '@/shared/ui';
-import { autoShadowSwitchQuery } from '../api/autoApi';
+import { autoEvidenceSetQuery, autoShadowSwitchQuery } from '../api/autoApi';
 
 /** The forward-evidence services: outside the Auto chain (ADR 0252), each its own switch (OPS-01, ADR 0278). */
 const evidence = [
@@ -23,6 +23,22 @@ function stateOf(service: Schemas['ServiceView'] | undefined): string {
   return service.status === 'failed' ? 'failed' : 'running';
 }
 
+/** ON from the seed row does not mean writing: with no evidence set stored and none nameable the writer writes nothing (AM-01b), and the screen says so. */
+function shadowState(
+  shadow: Schemas['ShadowSummaryView'] | undefined,
+  failed: boolean,
+  evidenceSet: Schemas['EvidenceSetView'] | undefined,
+  evidenceSetFailed: boolean,
+): string {
+  if (failed) return 'unavailable';
+  if (!shadow) return 'loading';
+  if (!shadow.enabled) return 'OFF';
+  if (evidenceSetFailed) return 'ON, evidence set unreadable';
+  return evidenceSet?.state === 'pending' && evidenceSet.versions.length === 0
+    ? 'ON, writing nothing: no evidence set'
+    : 'ON';
+}
+
 function Row({ name, state, to, note }: { name: string; state: string; to: string; note?: string }) {
   return (
     <li>
@@ -38,6 +54,7 @@ function Row({ name, state, to, note }: { name: string; state: string; to: strin
 export function EvidenceServices() {
   const services = useQuery(servicesListQuery);
   const shadow = useQuery(autoShadowSwitchQuery);
+  const evidenceSet = useQuery(autoEvidenceSetQuery);
   const find = (id: string) => services.data?.items.find((item) => item.id === id);
   return (
     <Box component="section" aria-labelledby="evidence-services-heading">
@@ -53,7 +70,7 @@ export function EvidenceServices() {
         <Stack component="ul" aria-label="Evidence services" spacing={0.5} sx={{ m: 0, pl: 2.5 }}>
           <Row
             name="Shadow record switch"
-            state={shadow.isError ? 'unavailable' : shadow.data ? (shadow.data.enabled ? 'ON' : 'OFF') : 'loading'}
+            state={shadowState(shadow.data, shadow.isError, evidenceSet.data, evidenceSet.isError)}
             to="/paper?tab=shadow"
           />
           {evidence.map(({ id, name }) => (
