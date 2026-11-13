@@ -7,6 +7,7 @@ import { formatDate } from '@/shared/lib/format';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
 import { replayRunsQuery } from '../../api/replayApi';
 import { SimulationTabs } from '../SimulationTabs';
+import { HoldOutReplayCard } from './HoldOutReplayCard';
 import { ReplayResults } from './ReplayResults';
 import { ReplayStartForm } from './ReplayStartForm';
 import { SweepCard } from './SweepCard';
@@ -111,6 +112,11 @@ export function SystemReplayPage() {
                 />
               </Box>
             </Collapse>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <HoldOutReplayCard />
           </CardContent>
         </Card>
       </Box>

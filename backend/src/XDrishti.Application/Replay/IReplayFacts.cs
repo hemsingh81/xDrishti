@@ -44,6 +44,9 @@ public interface IReplayFacts
     /// <summary>The cash cells with their statistics (frozen at the start date, or recomputed in memory as of the cut on the weekly cadence), their state and their strategy version as of the cut.</summary>
     ValueTask<ReplayCells> CellsAsync(ReplayParams parameters, DateOnly cut, CancellationToken cancellationToken);
 
+    /// <summary>The frozen cash cells as of the snapshot written before the first session of the range (as-of date before <c>From</c>), the freeze of a run over a claimed hold-out block (SR-03); <see cref="CellsAsync"/> freezes on the first session after it.</summary>
+    ValueTask<ReplayCells> CellsBeforeStartAsync(ReplayParams parameters, CancellationToken cancellationToken);
+
     /// <summary>The 1-minute bars of the instrument up to and including the close of <paramref name="cut"/>, about 400 calendar days.</summary>
     ValueTask<IReadOnlyList<Bar>> MinuteBarsAsync(Guid instrumentId, DateOnly cut, CancellationToken cancellationToken);
 

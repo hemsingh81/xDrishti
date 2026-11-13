@@ -18059,6 +18059,283 @@
         }
       }
     },
+    "/api/replay/holdout-registrations": {
+      "post": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "Pre-register the system for the next hold-out block that has not begun (owner session): body basketIds, instrumentIds (empty: the stored Auto scope), capital, riskProfileId, costSheetId (a checked sheet, required), maxDrawdownPct (default 15). The canonical config (versions by hash, the settings snapshot, the resolved scope, the sheet's content hash, both arms, the engine version, the pass rule) is stored with its SHA-256. 200 with id, configHash, blockStart. 422 replay.registration_invalid with a reason: no_future_block, gross_choice, sheet_missing, sheet_unchecked, scope_empty, scope_over_memory_cap, bad_rule.",
+        "operationId": "RegisterHoldOutReplay",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldOutRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredHoldOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "The registrations, newest first, each with its state (waiting, superseded, claimed, run), its rule and, when it ran, the verdict. Research only.",
+        "operationId": "ListHoldOutReplayRegistrations",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HoldOutRegistrationView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/replay/holdout-registrations/{id}": {
+      "get": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "One registration: the frozen hash and inputs, the rule first, the state (waiting, superseded, drift, claimed, run) and the verdict with both arms' figures and the hindsight label. Research only. 404 replay.registration_not_found.",
+        "operationId": "GetHoldOutReplayRegistration",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOutRegistrationView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/replay/holdout-registrations/{id}/run": {
+      "post": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "Owner act, fresh password in the body: claim the one system look of the registration's block and run both arms over it once (irreversible: the look is burned even if the run is abandoned). 202 with the ids of the two results. 401 auth.invalid_credentials, 403 auth.step_up_required, 423 auth.locked, 409 replay.registration_drift (a stored input is missing or the sheet changed; nothing is claimed), replay.holdout_used (a second run), replay.registration_superseded, lab.holdout_filling, lab.holdout_unavailable, 404 replay.registration_not_found.",
+        "operationId": "RunHoldOutReplayRegistration",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldOutPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartedHoldOutRun"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/replay/settings": {
+      "get": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "The two automatic switches of the system replay: autoRegister and autoRun (default ON, ADR 0282); null is unavailable.",
+        "operationId": "GetReplayHoldOutSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOutAutoSettingsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Replay"
+        ],
+        "summary": "Owner act, fresh password in the body: set autoRegister and/or autoRun (turning either OFF or back ON). Each change is an appended row with the owner as actor. Neither switch ever places an order. 401, 403, 423 as for a run.",
+        "operationId": "PutReplayHoldOutSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldOutAutoSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOutAutoSettingsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports/basket-benchmark": {
       "put": {
         "tags": [
@@ -26612,6 +26889,10 @@
           }
         },
         "description": "The body of an approval. Everything is optional; a ticket whose checks all passed needs no body. The actor comes from the signed-in session, never from here."
+      },
+      "ArmAnswer": {
+        "type": "integer",
+        "description": "The answer of the selection-versus-baseline comparison (SR-02, D2): the same rule and bars as the frozen-versus-learning pair."
       },
       "AssistantChatRequest": {
         "required": [
@@ -45406,6 +45687,52 @@
           }
         }
       },
+      "HoldOutAutoSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "autoRegister": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "autoRun": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "description": "Body of `PUT /api/replay/settings`: the password, typed again, and the switches to set (null leaves one as it is)."
+      },
+      "HoldOutAutoSettingsView": {
+        "required": [
+          "autoRegister",
+          "autoRun"
+        ],
+        "type": "object",
+        "properties": {
+          "autoRegister": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "autoRun": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "description": "The two automatic switches as served; a null is unavailable (the table could not be read)."
+      },
       "HoldOutBlockView": {
         "required": [
           "start",
@@ -45541,6 +45868,18 @@
         },
         "description": "The three looks of a block (HO-01 D5): one per kind."
       },
+      "HoldOutPasswordRequest": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Body of `POST /api/replay/holdout-registrations/{id}/run`: the owner's password, typed again for this act."
+      },
       "HoldOutPlanView": {
         "required": [
           "historyMonths",
@@ -45580,6 +45919,200 @@
           }
         },
         "description": "The sizing the policy gives for the stored history now (D4)."
+      },
+      "HoldOutRegistrationRequest": {
+        "type": "object",
+        "properties": {
+          "basketIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "instrumentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "capital": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "riskProfileId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "costSheetId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "maxDrawdownPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "Body of `POST /api/replay/holdout-registrations` (SR-03): the scope (empty: the stored Auto scope), capital, risk profile, the checked charge sheet and the drawdown limit of the pass rule. Nulls are the defaults."
+      },
+      "HoldOutRegistrationResultView": {
+        "required": [
+          "verdict",
+          "reason",
+          "figures",
+          "runIds",
+          "engineVersions",
+          "mode",
+          "actor",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "verdict": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "figures": {
+            "$ref": "#/components/schemas/SystemRunFigures"
+          },
+          "runIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "engineVersions": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "The stored result with its identity."
+      },
+      "HoldOutRegistrationView": {
+        "required": [
+          "id",
+          "blockStart",
+          "blockEnd",
+          "configHash",
+          "mode",
+          "actor",
+          "createdAt",
+          "state",
+          "driftReason",
+          "rule",
+          "costSheetId",
+          "costSheetRatesHash",
+          "capital",
+          "instruments",
+          "engineVersion",
+          "settingsHash",
+          "hindsight",
+          "result"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "blockStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "blockEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "configHash": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string"
+          },
+          "driftReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "rule": {
+            "$ref": "#/components/schemas/SystemReplayPassRule"
+          },
+          "costSheetId": {
+            "type": "string"
+          },
+          "costSheetRatesHash": {
+            "type": "string"
+          },
+          "capital": {
+            "type": "number",
+            "format": "double"
+          },
+          "instruments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "engineVersion": {
+            "type": "string"
+          },
+          "settingsHash": {
+            "type": "string"
+          },
+          "hindsight": {
+            "type": "string"
+          },
+          "result": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/HoldOutRegistrationResultView"
+              }
+            ]
+          }
+        },
+        "description": "A registration as served (SR-03): the frozen hash and the inputs it fixed, the rule first, the state and, when it ran, the result. `State` is `waiting`, `superseded`, `late` (stored on or after the block began), `drift` (a stored input no longer resolves; read live), `claimed` (the look is taken\nand the run follows) or `run` (the result is stored). The hindsight text is always present."
       },
       "HoldOutReleaseRequest": {
         "type": "object",
@@ -64435,6 +64968,28 @@
         },
         "description": "Sessions with no label, by reason."
       },
+      "RegisteredHoldOut": {
+        "required": [
+          "id",
+          "configHash",
+          "blockStart"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "configHash": {
+            "type": "string"
+          },
+          "blockStart": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "description": "The stored registration."
+      },
       "RegistrationRequest": {
         "type": "object",
         "properties": {
@@ -64926,6 +65481,87 @@
           }
         },
         "description": "The selection run against the no-selection baseline of one request (SR-02, D2), computed on read by the same paired day bootstrap as the frozen-versus-learning pair. string? ReplayArmComparisonView.Answer is null while a run is not complete, with the reason; the probabilities are null with too little history.\nstring ReplayArmComparisonView.Label says what the baseline is (no choosing among the system's candidates, not random stocks) and string ReplayArmComparisonView.Shortcut that equity is realised only."
+      },
+      "ReplayArmResult": {
+        "required": [
+          "answer",
+          "days",
+          "informativeDays",
+          "meanDailyDifference",
+          "probabilitySelectionBetter",
+          "probabilityBaselineBetter",
+          "low",
+          "high",
+          "cut",
+          "hurtsBar",
+          "minDays"
+        ],
+        "type": "object",
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/ArmAnswer"
+          },
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "informativeDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "meanDailyDifference": {
+            "type": "number",
+            "format": "double"
+          },
+          "probabilitySelectionBetter": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "probabilityBaselineBetter": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "low": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "high": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "cut": {
+            "type": "number",
+            "format": "double"
+          },
+          "hurtsBar": {
+            "type": "number",
+            "format": "double"
+          },
+          "minDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "answerCode": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The wire word of the answer."
+          }
+        },
+        "description": "The comparison of the selection arm with the baseline arm: always n, the informative days and the mean daily difference (selection minus baseline); the probabilities and the interval are null when there is too little history."
       },
       "ReplayBarView": {
         "required": [
@@ -72912,6 +73548,22 @@
         },
         "description": "Starts a refresh. `force` skips the \"file unchanged\" check."
       },
+      "StartedHoldOutRun": {
+        "required": [
+          "runIds"
+        ],
+        "type": "object",
+        "properties": {
+          "runIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "description": "The ids of the two arm results the run will store."
+      },
       "StartedReplay": {
         "required": [
           "runIds",
@@ -73769,6 +74421,67 @@
         },
         "description": "The refresh settings of an account and its latest run. Mode \"off\" or \"daily\"; NextRunAt is null when the mode is off. FirstImportDate is the date holdings\nget when they are imported without a date of their own; HasHoldings is true once the account has any holding (the first import has happened). Running is\ntrue while a sync or import of the account is in progress. The health (ADR 0027): `ConsecutiveFailedDays` are the days in a row whose last attempt failed (0 when the latest succeeded), `LastFailureReason` a code (`unavailable`, `rate_limited`,\n`interrupted`, `rejected`, `token_expired`, `token_refused`, `not_connected`, `unexpected`; null while healthy), `Attempts` the failed attempts of the day of the latest failure and `RetryAt` when the next quiet retry is due (null when none is pending)."
       },
+      "SystemArmFigures": {
+        "required": [
+          "arm",
+          "closedTrades",
+          "capital",
+          "finalEquity",
+          "netReturnPct",
+          "cagrPct",
+          "maxDrawdownPct",
+          "netBasis",
+          "basis",
+          "sessions"
+        ],
+        "type": "object",
+        "properties": {
+          "arm": {
+            "type": "string"
+          },
+          "closedTrades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "capital": {
+            "type": "number",
+            "format": "double"
+          },
+          "finalEquity": {
+            "type": "number",
+            "format": "double"
+          },
+          "netReturnPct": {
+            "type": "number",
+            "format": "double"
+          },
+          "cagrPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxDrawdownPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "netBasis": {
+            "type": "boolean"
+          },
+          "basis": {
+            "type": "string"
+          },
+          "sessions": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The figures of one arm over the block (net when the sheet charged every trade)."
+      },
       "SystemBasketSettingsView": {
         "required": [
           "fetchEnabled",
@@ -73788,6 +74501,103 @@
           }
         },
         "description": "Which owner-act switches are on (BK-04): `fetchEnabled` = Baskets:System:Fetch:Enabled (index lists), `listFetchEnabled` = Baskets:System:Lists:FetchEnabled (the two NSE F&amp;O files), `derivedEnabled` = Baskets:System:Derived:Enabled. The screen disables its buttons from these; the API stays the authority."
+      },
+      "SystemReplayPassRule": {
+        "type": "object",
+        "properties": {
+          "minTrades": {
+            "type": "integer",
+            "description": "The fewest closed trades of the selection arm for a verdict; fewer is `inconclusive` (default 30).",
+            "format": "int32",
+            "default": 30
+          },
+          "maxDrawdownPct": {
+            "type": "number",
+            "description": "The largest maximum drawdown, in percent, a pass allows (default 15).",
+            "format": "double",
+            "default": 15
+          }
+        },
+        "description": "The pass rule of the pre-registered system replay (SR-03 D3), fixed at registration and stored with it. All figures it judges are net of the checked charge sheet."
+      },
+      "SystemRunFigures": {
+        "required": [
+          "selection",
+          "baseline",
+          "comparison",
+          "rule",
+          "labels",
+          "engineChanged",
+          "failure"
+        ],
+        "type": "object",
+        "properties": {
+          "selection": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SystemArmFigures"
+              }
+            ]
+          },
+          "baseline": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SystemArmFigures"
+              }
+            ]
+          },
+          "comparison": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReplayArmResult"
+              }
+            ]
+          },
+          "rule": {
+            "$ref": "#/components/schemas/SystemReplayPassRule"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "engineChanged": {
+            "type": "boolean"
+          },
+          "failure": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "snapshotKeys": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "snapshotCreatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "What is stored with a result: both arms, the comparison, the rule it was judged by, the labels, the failure of a run that failed (the verdict is then `run_failed`) and the cell-statistics snapshot the arms started from (its keys and newest creation time)."
       },
       "SystemScorecardView": {
         "required": [

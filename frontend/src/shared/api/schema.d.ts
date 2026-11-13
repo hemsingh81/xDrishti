@@ -5196,6 +5196,76 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/replay/holdout-registrations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The registrations, newest first, each with its state (waiting, superseded, claimed, run), its rule and, when it ran, the verdict. Research only. */
+    get: operations['ListHoldOutReplayRegistrations'];
+    put?: never;
+    /** Pre-register the system for the next hold-out block that has not begun (owner session): body basketIds, instrumentIds (empty: the stored Auto scope), capital, riskProfileId, costSheetId (a checked sheet, required), maxDrawdownPct (default 15). The canonical config (versions by hash, the settings snapshot, the resolved scope, the sheet's content hash, both arms, the engine version, the pass rule) is stored with its SHA-256. 200 with id, configHash, blockStart. 422 replay.registration_invalid with a reason: no_future_block, gross_choice, sheet_missing, sheet_unchecked, scope_empty, scope_over_memory_cap, bad_rule. */
+    post: operations['RegisterHoldOutReplay'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/holdout-registrations/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One registration: the frozen hash and inputs, the rule first, the state (waiting, superseded, drift, claimed, run) and the verdict with both arms' figures and the hindsight label. Research only. 404 replay.registration_not_found. */
+    get: operations['GetHoldOutReplayRegistration'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/holdout-registrations/{id}/run': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Owner act, fresh password in the body: claim the one system look of the registration's block and run both arms over it once (irreversible: the look is burned even if the run is abandoned). 202 with the ids of the two results. 401 auth.invalid_credentials, 403 auth.step_up_required, 423 auth.locked, 409 replay.registration_drift (a stored input is missing or the sheet changed; nothing is claimed), replay.holdout_used (a second run), replay.registration_superseded, lab.holdout_filling, lab.holdout_unavailable, 404 replay.registration_not_found. */
+    post: operations['RunHoldOutReplayRegistration'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/replay/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The two automatic switches of the system replay: autoRegister and autoRun (default ON, ADR 0282); null is unavailable. */
+    get: operations['GetReplayHoldOutSettings'];
+    /** Owner act, fresh password in the body: set autoRegister and/or autoRun (turning either OFF or back ON). Each change is an appended row with the owner as actor. Neither switch ever places an order. 401, 403, 423 as for a run. */
+    put: operations['PutReplayHoldOutSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/reports/basket-benchmark': {
     parameters: {
       query?: never;
@@ -7669,6 +7739,8 @@ export interface components {
       /** @description The checks approved despite, per account. */
       confirmations: null | components['schemas']['CheckConfirmationRequest'][];
     };
+    /** @description The answer of the selection-versus-baseline comparison (SR-02, D2): the same rule and bars as the frozen-versus-learning pair. */
+    ArmAnswer: number;
     /** @description The body of `POST /api/assistant/chat`: the question and, to continue a conversation, its id. */
     AssistantChatRequest: {
       /**
@@ -14472,6 +14544,17 @@ export interface components {
       /** Format: int32 */
       from5: number;
     };
+    /** @description Body of `PUT /api/replay/settings`: the password, typed again, and the switches to set (null leaves one as it is). */
+    HoldOutAutoSettingsRequest: {
+      password?: null | string;
+      autoRegister?: null | boolean;
+      autoRun?: null | boolean;
+    };
+    /** @description The two automatic switches as served; a null is unavailable (the table could not be read). */
+    HoldOutAutoSettingsView: {
+      autoRegister: null | boolean;
+      autoRun: null | boolean;
+    };
     /**
      * @description A block of the hold-out chain as served (HO-01): `HistoryLast` is its last date. `State` is `filling`, `sealed`, `looked` or `released`; `Looks` holds the three looks (strategy, model, system); `BlockedBy` names what keeps the block in force from being released by the auto option (set for the block in force only);
      *     `ReleasedAt` and `Mode` (`owner` or `auto`) are set once it is released.
@@ -14514,6 +14597,10 @@ export interface components {
       model: components['schemas']['HoldOutLookView'];
       system: components['schemas']['HoldOutLookView'];
     };
+    /** @description Body of `POST /api/replay/holdout-registrations/{id}/run`: the owner's password, typed again for this act. */
+    HoldOutPasswordRequest: {
+      password?: null | string;
+    };
     /** @description The sizing the policy gives for the stored history now (D4). */
     HoldOutPlanView: {
       /** Format: double */
@@ -14527,6 +14614,60 @@ export interface components {
       /** Format: date */
       start: null | string;
       status: string;
+    };
+    /** @description Body of `POST /api/replay/holdout-registrations` (SR-03): the scope (empty: the stored Auto scope), capital, risk profile, the checked charge sheet and the drawdown limit of the pass rule. Nulls are the defaults. */
+    HoldOutRegistrationRequest: {
+      basketIds?: null | string[];
+      instrumentIds?: null | string[];
+      /** Format: double */
+      capital?: null | number;
+      /** Format: uuid */
+      riskProfileId?: null | string;
+      costSheetId?: null | string;
+      /** Format: double */
+      maxDrawdownPct?: null | number;
+    };
+    /** @description The stored result with its identity. */
+    HoldOutRegistrationResultView: {
+      verdict: string;
+      reason: string;
+      figures: components['schemas']['SystemRunFigures'];
+      runIds: string[];
+      engineVersions: string;
+      mode: string;
+      actor: string;
+      /** Format: date-time */
+      at: string;
+    };
+    /**
+     * @description A registration as served (SR-03): the frozen hash and the inputs it fixed, the rule first, the state and, when it ran, the result. `State` is `waiting`, `superseded`, `late` (stored on or after the block began), `drift` (a stored input no longer resolves; read live), `claimed` (the look is taken
+     *     and the run follows) or `run` (the result is stored). The hindsight text is always present.
+     */
+    HoldOutRegistrationView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: date */
+      blockStart: string;
+      /** Format: date */
+      blockEnd: string;
+      configHash: string;
+      mode: string;
+      actor: string;
+      /** Format: date-time */
+      createdAt: string;
+      state: string;
+      driftReason: null | string;
+      rule: components['schemas']['SystemReplayPassRule'];
+      costSheetId: string;
+      costSheetRatesHash: string;
+      /** Format: double */
+      capital: number;
+      /** Format: int32 */
+      instruments: number;
+      engineVersion: string;
+      settingsHash: string;
+      hindsight: string;
+      result: null | components['schemas']['HoldOutRegistrationResultView'];
     };
     /** @description Body of `POST /api/lab/holdout/blocks/{start}/release` (HO-01, D4): the owner's password, typed again for this act, and whether a block with no fresh look may be released (which forfeits its looks for good). */
     HoldOutReleaseRequest: {
@@ -21559,6 +21700,14 @@ export interface components {
       /** Format: int32 */
       days: number;
     };
+    /** @description The stored registration. */
+    RegisteredHoldOut: {
+      /** Format: uuid */
+      id: string;
+      configHash: string;
+      /** Format: date */
+      blockStart: string;
+    };
     /** @description Body of `PUT /api/lab/strategies/{id}/versions/{v}/registration` (spec CF-06, D1): the five plain texts. The actor is the signed-in owner, never a field. */
     RegistrationRequest: {
       counterparty?: null | string;
@@ -21713,6 +21862,32 @@ export interface components {
       minDays: null | number;
       label: string;
       shortcut: string;
+    };
+    /** @description The comparison of the selection arm with the baseline arm: always n, the informative days and the mean daily difference (selection minus baseline); the probabilities and the interval are null when there is too little history. */
+    ReplayArmResult: {
+      answer: components['schemas']['ArmAnswer'];
+      /** Format: int32 */
+      days: number;
+      /** Format: int32 */
+      informativeDays: number;
+      /** Format: double */
+      meanDailyDifference: number;
+      /** Format: double */
+      probabilitySelectionBetter: null | number;
+      /** Format: double */
+      probabilityBaselineBetter: null | number;
+      /** Format: double */
+      low: null | number;
+      /** Format: double */
+      high: null | number;
+      /** Format: double */
+      cut: number;
+      /** Format: double */
+      hurtsBar: number;
+      /** Format: int32 */
+      minDays: number;
+      /** @description The wire word of the answer. */
+      answerCode?: null | string;
     };
     /** @description One bar: `t` is the epoch seconds of its start. */
     ReplayBarView: {
@@ -24543,6 +24718,10 @@ export interface components {
       /** @default false */
       force: boolean;
     };
+    /** @description The ids of the two arm results the run will store. */
+    StartedHoldOutRun: {
+      runIds: string[];
+    };
     /** @description The runs that were stored. */
     StartedReplay: {
       /** @description The ids, in the order of the request. */
@@ -24849,11 +25028,59 @@ export interface components {
       /** Format: date-time */
       retryAt?: null | string;
     };
+    /** @description The figures of one arm over the block (net when the sheet charged every trade). */
+    SystemArmFigures: {
+      arm: string;
+      /** Format: int32 */
+      closedTrades: number;
+      /** Format: double */
+      capital: number;
+      /** Format: double */
+      finalEquity: number;
+      /** Format: double */
+      netReturnPct: number;
+      /** Format: double */
+      cagrPct: null | number;
+      /** Format: double */
+      maxDrawdownPct: null | number;
+      netBasis: boolean;
+      basis: string;
+      /** Format: int32 */
+      sessions: number;
+    };
     /** @description Which owner-act switches are on (BK-04): `fetchEnabled` = Baskets:System:Fetch:Enabled (index lists), `listFetchEnabled` = Baskets:System:Lists:FetchEnabled (the two NSE F&amp;O files), `derivedEnabled` = Baskets:System:Derived:Enabled. The screen disables its buttons from these; the API stays the authority. */
     SystemBasketSettingsView: {
       fetchEnabled: boolean;
       listFetchEnabled: boolean;
       derivedEnabled: boolean;
+    };
+    /** @description The pass rule of the pre-registered system replay (SR-03 D3), fixed at registration and stored with it. All figures it judges are net of the checked charge sheet. */
+    SystemReplayPassRule: {
+      /**
+       * Format: int32
+       * @description The fewest closed trades of the selection arm for a verdict; fewer is `inconclusive` (default 30).
+       * @default 30
+       */
+      minTrades: number;
+      /**
+       * Format: double
+       * @description The largest maximum drawdown, in percent, a pass allows (default 15).
+       * @default 15
+       */
+      maxDrawdownPct: number;
+    };
+    /** @description What is stored with a result: both arms, the comparison, the rule it was judged by, the labels, the failure of a run that failed (the verdict is then `run_failed`) and the cell-statistics snapshot the arms started from (its keys and newest creation time). */
+    SystemRunFigures: {
+      selection: null | components['schemas']['SystemArmFigures'];
+      baseline: null | components['schemas']['SystemArmFigures'];
+      comparison: null | components['schemas']['ReplayArmResult'];
+      rule: components['schemas']['SystemReplayPassRule'];
+      labels: string[];
+      engineChanged: boolean;
+      failure: null | string;
+      snapshotKeys?: null | string[];
+      /** Format: date-time */
+      snapshotCreatedAt?: null | string;
     };
     /** @description The system card (spec CF-11 D5). */
     SystemScorecardView: {
@@ -38963,6 +39190,232 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListHoldOutReplayRegistrations: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldOutRegistrationView'][];
+        };
+      };
+    };
+  };
+  RegisterHoldOutReplay: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['HoldOutRegistrationRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RegisteredHoldOut'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetHoldOutReplayRegistration: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldOutRegistrationView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  RunHoldOutReplayRegistration: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['HoldOutPasswordRequest'];
+      };
+    };
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StartedHoldOutRun'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReplayHoldOutSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldOutAutoSettingsView'];
+        };
+      };
+    };
+  };
+  PutReplayHoldOutSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['HoldOutAutoSettingsRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldOutAutoSettingsView'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
         headers: {
           [name: string]: unknown;
         };
