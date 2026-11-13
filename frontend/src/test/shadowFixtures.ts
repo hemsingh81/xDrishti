@@ -20,6 +20,7 @@ export const buildShadowSummary = (over: Partial<Summary> = {}): Summary => ({
     pending: 5,
     notTriggered: 10,
     notGradable: 5,
+    outsideSet: 3,
   },
   edge: {
     rawN: 40,
@@ -55,6 +56,30 @@ export const buildShadowSummary = (over: Partial<Summary> = {}): Summary => ({
   ...over,
 });
 
-export function mountShadow(view: Summary = buildShadowSummary()) {
+type EvidenceSet = Schemas['EvidenceSetView'];
+const hashA = 'a'.repeat(64);
+const hashB = 'b'.repeat(64);
+
+export const buildEvidenceSet = (over: Partial<EvidenceSet> = {}): EvidenceSet => ({
+  edgeEpoch: 3,
+  state: 'frozen',
+  versions: [hashA, hashB],
+  setHash: 'c'.repeat(64),
+  mode: 'auto',
+  actor: 'system:default',
+  reason: null,
+  createdAt: '2026-11-13T13:30:00Z',
+  firstWriteAt: '2026-11-13T13:30:00Z',
+  shadowEnabled: true,
+  note: 'Frozen: a shadow row of this epoch is stored.',
+  ...over,
+});
+
+export function mountEvidenceSet(view: EvidenceSet = buildEvidenceSet()) {
+  server.use(http.get('/api/paper/shadow/evidence-set', () => HttpResponse.json(view)));
+}
+
+export function mountShadow(view: Summary = buildShadowSummary(), evidence: EvidenceSet = buildEvidenceSet()) {
   server.use(http.get('/api/paper/shadow/summary', () => HttpResponse.json(view)));
+  mountEvidenceSet(evidence);
 }

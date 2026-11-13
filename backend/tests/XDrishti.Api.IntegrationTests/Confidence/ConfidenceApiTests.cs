@@ -33,6 +33,7 @@ public sealed class ConfidenceApiTests(ApiFactory factory) : DataTestBase(factor
             "INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at) VALUES (@k, @d, @c, 1, repeat('a', 64), 'b', true, 'n', 'l', 'probe', @at) RETURNING id",
             ("k", "dec-" + Guid.NewGuid().ToString("N")), ("d", Session), ("c", new DateTimeOffset(2099, 3, 4, 3, 35, 0, TimeSpan.Zero)), ("at", new DateTimeOffset(2099, 3, 3, 15, 40, 0, TimeSpan.Zero)));
         await ExecuteAsync(connection, "INSERT INTO paper.shadow_sessions (session_date, n_rows, status, digest, prev_digest, written_at) VALUES (@d, @n, 'ok', repeat('a', 64), NULL, '2000-01-01')", ("d", Session), ("n", count));
+        await ExecuteAsync(connection, "INSERT INTO paper.evidence_sets (edge_epoch, versions, set_hash, mode, actor, reason) VALUES (0, to_jsonb(ARRAY[repeat('a', 64)]), repeat('d', 64), 'owner', 'owner:seed@example.test', 'seeded evidence set')"); // only rows inside the epoch's evidence set count for edge (AM-01b)
         for (var i = 0; i < count; i++)
         {
             var item = await ScalarAsync<long>(

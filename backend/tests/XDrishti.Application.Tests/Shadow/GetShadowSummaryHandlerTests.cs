@@ -54,7 +54,7 @@ public sealed class GetShadowSummaryHandlerTests
             for (var c = 0; c < perSession; c++)
             {
                 var r = c % 2 == 0 ? 1.0 : -0.5;
-                rows.Add(new ShadowResultRow(Start.AddDays(s), $"k{s}-{c}", groups[c % 3], true, "graded", r, basis, sheet, basis == "net" ? r + 0.2 : r));
+                rows.Add(new ShadowResultRow(Start.AddDays(s), $"k{s}-{c}", groups[c % 3], true, "graded", r, basis, sheet, basis == "net" ? r + 0.2 : r, InSet: true));
             }
         }
 
@@ -232,8 +232,8 @@ public sealed class GetShadowSummaryHandlerTests
     {
         _reader.ResultsAsync(Ct).Returns(
         [
-            new ShadowResultRow(Start, "a", "primary", true, "graded", 0.8, "net", "flat-10", 1.0),
-            new ShadowResultRow(Start, "b", "primary", true, "graded", 2.0, "gross", null, 2.0),
+            new ShadowResultRow(Start, "a", "primary", true, "graded", 0.8, "net", "flat-10", 1.0, InSet: true),
+            new ShadowResultRow(Start, "b", "primary", true, "graded", 2.0, "gross", null, 2.0, InSet: true),
         ]);
         _costs.ConfirmedOnAsync("flat-10", Ct).Returns(Start);
 
@@ -251,7 +251,7 @@ public sealed class GetShadowSummaryHandlerTests
         var rows = (await _reader.ResultsAsync(Ct)).ToList();
         for (var s = 10; s < 15; s++)
         {
-            rows.AddRange(Enumerable.Range(0, 6).Select(c => new ShadowResultRow(Start.AddDays(s), $"p{s}-{c}", "primary", true, "pending", null, null, null, null)));
+            rows.AddRange(Enumerable.Range(0, 6).Select(c => new ShadowResultRow(Start.AddDays(s), $"p{s}-{c}", "primary", true, "pending", null, null, null, null, InSet: true)));
         }
 
         _reader.ResultsAsync(Ct).Returns(rows);
@@ -284,11 +284,11 @@ public sealed class GetShadowSummaryHandlerTests
     {
         _reader.ResultsAsync(Ct).Returns(
         [
-            new ShadowResultRow(Start, "a", "primary", true, "graded", 1.0, "gross", null, 1.0),
-            new ShadowResultRow(Start, "b", "reserve", true, "pending", null, null, null, null),
-            new ShadowResultRow(Start, "c", "reserve", true, "not_triggered", null, null, null, null),
-            new ShadowResultRow(Start, "d", "rejected", true, "not_gradable", null, null, null, null),
-            new ShadowResultRow(Start, "e", "rejected", false, "graded", 5.0, "gross", null, 5.0),
+            new ShadowResultRow(Start, "a", "primary", true, "graded", 1.0, "gross", null, 1.0, InSet: true),
+            new ShadowResultRow(Start, "b", "reserve", true, "pending", null, null, null, null, InSet: true),
+            new ShadowResultRow(Start, "c", "reserve", true, "not_triggered", null, null, null, null, InSet: true),
+            new ShadowResultRow(Start, "d", "rejected", true, "not_gradable", null, null, null, null, InSet: true),
+            new ShadowResultRow(Start, "e", "rejected", false, "graded", 5.0, "gross", null, 5.0, InSet: true),
         ]);
 
         var view = await ReadAsync();
@@ -296,6 +296,25 @@ public sealed class GetShadowSummaryHandlerTests
         view.Counts.ShouldBe(new ShadowCountsView(0, 1, view.Counts.EdgeEffective, 5, 4, 1, 1, 1));
         view.Groups[0].N.ShouldBe(1); // the set-aside graded row is not edge evidence
         view.Edge.EffectiveN.ShouldBe(1.0 / ShadowEdgeDesign(4), 1e-9); // one graded of four candidates that day
+    }
+
+    [Fact]
+    public async Task Rows_outside_the_evidence_set_are_counted_apart_and_left_out_of_every_edge_figure()
+    {
+        _reader.ResultsAsync(Ct).Returns(
+        [
+            new ShadowResultRow(Start, "a", "primary", true, "graded", 1.0, "gross", null, 1.0, InSet: true),
+            new ShadowResultRow(Start, "b", "primary", true, "graded", 9.0, "gross", null, 9.0, InSet: false),
+            new ShadowResultRow(Start, "c", "reserve", true, "pending", null, null, null, null, InSet: false),
+        ]);
+
+        var view = await ReadAsync();
+
+        view.Counts.Candidates.ShouldBe(3);
+        view.Counts.EdgeCandidates.ShouldBe(1);
+        view.Counts.EdgeRaw.ShouldBe(1);
+        view.Counts.OutsideSet.ShouldBe(2);
+        view.Groups[0].N.ShouldBe(1);
     }
 
     private static double ShadowEdgeDesign(int m) => EdgeCount.DesignEffect(m, EdgeCount.PlaceholderRho);

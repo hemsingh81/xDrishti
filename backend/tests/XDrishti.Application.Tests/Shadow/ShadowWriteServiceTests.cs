@@ -17,12 +17,12 @@ public sealed class ShadowWriteServiceTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
-    public void The_service_starts_paused_runs_at_1900_after_the_nightly_plan_and_raises_no_schedule_issue()
+    public void The_service_starts_enabled_runs_at_1900_after_the_nightly_plan_and_raises_no_schedule_issue()
     {
         var d = ShadowWriteService.Definition;
 
         d.Id.ShouldBe("shadow-write");
-        d.Defaults.Enabled.ShouldBeFalse();
+        d.Defaults.Enabled.ShouldBeTrue();
         d.Defaults.Schedule.ShouldBe(Schedule.Daily(new TimeOnly(19, 0)));
         d.Constraints.MustFollow.ShouldBe([NightlyService.Id]);
         d.Constraints.StartNotBefore.ShouldBe(new TimeOnly(18, 30));
@@ -67,12 +67,12 @@ public sealed class ShadowWriteServiceTests
     }
 
     [Fact]
-    public void The_grading_service_starts_paused_follows_the_end_of_day_run_and_raises_no_schedule_issue()
+    public void The_grading_service_starts_enabled_follows_the_end_of_day_run_and_raises_no_schedule_issue()
     {
         var d = ShadowGradeService.Definition;
 
         d.Id.ShouldBe("shadow-grade");
-        d.Defaults.Enabled.ShouldBeFalse();
+        d.Defaults.Enabled.ShouldBeTrue();
         d.Defaults.Schedule.ShouldBe(Schedule.Daily(new TimeOnly(17, 30)));
         d.Constraints.MustFollow.ShouldBe([XDrishti.Application.Market.Bars.Eod.EodService.Id]);
         var subjects = new[] { XDrishti.Application.Market.Bars.Eod.EodService.Definition, ShadowGradeService.Definition }.Select(x => new RuleSubject(x, x.Defaults)).ToList();

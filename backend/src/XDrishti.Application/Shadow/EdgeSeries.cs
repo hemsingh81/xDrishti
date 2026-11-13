@@ -32,7 +32,7 @@ internal static class EdgeSeries
     public static EdgeSelection Select(IReadOnlyList<ShadowResultRow> rows, long? epochId, string? prefix)
     {
         ArgumentNullException.ThrowIfNull(rows);
-        var scoped = rows.Where(r => r.CountsForEdge && r.EdgeEpoch == epochId && (prefix is null || r.TradeKey.StartsWith(prefix, StringComparison.Ordinal))).ToList();
+        var scoped = rows.Where(r => r.CountsForEdge && r.InSet && r.EdgeEpoch == epochId && (prefix is null || r.TradeKey.StartsWith(prefix, StringComparison.Ordinal))).ToList();
         var sessions = scoped.GroupBy(r => r.SessionDate).OrderBy(g => g.Key).ToList();
         var firstPending = sessions.Find(g => g.Any(r => r.Status == "pending"));
         var complete = sessions.TakeWhile(g => g != firstPending).SelectMany(g => g).ToList();

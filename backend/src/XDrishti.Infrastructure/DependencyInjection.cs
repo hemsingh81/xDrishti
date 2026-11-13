@@ -246,6 +246,7 @@ public static class DependencyInjection
         services.AddOptions<ShadowOptions>().Bind(configuration.GetSection(ShadowOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // Shadow:DigestFolder, Shadow:MaxResumeGapSessions (CF-08, ADR 0232)
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ShadowOptions>>().Value));
         services.AddSingleton<IShadowDigestSink, ShadowDigestFile>(); // the weekly digest log outside the database (CF-08 review fix 4)
+        services.AddScoped<IEvidenceSetStore, EvidenceSetStore>(); // the frozen evidence set of each edge epoch, insert-only (AM-01b, GAP-09)
         services.AddScoped<IShadowSettings, ShadowSettings>(); // paper.shadow.enabled: the newest row of paper.shadow_settings, OFF when none (CF-08)
         services.AddScoped<IShadowGradeStore, ShadowGradeStore>(); // insert-only grades of the shadow record, one per entry (CF-08 part B, ADR 0212)
         services.AddScoped<IShadowScoreReader, ShadowScoreReader>(); // a model's graded shadow scores, for the learning evidence sources only (CF-10e part 10e-1)

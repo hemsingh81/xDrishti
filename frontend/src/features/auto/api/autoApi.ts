@@ -23,6 +23,12 @@ export const autoShadowSwitchQuery = queryOptions({
   queryFn: async ({ signal }) => unwrap(await api.GET('/api/paper/shadow/summary', { signal })),
 });
 
+/** The evidence set of the current edge epoch, for the one question the Auto screen asks: is the shadow record ON but writing nothing (AM-01b)? Same key as the Paper tab's. */
+export const autoEvidenceSetQuery = queryOptions({
+  queryKey: ['paper', 'shadow-evidence-set'] as const,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/paper/shadow/evidence-set', { signal })),
+});
+
 export const autoScopeQuery = queryOptions({
   queryKey: autoKeys.scope,
   queryFn: async ({ signal }) => unwrap(await api.GET('/api/auto/scope', { signal })),
