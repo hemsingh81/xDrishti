@@ -7,13 +7,11 @@ namespace XDrishti.Application.Planning;
 /// <summary>The stored scope with its baskets expanded to their members now (spec AU-16). A removed or archived basket contributes no instruments.</summary>
 internal sealed class AutoScopeResolver(IAutoScopeStore store, IBasketQueries baskets) : IAutoScopeSource
 {
-    public ValueTask<ResolvedAutoScope?> ResolveAsync(CancellationToken cancellationToken) => ResolveAsync(null, cancellationToken);
-
     /// <summary>
-    /// The scope with its baskets expanded to their members <paramref name="asOf"/> the close of that India date (SR-01, Q8); with <c>null</c> exactly the live read above (members now). The scope itself is the stored one in force: the store keeps no
+    /// The scope with its baskets expanded to their members <paramref name="asOf"/> the close of that India date (SR-01, Q8); with <c>null</c> the live read (members now). The scope itself is the stored one in force: the store keeps no
     /// older read, so a scope chosen after <paramref name="asOf"/> still applies (hindsight, stated on the replay). A system basket is clamped to its known-since date by the basket query (ISS-22).
     /// </summary>
-    // shortcut: the as-of branch has no production caller since SR-01 part C (the replay reads the stored baskets per session); kept for REVIEW-2026-11-10 Q3 (plan-session members for Auto), which will call it.
+    // shortcut: the null (members now) path has no production caller since ADR 0287; kept for the live read and its characterisation test.
     public async ValueTask<ResolvedAutoScope?> ResolveAsync(DateOnly? asOf, CancellationToken cancellationToken)
     {
         // shortcut: the store has no history reader, so on the as-of path the latest scope definition applies (hindsight, under settings_now; part B stores the scope hash); upgrade when the scopes are listable by date.
@@ -24,6 +22,7 @@ internal sealed class AutoScopeResolver(IAutoScopeStore store, IBasketQueries ba
         }
 
         var ids = new HashSet<Guid>(scope.InstrumentIds);
+        List<Guid>? unproven = null;
         foreach (var basketId in scope.BasketIds)
         {
             if (asOf is { } day)
@@ -31,6 +30,10 @@ internal sealed class AutoScopeResolver(IAutoScopeStore store, IBasketQueries ba
                 if (await baskets.MembersAsync(basketId, BasketMember.CutoffAfter(day), null, cancellationToken) is { } past && !(past.ArchivedAt is { } archived && archived <= BasketMember.CutoffAfter(day)))
                 {
                     ids.UnionWith(past.Items.Select(m => m.Instrument.Id));
+                    if (past.MembersKnownSince is { } since && day < since)
+                    {
+                        (unproven ??= []).Add(basketId); // membership before the first fetch is unknown: the first known members stand in, flagged, never proven
+                    }
                 }
             }
             else if (await baskets.MembersAsync(basketId, null, null, cancellationToken) is { ArchivedAt: null } members)
@@ -39,6 +42,6 @@ internal sealed class AutoScopeResolver(IAutoScopeStore store, IBasketQueries ba
             }
         }
 
-        return new ResolvedAutoScope(scope.Hash, ids);
+        return new ResolvedAutoScope(scope.Hash, ids, unproven);
     }
 }

@@ -43,6 +43,9 @@ internal sealed class SelectionPlanBuilder(
     /// <summary>The longest basis the plan table stores.</summary>
     public const int MaxBasisLength = 500;
 
+    /// <summary>Listed as not applied when a system basket in the scope was expanded for a date before its membership is known (ADR 0287).</summary>
+    public const string ScopeBeforeKnownSince = "scope_members_before_known_since";
+
     /// <summary>The cell statistics were replayed on some version of the strategy; the ticket uses the latest stored version (P7-04).</summary>
     public const string StatsVersionCaveat = "stats may belong to an older strategy version";
 
@@ -64,7 +67,13 @@ internal sealed class SelectionPlanBuilder(
         }
 
         var found = read.Value;
-        var scope = scopeSource is null ? null : await scopeSource.ResolveAsync(cancellationToken); // AU-16: the owner's scope is a filter on the candidates; nothing after it changes
+        var scope = scopeSource is null ? null : await scopeSource.ResolveAsync(request.ForDate, cancellationToken); // AU-16: the owner's scope is a filter on the candidates; its baskets are expanded as of the plan session (ADR 0287)
+        var unproven = scope?.BasketsBeforeKnownSince is { Count: > 0 } before ? before.Count : 0;
+        if (unproven > 0)
+        {
+            PlanWiringLog.ScopeMembersBeforeKnownSince(logger, request.ForDate, unproven);
+        }
+
         // One ticket per (symbol, cell): a duplicate from the source is ignored, never an exception.
         var drafts = new Dictionary<(string, string), TicketDraft>();
         var ids = new Dictionary<string, Guid?>(StringComparer.OrdinalIgnoreCase);
@@ -100,7 +109,7 @@ internal sealed class SelectionPlanBuilder(
             ListFilterLog.Applied(logger, request.ForDate, lists.Flags.BanCovered, lists.Flags.SurveillanceCovered, banned, surveilled);
         }
 
-        var always = (events.Active ? AlwaysWithoutEvents : AlwaysWithEvents).Where(a => !(answered && a is "fno_ban" or "surveillance")).ToArray();
+        var always = (events.Active ? AlwaysWithoutEvents : AlwaysWithEvents).Where(a => !(answered && a is "fno_ban" or "surveillance")).Concat(unproven > 0 ? [ScopeBeforeKnownSince] : []).ToArray(); // the plan says its scope used first-known members, never a proof
         var selection = CandidateSelector.Select(candidates, rules ?? new SelectionRules());
 
         var wanted = selection.Ranked.Select(r => r.Merged.Winner.Candidate.Symbol).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Select(s => new ContextInstrument(ids.GetValueOrDefault(s), s)).ToList();

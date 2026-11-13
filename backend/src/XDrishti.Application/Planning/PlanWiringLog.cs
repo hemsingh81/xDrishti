@@ -16,4 +16,7 @@ internal static partial class PlanWiringLog
 
     [LoggerMessage(EventId = 4743, Level = LogLevel.Information, Message = "suggestions.no_plan {ForDate}")]
     public static partial void NoPlan(ILogger logger, DateOnly? forDate);
+
+    [LoggerMessage(EventId = 4744, Level = LogLevel.Warning, Message = "plan.scope_members_before_known_since {ForDate}: {Baskets} basket(s) expanded to their first known members, membership before that is unknown")]
+    public static partial void ScopeMembersBeforeKnownSince(ILogger logger, DateOnly forDate, int baskets);
 }
