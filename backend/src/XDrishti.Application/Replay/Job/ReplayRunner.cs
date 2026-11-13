@@ -52,9 +52,6 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
     private volatile ActiveRun? _active;
     private bool _recovered;
 
-    /// <summary>Whether a run is in hand now (SR-03: the hold-out replay waits while it is, so two heavy replays never share the memory budget).</summary>
-    public bool Busy => _active is not null;
-
     /// <summary>The loop of the host: recover once, then look every poll interval until the host stops.</summary>
     public async Task RunAsync(CancellationToken stoppingToken)
     {
@@ -72,9 +69,19 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
         }
         finally
         {
-            _active?.Scope.Dispose();
-            _active = null;
+            if (_active is { } left)
+            {
+                left.Scope.Dispose();
+                Release();
+            }
         }
+    }
+
+    /// <summary>Lets go of the run in hand and of the gate the hold-out loop shares with the job (SR-03).</summary>
+    private void Release()
+    {
+        _active = null;
+        holdOut?.ExitReplay();
     }
 
     /// <summary>After a stop: a run left running goes back to queued (it resumes at the next session), a run left cancelling is cancelled. Call once before the first tick.</summary>
@@ -100,25 +107,35 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
 
         if (_active is null)
         {
-            if (holdOut is { Running: true })
+            if (holdOut is not null && !holdOut.TryEnterReplay())
             {
-                return; // a hold-out system replay is running (SR-03): two heavy replays never share the memory budget
+                return; // a hold-out system replay holds the gate (SR-03): two heavy replays never share the memory budget
             }
 
             var scope = scopes.CreateAsyncScope();
-            if (await YieldAsync(scope.ServiceProvider, true, cancellationToken) is { } reason)
+            ReplayRunRow? claimed = null;
+            try
             {
-                await scope.DisposeAsync();
-                NoteYield(null, reason);
-                return;
-            }
+                if (await YieldAsync(scope.ServiceProvider, true, cancellationToken) is { } reason)
+                {
+                    NoteYield(null, reason);
+                    return;
+                }
 
-            var store = scope.ServiceProvider.GetRequiredService<IReplayStore>();
-            var claimed = await store.ClaimAsync(cancellationToken);
-            if (claimed is null)
+                var store = scope.ServiceProvider.GetRequiredService<IReplayStore>();
+                claimed = await store.ClaimAsync(cancellationToken);
+                if (claimed is null)
+                {
+                    return;
+                }
+            }
+            finally
             {
-                await scope.DisposeAsync();
-                return;
+                if (claimed is null)
+                {
+                    await scope.DisposeAsync();
+                    holdOut?.ExitReplay(); // nothing in hand: the gate goes back
+                }
             }
 
             _active = new ActiveRun(scope, claimed);
@@ -136,7 +153,7 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
             if (await waiting.StateAsync(run.Row.Id, cancellationToken) == ReplayRunStates.Cancelling && await EndAsync(run, waiting, ReplayRunStates.Cancelled, null, null, cancellationToken))
             {
                 run.Scope.Dispose();
-                _active = null;
+                Release();
             }
 
             return;
@@ -168,7 +185,7 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
             if (ended)
             {
                 run.Scope.Dispose();
-                _active = null;
+                Release();
             }
         }
     }

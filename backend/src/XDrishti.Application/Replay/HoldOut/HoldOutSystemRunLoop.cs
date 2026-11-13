@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using XDrishti.Application.Replay.Job;
 
 namespace XDrishti.Application.Replay.HoldOut;
 
@@ -8,7 +7,7 @@ namespace XDrishti.Application.Replay.HoldOut;
 /// The loop of the host (xd-api) that runs the claimed system replays (SR-03): every poll it runs, one at a time, each registration whose <c>system</c> look is claimed and that has no result. It waits while a queued replay runs, so two heavy replays never share the
 /// memory budget. All logic is in <see cref="HoldOutSystemRunner"/>. Off when <c>Replay:RunWorker</c> is false (the tests drive the runner).
 /// </summary>
-public sealed class HoldOutSystemRunLoop(IServiceScopeFactory scopes, SystemReplayOptions options, ReplayRunner replays, HoldOutRunActivity activity, TimeProvider time, ILogger<HoldOutSystemRunLoop> logger)
+public sealed class HoldOutSystemRunLoop(IServiceScopeFactory scopes, SystemReplayOptions options, HoldOutRunActivity activity, TimeProvider time, ILogger<HoldOutSystemRunLoop> logger)
 {
     private static readonly TimeSpan Poll = TimeSpan.FromSeconds(30);
 
@@ -39,13 +38,12 @@ public sealed class HoldOutSystemRunLoop(IServiceScopeFactory scopes, SystemRepl
     {
         try
         {
-            if (replays.Busy)
+            if (!activity.TryEnterHoldOut())
             {
-                return;
+                return; // the queued replay job holds the gate
             }
 
             await using var scope = scopes.CreateAsyncScope();
-            activity.Set(true);
             try
             {
                 if (await scope.ServiceProvider.GetRequiredService<HoldOutSystemRunner>().RunPendingAsync(cancellationToken) is > 0 and var stored)
@@ -55,7 +53,7 @@ public sealed class HoldOutSystemRunLoop(IServiceScopeFactory scopes, SystemRepl
             }
             finally
             {
-                activity.Set(false);
+                activity.ExitHoldOut();
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

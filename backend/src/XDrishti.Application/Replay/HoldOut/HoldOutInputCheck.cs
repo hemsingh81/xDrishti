@@ -5,7 +5,7 @@ namespace XDrishti.Application.Replay.HoldOut;
 
 /// <summary>
 /// Whether every stored input of a registration still resolves (SR-03 D4), checked before anything is claimed: the cost sheet (present, still carrying its <c>checked</c> note, the same rates hash), each strategy version by its hash, the scope's members (some, and still within the
-/// memory cap), and the cell-statistics snapshot as of the block start (some, and created before the block began: a snapshot written on or after the start could hold the block's own trades). Only a missing or changed input is drift; a changed live setting or engine version is not.
+/// memory cap), and the cell-statistics snapshot the run freezes on (as-of before the block's first session; some, and created before the block began: a snapshot written on or after the start could hold the block's own trades; the daily refresh of the first session's evening is never used). Only a missing or changed input is drift; a changed live setting or engine version is not.
 /// Reads no bar: nothing of the block is touched before the claim.
 /// </summary>
 internal sealed class HoldOutInputCheck(IReplayFacts facts, IStrategyStore strategies, ICostSheetStore sheets, SystemReplayOptions options)
@@ -58,7 +58,7 @@ internal sealed class HoldOutInputCheck(IReplayFacts facts, IStrategyStore strat
             return $"the scope now reads {members} instruments, which is over the memory cap (Replay:MaxWindowMb)";
         }
 
-        var cells = (await facts.CellsAsync(config.Parameters, config.BlockStart, cancellationToken)).Cells;
+        var cells = (await facts.CellsBeforeStartAsync(config.Parameters, cancellationToken)).Cells; // the same freeze the run uses: the snapshot as of before the block's first session
         if (cells.Count == 0)
         {
             return "there is no cell statistics snapshot as of the block start";

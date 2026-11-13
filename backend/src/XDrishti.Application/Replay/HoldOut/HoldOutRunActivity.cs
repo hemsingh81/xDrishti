@@ -1,12 +1,25 @@
 namespace XDrishti.Application.Replay.HoldOut;
 
-/// <summary>Whether a hold-out system replay is running now (SR-03). The queued replay job (<see cref="Job.ReplayRunner"/>) does not claim a run while it is, and the hold-out loop does not start while a queued replay is in hand, so two heavy replays never share the memory budget.</summary>
+/// <summary>
+/// The one gate between the queued replay job (<see cref="Job.ReplayRunner"/>) and the hold-out system replay (SR-03), so two heavy replays never share the memory budget. It is atomic: idle, held by the hold-out loop, or held by the replay job, and each side takes it
+/// with a compare-and-exchange before it claims anything. The replay job holds it for as long as it has a run in hand; the hold-out loop holds it for one pass.
+/// </summary>
 public sealed class HoldOutRunActivity
 {
-    private volatile bool _running;
+    private const int Idle = 0;
+    private const int HoldOut = 1;
+    private const int Replay = 2;
 
-    /// <summary>True while the hold-out loop is running a claimed registration.</summary>
-    public bool Running => _running;
+    private int _state;
 
-    internal void Set(bool running) => _running = running;
+    /// <summary>True while the hold-out loop holds the gate.</summary>
+    public bool Running => Volatile.Read(ref _state) == HoldOut;
+
+    internal bool TryEnterHoldOut() => Interlocked.CompareExchange(ref _state, HoldOut, Idle) == Idle;
+
+    internal void ExitHoldOut() => Interlocked.CompareExchange(ref _state, Idle, HoldOut);
+
+    internal bool TryEnterReplay() => Interlocked.CompareExchange(ref _state, Replay, Idle) == Idle;
+
+    internal void ExitReplay() => Interlocked.CompareExchange(ref _state, Idle, Replay);
 }

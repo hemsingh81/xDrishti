@@ -114,13 +114,8 @@ internal sealed class RunHoldOutRegistrationHandler(
             return Result.Failure<StartedHoldOutRun>(HoldOutRegistrationErrors.Used("The system look could not be claimed: the slot was taken, or the block was released, between the check and the claim."));
         }
 
-        // one trial-ledger look of kind system_replay per strategy version the run uses, keyed by the look (no figure: the run has not read anything yet)
-        var runKey = ReplayJson.Sha256(HoldOutRegistrationIds.LookId(registration.Id).ToString("N"));
-        foreach (var v in config.Versions.Values.SelectMany(l => l))
-        {
-            var rowId = new Guid(Convert.FromHexString(ReplayJson.Sha256($"system-replay|{runKey}")[..16] + ReplayJson.Sha256($"system-replay|{runKey}|{v.Hash}")[..16]));
-            await ledger.AppendAsync(new LedgerRow(rowId, runKey, v.StrategyId, v.Version, v.Hash, null, "system replay", config.BlockStart, config.BlockEnd, LedgerRow.SystemReplayKind, now, LedgerRow.SystemReplayKind, 0), cancellationToken);
-        }
+        // one trial-ledger look of kind system_replay per strategy version, keyed by the look; the runner appends the same rows again before it reads anything (the look and the ledger are separate connections), and a second append writes nothing
+        await HoldOutLedgerRows.AppendAsync(ledger, registration.Id, config, now, cancellationToken);
 
         return Result.Success(new StartedHoldOutRun(runIds));
     }

@@ -67,6 +67,7 @@ public sealed class SystemReplayHoldOutTests
         _facts.SettingsAsync(Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(Snapshot()));
         _facts.UniverseAsync(Arg.Any<ReplayParams>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(new ReplayUniverse([.. Enumerable.Range(0, _members).Select(i => new ReplayInstrument(new Guid(i + 1, 0, 0, new byte[8]), "S" + i))], false)));
         _facts.CellsAsync(Arg.Any<ReplayParams>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(c => ValueTask.FromResult(Cells(c.ArgAt<DateOnly>(1), _snapshotCreated)));
+        _facts.CellsBeforeStartAsync(Arg.Any<ReplayParams>(), Arg.Any<CancellationToken>()).Returns(c => ValueTask.FromResult(Cells(c.ArgAt<ReplayParams>(0).From, _snapshotCreated)));
         _inputs.VersionsAsync(Arg.Any<ReplayParams>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>>>(new Dictionary<string, IReadOnlyList<StoredVersion>> { ["S1"] = [Version()] }));
         _strategies.ListVersionsAsync("S1", Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<StoredVersion>>([Version()]));
     }

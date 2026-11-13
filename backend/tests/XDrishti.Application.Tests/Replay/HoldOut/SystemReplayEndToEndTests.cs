@@ -58,9 +58,11 @@ public sealed class SystemReplayEndToEndTests
 
         public required IStrategyStore Strategies { get; init; }
 
+        public ITestLedger Ledger { get; } = Substitute.For<ITestLedger>();
+
         public Guid RegistrationId { get; set; }
 
-        public HoldOutSystemRunner Runner() => new(Services, Regs, Blocks, Engine, Attempts, Time, NullLogger<HoldOutSystemRunner>.Instance);
+        public HoldOutSystemRunner Runner() => new(Services, Regs, Blocks, Ledger, Engine, Attempts, Time, NullLogger<HoldOutSystemRunner>.Instance);
 
         public ISimulationEngineVersion Engine { get; } = Version("sim-5");
 
@@ -107,6 +109,8 @@ public sealed class SystemReplayEndToEndTests
         engine.EngineVersion.Returns(text);
         return engine;
     }
+
+    private sealed class TestDbException(string message) : System.Data.Common.DbException(message);
 
     private static async Task<Scenario> RegisteredAsync(Action<ReplayWorld>? tune = null)
     {
@@ -197,6 +201,7 @@ public sealed class SystemReplayEndToEndTests
         var closeOfEnd = new DateTimeOffset(ThreeEnd.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(5.5));
         s.World.Close["AAA"].Keys.Max().ShouldBeGreaterThan(ThreeEnd);
         s.World.MinuteReadEnds.ShouldNotBeEmpty();
+        s.World.DayReadEnds.ShouldNotBeEmpty();
         s.World.MinuteReadEnds.Where(e => e > closeOfEnd).ShouldBeEmpty();
         s.World.DayReadEnds.Where(e => e > ThreeEnd.AddDays(1)).ShouldBeEmpty();
     }
@@ -259,6 +264,65 @@ public sealed class SystemReplayEndToEndTests
     }
 
     [Fact]
+    public async Task A_database_failure_wrapped_by_the_retrying_strategy_is_still_transient_and_the_claim_stays()
+    {
+        var s = await RegisteredAsync();
+        await ClaimAsync(s);
+        s.World.ReadFailure = new InvalidOperationException("retry limit exceeded", new TestDbException("connection reset"));
+
+        var first = await s.Runner().RunPendingAsync(Ct);
+        s.World.ReadFailure = null;
+        var second = await s.Runner().RunPendingAsync(Ct);
+
+        (first, second).ShouldBe((0, 1));
+        s.Regs.Results.Values.Single().Verdict.ShouldNotBe("run_failed");
+    }
+
+    [Fact]
+    public async Task The_runner_appends_the_ledger_rows_before_it_reads_and_a_failing_ledger_means_no_read_and_a_retry()
+    {
+        var s = await RegisteredAsync();
+        await ClaimAsync(s);
+        s.Ledger.AppendAsync(Arg.Any<LedgerRow>(), Arg.Any<CancellationToken>()).Returns<ValueTask<bool>>(_ => throw new TestDbException("ledger down"));
+
+        var failed = await s.Runner().RunPendingAsync(Ct);
+
+        failed.ShouldBe(0);
+        s.World.MinuteReadEnds.ShouldBeEmpty("no read of the block without its ledger rows");
+        s.Regs.Results.ShouldBeEmpty();
+        s.Ledger.ClearReceivedCalls();
+        s.Ledger.AppendAsync(Arg.Any<LedgerRow>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(true));
+
+        var stored = await s.Runner().RunPendingAsync(Ct);
+
+        stored.ShouldBe(1);
+        await s.Ledger.Received().AppendAsync(Arg.Is<LedgerRow>(r => r.TrialKind == LedgerRow.SystemReplayKind && r.StrategyId == "S1"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task The_run_freezes_on_the_snapshot_as_of_before_the_block_even_when_the_first_sessions_own_refresh_was_written_that_evening()
+    {
+        // LC-01 writes a snapshot every evening, as of that day: the one as of 2026-09-07 (the block's first session) is created after the block began
+        var s = await RegisteredAsync(w =>
+        {
+            w.Snapshots.Clear();
+            for (var day = Three.AddDays(-6); day <= Three.AddDays(10); day = day.AddDays(1))
+            {
+                var evening = new DateTimeOffset(day.ToDateTime(new TimeOnly(20, 0)), TimeSpan.FromHours(5.5));
+                w.Snapshots.Add((day, ReplayWorld.Stats(day) with { CreatedAt = evening }));
+            }
+        });
+
+        await ClaimAsync(s);
+        var stored = await s.Runner().RunPendingAsync(Ct);
+
+        stored.ShouldBe(1);
+        var figures = Body(s.Regs.Results.Values.Single()).Figures;
+        figures.SnapshotKeys.ShouldBe(["snap20260906"]);
+        figures.SnapshotCreatedAt.ShouldBe(new DateTimeOffset(2026, 9, 6, 20, 0, 0, TimeSpan.FromHours(5.5)));
+    }
+
+    [Fact]
     public async Task A_transient_failure_that_goes_on_is_stored_run_failed_after_the_bounded_tries()
     {
         var s = await RegisteredAsync();
@@ -293,7 +357,7 @@ public sealed class SystemReplayEndToEndTests
     }
 
     [Fact]
-    public async Task A_stored_block_that_no_longer_ends_where_registered_reads_and_stores_nothing()
+    public async Task A_stored_block_that_no_longer_ends_where_registered_reads_nothing_and_is_stored_run_failed_once()
     {
         var s = await RegisteredAsync();
         await ClaimAsync(s);
@@ -301,9 +365,10 @@ public sealed class SystemReplayEndToEndTests
         s.Blocks.Blocks.Add(new HoldOutBlock(Three, new DateOnly(2025, 1, 1), ThreeEnd.AddMonths(3), 6, Hash, DateTimeOffset.UnixEpoch, Two));
 
         var stored = await s.Runner().RunPendingAsync(Ct);
+        var again = await s.Runner().RunPendingAsync(Ct);
 
-        stored.ShouldBe(0);
-        s.Regs.Results.ShouldBeEmpty();
+        (stored, again).ShouldBe((1, 0));
+        s.Regs.Results.Values.Single().Verdict.ShouldBe("run_failed");
         s.World.MinuteReadEnds.ShouldBeEmpty("no bar of the block was read");
     }
 

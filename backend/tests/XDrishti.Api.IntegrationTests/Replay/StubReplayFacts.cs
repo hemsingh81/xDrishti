@@ -53,6 +53,8 @@ internal sealed class StubReplayFacts : IReplayFacts, IReplayInputs
         return ValueTask.FromResult(new ReplayCells(Cells ? [new ReplayCell(stored, null, null)] : [], []));
     }
 
+    public ValueTask<ReplayCells> CellsBeforeStartAsync(ReplayParams parameters, CancellationToken cancellationToken) => CellsAsync(parameters, parameters.From, cancellationToken);
+
     public ValueTask<IReadOnlyList<Bar>> MinuteBarsAsync(Guid instrumentId, DateOnly cut, CancellationToken cancellationToken) => throw new NotSupportedException("a start reads no bars");
 
     public ValueTask<ReplayMarket> MarketAsync(DateOnly cut, DateOnly forDate, IReadOnlyList<ContextInstrument> instruments, IReadOnlyList<ContextInstrument> ranked, CancellationToken cancellationToken) => throw new NotSupportedException("a start steps no session");
