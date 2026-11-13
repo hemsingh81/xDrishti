@@ -66,6 +66,6 @@ public sealed class LabVariantStatsMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["expression_profiles", "holdout_blocks", "holdout_unlocks", "lab_results", "lab_runs", "plan_freezes", "registrations", "strategies", "strategy_versions", "test_ledger", "variant_stats"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["expression_profiles", "holdout_blocks", "holdout_releases", "holdout_unlocks", "lab_results", "lab_runs", "plan_freezes", "registrations", "strategies", "strategy_versions", "test_ledger", "variant_stats"]);
     }
 }

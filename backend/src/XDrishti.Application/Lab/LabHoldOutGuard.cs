@@ -26,6 +26,10 @@ internal sealed class LabHoldOutGuard(IHoldOutStore store, IBarQueries bars, Hol
             : null;
     }
 
+    /// <summary>The released blocks as (start, end), for the <c>seen_holdout</c> labels (HO-01 D7); none until the first release.</summary>
+    public async ValueTask<IReadOnlyList<(DateOnly Start, DateOnly End)>> ReleasedAsync(CancellationToken cancellationToken) =>
+        [.. (await store.ListBlocksAsync(cancellationToken)).Where(b => b.Release is not null).Select(b => (b.Block.Start, b.Block.HistoryLast))];
+
     /// <summary>The sizing for the history.</summary>
     public HoldOutPlan Plan(DateOnly first, DateOnly last) => HoldOutPolicy.FromDates(first, last, options, new SelectionOptions());
 

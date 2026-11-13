@@ -34,7 +34,7 @@ internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options,
         }
 
         var block = await holdOut.CurrentAsync(cancellationToken) ?? throw new ReplayHoldOutException();
-        _last = block.Start.AddDays(-1 - options.TrainingEmbargoDays);
+        _last = HoldOutOptions.TrainingCut(block.Start, options.TrainingEmbargoDays); // the one shared cut formula; it moves forward only when the block in force is released (HO-01)
         return _last.Value;
     }
 

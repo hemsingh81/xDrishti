@@ -180,6 +180,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<HoldOutBlockRecord> HoldOutBlocks => Set<HoldOutBlockRecord>();
 
+    internal DbSet<HoldOutReleaseRecord> HoldOutReleases => Set<HoldOutReleaseRecord>();
+
     internal DbSet<HoldOutUnlockRecord> HoldOutUnlocks => Set<HoldOutUnlockRecord>();
 
     internal DbSet<CellStatsRecord> CellStats => Set<CellStatsRecord>();

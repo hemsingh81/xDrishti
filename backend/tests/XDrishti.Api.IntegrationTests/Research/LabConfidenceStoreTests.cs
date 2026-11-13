@@ -15,7 +15,7 @@ namespace XDrishti.Api.IntegrationTests.Research;
 [Collection(ApiTestSuite.Name)]
 public sealed class LabConfidenceStoreTests(ApiFactory factory, ResearchGrantsTests.DedicatedServer server) : IClassFixture<ResearchGrantsTests.DedicatedServer>
 {
-    private static readonly string[] Tables = ["registrations", "plan_freezes", "holdout_blocks", "holdout_unlocks"];
+    private static readonly string[] Tables = ["registrations", "plan_freezes", "holdout_blocks", "holdout_releases", "holdout_unlocks"];
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 

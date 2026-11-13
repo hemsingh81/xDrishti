@@ -159,7 +159,7 @@ internal sealed class HoldOutUnlocker(
         }
     }
 
-    /// <summary>The auto option (D6): runs once, recorded as <c>auto</c>, only when the option is on, nothing was looked at by this version, and every development row of the verdict is a pass. Returns null when it did not run.</summary>
+    /// <summary>The auto option (D6): runs once, recorded as <c>auto</c>, only when the option is on, nothing was looked at by this version, and every development row of the verdict is a pass, and never at block 1 of the chain (HO-01). Returns null when it did not run.</summary>
     public async ValueTask<HoldOutResultView?> TryAutoAsync(Guid runId, LabVerdictView verdict, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(verdict);
@@ -172,6 +172,12 @@ internal sealed class HoldOutUnlocker(
         var run = await runs.GetAsync(runId, cancellationToken);
         var block = run is null ? null : await BlockAsync(cancellationToken);
         if (run is null || !HoldOutAutoGate.AllPass(verdict, run.To, block?.Start))
+        {
+            return null;
+        }
+
+        // HO-01 (coordinator, 2026-11-13): the auto look never claims block 1. It has no pre-dating horizon and its look is irreversible, so it stays the owner's act (a manual unlock, or a release with the forfeit). Automatic looks start at block 2.
+        if (block is { PrevStart: null })
         {
             return null;
         }

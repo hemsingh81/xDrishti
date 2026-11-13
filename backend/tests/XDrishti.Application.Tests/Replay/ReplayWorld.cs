@@ -142,7 +142,7 @@ internal sealed class ReplayWorld
     /// <summary>The real facts over stubs that answer by date range like the stores do.</summary>
     public ReplayFacts Facts(double incompleteShare = 0.2)
     {
-        var holdOut = Substitute.For<IHoldOutStore>();
+        var holdOut = TestHoldOutStores.NoReleases();
         holdOut.CurrentAsync(Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult<HoldOutBlock?>(NoHoldOut ? null : new HoldOutBlock(HoldOutStart, Start.AddYears(-3), Start, 6, "h", DateTimeOffset.UnixEpoch)));
 
         var baskets = Substitute.For<IBasketQueries>();

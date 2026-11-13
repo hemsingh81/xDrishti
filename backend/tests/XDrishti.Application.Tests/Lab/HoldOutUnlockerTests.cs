@@ -219,6 +219,7 @@ public sealed class HoldOutUnlockerTests
     {
         _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
         var run = Run();
+        ReleaseBlock1(); // automatic looks start at block 2 (HO-01)
 
         (await Unlocker(new HoldOutOptions(AutoUnlock: false)).TryAutoAsync(run.Id, Verdict(), Ct)).ShouldBeNull();
         _store.Unlocks.ShouldBeEmpty();
@@ -231,6 +232,29 @@ public sealed class HoldOutUnlockerTests
         second.ShouldBeNull("it ran once");
         _events.Received(1).Record(Arg.Is<AccountEvent>(e => e.Event == AccountEventType.LabHoldOutUnlocked && e.Actor == "system:auto-unlock" && e.Detail!.Contains("mode=auto", StringComparison.Ordinal)));
         _store.Unlocks.Single().Mode.ShouldBe("auto");
+    }
+
+    private void ReleaseBlock1()
+    {
+        var one = new HoldOutBlock(new DateOnly(2026, 5, 1), new DateOnly(2024, 10, 1), new DateOnly(2026, 10, 30), 6, Hash, _time.GetUtcNow());
+        var two = new HoldOutBlock(new DateOnly(2026, 10, 31), new DateOnly(2024, 10, 1), new DateOnly(2027, 4, 30), 6, Hash, _time.GetUtcNow(), one.Start);
+        _store.Blocks.Add(one);
+        _store.Releases.Add(new StoredRelease(one.Start, _time.GetUtcNow(), "owner", "owner:x", Hash, false, two.Start));
+        _store.Blocks.Add(two);
+    }
+
+    [Fact]
+    public async Task The_auto_option_never_claims_block_1_even_when_every_development_row_passes()
+    {
+        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
+        var run = Run();
+
+        var auto = await Unlocker(new HoldOutOptions(AutoUnlock: true)).TryAutoAsync(run.Id, Verdict(), Ct);
+
+        auto.ShouldBeNull();
+        _store.Unlocks.ShouldBeEmpty();
+        _pass.Calls.ShouldBe(0);
+        (await Unlocker().UnlockAsync(run.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct)).IsSuccess.ShouldBeTrue("the owner's own look at block 1 is unchanged");
     }
 
     [Fact]
@@ -455,7 +479,7 @@ public sealed class HoldOutUnlockerTests
     [Fact]
     public async Task The_hold_out_view_shows_the_proposal_before_a_block_exists_and_numbers_only_in_a_look_that_was_taken()
     {
-        var handler = new GetHoldOutHandler(_store, new LabHoldOutGuard(_store, _bars, new HoldOutOptions(), _time), new HoldOutOptions());
+        var handler = new GetHoldOutHandler(_store, new LabHoldOutGuard(_store, _bars, new HoldOutOptions(), _time), new HoldOutOptions(), new HoldOutEpochs(_store, new FixedCalendar(), _time));
 
         var before = (await handler.HandleAsync(new GetHoldOutQuery(), Ct)).Value;
 
@@ -503,7 +527,35 @@ internal sealed class MemoryHoldOutStore : IHoldOutStore
 
     public List<StoredUnlock> Unlocks { get; } = [];
 
-    public ValueTask<HoldOutBlock?> CurrentAsync(CancellationToken cancellationToken) => ValueTask.FromResult(Blocks.FirstOrDefault());
+    public List<StoredRelease> Releases { get; } = [];
+
+    /// <summary>Set to make every read fail, as an unavailable database does.</summary>
+    public bool Failing { get; set; }
+
+    public ValueTask<HoldOutBlock?> CurrentAsync(CancellationToken cancellationToken) =>
+        Failing ? throw new InvalidOperationException("unavailable") : ValueTask.FromResult(Blocks.OrderBy(b => b.Start).FirstOrDefault(b => Releases.All(r => r.BlockStart != b.Start)));
+
+    public ValueTask<IReadOnlyList<StoredBlock>> ListBlocksAsync(CancellationToken cancellationToken) =>
+        Failing ? throw new InvalidOperationException("unavailable") : ValueTask.FromResult<IReadOnlyList<StoredBlock>>([.. Blocks.OrderBy(b => b.Start).Select(b => new StoredBlock(b, Releases.FirstOrDefault(r => r.BlockStart == b.Start)))]);
+
+    public ValueTask<bool> HasFreshLookAsync(DateOnly blockStart, CancellationToken cancellationToken) => ValueTask.FromResult(Unlocks.Any(u => u.BlockStart == blockStart && !u.ReusedWindow));
+
+    public ValueTask<ReleaseOutcome> ReleaseAsync(StoredRelease release, HoldOutBlock next, CancellationToken cancellationToken)
+    {
+        if (Releases.Any(r => r.BlockStart == release.BlockStart))
+        {
+            return ValueTask.FromResult(ReleaseOutcome.AlreadyReleased);
+        }
+
+        if (Blocks.Any(b => b.Start == next.Start))
+        {
+            return ValueTask.FromResult(ReleaseOutcome.ChainConflict);
+        }
+
+        Releases.Add(release);
+        Blocks.Add(next);
+        return ValueTask.FromResult(ReleaseOutcome.Released);
+    }
 
     public ValueTask<bool> InsertBlockAsync(HoldOutBlock block, CancellationToken cancellationToken)
     {

@@ -2982,6 +2982,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/lab/holdout/blocks/{start}/release': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Owner act, fresh password in the body (HO-01): release the earliest unreleased hold-out block once it is sealed. It becomes development data, labelled seen_holdout, every development cut moves forward, and the next block is stored in the same transaction. A block with no fresh look is released only with forfeitLook: true, which forfeits its looks for good. Irreversible. 200 the released block; 401 auth.invalid_credentials for a wrong password, 403 auth.step_up_required without one, 423 auth.locked, 409 lab.holdout_filling, lab.holdout_order, lab.holdout_unlooked, lab.holdout_released or lab.holdout_unavailable, 404 lab.not_found, 422 for a start that is not a date */
+    post: operations['ReleaseLabHoldOutBlock'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/lessons/{id}/link': {
     parameters: {
       query?: never;
@@ -14356,7 +14373,10 @@ export interface components {
       /** Format: int32 */
       from5: number;
     };
-    /** @description The locked block as served. */
+    /**
+     * @description A block of the hold-out chain as served (HO-01): `HistoryLast` is its last date. `State` is `filling`, `sealed`, `looked` or `released`; `FreshLook` says whether a fresh look was taken (for a released block, whether it had one when
+     *     released); `ReleasedAt` and `Mode` (`owner` or `auto`) are set once it is released.
+     */
     HoldOutBlockView: {
       /** Format: date */
       start: string;
@@ -14369,6 +14389,11 @@ export interface components {
       settingHash: string;
       /** Format: date-time */
       createdAt: string;
+      state?: null | string;
+      freshLook?: null | boolean;
+      /** Format: date-time */
+      releasedAt?: null | string;
+      mode?: null | string;
     };
     /** @description The sizing the policy gives for the stored history now (D4). */
     HoldOutPlanView: {
@@ -14383,6 +14408,12 @@ export interface components {
       /** Format: date */
       start: null | string;
       status: string;
+    };
+    /** @description Body of `POST /api/lab/holdout/blocks/{start}/release` (HO-01, D4): the owner's password, typed again for this act, and whether a block with no fresh look may be released (which forfeits its looks for good). */
+    HoldOutReleaseRequest: {
+      password?: null | string;
+      /** @default false */
+      forfeitLook: boolean;
     };
     /**
      * @description What the one look at the hold-out said, as served and as stored (spec CF-06, D5). `State` is `used` (the first look at the block) or `reused` (a later look: the numbers are shown, the result counts as a trial and cannot count toward a pass).
@@ -14423,13 +14454,16 @@ export interface components {
     HoldOutUnlockRequest: {
       password?: null | string;
     };
-    /** @description `GET /api/lab/holdout`: the block (or what it would be), whether the Lab enforces it, and every look taken. Numbers appear only in an unlock that was taken. */
+    /** @description `GET /api/lab/holdout`: the block in force (or what it would be), whether the Lab enforces it, the auto options, the chain of `Blocks` with their states, and every look taken. Numbers appear only in an unlock that was taken. */
     HoldOutView: {
       enforce: boolean;
       autoUnlock: boolean;
       block: null | components['schemas']['HoldOutBlockView'];
       proposed: null | components['schemas']['HoldOutPlanView'];
       unlocks: components['schemas']['HoldOutResultView'][];
+      blocks?: null | components['schemas']['HoldOutBlockView'][];
+      /** @default true */
+      autoRelease: boolean;
     };
     /**
      * @description One group. Key is the account id, bucket id, sector name or basket id, or `~none` for the sector "Unclassified" and the basket "No basket". Holdings counts every holding of the group in the scope;
@@ -33415,6 +33449,86 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ReleaseLabHoldOutBlock: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        start: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['HoldOutReleaseRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldOutBlockView'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };

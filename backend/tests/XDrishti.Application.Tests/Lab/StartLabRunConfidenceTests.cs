@@ -38,7 +38,7 @@ public sealed class StartLabRunConfidenceTests
     private readonly ICostSheetStore _sheets = Substitute.For<ICostSheetStore>();
     private readonly IRegistrationStore _registrations = Substitute.For<IRegistrationStore>();
     private readonly IPlanFreezeStore _freezes = Substitute.For<IPlanFreezeStore>();
-    private readonly IHoldOutStore _holdOuts = Substitute.For<IHoldOutStore>();
+    private readonly IHoldOutStore _holdOuts = TestHoldOutStores.NoReleases();
     private readonly IStrategyChecker _checker = Substitute.For<IStrategyChecker>();
     private readonly List<LedgerRow> _appended = [];
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 22, 6, 0, 0, TimeSpan.Zero));

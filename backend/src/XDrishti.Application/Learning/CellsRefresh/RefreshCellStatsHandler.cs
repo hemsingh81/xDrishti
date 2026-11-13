@@ -150,7 +150,7 @@ internal sealed class RefreshCellStatsHandler(
         }
 
         CellsRefreshLog.Completed(logger, computed.Value.SnapshotKey[..12], kept.Count, extended.Count, newRuns);
-        return Result.Success(new RefreshCellStatsOutcome(session, end, computed.Value.SnapshotKey, computed.Value.AlreadyStored, kept, extended, newRuns));
+        return Result.Success(new RefreshCellStatsOutcome(session, end, computed.Value.SnapshotKey, computed.Value.AlreadyStored, kept, extended, newRuns, Domain.Lab.SeenHoldOut.Labels((await holdOut.ListBlocksAsync(cancellationToken)).Where(b => b.Release is not null).Select(b => (b.Block.Start, b.Block.HistoryLast)), DateOnly.MinValue, end)));
     }
 
     private Result<RefreshCellStatsOutcome> Fail(Error error)

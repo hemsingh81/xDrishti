@@ -81,6 +81,9 @@ internal sealed class ReplayFacts(
 
     public ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken) => _bars.LastReadableAsync(cancellationToken);
 
+    public async ValueTask<IReadOnlyList<(DateOnly Start, DateOnly End)>> ReleasedHoldOutAsync(CancellationToken cancellationToken) =>
+        [.. (await holdOut.ListBlocksAsync(cancellationToken)).Where(b => b.Release is not null).Select(b => (b.Block.Start, b.Block.HistoryLast))];
+
     public async ValueTask<IReadOnlyList<(DateOnly Session, double Close)>> DayClosesAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
         [.. (await _bars.DaysAsync(instrumentId, from, to, cancellationToken)).Select(b => (XDrishti.Domain.Market.IndiaTime.Today(b.Ts), b.Close))];
 

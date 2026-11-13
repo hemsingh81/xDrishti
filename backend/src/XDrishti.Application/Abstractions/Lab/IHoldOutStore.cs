@@ -3,7 +3,27 @@ using XDrishti.Application.Lab;
 namespace XDrishti.Application.Abstractions.Lab;
 
 /// <summary>The locked hold-out block (spec CF-06, D4): where it starts, over which history it was sized, and the settings it was sized under. A later block (set once by an owner act when more history exists) supersedes this one.</summary>
-public sealed record HoldOutBlock(DateOnly Start, DateOnly HistoryFirst, DateOnly HistoryLast, int LengthMonths, string SettingHash, DateTimeOffset CreatedAt);
+/// <remarks><c>PrevStart</c> is the start of the block before it in the chain, null for block 1 (HO-01). A block of the chain ends on <c>HistoryLast</c>.</remarks>
+public sealed record HoldOutBlock(DateOnly Start, DateOnly HistoryFirst, DateOnly HistoryLast, int LengthMonths, string SettingHash, DateTimeOffset CreatedAt, DateOnly? PrevStart = null);
+
+/// <summary>The release of a block (HO-01 D4), as stored in <c>lab.holdout_releases</c>: owner or auto, the setting snapshot, whether the block had a fresh look, and the block it opened.</summary>
+public sealed record StoredRelease(DateOnly BlockStart, DateTimeOffset ReleasedAt, string Mode, string Actor, string SettingHash, bool Looked, DateOnly NextBlockStart);
+
+/// <summary>A block of the chain with its release, when it has one.</summary>
+public sealed record StoredBlock(HoldOutBlock Block, StoredRelease? Release);
+
+/// <summary>What <see cref="IHoldOutStore.ReleaseAsync"/> did.</summary>
+public enum ReleaseOutcome
+{
+    /// <summary>The release row and the next block were stored together.</summary>
+    Released,
+
+    /// <summary>The block was released already; nothing was written.</summary>
+    AlreadyReleased,
+
+    /// <summary>The next block could not be stored (its start is taken); nothing was written.</summary>
+    ChainConflict,
+}
 
 /// <summary>One look at the hold-out, as stored in <c>lab.holdout_unlocks</c> (spec CF-06, D5).</summary>
 public sealed record StoredUnlock(string StrategyId, int Version, string Kind, string Mode, string Actor, DateTimeOffset UnlockedAt, string SettingHash, bool ReusedWindow, DateOnly BlockStart, Guid RunId, HoldOutResultView Result);
@@ -14,8 +34,17 @@ public sealed record StoredUnlock(string StrategyId, int Version, string Kind, s
 /// </summary>
 public interface IHoldOutStore
 {
-    /// <summary>The first block stored (there is one by design), or null when none is fixed.</summary>
+    /// <summary>The block in force: the earliest block that is not released (block 1 until the first release), or null when none is fixed. Every cut follows it.</summary>
     ValueTask<HoldOutBlock?> CurrentAsync(CancellationToken cancellationToken);
+
+    /// <summary>Every block of the chain, earliest first, with its release (HO-01).</summary>
+    ValueTask<IReadOnlyList<StoredBlock>> ListBlocksAsync(CancellationToken cancellationToken);
+
+    /// <summary>Whether a fresh (not re-used) look was taken at the block that starts on this date.</summary>
+    ValueTask<bool> HasFreshLookAsync(DateOnly blockStart, CancellationToken cancellationToken);
+
+    /// <summary>Stores the release row and the next block in one transaction (HO-01 D4); both or neither.</summary>
+    ValueTask<ReleaseOutcome> ReleaseAsync(StoredRelease release, HoldOutBlock next, CancellationToken cancellationToken);
 
     /// <summary>Stores the block; false when a block with this start exists.</summary>
     ValueTask<bool> InsertBlockAsync(HoldOutBlock block, CancellationToken cancellationToken);

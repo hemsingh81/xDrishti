@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Replay;
 using XDrishti.Application.Planning;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Lab;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Paper;
@@ -64,6 +65,12 @@ internal sealed class ReplaySessionRunner(IReplayFacts facts, IReplayCandidates 
         if (set.Survivorship)
         {
             labels.Add(HindsightLabels.Survivorship);
+        }
+
+        // HO-01 D7: a session inside a released hold-out block is allowed and labelled; it never counts as hold-out evidence
+        if (run.ReleasedHoldOut is { Count: > 0 } released)
+        {
+            labels.AddRange(SeenHoldOut.Labels(released, session, session));
         }
 
         // DATA-01: the ban and surveillance filters are fed from the dated lists (switch ON). The label stays unless both lists have a stored row for this session; the event filter has no history either way.

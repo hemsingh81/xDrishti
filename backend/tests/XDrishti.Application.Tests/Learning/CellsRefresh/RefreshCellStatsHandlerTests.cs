@@ -48,7 +48,7 @@ public sealed class RefreshCellStatsHandlerTests
 
     private readonly ICellStatsStore _cells = Substitute.For<ICellStatsStore>();
 
-    private readonly IHoldOutStore _holdOut = Substitute.For<IHoldOutStore>();
+    private readonly IHoldOutStore _holdOut = TestHoldOutStores.NoReleases();
 
     private readonly ITradingCalendar _calendar = Substitute.For<ITradingCalendar>();
 
