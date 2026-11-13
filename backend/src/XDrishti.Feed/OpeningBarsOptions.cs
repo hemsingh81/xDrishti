@@ -5,7 +5,7 @@ namespace XDrishti.Feed;
 
 /// <summary>
 /// The numbers of the opening-minute recorder (<c>OpeningBars:*</c>, BK-03b, documented in doc 16), bounds-checked at start. <see cref="Enabled"/> is the deployment gate and is <b>false</b> by default: with it false the recorder never reads credentials, opens a
-/// socket or writes a row (it takes a restart to change). The owner's stored switch <c>baskets.opening_bars</c> and the paused service are the other two gates. The free-space floor is the depth recorder's (<c>Depth:MinFreeGb</c>, shared).
+/// socket or writes a row (it takes a restart to change). The owner's stored switch <c>baskets.opening_bars</c> and the paused service are the other two gates. The free-space floor is the options recorders' (<c>Options:MinFreeGb</c>, shared).
 /// </summary>
 internal sealed class OpeningBarsOptions : IValidatableObject
 {
@@ -48,7 +48,7 @@ internal sealed class OpeningBarsOptions : IValidatableObject
         }
     }
 
-    /// <summary>The settings the recorder works with; the free floor is the shared <c>Depth:MinFreeGb</c>.</summary>
+    /// <summary>The settings the recorder works with; the free floor is the shared <c>Options:MinFreeGb</c>.</summary>
     public OpeningBarsSettings ToSettings(int minFreeGb) =>
         new(Enabled, MaxInstruments, RecordUntil, TimeSpan.FromSeconds(GraceSeconds), TimeSpan.FromSeconds(FormBySeconds), KeepDays, TimeSpan.FromSeconds(SilenceSeconds), minFreeGb * 1024L * 1024 * 1024);
 }

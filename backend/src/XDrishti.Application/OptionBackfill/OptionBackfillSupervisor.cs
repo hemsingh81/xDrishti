@@ -3,9 +3,9 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.OptionBackfill;
 using XDrishti.Application.Abstractions.Platform;
-using XDrishti.Application.Depth;
 using XDrishti.Application.Live;
 using XDrishti.Application.Platform.Services;
+using XDrishti.Application.Recording;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Platform.Services;
 
@@ -110,7 +110,7 @@ internal sealed class OptionBackfillSupervisor(IServiceScopeFactory scopes, IBac
     internal async Task TickAsync(CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
-        var state = _waiting ?? DepthStates.Closed;
+        var state = _waiting ?? RecorderStates.Closed;
         try
         {
             _startedAt ??= now;
@@ -135,7 +135,7 @@ internal sealed class OptionBackfillSupervisor(IServiceScopeFactory scopes, IBac
         if (!settings.Enabled)
         {
             // Gate 1: nothing below this line runs - no credentials, no request, no store.
-            return DepthStates.Disabled;
+            return RecorderStates.Disabled;
         }
 
         await using var scope = scopes.CreateAsyncScope();
@@ -170,7 +170,7 @@ internal sealed class OptionBackfillSupervisor(IServiceScopeFactory scopes, IBac
                 await StopRunAsync(runs, OptionBackfillService.Paused, cancellationToken);
             }
 
-            return DepthStates.Paused;
+            return RecorderStates.Paused;
         }
 
         await RefreshProgressAsync(services, now, cancellationToken);
@@ -207,10 +207,10 @@ internal sealed class OptionBackfillSupervisor(IServiceScopeFactory scopes, IBac
 
         if (shouldBeUp)
         {
-            return _waiting ?? DepthStates.Connecting;
+            return _waiting ?? RecorderStates.Connecting;
         }
 
-        return !switchOn ? DepthStates.SwitchOff : !service.Enabled ? DepthStates.Paused : !acknowledged ? BackfillStates.ProbeNotAccepted : BackfillStates.OutsideWindow;
+        return !switchOn ? RecorderStates.SwitchOff : !service.Enabled ? RecorderStates.Paused : !acknowledged ? BackfillStates.ProbeNotAccepted : BackfillStates.OutsideWindow;
     }
 
     /// <summary>The first look of a process: the run the previous process left open is closed as failed (interrupted).</summary>
@@ -235,12 +235,12 @@ internal sealed class OptionBackfillSupervisor(IServiceScopeFactory scopes, IBac
         var store = services.GetRequiredService<IRollingBarStore>();
         var stored = await store.StoredBytesAsync(cancellationToken);
         var free = await store.FreeBytesAsync(cancellationToken);
-        var verdict = DepthDiskGuard.Check(stored, free, settings.MaxStoredBytes, settings.MinFreeBytes);
-        if (verdict is DepthDiskVerdict.OverBudget or DepthDiskVerdict.LowFree)
+        var verdict = RecorderDiskGuard.Check(stored, free, settings.MaxStoredBytes, settings.MinFreeBytes);
+        if (verdict is RecorderDiskVerdict.OverBudget or RecorderDiskVerdict.LowFree)
         {
-            var over = verdict == DepthDiskVerdict.OverBudget;
+            var over = verdict == RecorderDiskVerdict.OverBudget;
             _diskLatched = true;
-            _waiting = over ? DepthStates.DiskBudget : DepthStates.DiskFree;
+            _waiting = over ? RecorderStates.DiskBudget : RecorderStates.DiskFree;
             await SkipOncePerDayAsync(runs, today, over ? DiskBudgetMessage : DiskFreeMessage, now, cancellationToken);
             return;
         }
@@ -253,7 +253,7 @@ internal sealed class OptionBackfillSupervisor(IServiceScopeFactory scopes, IBac
         var planned = BackfillPlanner.Plan(targets, settings, today).Count();
         if (planned == 0)
         {
-            _waiting = DepthStates.NoInstruments;
+            _waiting = RecorderStates.NoInstruments;
             await SkipOncePerDayAsync(runs, today, NoUnderlyingsMessage, now, cancellationToken);
             return;
         }
@@ -266,7 +266,7 @@ internal sealed class OptionBackfillSupervisor(IServiceScopeFactory scopes, IBac
 
         if (credentials is null)
         {
-            _waiting = _tokenRefused ? DepthStates.TokenRefused : DepthStates.NoToken;
+            _waiting = _tokenRefused ? RecorderStates.TokenRefused : RecorderStates.NoToken;
             if (!_tokenRefused)
             {
                 await SkipOncePerDayAsync(runs, today, NoTokenMessage, now, cancellationToken);
@@ -280,7 +280,7 @@ internal sealed class OptionBackfillSupervisor(IServiceScopeFactory scopes, IBac
         {
             if (_refusedFingerprint == fingerprint)
             {
-                _waiting = DepthStates.TokenRefused;
+                _waiting = RecorderStates.TokenRefused;
                 return;
             }
 
@@ -343,26 +343,26 @@ internal sealed class OptionBackfillSupervisor(IServiceScopeFactory scopes, IBac
                 _tokenRefused = true;
                 _refusedFingerprint = running.Fingerprint;
                 _nextTokenCheck = now + TokenCheckInterval;
-                _waiting = DepthStates.TokenRefused;
+                _waiting = RecorderStates.TokenRefused;
                 break;
             case BackfillSessionEnd.NotSubscribed:
                 (status, message) = (ServiceRunStatus.Failed, NotSubscribedMessage);
                 _endedNight = BackfillWindow.NightOf(running.StartedAt);
-                _waiting = DepthStates.NotSubscribed;
+                _waiting = RecorderStates.NotSubscribed;
                 break;
             case BackfillSessionEnd.NoToken:
                 (status, message) = (ServiceRunStatus.Failed, NoTokenLostMessage);
-                _waiting = DepthStates.NoToken;
+                _waiting = RecorderStates.NoToken;
                 break;
             case BackfillSessionEnd.DiskBudget:
                 (status, message) = (ServiceRunStatus.Failed, DiskBudgetMessage);
                 _diskLatched = true;
-                _waiting = DepthStates.DiskBudget;
+                _waiting = RecorderStates.DiskBudget;
                 break;
             case BackfillSessionEnd.DiskFree:
                 (status, message) = (ServiceRunStatus.Failed, DiskFreeMessage);
                 _diskLatched = true;
-                _waiting = DepthStates.DiskFree;
+                _waiting = RecorderStates.DiskFree;
                 break;
             case BackfillSessionEnd.StoreFailed:
                 (status, message) = (ServiceRunStatus.Failed, StoreFailedMessage);
@@ -395,7 +395,7 @@ internal sealed class OptionBackfillSupervisor(IServiceScopeFactory scopes, IBac
             default:
                 (status, message) = (ServiceRunStatus.Failed, CrashMessage);
                 _resumeAt = now + CrashPause;
-                _waiting = DepthStates.Connecting;
+                _waiting = RecorderStates.Connecting;
                 break;
         }
 
@@ -519,7 +519,7 @@ internal sealed class OptionBackfillSupervisor(IServiceScopeFactory scopes, IBac
                 }
             }
 
-            await scope.ServiceProvider.GetRequiredService<IOptionBackfillHeartbeats>().ReportAsync(DepthStates.Stopped, new BackfillHeartbeat(settings.Enabled, settings.RequestsPerSecond, 0, 0, 0, 0, session.FreeSpaceReadable, _progress), application.Instance, application.Version, wait.Token);
+            await scope.ServiceProvider.GetRequiredService<IOptionBackfillHeartbeats>().ReportAsync(RecorderStates.Stopped, new BackfillHeartbeat(settings.Enabled, settings.RequestsPerSecond, 0, 0, 0, 0, session.FreeSpaceReadable, _progress), application.Instance, application.Version, wait.Token);
         }
 #pragma warning disable CA1031 // the process is going down; the record is closed as interrupted at the next start if this fails
         catch (Exception ex)

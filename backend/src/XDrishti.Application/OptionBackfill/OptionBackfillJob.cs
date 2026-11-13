@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.OptionBackfill;
-using XDrishti.Application.Depth;
+using XDrishti.Application.Recording;
 using XDrishti.Domain.Market;
 
 namespace XDrishti.Application.OptionBackfill;
@@ -277,18 +277,18 @@ internal sealed class OptionBackfillJob(IServiceScopeFactory scopes, OptionBackf
         }
 
         _freeReadable = free is not null;
-        var verdict = DepthDiskGuard.Check(stored, free, settings.MaxStoredBytes, settings.MinFreeBytes);
+        var verdict = RecorderDiskGuard.Check(stored, free, settings.MaxStoredBytes, settings.MinFreeBytes);
         switch (verdict)
         {
-            case DepthDiskVerdict.OverBudget:
+            case RecorderDiskVerdict.OverBudget:
                 OptionBackfillLog.DiskStop(logger, "disk_budget");
-                _state = DepthStates.DiskBudget;
+                _state = RecorderStates.DiskBudget;
                 return BackfillSessionEnd.DiskBudget;
-            case DepthDiskVerdict.LowFree:
+            case RecorderDiskVerdict.LowFree:
                 OptionBackfillLog.DiskStop(logger, "disk_free");
-                _state = DepthStates.DiskFree;
+                _state = RecorderStates.DiskFree;
                 return BackfillSessionEnd.DiskFree;
-            case DepthDiskVerdict.Warning when !_warned:
+            case RecorderDiskVerdict.Warning when !_warned:
                 _warned = true;
                 OptionBackfillLog.DiskWarning(logger, stored / (1024 * 1024), settings.MaxStoredBytes / (1024 * 1024));
                 break;

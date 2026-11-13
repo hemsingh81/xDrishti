@@ -36,3 +36,7 @@ Dhan offers no historical market depth, so a later phase (P13, order-book featur
 ## Amendment (2026-11-01): the owner's switch on the Services page
 Decision 7 ("no hand-written frontend file mentions depth") has one exception, approved by the owner under the standing run instruction (the open question of a Services-page switch for the recorder, raised 2026-10-31): the files `frontend/src/features/services/api/recordersApi.ts` and `frontend/src/features/services/components/RecordersSection.tsx` read and change the owner's switch of the recorder (`GET` and `PUT /api/depth/recorder`, fresh password and reason) and show its state, the reasons it is not running, the notice and the history rows. They show no depth data, because no route returns any. `DepthRecordingArchitectureTests` pins exactly these two relative paths (no wildcard); any other file that mentions depth, or either file ceasing to, fails the test. The no-reader and no-trading-use rules are unchanged.
 
+
+
+## Amendment (2026-11-13): removed
+The depth recorder is removed with P13, and its tables are dropped by migration `DropDepthAndTickRecording` ([ADR 0288](0288-p13-tick-and-depth-features-are-dropped-the-depth-and-tick-recorders-are-removed-and-the-feature-set-comparison-stays.md)). This ADR stays as the record of what was built.

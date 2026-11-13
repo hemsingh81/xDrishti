@@ -8,10 +8,9 @@ using XDrishti.Application.Abstractions.OpeningBars;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.OpeningBars;
 using XDrishti.Application.Platform.Services;
-using XDrishti.Application.Tests.Depth;
+using XDrishti.Application.Tests.Live;
 using XDrishti.Application.Tests.Market.Baskets.Derived;
 using XDrishti.Application.Tests.Platform.Services;
-using XDrishti.Application.Tests.Ticks;
 using XDrishti.Domain.Baskets.Derived;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Platform.Services;
@@ -132,7 +131,7 @@ public sealed class OpeningBarsSupervisorTests
 
         public Task TickAsync() => Supervisor.TickAsync(Ct);
 
-        public async Task<FakeTickConnection> ConnectedAsync()
+        public async Task<FakeFeedConnection> ConnectedAsync()
         {
             for (var i = 0; i < 1_000_000 && !(Connector.Connections.Count > 0 && Connector.Connections[0].Subscriptions.Count > 0); i++)
             {

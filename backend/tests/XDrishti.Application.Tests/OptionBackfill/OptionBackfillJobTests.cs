@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using XDrishti.Application.Abstractions.OptionBackfill;
-using XDrishti.Application.Depth;
 using XDrishti.Application.OptionBackfill;
+using XDrishti.Application.Recording;
 using XDrishti.Application.Tests.Platform.Services;
 using static XDrishti.Application.Tests.OptionBackfill.BackfillSamples;
 
@@ -314,7 +314,7 @@ public sealed class OptionBackfillJobTests
         result.End.ShouldBe(BackfillSessionEnd.DiskBudget);
         world.Client.Calls.ShouldBeEmpty();
         world.Store.Log.ShouldHaveSingleItem().Outcome.ShouldBe(BackfillOutcomes.DiskStop);
-        world.Job.State.ShouldBe(DepthStates.DiskBudget);
+        world.Job.State.ShouldBe(RecorderStates.DiskBudget);
         var state = (await world.Store.LoadStateAsync(Ct)).Values.Single();
         (state.IsDone, state.Failed).ShouldBe((false, 0), "a disk stop does not count against the key");
     }
@@ -346,7 +346,7 @@ public sealed class OptionBackfillJobTests
         var low = new World();
         low.Store.Free = low.Settings.MinFreeBytes - 1;
         (await low.RunAsync()).End.ShouldBe(BackfillSessionEnd.DiskFree);
-        low.Job.State.ShouldBe(DepthStates.DiskFree);
+        low.Job.State.ShouldBe(RecorderStates.DiskFree);
 
         var unknown = new World();
         unknown.Store.Free = null;

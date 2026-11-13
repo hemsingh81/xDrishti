@@ -38,8 +38,6 @@ public sealed class OptionQualityArchitectureTests
     [InlineData("XDrishti.Application.Lab")]
     [InlineData("XDrishti.Application.Reporting")]
     [InlineData("XDrishti.Application.Paper")]
-    [InlineData("XDrishti.Application.Depth")]
-    [InlineData("XDrishti.Application.Ticks")]
     [InlineData("XDrishti.Application.OptionChain")]
     [InlineData("XDrishti.Application.OptionBackfill")]
     public void The_decision_live_and_recorder_code_references_no_quality_type(string area)
@@ -100,8 +98,8 @@ public sealed class OptionQualityArchitectureTests
         string[] banned =
         [
             "System.Net.Http", "System.Net.WebSockets", "XDrishti.Application.Execution", "XDrishti.Application.LiveTrading", "XDrishti.Application.Planning", "XDrishti.Application.Learning", "XDrishti.Application.Portfolio", "XDrishti.Application.Paper",
-            "XDrishti.Application.Abstractions.Planning", "XDrishti.Application.Abstractions.Live", "XDrishti.Application.Live", "XDrishti.Application.Abstractions.Execution", "XDrishti.Application.Abstractions.Brokers", "XDrishti.Application.Abstractions.Depth",
-            "XDrishti.Application.Abstractions.Ticks", "XDrishti.Application.Depth", "XDrishti.Application.Ticks", "XDrishti.Infrastructure.Brokers", .. RecorderNamespaces,
+            "XDrishti.Application.Abstractions.Planning", "XDrishti.Application.Abstractions.Live", "XDrishti.Application.Live", "XDrishti.Application.Abstractions.Execution", "XDrishti.Application.Abstractions.Brokers",
+            "XDrishti.Infrastructure.Brokers", .. RecorderNamespaces,
         ];
         foreach (var ns in new[] { "XDrishti.Application.OptionQuality", "XDrishti.Application.Abstractions.OptionQuality" })
         {

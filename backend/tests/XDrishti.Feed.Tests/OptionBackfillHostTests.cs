@@ -112,8 +112,6 @@ public sealed class OptionBackfillHostTests
         scope.ServiceProvider.GetRequiredService<BackfillProbe>().ShouldNotBeNull();
         var loops = host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name).ToList();
         loops.ShouldContain("FeedService");
-        loops.ShouldContain("DepthService");
-        loops.ShouldContain("TickService");
         loops.ShouldContain("OptionChainService");
         loops.ShouldContain("OptionBackfillService");
     }

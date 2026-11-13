@@ -1,7 +1,7 @@
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.OptionChain;
-using XDrishti.Application.Depth;
 using XDrishti.Application.Platform.Services;
+using XDrishti.Application.Recording;
 
 namespace XDrishti.Application.OptionChain;
 
@@ -55,12 +55,12 @@ internal sealed class GetOptionChainRecorderHandler(IOptionChainSwitchStore swit
 
     private static string? Explain(string state) => state switch
     {
-        DepthStates.NoToken => "The Data account has no usable token.",
-        DepthStates.TokenRefused => "Dhan refused the Data account's token; waiting for a new one.",
-        DepthStates.NotSubscribed => "Dhan says the Data APIs are not part of the plan (DH-902); recording ended for the day.",
-        DepthStates.DiskBudget => "The stored option chains are over their cap; recording stopped and nothing was deleted.",
-        DepthStates.DiskFree => "The free disk space is under its floor; recording stopped and nothing was deleted.",
-        DepthStates.NoInstruments => "No option underlyings to record today.",
+        RecorderStates.NoToken => "The Data account has no usable token.",
+        RecorderStates.TokenRefused => "Dhan refused the Data account's token; waiting for a new one.",
+        RecorderStates.NotSubscribed => "Dhan says the Data APIs are not part of the plan (DH-902); recording ended for the day.",
+        RecorderStates.DiskBudget => "The stored option chains are over their cap; recording stopped and nothing was deleted.",
+        RecorderStates.DiskFree => "The free disk space is under its floor; recording stopped and nothing was deleted.",
+        RecorderStates.NoInstruments => "No option underlyings to record today.",
         ChainStates.RatePaused => "Dhan's rate limit was hit in three slots in a row; requests are paused for 15 minutes.",
         _ => null,
     };

@@ -5,7 +5,6 @@ using XDrishti.Application.Abstractions.OpeningBars;
 using XDrishti.Application.OpeningBars;
 using XDrishti.Application.Tests.Live;
 using XDrishti.Application.Tests.Platform.Services;
-using XDrishti.Application.Tests.Ticks;
 
 namespace XDrishti.Application.Tests.OpeningBars;
 
@@ -58,7 +57,7 @@ public sealed class OpeningBarsRecorderTests
             return await run;
         }
 
-        public async Task<FakeTickConnection> ConnectedAsync(int index = 0)
+        public async Task<FakeFeedConnection> ConnectedAsync(int index = 0)
         {
             await UntilAsync(() => Connector.Connections.Count > index && Connector.Connections[index].Subscriptions.Count > 0, "the session did not subscribe");
             return Connector.Connections[index];

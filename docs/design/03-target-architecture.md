@@ -26,7 +26,7 @@ flowchart TB
         VOL[("models volume<br/>ML.NET models · LLM weights")]
         SEQ["xd-seq · Seq<br/>logs"]
         BAK["xd-backup · restic"]
-        FEED["xd-feed · .NET<br/>live feed for active set<br/>+ depth recorder (P7-16, off)"]
+        FEED["xd-feed · .NET<br/>live feed for active set"]
         EXEC["xd-exec · .NET (later)<br/>orders · kill switch"]
     end
 
@@ -221,7 +221,7 @@ xDrishti/
 │   │   ├── XDrishti.Worker/         # host: Hangfire server, scheduled services
 │   │   ├── XDrishti.Mcp/            # host: MCP read-only tool server
 │   │   ├── XDrishti.Cli/            # `xd` command-line tool
-│   │   ├── XDrishti.Feed/           # host: market-hours live feed for the active set and the depth recorder (P7-16, off by default)
+│   │   ├── XDrishti.Feed/           # host: market-hours live feed for the active set
 │   │   └── XDrishti.Execution/      # order service host (P12-01/01b): Domain, Application, Persistence (Npgsql, role xd_exec), Host; Dhan/ is P12-02
 │   └── tests/                       # Domain/Application unit, Architecture (layer rules), Api.IntegrationTests (Testcontainers)
 ├── frontend/                        # React 19 + TypeScript + Vite + MUI; Dockerfile builds xd-proxy (Caddy + app)

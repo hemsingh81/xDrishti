@@ -20,10 +20,6 @@ internal static class FeedHost
             .AddInfrastructure(builder.Configuration)
             .AddLiveFeed()
             .AddFeedEngine()
-            .AddDepthRecording()
-            .AddDepthRecorder()
-            .AddTickRecording()
-            .AddTickRecorder()
             .AddOptionChainRecording()
             .AddOptionChainRecorder()
             .AddOptionBackfillRecording()
@@ -39,26 +35,12 @@ internal static class FeedHost
             .ValidateOnStart();
         builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<LiveOptions>>().Value.ToSettings());
 
-        // The depth recorder (P7-16): off by default (Depth:Enabled false), registered paused, behind the owner's stored switch.
-        builder.Services.AddOptions<DepthOptions>()
-            .Bind(builder.Configuration.GetSection(DepthOptions.SectionName))
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-        builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<DepthOptions>>().Value.ToSettings());
-
-        // The trade-tick recorder (P7-16b): off by default (Ticks:Enabled false), registered paused, behind its own stored switch; the free floor is the depth recorder's (shared).
-        builder.Services.AddOptions<TickOptions>()
-            .Bind(builder.Configuration.GetSection(TickOptions.SectionName))
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-        builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<TickOptions>>().Value.ToSettings(sp.GetRequiredService<IOptions<DepthOptions>>().Value.MinFreeGb));
-
-        // The opening-minute recorder (BK-03b): off by default (OpeningBars:Enabled false), registered paused, behind the owner's stored switch baskets.opening_bars; its own connection; the free floor is the depth recorder's (shared).
+        // The opening-minute recorder (BK-03b): off by default (OpeningBars:Enabled false), registered paused, behind the owner's stored switch baskets.opening_bars; its own connection; the free floor is the options recorders' (Options:MinFreeGb, shared).
         builder.Services.AddOptions<OpeningBarsOptions>()
             .Bind(builder.Configuration.GetSection(OpeningBarsOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
-        builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<OpeningBarsOptions>>().Value.ToSettings(sp.GetRequiredService<IOptions<DepthOptions>>().Value.MinFreeGb));
+        builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<OpeningBarsOptions>>().Value.ToSettings(sp.GetRequiredService<IOptions<OptionsOptions>>().Value.MinFreeGb));
 
         // The option-chain recorder (P14-02): off by default (Options:Chain:Enabled false), registered paused, behind its own stored switch; REST requests to the two allowed option-chain endpoints, one per 3 seconds at most.
         builder.Services.AddOptions<OptionsOptions>()
@@ -72,5 +54,5 @@ internal static class FeedHost
         return builder;
     }
 
-    public static IServiceCollection AddFeedService(this IServiceCollection services) => services.AddHostedService<FeedService>().AddHostedService<DepthService>().AddHostedService<TickService>().AddHostedService<OptionChainService>().AddHostedService<OptionBackfillService>().AddHostedService<OpeningBarsHostService>();
+    public static IServiceCollection AddFeedService(this IServiceCollection services) => services.AddHostedService<FeedService>().AddHostedService<OptionChainService>().AddHostedService<OptionBackfillService>().AddHostedService<OpeningBarsHostService>();
 }

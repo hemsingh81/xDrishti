@@ -1,8 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using XDrishti.Application.Abstractions.Depth;
 using XDrishti.Application.Abstractions.OptionChain;
-using XDrishti.Application.Depth;
+using XDrishti.Application.Recording;
 using XDrishti.Domain.Market;
 
 namespace XDrishti.Application.OptionChain;
@@ -274,22 +273,22 @@ internal sealed class OptionChainRecorder(IServiceScopeFactory scopes, OptionCha
         }
 
         _freeReadable = free is not null;
-        var verdict = DepthDiskGuard.Check(stored, free, settings.MaxStoredBytes, settings.MinFreeBytes);
+        var verdict = RecorderDiskGuard.Check(stored, free, settings.MaxStoredBytes, settings.MinFreeBytes);
         switch (verdict)
         {
-            case DepthDiskVerdict.Warning:
+            case RecorderDiskVerdict.Warning:
                 OptionChainLog.DiskWarning(logger, stored / (1024 * 1024), settings.MaxStoredBytes / (1024 * 1024));
                 return null;
-            case DepthDiskVerdict.OverBudget or DepthDiskVerdict.LowFree:
-                var over = verdict == DepthDiskVerdict.OverBudget;
-                OptionChainLog.DiskStop(logger, over ? DepthEndReasons.DiskBudget : DepthEndReasons.DiskFree);
+            case RecorderDiskVerdict.OverBudget or RecorderDiskVerdict.LowFree:
+                var over = verdict == RecorderDiskVerdict.OverBudget;
+                OptionChainLog.DiskStop(logger, over ? RecorderEndReasons.DiskBudget : RecorderEndReasons.DiskFree);
                 var tally = new Tally();
                 foreach (var (target, expiry) in planned)
                 {
                     await RecordGapAsync(ChainKind.Chain, target, expiry, slot, ChainOutcomes.DiskStop, tally, cancellationToken);
                 }
 
-                _state = over ? DepthStates.DiskBudget : DepthStates.DiskFree;
+                _state = over ? RecorderStates.DiskBudget : RecorderStates.DiskFree;
                 return over ? ChainSessionEnd.DiskBudget : ChainSessionEnd.DiskFree;
             default:
                 return null;
