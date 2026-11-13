@@ -11,6 +11,9 @@ public interface ICostSheetStore
     /// <summary>The stored sheet: <c>costs.sheet_not_found</c> (not found) for an id that was never stored and for any <c>test-</c> id, or <c>costs.sheet_invalid</c> when the stored text no longer parses.</summary>
     ValueTask<Result<CostSheet>> FindAsync(string sheetId, CancellationToken cancellationToken);
 
+    /// <summary>The stored sheets that carry a <c>checked</c> note (ISS-25), most recently written first (SR-03: the auto registration takes the first).</summary>
+    ValueTask<IReadOnlyList<CostSheet>> ListCheckedAsync(CancellationToken cancellationToken);
+
     /// <summary>Collects the change (the caller saves the unit of work). A <c>test-</c> id is refused with an argument exception: it is a caller error, the verb refuses it earlier.</summary>
     ValueTask SaveAsync(CostSheet sheet, string actor, DateTimeOffset now, CancellationToken cancellationToken);
 }

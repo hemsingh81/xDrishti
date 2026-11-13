@@ -37,6 +37,8 @@ internal sealed class FakeCostSheetStore : ICostSheetStore
         return ValueTask.FromResult(_sheets.TryGetValue(sheetId, out var sheet) ? Result.Success(sheet) : Result.Failure<CostSheet>(CostErrors.SheetNotFound(sheetId)));
     }
 
+    public ValueTask<IReadOnlyList<CostSheet>> ListCheckedAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<CostSheet>>([.. _sheets.Values.Where(x => x.Checked is not null).Reverse()]);
+
     public ValueTask SaveAsync(CostSheet sheet, string actor, DateTimeOffset now, CancellationToken cancellationToken)
     {
         Saves.Add((sheet, actor, now));

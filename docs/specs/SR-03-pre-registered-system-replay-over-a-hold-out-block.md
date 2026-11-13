@@ -1,6 +1,6 @@
 # SR-03 — A pre-registered system replay over a hold-out block
 
-- **Status:** Approved (owner, 2026-11-13, in chat: "Consider my approval and you do due diligence also consider mostly things should be in auto mode with best default values"). All five questions as recommended, with the changes of the due diligence of 2026-11-13 (see *Due diligence*): the system look has **its own fresh slot per block** (HO-01 D5), the registration must be stored **before the block begins**, the run uses the **stored** inputs, and the registration and the run are **automatic by default** (ADR 0282). Build after HO-01b. ISS-25 (a `checked` sheet) is needed to register, not to build.
+- **Status:** Built 2026-11-13 (ADR 0284; not merged or deployed). Approved (owner, 2026-11-13, in chat: "Consider my approval and you do due diligence also consider mostly things should be in auto mode with best default values"). All five questions as recommended, with the changes of the due diligence of 2026-11-13 (see *Due diligence*): the system look has **its own fresh slot per block** (HO-01 D5), the registration must be stored **before the block begins**, the run uses the **stored** inputs, and the registration and the run are **automatic by default** (ADR 0282). Build after HO-01b. ISS-25 (a `checked` sheet) is needed to register, not to build.
 - **Phase / roadmap row:** SR — System replay, row SR-03 (GAP-07 of the 2026-11-12 due-diligence review)
 - **Size:** about 3.5 agent-days (estimate, uncalibrated): registration and frozen inputs 1, the one-run handler and block reader 1, verdict and auto steps 1, card and tests 0.5.
 - **Needs:**
@@ -48,7 +48,9 @@ The system fixes, before a block begins, exactly what it would run and what resu
   - It then claims the look, kind `system` (HO-01), insert-only, burned even if the run is abandoned.
   - It runs both arms over `[S_k, E_k]` with a block reader that only this handler may construct, after the claim, and only up to the block end. The block must be sealed (HO-01 D6, 409 otherwise).
   - A second run answers 409 `replay.holdout_used` with the stored result.
-  - The look is shown `reused_window` if the database refuses it as fresh, and then never counts.
+  - *Amended in the build (ADR 0284):* a look that cannot be fresh (the registration was stored on or after the block's start, or the slot is taken) is refused with nothing stored and nothing read, instead of being stored `reused_window`: a look that could never count is not burned.
+  - *Amended:* the drift check also refuses when the stored block's end is not the registered one (a changed `BlockMonths`), when the sheet lost its `checked` note, when the scope has grown over the memory cap, and when the newest cell-statistics snapshot was created on or after the block start; the snapshot keys and creation time are stored with the result. The claim appends one `system_replay` trial-ledger row per strategy version, keyed by the look.
+  - *Amended:* a run that cannot be carried out is stored `run_failed` (never `inconclusive`, which is for an unavailable figure of the rule); a database, timeout or I/O failure leaves the claim and is retried up to 5 times first.
   - **Owner act:** `POST …/run` with a fresh password.
 - **D5. Automatic by default** (ADR 0282; due diligence change 3).
   - `replay.holdout.auto_register`, **default ON**: on the evening block k seals (HO-01 seal service), if no registration targets block k+1 and a `checked` sheet exists, the current configuration is registered for block k+1 as `auto` (scope = the Auto scope, capital and profile = the replay defaults, the sheet `checked` most recently, the D3 defaults). This is the last evening before `S_{k+1}`, so the registration is "the system as it stands when the block begins". A scope over the memory cap, or any unavailable input, registers nothing and raises a notice.
@@ -78,11 +80,11 @@ The system fixes, before a block begins, exactly what it would run and what resu
 - any order.
 
 ## Acceptance criteria
-1. **Register.** On 2027-04-20, a registration for block 3 with sheet `dhan-2026-04` (`checked`) stores `config_hash` and the frozen inputs; the same inputs give the same hash. Each of an unchecked sheet, a gross choice, a block that has begun (`block_started`), no future block (`no_future_block`) or a scope over the memory cap answers 422 `replay.registration_invalid`, naming the reason. A registration stored on 2027-05-05 for block 3 is refused (`block_started`).
+1. **Register.** On 2027-04-20, a registration for block 3 with sheet `dhan-2026-04` (`checked`) stores `config_hash` and the frozen inputs; the same inputs give the same hash. Each of an unchecked sheet, a gross choice, no future block (`no_future_block`, which includes a block that has begun) or a scope over the memory cap answers 422 `replay.registration_invalid`, naming the reason. A registration stored on 2027-05-05 for block 3 is refused (`no_future_block`).
 2. **Newest before the horizon.** Two registrations for block 3 on 2027-04-01 and 2027-04-20: the second is the one, the first reads `superseded`.
 3. **Live changes do not drift.** After registration a selection setting changes; the run uses the stored snapshot and its result is the same as with the setting unchanged.
 4. **Drift.** The registered sheet is replaced with a new content hash: the run answers 409 `replay.registration_drift`, writes no look and reads no bar of the block.
-5. **One look.** The first run claims the `system` look and stores two runs flagged `holdout_block`. A strategy look and a model look at the same block stay fresh.
+5. **One look.** The first run claims the `system` look and stores one result row holding both arms' figures (the arms are not stored as `replay_runs` rows, so no replay read can show the block's prices; `runIds` are the stable ids of the two arm results). A strategy look and a model look at the same block stay fresh.
    - A second run answers 409 `replay.holdout_used` with the stored result unchanged.
    - A filling block answers 409 `lab.holdout_filling`.
    - Without a fresh password: 403; a wrong one: 401, counted toward the lockout.

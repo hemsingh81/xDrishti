@@ -100,7 +100,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             }
         }
 
-        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "expression_legs", "expression_runs", "expression_trades", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "ml_influence_checks", "ml_monitor_checks", "ml_switch_settings", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "replay_runs", "replay_sessions", "replay_sweeps", "replay_trades", "rollback_proposals", "sim_all_chunks", "sim_all_jobs", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "sim_training_runs", "trade_features", "trade_features_ext", "training_sets", "training_sim_cell_stats", "universe_settings_changes"]);
+        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "expression_legs", "expression_runs", "expression_trades", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "ml_influence_checks", "ml_monitor_checks", "ml_switch_settings", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "replay_holdout_registrations", "replay_holdout_results", "replay_holdout_settings", "replay_runs", "replay_sessions", "replay_sweeps", "replay_trades", "rollback_proposals", "sim_all_chunks", "sim_all_jobs", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "sim_training_runs", "trade_features", "trade_features_ext", "training_sets", "training_sim_cell_stats", "universe_settings_changes"]);
         foreach (var name in names)
         {
             // a rollback proposal is inserted column by column (never as an already-decided row), so the role holds no table-level INSERT on it (RollbackGrantsTests covers its columns)
@@ -127,6 +127,24 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             check.Parameters.AddWithValue("c", column);
             ((bool)(await check.ExecuteScalarAsync(Ct))!).ShouldBe(expected, $"UPDATE of {table}.{column}");
         }
+    }
+
+    [Fact]
+    public async Task The_hold_out_replay_tables_are_insert_only_for_the_runtime_role_and_the_two_seed_rows_can_be_written_only_by_the_migration()
+    {
+        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM research.replay_holdout_settings WHERE actor = 'system:default' AND reason = 'ADR 0282' AND enabled", Ct)).ShouldBe(2, "both switches are seeded ON");
+        foreach (var table in new[] { "replay_holdout_registrations", "replay_holdout_results", "replay_holdout_settings" })
+        {
+            (await SqlStateAsync(_app, $"UPDATE research.{table} SET actor = 'x'")).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, table + " is never updated by the runtime role");
+            (await SqlStateAsync(_app, $"DELETE FROM research.{table}")).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, table + " is never deleted from by the runtime role");
+        }
+
+        const string seed = "INSERT INTO research.replay_holdout_settings (name, enabled, actor, reason, at) VALUES ('replay.holdout.auto_run', true, 'system:default', 'ADR 0282', now())";
+        (await SqlStateAsync(_app, seed)).ShouldBe(PostgresErrorCodes.CheckViolation, "the runtime role cannot write the system default row");
+        (await SqlStateAsync(_owner, seed)).ShouldBe(PostgresErrorCodes.CheckViolation, "even the owner cannot write it a second time for a switch that has a row");
+        (await SqlStateAsync(_app, "INSERT INTO research.replay_holdout_settings (name, enabled, actor, reason, at) VALUES ('replay.holdout.auto_run', false, 'owner:test@example.invalid', 'owner setting', now())")).ShouldBeNull("the owner's own row is allowed");
+        (await SqlStateAsync(_app, "INSERT INTO research.replay_holdout_settings (name, enabled, actor, reason, at) VALUES ('replay.holdout.auto_run', false, '', 'owner setting', now())")).ShouldBe(PostgresErrorCodes.CheckViolation, "an empty actor is refused");
+        (await SqlStateAsync(_app, "INSERT INTO research.replay_holdout_settings (name, enabled, actor, reason, at) VALUES ('replay.holdout.auto_run', false, 'owner:test@example.invalid', ' ', now())")).ShouldBe(PostgresErrorCodes.CheckViolation, "an empty reason is refused");
     }
 
     [Fact]
@@ -253,7 +271,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             (await SqlStateAsync(_app, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
 
-        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(42);
+        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(45);
     }
 
     [Fact]
