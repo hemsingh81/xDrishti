@@ -126,13 +126,19 @@ internal sealed class HoldOutReleaser(HoldOutEpochs epochs, IHoldOutStore store,
     }
 
     /// <summary>What keeps the auto release from acting on the block in force, as a word (<c>auto_release_off</c>, <c>no_strategy_slot</c>, <c>filling</c>, <c>unlooked</c>, <c>look_available</c>, <c>unavailable</c>), or null when it would release now. Read only.</summary>
-    public async ValueTask<(string? Reason, IReadOnlyDictionary<string, LookAvailability> Kinds)> WhatHoldsAsync(BlockStatus current, CancellationToken cancellationToken)
+    public async ValueTask<(string? Reason, IReadOnlyDictionary<string, LookAvailability> Kinds)> WhatHoldsAsync(BlockStatus current, CancellationToken cancellationToken, bool needKinds = true)
     {
         ArgumentNullException.ThrowIfNull(current);
         // a filling or released block is answered without reading any slot (the card and the bell read this often)
         if (current.State is HoldOutBlockState.Filling or HoldOutBlockState.Released)
         {
             return (HoldOutChain.Word(current.State), new Dictionary<string, LookAvailability>(StringComparer.Ordinal));
+        }
+
+        // a sealed block with no look is held by "unlooked" whatever the slots say; the bell does not need the kinds
+        if (!needKinds && current.State == HoldOutBlockState.Sealed)
+        {
+            return ("unlooked", new Dictionary<string, LookAvailability>(StringComparer.Ordinal));
         }
 
         var kinds = await ReadSlotsAsync(current.Block.Start, cancellationToken);

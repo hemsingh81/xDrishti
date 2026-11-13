@@ -26,7 +26,7 @@ internal sealed class HoldOutStalledNotices(HoldOutEpochs epochs, HoldOutRelease
             return [];
         }
 
-        var (reason, _) = await releaser.WhatHoldsAsync(current, cancellationToken);
+        var (reason, _) = await releaser.WhatHoldsAsync(current, cancellationToken, needKinds: false);
         if (reason is null)
         {
             return [];

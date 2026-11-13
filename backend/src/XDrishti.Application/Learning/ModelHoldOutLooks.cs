@@ -80,7 +80,7 @@ internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time)
 
     /// <summary>
     /// Takes the family's one look at the current block for the model before anything is scored: stores the unlock row. A model without a kept hold-out, a kept hold-out that starts after the block, or no fixed block, cannot look (<c>learning.holdout_unavailable</c>, nothing written);
-    /// a family that has looked at this block is refused <c>learning.holdout_reused</c> and nothing is written. The first look at the block is <c>fresh</c> and every later one by any strategy or model is stored as <c>reused_window</c> and cannot count (CF-06 D5).
+    /// a family that has looked at this block is refused <c>learning.holdout_reused</c> and nothing is written, and so is a model registered on or after the block's horizon (HO-01 D5: it would otherwise fill the family's one row at the block). The first look of the model kind at the block is <c>fresh</c>; a later one by another family is stored as <c>reused_window</c> and cannot count.
     /// </summary>
     public async ValueTask<Result<StoredUnlock>> ClaimAsync(StoredModel model, string mode, string actor, string settingHash, CancellationToken cancellationToken)
     {
@@ -126,21 +126,20 @@ internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time)
             return Result.Failure<StoredUnlock>(MlInfluenceErrors.HoldOutUnavailable("The model was registered on or after the horizon of the block (the block's start, or its first look at block 1), so it cannot take a fresh look at it."));
         }
 
-        var predated = true;
         var reused = await store.HasFreshLookAsync(block.Start, ModelKind, cancellationToken);
-        var look = Build(model, block, key, mode, actor, settingHash, reused, predated);
+        var look = Build(model, block, key, mode, actor, settingHash, reused);
         var stored = await store.InsertUnlockAsync(look, cancellationToken);
         if (!stored && !reused && await store.GetUnlockAsync(key, FamilyVersion, ModelKind, block.Start, cancellationToken) is null)
         {
             // another look took the block's model slot between the read and the insert: store this one as re-used
-            look = Build(model, block, key, mode, actor, settingHash, true, predated);
+            look = Build(model, block, key, mode, actor, settingHash, true);
             stored = await store.InsertUnlockAsync(look, cancellationToken);
         }
 
         return stored ? Result.Success(look) : Result.Failure<StoredUnlock>(MlInfluenceErrors.HoldOutReused(key));
     }
 
-    private StoredUnlock Build(StoredModel model, HoldOutBlock block, string key, string mode, string actor, string settingHash, bool reused, bool predated)
+    private StoredUnlock Build(StoredModel model, HoldOutBlock block, string key, string mode, string actor, string settingHash, bool reused)
     {
         var now = time.GetUtcNow();
         var view = new HoldOutResultView(
@@ -164,8 +163,7 @@ internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time)
             null,
             settingHash,
             actor,
-            reused ? [predated ? "Re-used window: the block's model look was already taken, so the look cannot count toward a pass." : "Not pre-dated: the model was registered on or after the start of this block (or after its first look), so the look cannot count toward a pass."] : [],
-            predated ? null : HoldOutHorizon.NotPredated);
-        return new StoredUnlock(key, FamilyVersion, ModelKind, mode, actor, now, settingHash, reused, block.Start, LookId(model.Model), view, predated ? null : HoldOutHorizon.NotPredated);
+            reused ? ["Re-used window: the block's model look was already taken, so the look cannot count toward a pass."] : []);
+        return new StoredUnlock(key, FamilyVersion, ModelKind, mode, actor, now, settingHash, reused, block.Start, LookId(model.Model), view);
     }
 }

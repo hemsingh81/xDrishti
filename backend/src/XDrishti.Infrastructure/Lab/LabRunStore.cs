@@ -94,6 +94,7 @@ internal sealed class LabRunStore(NpgsqlDataSource dataSource) : ILabRunStore
         return list;
     }
 
+    // shortcut: every succeeded full or robust run header is read and the newest-per-version choice is made in memory. When runs reach the thousands, push `window_to < @blockStart` and `DISTINCT ON (strategy_id, version)` (newest first) into this SQL.
     public async ValueTask<IReadOnlyList<LabRun>> ListSucceededFullTestsAsync(CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand($"SELECT {Columns} FROM lab.lab_runs WHERE state = 'succeeded' AND method IN ('full', 'robust') ORDER BY created_at DESC, id DESC");

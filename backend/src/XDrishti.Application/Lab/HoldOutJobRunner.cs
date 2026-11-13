@@ -34,7 +34,14 @@ internal sealed class HoldOutJobRunner(ILabRunStore runs, HoldOutUnlocker unlock
             else if (string.Equals(HoldOutJob.ModeOf(job.Actor), HoldOutUnlocker.AutoMode, StringComparison.Ordinal) && !options.AutoUnlock)
             {
                 // an automatic look queued while the setting was ON is not taken after it was turned OFF
-                (state, error) = (LabRunState.Cancelled, null);
+                state = LabRunState.Cancelled;
+                problems.Add(new LabProblem(HoldOutJob.Stage, "holdout", "lab.holdout_auto_off", "The automatic look was queued while the setting was ON and is not taken now that it is OFF.", "info", null, null));
+            }
+            else if (string.Equals(HoldOutJob.ModeOf(job.Actor), HoldOutUnlocker.AutoMode, StringComparison.Ordinal) && await unlocker.AutoLookRefusalAsync(job.RunId, hostStop) is { } refusal)
+            {
+                // the slot was taken, or the version is not pre-dated, while the job waited: nothing is stored, so the version's look at the block is not burned as a re-used one
+                state = LabRunState.Cancelled;
+                problems.Add(new LabProblem(HoldOutJob.Stage, "holdout", "lab.holdout_auto_refused", "The automatic look was not taken: " + refusal + ".", "info", null, null));
             }
             else
             {

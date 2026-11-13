@@ -60,9 +60,9 @@ internal sealed class StrategyAutoLookStep(HoldOutEpochs epochs, HoldOutStrategy
                 cancellationToken);
             if (!queued.Created)
             {
-                // a look of this run at this block is queued, running or done already: this evening claims nothing new for it, and the next candidate may still be claimed
+                // a look of this run at this block is queued, running or done already. Claim nothing else this evening: a second queued look would take the slot first and the first one would be stored re-used, burning its version's look
                 LabRunLog.HoldOutLookAlreadyQueued(logger, run.Id);
-                continue;
+                return $"look already queued for {run.StrategyId} v{run.Version}";
             }
 
             return $"look queued for {run.StrategyId} v{run.Version}";

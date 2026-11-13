@@ -222,7 +222,7 @@ public sealed class HoldOutSealTests
     {
         var v3 = Run("ORB", 3, new DateOnly(2026, 10, 1));
         (await Step().RunAsync(Ct)).ShouldBe("look queued for ORB v3");
-        (await Step().RunAsync(Ct)).ShouldBe("no candidate"); // the same run at the same block gets its queued job back: nothing new is claimed
+        (await Step().RunAsync(Ct)).ShouldBe("look already queued for ORB v3"); // the same run at the same block gets its queued job back: nothing new is claimed
         _store.Unlocks.Add(new StoredUnlock("ORB", 3, "strategy", "auto", "system:auto-unlock", DateTimeOffset.UnixEpoch.AddDays(1), Hash, false, Two, v3.Id, View(Two)));
         _store.Releases.Add(new StoredRelease(Two, DateTimeOffset.UnixEpoch.AddDays(2), "auto", "system:auto-release", Hash, true, new DateOnly(2027, 5, 1)));
         _store.Blocks.Add(new HoldOutBlock(new DateOnly(2027, 5, 1), new DateOnly(2024, 10, 1), new DateOnly(2027, 10, 31), 6, Hash, DateTimeOffset.UnixEpoch, Two));
@@ -272,23 +272,36 @@ public sealed class HoldOutSealTests
     // ---- the post-run auto look and the queued auto job
 
     [Fact]
-    public async Task The_post_run_auto_look_takes_a_pre_dated_version_and_skips_a_later_one_and_a_used_slot()
+    public async Task With_the_first_job_still_queued_no_second_candidate_is_claimed()
     {
-        var late = Run("ORB", 4, new DateOnly(2026, 12, 15));
+        Run("ORB", 4, new DateOnly(2026, 10, 1));
+        Run("ORB", 3, new DateOnly(2026, 9, 1));
+
+        (await Step().RunAsync(Ct)).ShouldBe("look queued for ORB v4");
+        var again = await Step().RunAsync(Ct);
+
+        again.ShouldBe("look already queued for ORB v4");
+        _jobs.Count.ShouldBe(1, "B is not queued while A's job waits: a second look would take the slot first and burn A's look");
+    }
+
+    [Fact]
+    public async Task An_auto_job_whose_slot_was_taken_or_whose_version_is_not_pre_dated_stores_nothing_and_ends_cancelled()
+    {
         var early = Run("ORB", 3, new DateOnly(2026, 10, 1));
-        var verdict = HoldOutUnlockerTests.Verdict();
+        var late = Run("ORB", 4, new DateOnly(2026, 12, 15));
+        var runner = new HoldOutJobRunner(_runs, Unlocker(), Substitute.For<ILabProgress>(), new HoldOutOptions(), _time, NullLogger<HoldOutJobRunner>.Instance);
+        LabRun JobFor(LabRun source) => Queued(new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(source.Id, Two), source.StrategyId, source.Version, source.StrategyHash, source.Universe, source.From, source.To, HoldOutJob.Method, HoldOutJob.ConfigHash, source.EngineVersion, [HoldOutJob.Label(source.Id, "system:auto-unlock")], _time.GetUtcNow()));
+        FreshStrategyLook(Two); // the slot was taken before the job ran
+        var taken = JobFor(early);
+        var notPredated = JobFor(late);
 
-        (await Unlocker().TryAutoAsync(late.Id, verdict, Ct)).ShouldBeNull("not pre-dated: the look would only burn the version's look at the block");
-        _store.Unlocks.ShouldBeEmpty();
-        FreshStrategyLook(Two);
-        (await Unlocker().TryAutoAsync(early.Id, verdict, Ct)).ShouldBeNull("the block's strategy slot is taken");
-        _store.Unlocks.Count.ShouldBe(1);
+        await runner.ExecuteAsync(taken, Ct);
         _store.Unlocks.Clear();
+        await runner.ExecuteAsync(notPredated, Ct);
 
-        var taken = await Unlocker().TryAutoAsync(early.Id, verdict, Ct);
-
-        taken.ShouldNotBeNull().ReusedWindow.ShouldBeFalse();
-        taken.Mode.ShouldBe("auto");
+        _store.Unlocks.ShouldBeEmpty();
+        await _runs.Received(1).FinishAsync(Arg.Is<LabFinish>(f => f.Id == taken.Id && f.State == LabRunState.Cancelled && f.Problems.Any(p => p.Code == "lab.holdout_auto_refused" && p.Message.Contains("already taken", StringComparison.Ordinal))), Arg.Any<CancellationToken>());
+        await _runs.Received(1).FinishAsync(Arg.Is<LabFinish>(f => f.Id == notPredated.Id && f.State == LabRunState.Cancelled && f.Problems.Any(p => p.Code == "lab.holdout_auto_refused")), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -302,7 +315,7 @@ public sealed class HoldOutSealTests
         await runner.ExecuteAsync(job, Ct);
 
         _store.Unlocks.ShouldBeEmpty();
-        await _runs.Received(1).FinishAsync(Arg.Is<LabFinish>(f => f.Id == job.Id && f.State == LabRunState.Cancelled), Arg.Any<CancellationToken>());
+        await _runs.Received(1).FinishAsync(Arg.Is<LabFinish>(f => f.Id == job.Id && f.State == LabRunState.Cancelled && f.Problems.Any(p => p.Code == "lab.holdout_auto_off" && p.Severity == "info")), Arg.Any<CancellationToken>());
     }
 
     // ---- the slot and the auto release

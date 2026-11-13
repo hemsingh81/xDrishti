@@ -188,18 +188,16 @@ public sealed class HoldOutUnlockerTests
     [InlineData("robust", "nulls=off")]
     [InlineData("robust", "draws=300")]
     [InlineData("full", "stress=on")]
-    public async Task A_what_if_run_cannot_take_the_hold_out_by_hand_or_by_the_auto_option(string method, string options)
+    public async Task A_what_if_run_cannot_take_the_hold_out(string method, string options)
     {
         _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
         var run = Run(method: method);
         _runs.GetAsync(run.Id, Arg.Any<CancellationToken>()).Returns(run with { RunOptions = options });
 
         var manual = await Unlocker().UnlockAsync(run.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
-        var auto = await Unlocker(new HoldOutOptions(AutoUnlock: true)).TryAutoAsync(run.Id, Verdict(), Ct);
 
         manual.Error.Code.ShouldBe(LabErrors.HoldOutUnavailableCode);
         manual.Error.Message.ShouldContain("what-if");
-        auto.ShouldBeNull();
         _store.Unlocks.ShouldBeEmpty("the single look is not spent");
         _pass.Calls.ShouldBe(0);
     }
@@ -214,27 +212,6 @@ public sealed class HoldOutUnlockerTests
         (await Unlocker().UnlockAsync(run.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct)).IsSuccess.ShouldBeTrue();
     }
 
-    [Fact]
-    public async Task The_auto_option_off_never_runs_and_on_it_runs_once_recorded_as_auto_when_every_development_row_passes()
-    {
-        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
-        var run = Run();
-        ReleaseBlock1(); // automatic looks start at block 2 (HO-01)
-        _freezes.FirstFrozenAtAsync(run.StrategyId, run.Version, Arg.Any<CancellationToken>()).Returns(new DateTimeOffset(2026, 9, 1, 5, 0, 0, TimeSpan.Zero)); // pre-dated: frozen before block 2 begins
-
-        (await Unlocker(new HoldOutOptions(AutoUnlock: false)).TryAutoAsync(run.Id, Verdict(), Ct)).ShouldBeNull();
-        _store.Unlocks.ShouldBeEmpty();
-        var done = await Unlocker(new HoldOutOptions(AutoUnlock: true)).TryAutoAsync(run.Id, Verdict(), Ct);
-        var second = await Unlocker(new HoldOutOptions(AutoUnlock: true)).TryAutoAsync(run.Id, Verdict(), Ct);
-
-        done.ShouldNotBeNull().Mode.ShouldBe("auto");
-        done.Actor.ShouldBe("system:auto-unlock");
-        done.SettingHash.ShouldBe(new HoldOutOptions(AutoUnlock: true).SnapshotHash(), "the snapshot with the setting ON is recorded");
-        second.ShouldBeNull("it ran once");
-        _events.Received(1).Record(Arg.Is<AccountEvent>(e => e.Event == AccountEventType.LabHoldOutUnlocked && e.Actor == "system:auto-unlock" && e.Detail!.Contains("mode=auto", StringComparison.Ordinal)));
-        _store.Unlocks.Single().Mode.ShouldBe("auto");
-    }
-
     private void ReleaseBlock1()
     {
         var one = new HoldOutBlock(new DateOnly(2026, 5, 1), new DateOnly(2024, 10, 1), new DateOnly(2026, 10, 30), 6, Hash, _time.GetUtcNow());
@@ -245,7 +222,7 @@ public sealed class HoldOutUnlockerTests
     }
 
     [Fact]
-    public async Task A_filling_block_is_refused_for_a_manual_look_and_the_auto_option_does_not_run()
+    public async Task A_filling_block_is_refused_for_a_manual_look()
     {
         _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
         var run = Run();
@@ -255,44 +232,27 @@ public sealed class HoldOutUnlockerTests
         _store.Blocks.Add(filling);
 
         var manual = await Unlocker().UnlockAsync(run.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
-        var auto = await Unlocker(new HoldOutOptions(AutoUnlock: true)).TryAutoAsync(run.Id, Verdict(), Ct);
 
         manual.Error.Code.ShouldBe(LabErrors.HoldOutFillingCode);
-        auto.ShouldBeNull();
         _store.Unlocks.ShouldBeEmpty();
         _pass.Calls.ShouldBe(0);
-    }
-
-    [Fact]
-    public async Task The_auto_option_never_claims_block_1_even_when_every_development_row_passes()
-    {
-        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
-        var run = Run();
-
-        var auto = await Unlocker(new HoldOutOptions(AutoUnlock: true)).TryAutoAsync(run.Id, Verdict(), Ct);
-
-        auto.ShouldBeNull();
-        _store.Unlocks.ShouldBeEmpty();
-        _pass.Calls.ShouldBe(0);
-        (await Unlocker().UnlockAsync(run.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct)).IsSuccess.ShouldBeTrue("the owner's own look at block 1 is unchanged");
     }
 
     [Fact]
     public async Task The_auto_option_does_not_run_while_any_development_row_is_not_a_pass_or_is_unavailable()
     {
         _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
-        var run = Run();
-        var on = Unlocker(new HoldOutOptions(AutoUnlock: true));
+        var before = new DateOnly(2026, 4, 30);
+        var start = new DateOnly(2026, 5, 1);
 
-        (await on.TryAutoAsync(run.Id, Verdict(outcome: "MARGINAL"), Ct)).ShouldBeNull();
-        (await on.TryAutoAsync(run.Id, Verdict(gatesPass: false), Ct)).ShouldBeNull();
-        (await on.TryAutoAsync(run.Id, Verdict(enough: null), Ct)).ShouldBeNull("effective n unavailable");
-        (await on.TryAutoAsync(run.Id, Verdict(tradable: "unavailable"), Ct)).ShouldBeNull("cost stress unavailable");
-        (await on.TryAutoAsync(run.Id, Verdict(tradable: null), Ct)).ShouldBeNull("no cost stress block");
-        (await on.TryAutoAsync(run.Id, Verdict(dsr: null), Ct)).ShouldBeNull("no deflated Sharpe");
-        (await on.TryAutoAsync(run.Id, Verdict(dsr: 0.5), Ct)).ShouldBeNull();
-        _store.Unlocks.ShouldBeEmpty();
-        _pass.Calls.ShouldBe(0);
+        HoldOutAutoGate.AllPass(Verdict(), before, start).ShouldBeTrue();
+        HoldOutAutoGate.AllPass(Verdict(outcome: "MARGINAL"), before, start).ShouldBeFalse();
+        HoldOutAutoGate.AllPass(Verdict(gatesPass: false), before, start).ShouldBeFalse();
+        HoldOutAutoGate.AllPass(Verdict(enough: null), before, start).ShouldBeFalse("effective n unavailable");
+        HoldOutAutoGate.AllPass(Verdict(tradable: "unavailable"), before, start).ShouldBeFalse("cost stress unavailable");
+        HoldOutAutoGate.AllPass(Verdict(tradable: null), before, start).ShouldBeFalse("no cost stress block");
+        HoldOutAutoGate.AllPass(Verdict(dsr: null), before, start).ShouldBeFalse("no deflated Sharpe");
+        HoldOutAutoGate.AllPass(Verdict(dsr: 0.5), before, start).ShouldBeFalse();
     }
 
     [Fact]
@@ -309,24 +269,6 @@ public sealed class HoldOutUnlockerTests
         HoldOutAutoGate.AllPass(Verdict(), start, start).ShouldBeFalse("the window reaches the block");
         HoldOutAutoGate.AllPass(Verdict(), null, start).ShouldBeFalse("no window is unavailable");
         HoldOutAutoGate.AllPass(Verdict(), before, null).ShouldBeFalse("no block is unavailable");
-    }
-
-    [Fact]
-    public async Task The_auto_option_does_not_unlock_a_run_whose_explicit_window_reached_the_block_and_keeps_the_fresh_look_for_a_later_version()
-    {
-        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
-        var reaching = Run(version: 1, to: new DateOnly(2026, 6, 30));
-        var on = Unlocker(new HoldOutOptions(AutoUnlock: true));
-
-        (await on.TryAutoAsync(reaching.Id, Verdict(), Ct)).ShouldBeNull();
-
-        _store.Unlocks.ShouldBeEmpty();
-        _pass.Calls.ShouldBe(0);
-        var later = await Unlocker().UnlockAsync(Run(version: 2).Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
-        later.Value.ReusedWindow.ShouldBeFalse("the fresh slot was not burned");
-        // the owner path is unchanged: a reaching run may still be unlocked by the owner, and is stored but cannot count
-        var owner = await Unlocker().UnlockAsync(reaching.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
-        owner.IsSuccess.ShouldBeTrue();
     }
 
     [Fact]

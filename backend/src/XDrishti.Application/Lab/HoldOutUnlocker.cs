@@ -176,43 +176,25 @@ internal sealed class HoldOutUnlocker(
         }
     }
 
-    /// <summary>The auto option (D6): runs once, recorded as <c>auto</c>, only when the option is on, nothing was looked at by this version, and every development row of the verdict is a pass, and never at block 1 of the chain (HO-01). Returns null when it did not run.</summary>
-    public async ValueTask<HoldOutResultView?> TryAutoAsync(Guid runId, LabVerdictView verdict, CancellationToken cancellationToken)
+    /// <summary>
+    /// Whether a queued automatic look may still run (HO-01b): the version's plan was frozen before the block's horizon and the block's strategy slot is still free. The seal step checks the same when it claims the look; a job can wait in the queue while the owner or another
+    /// look takes the slot, and a look that would only be stored re-used would burn the version's look at the block for nothing. Returns the refusal in words, or null when the look may run.
+    /// </summary>
+    public async ValueTask<string?> AutoLookRefusalAsync(Guid runId, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(verdict);
-        if (!options.AutoUnlock || !HoldOutAutoGate.DevelopmentPass(verdict))
-        {
-            return null;
-        }
-
-        // window_clear: a run whose window reached the block cannot pass, so it must not burn the block's one fresh look
         var run = await runs.GetAsync(runId, cancellationToken);
-        var block = run is null ? null : await BlockAsync(cancellationToken);
-        if (run is null || !HoldOutAutoGate.AllPass(verdict, run.To, block?.Start))
+        if (run is null || await BlockAsync(cancellationToken) is not { } block)
         {
-            return null;
+            return "the run or the block is not available";
         }
 
-        // HO-01 (coordinator, 2026-11-13): the auto look never claims block 1. It has no pre-dating horizon and its look is irreversible, so it stays the owner's act (a manual unlock, or a release with the forfeit). Automatic looks start at block 2.
-        if (block is { PrevStart: null })
+        var frozenAt = await freezes.FirstFrozenAtAsync(run.StrategyId, run.Version, cancellationToken);
+        if (!HoldOutHorizon.IsPredated(StrategyKind, block.PrevStart is null, block.Start, frozenAt, null))
         {
-            return null;
+            return "the version was not frozen before the block's horizon";
         }
 
-        if (block is not null && !await epochs.IsSealedAsync(block.HistoryLast, cancellationToken))
-        {
-            return null; // a filling block is never looked at, by hand or by the auto option (D6)
-        }
-
-        // HO-01b: the same two conditions as the seal step's candidates: the version's plan was frozen before the block's horizon and the block's strategy slot is free; otherwise the look would only be stored re-used and burn the version's look at this block
-        var frozenAt = block is null ? null : await freezes.FirstFrozenAtAsync(run.StrategyId, run.Version, cancellationToken);
-        if (block is null || !HoldOutHorizon.IsPredated(StrategyKind, block.PrevStart is null, block.Start, frozenAt, null) || await store.HasFreshLookAsync(block.Start, StrategyKind, cancellationToken))
-        {
-            return null;
-        }
-
-        var result = await UnlockAsync(runId, AutoMode, "system:auto-unlock", cancellationToken);
-        return result.IsSuccess ? result.Value : null;
+        return await store.HasFreshLookAsync(block.Start, StrategyKind, cancellationToken) ? "the block's strategy look is already taken" : null;
     }
 }
 
