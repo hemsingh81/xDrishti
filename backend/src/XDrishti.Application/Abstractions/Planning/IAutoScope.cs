@@ -21,7 +21,7 @@ public interface IAutoScopeStore
     ValueTask<StoredAutoScope> AppendAsync(AutoScope scope, string actor, DateTimeOffset now, CancellationToken cancellationToken);
 }
 
-/// <summary>The scope as the plan builder reads it: the hash and every instrument id it covers now (members of the baskets plus the individual instruments).</summary>
+/// <summary>The scope as the plan builder reads it: the hash and every instrument id it covers as of the plan session (members of the baskets plus the individual instruments).</summary>
 /// <param name="Hash">The scope hash, stored on the plan.</param>
 /// <param name="InstrumentIds">The covered instruments.</param>
 /// <param name="BasketsBeforeKnownSince">Baskets whose members were asked for a date before their membership is known (a stored system basket, ADR 0254 item 6): the first known members were used, not proven ones. Empty on a live read.</param>

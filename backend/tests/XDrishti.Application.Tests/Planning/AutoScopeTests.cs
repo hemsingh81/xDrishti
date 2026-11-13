@@ -38,16 +38,34 @@ public sealed class AutoScopeTests
 
     private sealed class FixedScope(ResolvedAutoScope? scope) : IAutoScopeSource
     {
-        public ValueTask<ResolvedAutoScope?> ResolveAsync(DateOnly? asOf, CancellationToken cancellationToken) => ValueTask.FromResult(scope);
+        public DateOnly? AsOf { get; private set; }
+
+        public ValueTask<ResolvedAutoScope?> ResolveAsync(DateOnly? asOf, CancellationToken cancellationToken)
+        {
+            AsOf = asOf;
+            return ValueTask.FromResult(scope);
+        }
     }
 
-    private static SelectionPlanBuilder BuilderWith(IReadOnlyList<TicketCandidate> found, IAutoScopeSource? scope)
+    private sealed class EventLog : Microsoft.Extensions.Logging.ILogger<SelectionPlanBuilder>
+    {
+        public List<int> Ids { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) => Ids.Add(eventId.Id);
+    }
+
+    private static SelectionPlanBuilder BuilderWith(IReadOnlyList<TicketCandidate> found, IAutoScopeSource? scope, Microsoft.Extensions.Logging.ILogger<SelectionPlanBuilder>? logger = null)
     {
         var source = Substitute.For<ITicketSource>();
         source.ReadAsync(WiredPlanFixture.Session, WiredPlanFixture.ForDate, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(XDrishti.Domain.Common.Result.Success(new TicketSourceResult(found, 0, 0, []))));
         var context = Substitute.For<IPlanContextSource>();
         context.ReadAsync(Arg.Any<PlanContextRequest>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(XDrishti.Domain.Common.Result.Success(WiredPlanFixture.Context())));
-        return new SelectionPlanBuilder(source, context, NullLogger<SelectionPlanBuilder>.Instance, WiredPlanFixture.Loose, null, null, null, scope);
+        return new SelectionPlanBuilder(source, context, logger ?? NullLogger<SelectionPlanBuilder>.Instance, WiredPlanFixture.Loose, null, null, null, scope);
     }
 
     [Fact]
@@ -63,6 +81,30 @@ public sealed class AutoScopeTests
         with.Items.Select(i => (i.Rank, i.Group, i.Symbol, string.Join(',', i.Reasons))).ShouldBe(without.Items.Select(i => (i.Rank, i.Group, i.Symbol, string.Join(',', i.Reasons))));
         with.BasisFlags!.ScopeHash.ShouldBe("h1");
         without.BasisFlags!.ScopeHash.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task The_builder_expands_the_scope_as_of_the_plan_date()
+    {
+        var found = WiredPlanFixture.Candidates();
+        var scope = new FixedScope(new ResolvedAutoScope("h", found.Select(c => c.InstrumentId!.Value).ToHashSet()));
+
+        await BuilderWith(found, scope).BuildAsync(WiredPlanFixture.Request, Ct);
+
+        scope.AsOf.ShouldBe(WiredPlanFixture.Request.ForDate);
+    }
+
+    [Fact]
+    public async Task A_scope_flagged_before_known_since_is_logged_and_listed_on_the_plan()
+    {
+        var found = WiredPlanFixture.Candidates();
+        var logger = new EventLog();
+        var flagged = new ResolvedAutoScope("h", found.Select(c => c.InstrumentId!.Value).ToHashSet(), [Guid.NewGuid()]);
+
+        var plan = (await BuilderWith(found, new FixedScope(flagged), logger).BuildAsync(WiredPlanFixture.Request, Ct)).Value;
+
+        logger.Ids.ShouldContain(4744);
+        plan.Items.ShouldAllBe(i => i.Evidence.Unavailable.Contains(SelectionPlanBuilder.ScopeBeforeKnownSince));
     }
 
     [Fact]
@@ -100,10 +142,10 @@ public sealed class AutoScopeTests
         baskets.MembersAsync(basket, null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketMembers?>(Members(basket, null, Member(member, null), Member(Guid.NewGuid(), DateTimeOffset.UnixEpoch))));
         baskets.MembersAsync(archived, null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketMembers?>(Members(archived, DateTimeOffset.UnixEpoch, Member(Guid.NewGuid(), null))));
 
-        var resolved = await new AutoScopeResolver(store, baskets).ResolveAsync(Ct);
+        var resolved = await new AutoScopeResolver(store, baskets).ResolveAsync(null, Ct);
 
         resolved!.InstrumentIds.ShouldBe([member, stock], ignoreOrder: true);
-        (await new AutoScopeResolver(new MemoryScopes(), baskets).ResolveAsync(Ct)).ShouldBeNull();
+        (await new AutoScopeResolver(new MemoryScopes(), baskets).ResolveAsync(null, Ct)).ShouldBeNull();
     }
 
     [Fact]
@@ -120,7 +162,7 @@ public sealed class AutoScopeTests
         baskets.MembersAsync(basket, null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketMembers?>(Members(basket, null, Member(member, null), Member(Guid.NewGuid(), DateTimeOffset.UnixEpoch))));
         baskets.MembersAsync(archived, null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<BasketMembers?>(Members(archived, DateTimeOffset.UnixEpoch, Member(Guid.NewGuid(), null))));
 
-        var viaOverload = await new AutoScopeResolver(store, baskets).ResolveAsync((DateOnly?)null, Ct);
+        var viaOverload = await new AutoScopeResolver(store, baskets).ResolveAsync(null, Ct);
 
         viaOverload!.Hash.ShouldBe(stored.Hash);
         viaOverload.InstrumentIds.ShouldBe([member, stock], ignoreOrder: true);
@@ -160,10 +202,9 @@ public sealed class AutoScopeTests
     }
 
     [Fact]
-    public async Task The_plan_session_decides_the_members_one_removed_before_it_and_one_added_after_it_are_left_out_and_one_valid_on_it_stays()
+    public async Task The_resolver_asks_for_the_session_cutoff_and_uses_that_answer_not_the_members_now()
     {
         var basket = Guid.NewGuid();
-        var removedBefore = Guid.NewGuid();
         var addedAfter = Guid.NewGuid();
         var valid = Guid.NewGuid();
         var session = new DateOnly(2025, 3, 3);
@@ -177,7 +218,6 @@ public sealed class AutoScopeTests
         var resolved = await new AutoScopeResolver(store, baskets).ResolveAsync(session, Ct);
 
         resolved!.InstrumentIds.ShouldBe([valid]);
-        resolved.InstrumentIds.ShouldNotContain(removedBefore);
         resolved.InstrumentIds.ShouldNotContain(addedAfter);
         resolved.BasketsBeforeKnownSince.ShouldBeNull();
     }
