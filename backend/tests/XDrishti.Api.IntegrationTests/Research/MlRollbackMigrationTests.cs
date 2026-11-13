@@ -60,7 +60,8 @@ public sealed class MlRollbackMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await CountAsync(connection, "SELECT count(*) FROM research.ml_switch_settings")).ShouldBe(0, "no row means OFF");
+        (await CountAsync(connection, "SELECT count(*) FROM research.ml_switch_settings WHERE name <> 'ml.holdout.auto_score'")).ShouldBe(0, "no row means OFF for the three safety switches");
+        (await CountAsync(connection, "SELECT count(*) FROM research.ml_switch_settings")).ShouldBe(1, "the one seed row of ml.holdout.auto_score (ADR 0282, CF-10e part 3) is the only row");
         await using var again = new NpgsqlCommand("INSERT INTO research.ml_switch_settings (name, enabled, actor, reason) VALUES ('ml.influence.enabled', false, 'owner:me@x.test', 'again')", connection);
         (await again.ExecuteNonQueryAsync(Ct)).ShouldBe(1);
     }

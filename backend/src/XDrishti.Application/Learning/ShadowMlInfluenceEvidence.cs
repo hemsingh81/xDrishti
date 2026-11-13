@@ -8,7 +8,7 @@ namespace XDrishti.Application.Learning;
 
 /// <summary>
 /// The only <see cref="IMlInfluenceEvidence"/> (CF-10e parts 10e-1 and 10e-2, ADR 0281). The forward figures come from the model's graded shadow scores (<see cref="ShadowForwardFigures"/>; none: unavailable). The calibration alarm is the calibration verdict of the model's newest
-/// <c>ml_monitor_checks</c> row: <c>Fires</c> true, <c>Quiet</c> false, anything else, no row, or a row older than the last closed session: null, which is unavailable and never a pass. The hold-out figures have no source yet (part 10e-3 waits for HO-01) and stay null.
+/// <c>ml_monitor_checks</c> row: <c>Fires</c> true, <c>Quiet</c> false, anything else, no row, or a row older than the last closed session: null, which is unavailable and never a pass. The hold-out figures are not read here (CF-10e part 3, ADR 0285): they are stored per look and read by <see cref="ModelHoldOutLooks"/>, so this source leaves them null.
 /// Read only; the predicate, its bars and the owner's switch are not touched here.
 /// </summary>
 internal sealed class ShadowMlInfluenceEvidence(IShadowScoreReader scores, IMlMonitorChecks checks, ITradingCalendar calendars, TimeProvider clock) : IMlInfluenceEvidence
@@ -18,7 +18,7 @@ internal sealed class ShadowMlInfluenceEvidence(IShadowScoreReader scores, IMlMo
         ArgumentNullException.ThrowIfNull(model);
         var forward = ShadowForwardFigures.Compute(await scores.OutcomesAsync(model.Id, cancellationToken));
         var alarm = await CalibrationAlarmAsync(model.Id, cancellationToken);
-        // shortcut: no hold-out scoring pass exists (CF-10e part 10e-3 waits for HO-01), so the hold-out figures are unavailable
+        // the hold-out figures come from the model's newest fresh look (ModelHoldOutLooks.ReadAsync), not from this source
         return new MlInfluenceEvidence(null, forward, alarm);
     }
 

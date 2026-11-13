@@ -6,12 +6,13 @@ import { mlProblem } from './mlProblem';
 
 const maxReason = 500;
 
-export type MlSwitchKey = 'influence' | 'autoPromote' | 'autoRollback';
+export type MlSwitchKey = 'influence' | 'autoPromote' | 'autoRollback' | 'autoHoldOutScore';
 
 const fields: Record<MlSwitchKey, { field: MlSwitchField; title: string; name: string }> = {
   influence: { field: 'influenceEnabled', title: 'model influence', name: 'ml.influence.enabled' },
   autoPromote: { field: 'autoPromote', title: 'automatic promotion', name: 'ml.auto_promote' },
   autoRollback: { field: 'autoRollback', title: 'automatic rollback', name: 'ml.auto_rollback' },
+  autoHoldOutScore: { field: 'autoHoldOutScore', title: 'automatic hold-out score', name: 'ml.holdout.auto_score' },
 };
 
 interface MlSwitchDialogProps {
@@ -29,7 +30,7 @@ interface MlSwitchDialogProps {
 export function MlSwitchDialog({ switchKey, on, onClose }: MlSwitchDialogProps) {
   const act = useMlSwitchAct();
   const { field, title, name } = fields[switchKey];
-  const askPassword = on && switchKey !== 'autoRollback';
+  const askPassword = switchKey === 'autoHoldOutScore' || (on && switchKey !== 'autoRollback');
   const [reason, setReason] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -106,7 +107,7 @@ export function MlSwitchDialog({ switchKey, on, onClose }: MlSwitchDialogProps) 
                     setPassword(event.target.value);
                   }}
                   required
-                  helperText="Asked again for every change that turns this ON. A wrong one counts toward the sign-in lock."
+                  helperText="Asked again for every such change. A wrong one counts toward the sign-in lock."
                 />
               )}
             </>

@@ -51,7 +51,9 @@ public sealed record RollbackProposalView(
 /// <param name="AutoPromoteSettingId">Its row in force, or null.</param>
 /// <param name="AutoRollback"><c>ml.auto_rollback</c>.</param>
 /// <param name="AutoRollbackSettingId">Its row in force, or null.</param>
-public sealed record MlSettingsView(bool InfluenceEnabled, long? InfluenceSettingId, bool AutoPromote, long? AutoPromoteSettingId, bool AutoRollback, long? AutoRollbackSettingId);
+/// <param name="AutoHoldOutScore"><c>ml.holdout.auto_score</c> (ON by the ADR 0282 seed row).</param>
+/// <param name="AutoHoldOutScoreSettingId">Its row in force, or null.</param>
+public sealed record MlSettingsView(bool InfluenceEnabled, long? InfluenceSettingId, bool AutoPromote, long? AutoPromoteSettingId, bool AutoRollback, long? AutoRollbackSettingId, bool AutoHoldOutScore = false, long? AutoHoldOutScoreSettingId = null);
 
 /// <summary>The proposals and the switches beside them.</summary>
 /// <param name="Items">The proposals, newest first.</param>

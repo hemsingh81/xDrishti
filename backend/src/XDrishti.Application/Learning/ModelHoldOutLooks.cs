@@ -14,9 +14,9 @@ namespace XDrishti.Application.Learning;
 /// The one look a model family takes at the locked hold-out, per block (CF-10 part 10c-2, spec D6 and CF-06 D5, ADR 0217). A look is a row of <c>lab.holdout_unlocks</c> of kind <c>model</c> whose id is the family AND the block (<c>model-family:{feature version}@{block start}</c>) and whose
 /// version is 1, so the database lets a family have exactly one look per block, and a block that the owner advances gives the family a fresh one. Whoever takes it first owns it; a later model of the family, or a look at a block somebody had already looked at (<c>reused_window</c>), reads as
 /// <c>holdout_reused</c> and can never make <c>HoldOutBeatsNoMl</c> true. A model counts only if the hold-out it kept excludes the locked block (its kept start is not after the block's start). The row is insert-only, so a look that fails or is abandoned stays burned.
-/// This type claims and reads the look; scoring the hold-out rows is not built in this part, and no session of the hold-out is read here.
+/// This type claims and reads the look and the stored figures of it; scoring the hold-out rows is <see cref="ModelHoldOutScorer"/>, and no session of the hold-out is read here.
 /// </summary>
-internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time)
+internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time, IMlHoldOutScores? scores = null)
 {
     /// <summary>The kind of the unlock row.</summary>
     public const string ModelKind = "model";
@@ -70,7 +70,10 @@ internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time)
             .FirstOrDefault();
         if (own is not null)
         {
-            return new HoldOutReading(HoldOutReading.Used, new MlHoldOutFacts(true, false, null, null, null), own.BlockStart, own);
+            // the figures are those stored for exactly this look (CF-10e part 3): a look that was claimed and not scored has none, which is unavailable and never a pass
+            var score = scores is null ? null : await scores.FindAsync(model.Id, own.BlockStart, cancellationToken);
+            var facts = score is null ? new MlHoldOutFacts(true, false, null, null, null) : new MlHoldOutFacts(true, false, score.Rows, score.ProbabilityBetter, score.PolicyEffectR);
+            return new HoldOutReading(HoldOutReading.Used, facts, own.BlockStart, own, score);
         }
 
         return atBlock is null

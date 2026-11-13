@@ -151,3 +151,10 @@ The owner approved HO-01, SR-03 and this part on 2026-11-13 ("mostly things shou
 - **Unchanged.** `ml.influence.enabled` stays OFF and the gate's consumers stay pinned empty (D7). The source registration is `ShadowMlInfluenceEvidence` (`Application/DependencyInjection.cs:981`), whose hold-out figures are null today (`Application/Learning/ShadowMlInfluenceEvidence.cs:11, 22`); part 3 fills them from `research.ml_holdout_scores`.
 - **Decision record.** ADR **0285** (number reserved), amending ADR 0217 and 0281.
 - **Size.** About 3 agent-days, as planned; SAFETY, Opus reviewer.
+
+## As built (part 3, 2026-11-13, ADR 0285)
+- **Look and figures.** `ModelHoldOutScorer` (claim, pass once, store), `ModelHoldOutPass` (the second reader of the block), pure `ModelHoldOutFigures`, `research.ml_holdout_scores` (migration `AddMlHoldOutScores`; key `(model_id, block_start)` because HO-01 gives a family one fresh look per block). `ModelHoldOutLooks.ReadAsync` reads the figures stored for the newest fresh look.
+- **Seal step 30 and the model slot.** `ModelAutoLookStep` and `ModelLookSlot`; never block 1, never a filling block, only a pre-dated Eligible champion; the auto release waits while the slot reads Available.
+- **Setting.** `ml.holdout.auto_score` seeded ON (`system:default`, ADR 0282); any owner change needs a fresh password; automatic scores are recorded `auto` with a setting hash and the database refuses one while the switch is not ON.
+- **API, UI.** `POST /api/learning/models/{id}/holdout-score`; `autoHoldOutScore` in `PUT /api/learning/ml-settings` and in the settings view; the interval and figures in `GET .../influence`; the Models drawer's Influence section shows them and offers "Score on hold-out" behind the password dialog; the switch list shows the fourth switch.
+- **Deviations.** The take rule is a fixed threshold (not `MetaPolicyEvaluator`); the universe is the stored baskets; `xd learn holdout-score` is read only (the fresh password cannot be asked on the command line). Owner decision recorded as the spec's recommendation.

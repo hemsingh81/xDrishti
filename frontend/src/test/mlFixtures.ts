@@ -69,6 +69,10 @@ export const buildHoldingInfluence = (): Influence =>
       rows: 240,
       probabilityBeatsNoMl: 0.9712,
       policyEffectR: 0.0045,
+      gainLow: 0.001,
+      gainHigh: 0.03,
+      baselineName: 'cell_rate',
+      mode: 'auto',
     },
     switchOn: true,
     notes: [],
@@ -81,6 +85,8 @@ export const buildSettings = (over: Partial<Settings> = {}): Settings => ({
   autoPromoteSettingId: null,
   autoRollback: false,
   autoRollbackSettingId: null,
+  autoHoldOutScore: true,
+  autoHoldOutScoreSettingId: 4,
   ...over,
 });
 
@@ -118,6 +124,8 @@ export interface MlState {
   refuse: MlFake['refuse'] | null;
   /** Every body sent to `PUT /api/learning/ml-settings`. */
   switchBodies: Record<string, unknown>[];
+  /** Every (model id, password) sent to the hold-out score route. */
+  scoreBodies: { id: number; password: string | null }[];
   /** Every proposal id sent to the apply route. */
   applied: number[];
   /** The model ids the influence read was asked for. */
@@ -131,6 +139,7 @@ export function mlHandlers(fake: MlFake = {}) {
     settings: fake.settings ?? buildSettings(),
     refuse: fake.refuse ?? null,
     switchBodies: [],
+    scoreBodies: [],
     applied: [],
     influenceIds: [],
   };
@@ -178,12 +187,45 @@ export function mlHandlers(fake: MlFake = {}) {
         actor: 'owner:me',
       });
     }),
+    http.post('/api/learning/models/:id/holdout-score', async ({ params, request }) => {
+      const body = (await request.json()) as { password?: string | null };
+      state.scoreBodies.push({ id: Number(params.id), password: body.password ?? null });
+      const refusal = refused();
+      if (refusal) return refusal;
+      if (typeof body.password !== 'string') {
+        return problemResponse({ title: 'Password required.', code: 'auth.step_up_required' }, 403);
+      }
+      if (body.password === 'wrong') {
+        return problemResponse({ title: 'Invalid credentials', code: 'auth.invalid_credentials' }, 401);
+      }
+      return HttpResponse.json({
+        modelId: Number(params.id),
+        family: 'v3',
+        blockStart: '2026-10-31',
+        mode: 'owner',
+        actor: 'owner:me',
+        rows: 140,
+        days: 30,
+        dropped: 2,
+        logLossModel: 0.652,
+        logLossBaseline: 0.671,
+        baselineName: 'cell_rate',
+        probabilityBeatsNoMl: 0.97,
+        gainLow: 0.001,
+        gainHigh: 0.03,
+        policyEffectR: 0.04,
+        settingHash: 'a'.repeat(64),
+        inputHash: 'b'.repeat(64),
+        scoredAt: '2026-11-13T10:00:00Z',
+      } satisfies Schemas['MlHoldOutScoreView']);
+    }),
     http.put('/api/learning/ml-settings', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       state.switchBodies.push(body);
       const refusal = refused();
       if (refusal) return refusal;
-      const turnsOn = body.influenceEnabled === true || body.autoPromote === true;
+      const turnsOn =
+        body.influenceEnabled === true || body.autoPromote === true || typeof body.autoHoldOutScore === 'boolean';
       if (turnsOn && typeof body.password !== 'string') {
         return problemResponse({ title: 'Password required.', code: 'auth.step_up_required' }, 403);
       }
@@ -204,12 +246,17 @@ export function mlHandlers(fake: MlFake = {}) {
         next.autoRollback = body.autoRollback;
         changed.push('ml.auto_rollback');
       }
+      if (typeof body.autoHoldOutScore === 'boolean') {
+        next.autoHoldOutScore = body.autoHoldOutScore;
+        changed.push('ml.holdout.auto_score');
+      }
       state.settings = next;
       return HttpResponse.json({
         switches: {
           influence: { id: 1, on: next.influenceEnabled },
           autoPromote: { id: 2, on: next.autoPromote },
           autoRollback: { id: 3, on: next.autoRollback },
+          autoHoldOutScore: { id: 4, on: next.autoHoldOutScore },
         },
         changed,
       });

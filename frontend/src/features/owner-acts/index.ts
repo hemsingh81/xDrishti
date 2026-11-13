@@ -7,4 +7,5 @@ export const loadExperimentPage = async () => (await import('./components/Experi
 export const loadMlSwitchDialog = async () => (await import('./components/MlSwitchDialog')).MlSwitchDialog;
 export const loadApplyRollbackDialog = async () =>
   (await import('./components/ApplyRollbackDialog')).ApplyRollbackDialog;
+export const loadHoldOutScoreDialog = async () => (await import('./components/HoldOutScoreDialog')).HoldOutScoreDialog;
 export const loadMovePage = async () => (await import('./components/MovePage')).MovePage;

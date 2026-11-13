@@ -22,4 +22,10 @@ internal static partial class ModelLog
 
     [LoggerMessage(EventId = 4525, Level = LogLevel.Warning, Message = "learning.model.file_refused {ModelId} {Code}")]
     public static partial void FileRefused(ILogger logger, long modelId, string code);
+
+    [LoggerMessage(EventId = 4526, Level = LogLevel.Information, Message = "learning.model.holdout_scored {ModelId} {Mode}: {Rows} rows, {Dropped} dropped, {Millis} ms")]
+    public static partial void HoldOutScored(ILogger logger, long modelId, string mode, int rows, int dropped, long millis);
+
+    [LoggerMessage(EventId = 4527, Level = LogLevel.Warning, Message = "learning.model.holdout_pass_failed {ModelId} {Code}: the look stays burned")]
+    public static partial void HoldOutPassFailed(ILogger logger, long modelId, string code);
 }

@@ -64,6 +64,7 @@ public sealed partial class ExpressionDimensionArchitectureTests
         [
             "XDrishti.Application/Selection/ShowSelectionHandler.cs", "XDrishti.Infrastructure/Planning/StoredTicketSource.cs", "XDrishti.Application/Paper/ConfigSnapshotSource.cs",
             "XDrishti.Application/Learning/CellsRefresh/RefreshCellStatsHandler.cs", // the scheduled refresh (LC-01) repeats the newest cash snapshot
+            "XDrishti.Application/Learning/ModelHoldOutPass.cs", // the model's hold-out look (CF-10e part 3) reads the cash cells before the block only
             "XDrishti.Application/Shadow/ShadowScorer.cs", // the nightly shadow scores (CF-10e) read the cash cells of the candidates only
             "XDrishti.Application/Replay/ReplayFacts.cs", // the system replay (SR-01) reads the cells of a plan: cash only, as the live ticket source does
         ];

@@ -29,9 +29,9 @@ internal sealed class ChangeMlSettingsHandler(IMlSwitchSettings settings, IMlSwi
             return Result.Failure<MlSettingsChanged>(MlSafetyErrors.SettingsInvalid("A change needs a reason of 1 to 500 characters."));
         }
 
-        if (command.Influence is null && command.AutoPromote is null && command.AutoRollback is null)
+        if (command.Influence is null && command.AutoPromote is null && command.AutoRollback is null && command.AutoHoldOutScore is null)
         {
-            return Result.Failure<MlSettingsChanged>(MlSafetyErrors.SettingsInvalid("A change names at least one of ml.influence.enabled, ml.auto_promote and ml.auto_rollback."));
+            return Result.Failure<MlSettingsChanged>(MlSafetyErrors.SettingsInvalid("A change names at least one of ml.influence.enabled, ml.auto_promote, ml.auto_rollback and ml.holdout.auto_score."));
         }
 
         var now = await settings.CurrentAsync(cancellationToken);
@@ -41,6 +41,7 @@ internal sealed class ChangeMlSettingsHandler(IMlSwitchSettings settings, IMlSwi
             (MlSwitch.Influence, command.Influence, now.Influence.On),
             (MlSwitch.AutoPromote, command.AutoPromote, now.AutoPromote.On),
             (MlSwitch.AutoRollback, command.AutoRollback, now.AutoRollback.On),
+            (MlSwitch.AutoHoldOutScore, command.AutoHoldOutScore, now.AutoHoldOutScore?.On ?? false),
         })
         {
             if (wanted is not { } value || value == current)

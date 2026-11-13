@@ -11,6 +11,12 @@ public static class MlInfluenceErrors
     /// <summary>The model was trained without a hold-out, or no locked block is fixed, so there is no look to take.</summary>
     public const string HoldOutUnavailableCode = "learning.holdout_unavailable";
 
+    /// <summary>The look was taken but the block gave no candidate the model could score (422).</summary>
+    public const string HoldOutNoRowsCode = "learning.holdout_no_rows";
+
+    /// <summary>The look is burned (insert-only) and nothing could be scored.</summary>
+    public static Error HoldOutNoRows() => Error.Validation(HoldOutNoRowsCode, "The look was taken, but the block gave no candidate the model could score (no trade, or no features or cell statistics before it). The look stays burned and counts for nothing.");
+
     /// <summary>The family of the model already took its one look at this block of the hold-out.</summary>
     public static Error HoldOutReused(string family) =>
         Error.Conflict(HoldOutReusedCode, $"The model family `{family}` has already looked at this block of the hold-out; a second look is a new trial and cannot make the model pass. It needs a fresh hold-out (a block the owner advances) or stays advisory.");

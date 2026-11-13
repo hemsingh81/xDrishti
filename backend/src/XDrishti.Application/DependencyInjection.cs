@@ -1003,6 +1003,12 @@ public static class DependencyInjection
         services.AddScoped<IBellNoticeSource, PromotionNotices>(); // an automatic promotion stays on the bell for three days as a resolved notice (CF-10 part 10d-1)
         services.AddScoped<IBellNoticeSource, RollbackProposalNotices>(); // the open rollback proposals as bell notices, derived on read (CF-10 part 10d-1)
         services.AddScoped<ModelHoldOutLooks>(); // the one look a model family takes at the locked hold-out (CF-10 part 10c-2, ADR 0217)
+        services.AddScoped<IModelHoldOutPass, ModelHoldOutPass>(); // the second reader of the hold-out block: the model's strategy versions, once (CF-10e part 3, ADR 0285)
+        services.AddScoped<ModelHoldOutScorer>();
+        services.AddScoped<ModelHoldOutCandidates>();
+        services.AddScoped<ICommandHandler<ScoreModelHoldOutCommand, MlHoldOutScoreView>, ScoreModelHoldOutHandler>(); // the owner's model hold-out score (fresh password at the endpoint)
+        services.AddScoped<IHoldOutLookSlot, ModelLookSlot>(); // the model kind's slot for the auto release (HO-01 D4)
+        services.AddScoped<IHoldOutSealStep, ModelAutoLookStep>(); // seal step 30: the auto model look, ml.holdout.auto_score (ADR 0282)
         services.AddScoped<MlInfluenceEvaluator>();
         services.AddScoped<IMlInfluenceGate, MlInfluenceGate>(); // the only way Planning, Selection and Autonomy may read a model score (CF-10 part 10c-2, AC10)
         services.AddScoped<IQueryHandler<GetMlInfluenceQuery, Result<MlInfluenceView>>, GetMlInfluenceHandler>(); // the influence predicate of a model, term by term, read only (CF-10 part 10c-2)

@@ -416,6 +416,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(MlSettingsRequest))]
 [JsonSerializable(typeof(PromotionOutcome))]
 [JsonSerializable(typeof(PromoteModelRequest))]
+[JsonSerializable(typeof(MlHoldOutScoreRequest))]
+[JsonSerializable(typeof(MlHoldOutScoreView))]
 [JsonSerializable(typeof(ShadowSummaryView))]
 [JsonSerializable(typeof(ShadowSwitched))]
 [JsonSerializable(typeof(ShadowSwitchRequest))]

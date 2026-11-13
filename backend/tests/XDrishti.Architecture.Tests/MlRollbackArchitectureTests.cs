@@ -479,6 +479,7 @@ public sealed class MlRollbackArchitectureTests
         Dependents(Application, typeof(IMlSwitchSettings).FullName!).ShouldBe(
         [
             "XDrishti.Application.Learning.ApplyRollbackHandler", "XDrishti.Application.Learning.ChangeMlSettingsHandler", "XDrishti.Application.Learning.EvaluateMlModelsHandler", "XDrishti.Application.Learning.GetRollbackProposalsHandler",
+            "XDrishti.Application.Learning.ModelAutoLookStep", "XDrishti.Application.Learning.ModelHoldOutScorer", // read ml.holdout.auto_score only (CF-10e part 3)
             "XDrishti.Application.Learning.PromoteChallengerHandler", "XDrishti.Application.Learning.ProposeRollbackHandler",
         ]);
         Dependents(Application, typeof(IRollbackProposalReader).FullName!).ShouldBe(
@@ -635,7 +636,7 @@ public sealed class MlRollbackArchitectureTests
         var source = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", "Endpoints", "MlSafetyEndpoints.cs"));
 
         source.Split("MapGet(").Length.ShouldBe(2);
-        source.Split("MapPost(").Length.ShouldBe(3, "apply and promote");
+        source.Split("MapPost(").Length.ShouldBe(4, "apply, promote and the hold-out score");
         source.Split("MapPut(").Length.ShouldBe(2, "the switches");
         foreach (var verb in new[] { "MapDelete", "MapPatch", "MapMethods" })
         {
@@ -646,7 +647,8 @@ public sealed class MlRollbackArchitectureTests
         source.ShouldContain("/rollback/{id:long}/apply");
         source.ShouldContain("/ml-settings");
         source.ShouldContain("/models/{id:long}/promote");
-        source.Split("OwnerAct.FreshAsync(").Length.ShouldBe(3, "the switch change that raises reliance on ML, and the promotion");
+        source.ShouldContain("/models/{id:long}/holdout-score");
+        source.Split("OwnerAct.FreshAsync(").Length.ShouldBe(4, "the switch change that raises reliance on ML (or changes the auto hold-out score), the promotion and the hold-out score");
         source.ShouldContain("MlSwitch.NeedsFreshPassword(");
         source.Split("OwnerAct.SessionOwner(http)").Length.ShouldBe(3, "apply, and the switch change that only lowers reliance");
         source.ShouldNotContain("request.Actor");

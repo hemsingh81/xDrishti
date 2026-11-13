@@ -27,6 +27,8 @@ public sealed class MlSafetyApiTests(ApiFactory factory) : DataTestBase(factory)
 
     private static Uri Apply(long id) => new($"/api/learning/rollback/{id}/apply", UriKind.Relative);
 
+    private static Uri HoldOutScore(long id) => new($"/api/learning/models/{id}/holdout-score", UriKind.Relative);
+
     private static Uri Promote(long id) => new($"/api/learning/models/{id}/promote", UriKind.Relative);
 
     public override async ValueTask InitializeAsync()
@@ -366,6 +368,38 @@ public sealed class MlSafetyApiTests(ApiFactory factory) : DataTestBase(factory)
         (await RoleAsync(champion)).ShouldBe("champion");
         (await ScalarAsync<long>("SELECT count(*) FROM research.learning_changelog WHERE subject_kind = 'model'")).ShouldBe(changelog);
         (await ScalarAsync<long>("SELECT count(*) FROM research.ml_switch_settings")).ShouldBe(0, "promotion never touches a switch");
+    }
+
+    // ---- the model hold-out score (CF-10e part 3, ADR 0285) ----
+
+    [Fact]
+    public async Task The_hold_out_score_needs_a_fresh_password_and_with_no_block_is_refused_without_writing_anything()
+    {
+        var model = await RegisterAsync('8', '8', ModelRole.Champion);
+
+        var missing = await SendAsync(HttpMethod.Post, HoldOutScore(model), new { });
+        var wrong = await SendAsync(HttpMethod.Post, HoldOutScore(model), new { password = "not-the-password" });
+        var noBlock = await SendAsync(HttpMethod.Post, HoldOutScore(model), new { password = Factory.OwnerPassword });
+        var unknown = await SendAsync(HttpMethod.Post, HoldOutScore(model + 1000), new { password = Factory.OwnerPassword });
+
+        missing.Status.ShouldBe(HttpStatusCode.Forbidden);
+        missing.Body.GetProperty("code").GetString().ShouldBe("auth.step_up_required");
+        wrong.Status.ShouldBe(HttpStatusCode.Unauthorized);
+        noBlock.Status.ShouldBe(HttpStatusCode.Conflict);
+        noBlock.Body.GetProperty("code").GetString().ShouldBe("learning.holdout_unavailable");
+        unknown.Status.ShouldBe(HttpStatusCode.NotFound);
+        (await ScalarAsync<long>("SELECT count(*) FROM research.ml_holdout_scores")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Any_change_of_the_auto_hold_out_score_needs_the_password_and_is_recorded_with_the_owner()
+    {
+        var missing = await SendAsync(HttpMethod.Put, Settings, new { autoHoldOutScore = false, reason = "choose myself" });
+        var done = await SendAsync(HttpMethod.Put, Settings, new { autoHoldOutScore = false, reason = "choose myself", password = Factory.OwnerPassword });
+
+        missing.Status.ShouldBe(HttpStatusCode.Forbidden);
+        done.Status.ShouldBe(HttpStatusCode.OK);
+        (await ScalarAsync<string>("SELECT name || '|' || enabled::text || '|' || actor FROM research.ml_switch_settings")).ShouldBe($"ml.holdout.auto_score|false|owner:{ApiFactory.OwnerEmail}");
     }
 
     [Fact]

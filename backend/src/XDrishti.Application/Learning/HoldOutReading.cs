@@ -1,4 +1,5 @@
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Domain.Learning;
 
 namespace XDrishti.Application.Learning;
@@ -7,8 +8,9 @@ namespace XDrishti.Application.Learning;
 /// <param name="State">The state word.</param>
 /// <param name="Facts">The facts for the predicate; null while nothing was scored.</param>
 /// <param name="BlockStart">The start of the block the look was taken on (the model's newest fresh look across blocks when <c>used</c>, HO-01 D8), or null before a look.</param>
+/// <param name="Score">The stored figures of the newest fresh look (CF-10e part 3); null before they were scored.</param>
 /// <param name="Look">The model's newest fresh look when <c>used</c>, with the stored result; null otherwise.</param>
-internal sealed record HoldOutReading(string State, MlHoldOutFacts? Facts, DateOnly? BlockStart, StoredUnlock? Look = null)
+internal sealed record HoldOutReading(string State, MlHoldOutFacts? Facts, DateOnly? BlockStart, StoredUnlock? Look = null, StoredMlHoldOutScore? Score = null)
 {
     /// <summary>The model took the family's fresh look at the current block.</summary>
     public const string Used = "used";

@@ -9,7 +9,8 @@ public sealed record MlSwitchState(long? Id, bool On);
 /// <param name="Influence"><c>ml.influence.enabled</c>.</param>
 /// <param name="AutoPromote"><c>ml.auto_promote</c>.</param>
 /// <param name="AutoRollback"><c>ml.auto_rollback</c>.</param>
-public sealed record MlSwitches(MlSwitchState Influence, MlSwitchState AutoPromote, MlSwitchState AutoRollback)
+/// <param name="AutoHoldOutScore"><c>ml.holdout.auto_score</c> (CF-10e part 3): ON by the seed row of ADR 0282, OFF when no row exists.</param>
+public sealed record MlSwitches(MlSwitchState Influence, MlSwitchState AutoPromote, MlSwitchState AutoRollback, MlSwitchState? AutoHoldOutScore = null)
 {
     /// <summary>Every switch OFF, as when nothing is stored.</summary>
     public static MlSwitches AllOff { get; } = new(new MlSwitchState(null, false), new MlSwitchState(null, false), new MlSwitchState(null, false));

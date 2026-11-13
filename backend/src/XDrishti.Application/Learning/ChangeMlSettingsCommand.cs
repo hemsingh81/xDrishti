@@ -12,7 +12,8 @@ namespace XDrishti.Application.Learning;
 /// <param name="AutoPromote">The new value of <c>ml.auto_promote</c>, or null to leave it.</param>
 /// <param name="AutoRollback">The new value of <c>ml.auto_rollback</c>, or null to leave it.</param>
 /// <param name="Reason">Why, 1 to 500 characters.</param>
-public sealed record ChangeMlSettingsCommand(string Actor, bool? Influence, bool? AutoPromote, bool? AutoRollback, string Reason) : ICommand;
+/// <param name="AutoHoldOutScore">The new value of <c>ml.holdout.auto_score</c> (ON by the ADR 0282 seed row), or null to leave it; any change needs a fresh password at the endpoint.</param>
+public sealed record ChangeMlSettingsCommand(string Actor, bool? Influence, bool? AutoPromote, bool? AutoRollback, string Reason, bool? AutoHoldOutScore = null) : ICommand;
 
 /// <summary>The switches after a change.</summary>
 /// <param name="Switches">The three switches now in force.</param>

@@ -32,7 +32,7 @@ internal sealed class MlSafetyEndpoints : IEndpointModule
         learning.MapPut("/ml-settings", SwitchAsync)
             .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy) // a password may be checked here, so the sign-in limit applies
             .WithName("ChangeMlSettings")
-            .WithSummary("Change the ML switches ml.influence.enabled, ml.auto_promote and ml.auto_rollback (all OFF by default; no row means OFF) as the owner; each change appends an audited row with the owner as actor. A switch that is not given is left alone. Turning ml.influence.enabled or ml.auto_promote ON needs the session, the CSRF token and the password in the body, checked on EVERY such change (403 auth.step_up_required with no password, 401 auth.invalid_credentials, 423 auth.locked); ml.auto_rollback, and turning any switch OFF, needs the session and the CSRF token only. ON opens nothing alone: influence still needs the predicate's evidence terms, an automatic rollback is recorded as actor auto with the setting row, never as an owner approval, and an automatic promotion needs the promotion rule and the predicate without the switch. 400 learning.ml_settings_invalid, 429 auth.rate_limited")
+            .WithSummary("Change the ML switches ml.influence.enabled, ml.auto_promote and ml.auto_rollback (all OFF by default; no row means OFF) as the owner; each change appends an audited row with the owner as actor. A switch that is not given is left alone. Changing ml.holdout.auto_score (ON by default, ADR 0282) in either direction also needs the password. Turning ml.influence.enabled or ml.auto_promote ON needs the session, the CSRF token and the password in the body, checked on EVERY such change (403 auth.step_up_required with no password, 401 auth.invalid_credentials, 423 auth.locked); ml.auto_rollback, and turning any switch OFF, needs the session and the CSRF token only. ON opens nothing alone: influence still needs the predicate's evidence terms, an automatic rollback is recorded as actor auto with the setting row, never as an owner approval, and an automatic promotion needs the promotion rule and the predicate without the switch. 400 learning.ml_settings_invalid, 429 auth.rate_limited")
             .ProducesRejections(conflict: false, notFound: false);
 
         learning.MapPost("/models/{id:long}/promote", PromoteAsync)
@@ -40,6 +40,31 @@ internal sealed class MlSafetyEndpoints : IEndpointModule
             .WithName("PromoteModel")
             .WithSummary("Promote a model to champion as the owner, with the P6-08 changelog row. A challenger needs 30 graded candidates over 4 weeks, the paired bootstrap against the champion at 0.95, a P6-12 counterfactual that is not FrozenBetter and the champion rule; a retired previous champion is re-promoted only if its latest evaluation still satisfies the predicate without the owner's switch. A figure that is not available is never a pass (the sources of the first three do not exist yet, so every promotion is refused with the reason). Promotion never turns ml.influence.enabled on. Needs a session, the CSRF token and a fresh password in the body. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 404 models.not_found, 409 learning.promotion_refused or learning.repromotion_refused or models.not_eligible, 422 learning.invalid")
             .ProducesRejections(conflict: true);
+
+        learning.MapPost("/models/{id:long}/holdout-score", ScoreHoldOutAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy)
+            .WithName("ScoreModelHoldOut")
+            .WithSummary("Score a model on the locked hold-out as the owner (CF-10e part 3, ADR 0285): claims the model family's one fresh look at the block in force (insert-only, burned even if nothing can be scored), runs the model's strategy versions once over the block and stores the figures (rows, log loss against the better no-ML baseline, the paired day-cluster bootstrap probability and interval, and the effect of the fixed take rule on realised R). The evening seal service does the same, recorded as auto, while ml.holdout.auto_score is on. Needs a session, the CSRF token and a fresh password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 404 models.not_found, 409 learning.holdout_reused (this family, or another model, already took the model slot of this block) or learning.holdout_unavailable (no block, model not kept out of the block, not registered before the block, or inputs missing), 422 learning.holdout_no_rows")
+            .ProducesRejections(conflict: true);
+    }
+
+    private static async Task<Results<Ok<MlHoldOutScoreView>, ProblemHttpResult>> ScoreHoldOutAsync(
+        long id,
+        MlHoldOutScoreRequest request,
+        HttpContext http,
+        ICommandHandler<StepUpCommand, StepUpResult> passwordCheck,
+        ICommandHandler<ScoreModelHoldOutCommand, MlHoldOutScoreView> handler,
+        CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var owner = await OwnerAct.FreshAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new ScoreModelHoldOutCommand(id, owner.Value), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<RollbackProposalsView>, ProblemHttpResult>> ListAsync(
@@ -83,7 +108,7 @@ internal sealed class MlSafetyEndpoints : IEndpointModule
         http.Response.Headers.CacheControl = "no-store";
 
         // raising how far a model may matter needs the password for THIS change; lowering it, and the automatic rollback, need the session only
-        var owner = MlSwitch.NeedsFreshPassword(request.InfluenceEnabled, request.AutoPromote)
+        var owner = MlSwitch.NeedsFreshPassword(request.InfluenceEnabled, request.AutoPromote, request.AutoHoldOutScore)
             ? await OwnerAct.FreshAsync(http, passwordCheck, request.Password, cancellationToken)
             : OwnerAct.SessionOwner(http);
         if (owner.IsFailure)
@@ -91,7 +116,7 @@ internal sealed class MlSafetyEndpoints : IEndpointModule
             return ProblemResults.From(owner.Error, http);
         }
 
-        var result = await handler.HandleAsync(new ChangeMlSettingsCommand(owner.Value, request.InfluenceEnabled, request.AutoPromote, request.AutoRollback, request.Reason ?? string.Empty), cancellationToken);
+        var result = await handler.HandleAsync(new ChangeMlSettingsCommand(owner.Value, request.InfluenceEnabled, request.AutoPromote, request.AutoRollback, request.Reason ?? string.Empty, request.AutoHoldOutScore), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
@@ -116,7 +141,7 @@ internal sealed class MlSafetyEndpoints : IEndpointModule
 
     /// <summary>A refused input is 422, as in the Lab; every other failure is the shared mapping.</summary>
     private static ProblemHttpResult Problem(Error error, HttpContext http) =>
-        error.Code == LearningErrors.InvalidCode
+        error.Code is LearningErrors.InvalidCode or MlInfluenceErrors.HoldOutNoRowsCode
             ? TypedResults.Problem(ProblemResults.Create(StatusCodes.Status422UnprocessableEntity, error.Message, error.Code))
             : ProblemResults.From(error, http);
 }

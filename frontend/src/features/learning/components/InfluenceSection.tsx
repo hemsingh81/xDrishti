@@ -1,23 +1,26 @@
-import { Box, Typography } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { Suspense, useState } from 'react';
 import { formatAsOfDay, formatCount, MetricValue } from '@/shared/analytics';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { Facts } from '@/shared/ui/Facts';
 import { influenceQuery, rollbackQuery, type MlInfluence } from '../api/mlQueries';
-import { figure, formatFine, formatFineR } from '../lib/figure';
+import { figure, formatFine, formatFineR, formatFineSigned } from '../lib/figure';
 import { holdOutStateLabel, termLabel } from '../lib/mlText';
+import { HoldOutScoreDialog } from './ActDialogs';
 import { MlSwitchList } from './MlSwitchList';
 import { TermStateChip } from './TermStateChip';
 
-/** Whether the model may influence a decision, term by term. Read only: today the evidence terms have no source, so it does not. */
+/** Whether the model may influence a decision, term by term. The figures read only; the one hold-out look is the owner's act behind a password dialog. */
 export function InfluenceSection({ id }: { id: number }) {
   const query = useQuery(influenceQuery(id));
   if (query.isPending) return <LoadingState label="Loading the influence check…" />;
   if (query.isError) return <ErrorState error={query.error} />;
-  return <Body view={query.data} />;
+  return <Body id={id} view={query.data} />;
 }
 
-function Body({ view }: { view: MlInfluence }) {
+function Body({ id, view }: { id: number; view: MlInfluence }) {
+  const [scoring, setScoring] = useState(false);
   const inTerms = new Set(view.terms.flatMap((term) => term.reasons.map((r) => r.code)));
   const further = view.reasons.filter((reason) => !inTerms.has(reason.code));
   const holdOut = view.holdOut;
@@ -65,15 +68,13 @@ function Body({ view }: { view: MlInfluence }) {
           },
           {
             label: 'Hold-out rows',
-            value: (
-              <MetricValue state={figure(holdOut.rows, 'no source for the hold-out score yet')} format={formatCount} />
-            ),
+            value: <MetricValue state={figure(holdOut.rows, 'not scored on the hold-out yet')} format={formatCount} />,
           },
           {
             label: 'Odds of beating the best no-ML baseline',
             value: (
               <MetricValue
-                state={figure(holdOut.probabilityBeatsNoMl, 'no source for the hold-out score yet')}
+                state={figure(holdOut.probabilityBeatsNoMl, 'not scored on the hold-out yet')}
                 format={formatFine}
               />
             ),
@@ -82,22 +83,26 @@ function Body({ view }: { view: MlInfluence }) {
             label: 'Effect of the take rule',
             value: (
               <MetricValue
-                state={figure(holdOut.policyEffectR, 'no source for the hold-out score yet')}
+                state={figure(holdOut.policyEffectR, 'not scored on the hold-out yet')}
                 format={formatFineR}
               />
             ),
           },
           {
-            label: 'Interval',
-            value: (
-              <MetricValue
-                state={{
-                  kind: 'unavailable',
-                  reason: 'the hold-out probability has no source, so no interval can be drawn',
-                }}
-              />
-            ),
+            label: 'Interval of the gain over the baseline',
+            value:
+              typeof holdOut.gainLow === 'number' && typeof holdOut.gainHigh === 'number' ? (
+                `${formatFineSigned(holdOut.gainLow)} to ${formatFineSigned(holdOut.gainHigh)} log loss per row against ${holdOut.baselineName ?? 'the baseline'}`
+              ) : (
+                <MetricValue
+                  state={{
+                    kind: 'unavailable',
+                    reason: 'no stored hold-out figures, or too few trade days for an interval',
+                  }}
+                />
+              ),
           },
+          ...(holdOut.mode ? [{ label: 'Look taken as', value: holdOut.mode }] : []),
           { label: 'Thresholds', value: view.settings },
         ]}
       />
@@ -106,12 +111,36 @@ function Body({ view }: { view: MlInfluence }) {
           {note}
         </Typography>
       ))}
+      {holdOut.state === 'kept' && (
+        <Box>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => {
+              setScoring(true);
+            }}
+            sx={{ minHeight: 44 }}
+          >
+            Score on hold-out
+          </Button>
+        </Box>
+      )}
+      {scoring && (
+        <Suspense fallback={<LoadingState label="Loading the form…" />}>
+          <HoldOutScoreDialog
+            modelId={id}
+            onClose={() => {
+              setScoring(false);
+            }}
+          />
+        </Suspense>
+      )}
       <Switches />
     </Box>
   );
 }
 
-/** The three ML switches, read only here; the owner acts are on the Models tab. */
+/** The ML switches, read only here; the owner acts are on the Models tab. */
 function Switches() {
   const query = useQuery(rollbackQuery);
   return (

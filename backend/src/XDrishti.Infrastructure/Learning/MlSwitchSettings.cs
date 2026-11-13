@@ -25,7 +25,7 @@ internal sealed partial class MlSwitchSettings(NpgsqlDataSource dataSource, ILog
         }
 
         MlSwitchState Of(string name) => found.TryGetValue(name, out var state) ? state : new MlSwitchState(null, false);
-        return new MlSwitches(Of(MlSwitch.Influence), Of(MlSwitch.AutoPromote), Of(MlSwitch.AutoRollback));
+        return new MlSwitches(Of(MlSwitch.Influence), Of(MlSwitch.AutoPromote), Of(MlSwitch.AutoRollback), Of(MlSwitch.AutoHoldOutScore));
     }
 
     public async ValueTask<bool> IsOnAsync(CancellationToken cancellationToken)
