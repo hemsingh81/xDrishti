@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace XDrishti.Domain.Market.Context;
 
@@ -7,7 +8,7 @@ namespace XDrishti.Domain.Market.Context;
 /// Pure: reads the text of an owner-dropped NSE daily CSV (P3-01d, fallback D). NIFTY 50 (niftyindices.com: <c>Date, Open, High, Low, Close</c>, optionally an <c>Index Name</c> first) and INDIA VIX (nseindia.com: <c>Date, Open, High, Low, Close, Prev. Close, Change, % Change</c>).
 /// Tolerant of a BOM, header case and spacing, quoted numbers with thousands commas, trailing spaces and the date forms <c>dd-MMM-yyyy</c>, <c>dd MMM yyyy</c>, <c>dd-MM-yyyy</c>, <c>dd/MM/yyyy</c>, <c>yyyy-MM-dd</c>. A row that cannot be read is refused with a closed code, never guessed.
 /// </summary>
-public static class ContextCsv
+public static partial class ContextCsv
 {
     private const double MaxVix = 200;
 
@@ -45,10 +46,17 @@ public static class ContextCsv
             return Failed(kind, ContextCsvCodes.MissingColumn);
         }
 
+        // A file with no Index Name column must say NIFTY 50 in its name: the table cannot be corrected once written, so another index is never taken on trust.
+        if (kind == ContextCsvKind.Index && indexName < 0 && !(fileName is not null && Nifty50Name().IsMatch(fileName)))
+        {
+            return Failed(kind, ContextCsvCodes.UnknownIndex);
+        }
+
         var widest = Math.Max(Math.Max(date, close), Math.Max(high, low));
         var rows = new List<ContextCsvRow>();
         var rejects = new List<ContextCsvReject>();
         var seen = new HashSet<DateOnly>();
+        var numericBadDate = false;
         for (var i = headerAt + 1; i < lines.Length; i++)
         {
             if (string.IsNullOrWhiteSpace(lines[i]))
@@ -72,6 +80,7 @@ public static class ContextCsv
 
             if (!DateOnly.TryParseExact(cells[date].Trim(), DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out var day))
             {
+                numericBadDate |= NumericDate().IsMatch(cells[date].Trim());
                 rejects.Add(new ContextCsvReject(line, ContextCsvCodes.BadDate, "date"));
                 continue;
             }
@@ -100,8 +109,20 @@ public static class ContextCsv
             rows.Add(new ContextCsvRow(day, highValue, lowValue, closeValue.Value, line));
         }
 
+        // Good rows next to unreadable numeric dates is the sign of a day/month swap: the whole file is refused, never half-loaded.
+        if (numericBadDate && rows.Count > 0)
+        {
+            return Failed(kind, ContextCsvCodes.MixedDates);
+        }
+
         return new ContextCsvParsed(kind, rows, rejects, rows.Count == 0 && rejects.Count == 0 ? ContextCsvCodes.Empty : null);
     }
+
+    [GeneratedRegex(@"nifty[ _-]?50", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex Nifty50Name();
+
+    [GeneratedRegex(@"^\d{1,4}[-/]\d{1,2}[-/]\d{1,4}$", RegexOptions.CultureInvariant)]
+    private static partial Regex NumericDate();
 
     private static ContextCsvParsed Failed(ContextCsvKind kind, string code) => new(kind, [], [], code);
 

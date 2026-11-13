@@ -74,7 +74,7 @@ internal sealed class GetContextCoverageHandler(
             health?.GapSessions ?? 0,
             skipped.Count,
             [.. skipped.Take(MaxSkippedListed).Select(s => new ContextSkippedView(s.Date, s.Reason.ToCode(), s.Bars))],
-            SourceNote,
+            csv.IndexDays > 0 ? SourceNote + "; " + csv.IndexDays.ToString(System.Globalization.CultureInfo.InvariantCulture) + " days are the official figures from NSE CSV files (source nse_csv)" : SourceNote,
             breadth,
             new ContextCsvView(csv.IndexDays, csv.VixDays, csv.First, csv.Last));
     }

@@ -14,6 +14,7 @@ public sealed record LoadContextInboxCommand : ICommand;
 public sealed record ContextInboxLoaded(int Files, int FilesFailed, int IndexWritten, int VixWritten, int AlreadyStored, IReadOnlyDictionary<string, int> Rejected);
 
 internal sealed class LoadContextInboxHandler(
+    IContextSettings settings,
     IContextInbox inbox,
     IContextDayStore store,
     ITradingCalendar tradingCalendar,
@@ -26,7 +27,7 @@ internal sealed class LoadContextInboxHandler(
     public async ValueTask<Result<ContextInboxLoaded>> HandleAsync(LoadContextInboxCommand command, CancellationToken cancellationToken)
     {
         var rejected = new Dictionary<string, int>(StringComparer.Ordinal);
-        if (!inbox.Enabled)
+        if (!settings.Enabled || !inbox.Enabled)
         {
             return Result.Success(new ContextInboxLoaded(0, 0, 0, 0, 0, rejected));
         }
@@ -41,7 +42,7 @@ internal sealed class LoadContextInboxHandler(
         var lastClosed = calendar.LastClosedSession(clock.GetUtcNow());
         var index = new Dictionary<DateOnly, ContextCsvRow>();
         var vix = new Dictionary<DateOnly, ContextCsvRow>();
-        var verdicts = new List<(string Name, bool Ok)>();
+        var verdicts = new List<(string Name, bool? Ok)>(); // null: leave the file in the inbox and read it again on a later run
         foreach (var name in names)
         {
             var text = await inbox.ReadAsync(name, cancellationToken);
@@ -65,26 +66,41 @@ internal sealed class LoadContextInboxHandler(
                 Count(rejected, reject.Code);
             }
 
-            var target = parsed.Kind == ContextCsvKind.Vix ? vix : index;
+            var isVix = parsed.Kind == ContextCsvKind.Vix;
+            var target = isVix ? vix : index;
             var accepted = 0;
+            var held = 0;
             foreach (var row in parsed.Rows)
             {
                 if (!calendar.IsTradingDay(row.Date))
                 {
                     Count(rejected, ContextCsvCodes.NotASession);
                 }
-                else if (row.Date > lastClosed)
+                else if (row.Date > lastClosed || (!isVix && calendar.TradingDaysBetween(row.Date, lastClosed) < settings.VixGraceSessions))
                 {
+                    // An index day waits until it is as old as the VIX grace, so a CSV day never blocks the VIX the bars may still bring (spec D10).
+                    held++;
                     Count(rejected, ContextCsvCodes.NotFinal);
                 }
-                else if (target.TryAdd(row.Date, row))
+                else if (!target.TryAdd(row.Date, row))
+                {
+                    if (target[row.Date] with { Line = 0 } == row with { Line = 0 })
+                    {
+                        accepted++;
+                    }
+                    else
+                    {
+                        Count(rejected, ContextCsvCodes.Conflict);
+                    }
+                }
+                else
                 {
                     accepted++;
                 }
             }
 
-            // A file with rows but none usable (all refused) is a failed file; one with some good rows is done.
-            verdicts.Add((name, accepted > 0 || parsed.Rows.Count > 0));
+            // Rows held back keep the file in the inbox for a later run; a file with no usable row is failed; the rest is done.
+            verdicts.Add((name, held > 0 ? null : accepted > 0));
         }
 
         var stored = (await store.ListDatesAsync(cancellationToken)).ToHashSet();
@@ -95,12 +111,12 @@ internal sealed class LoadContextInboxHandler(
         var vixWritten = vixDays.Count == 0 ? 0 : await store.InsertVixAsync(vixDays, cancellationToken);
         var already = (index.Count - indexWritten) + (vix.Count - vixWritten);
 
-        foreach (var (name, ok) in verdicts)
+        foreach (var (name, ok) in verdicts.Where(v => v.Ok is not null))
         {
-            await inbox.MoveAsync(name, ok, cancellationToken);
+            await inbox.MoveAsync(name, ok!.Value, cancellationToken);
         }
 
-        var failed = verdicts.Count(v => !v.Ok);
+        var failed = verdicts.Count(v => v.Ok == false);
         var reasons = string.Join(",", rejected.OrderBy(r => r.Key, StringComparer.Ordinal).Select(r => $"{r.Key}:{r.Value}"));
         ContextLog.InboxLoaded(logger, names.Count, failed, indexWritten, vixWritten, already, reasons);
         return Result.Success(new ContextInboxLoaded(names.Count, failed, indexWritten, vixWritten, already, rejected));

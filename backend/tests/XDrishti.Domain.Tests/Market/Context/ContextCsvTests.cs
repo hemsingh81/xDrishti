@@ -49,7 +49,7 @@ public sealed class ContextCsvTests
     [InlineData("2025-11-07")]
     public void The_known_date_forms_read_the_same_day(string date)
     {
-        var parsed = ContextCsv.Parse("Date,Open,High,Low,Close\n" + date + ",1,110,90,100\n", null);
+        var parsed = ContextCsv.Parse("Date,Open,High,Low,Close\n" + date + ",1,110,90,100\n", "nifty50.csv");
 
         parsed.Rows.Single().Date.ShouldBe(new DateOnly(2025, 11, 7));
     }
@@ -73,7 +73,7 @@ public sealed class ContextCsvTests
             + "03-Nov-2025,1,110\n"            // short_row
             + "07-Nov-2025,1,110,90,101\n";    // duplicate_date
 
-        var parsed = ContextCsv.Parse(text, null);
+        var parsed = ContextCsv.Parse(text, "nifty50.csv");
 
         parsed.Rows.Select(r => r.Date).ShouldBe([new DateOnly(2025, 11, 7)]);
         parsed.Rejects.Select(r => r.Code).ShouldBe(
@@ -108,6 +108,36 @@ public sealed class ContextCsvTests
     [InlineData("Date,Close\n07-Nov-2025,100\n", ContextCsvCodes.MissingColumn)]
     public void A_file_that_cannot_be_read_is_refused_whole(string text, string code)
     {
-        ContextCsv.Parse(text, "x.csv").FileReject.ShouldBe(code);
+        ContextCsv.Parse(text, "nifty50.csv").FileReject.ShouldBe(code);
+    }
+
+    [Theory]
+    [InlineData("NIFTY BANK_Historical.csv")]
+    [InlineData(null)]
+    public void An_index_file_without_an_index_name_column_must_say_nifty_50_in_its_file_name(string? fileName)
+    {
+        var parsed = ContextCsv.Parse("Date,Open,High,Low,Close\n07-Nov-2025,1,110,90,100\n", fileName);
+
+        parsed.FileReject.ShouldBe(ContextCsvCodes.UnknownIndex);
+        parsed.Rows.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("NIFTY 50_Historical_PR.csv")]
+    [InlineData("nifty50.csv")]
+    [InlineData("Nifty_50-history.csv")]
+    public void The_nifty_50_file_name_forms_are_accepted(string fileName)
+    {
+        ContextCsv.Parse("Date,Open,High,Low,Close\n07-Nov-2025,1,110,90,100\n", fileName).FileReject.ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_file_that_mixes_good_rows_with_unreadable_numeric_dates_is_refused_whole()
+    {
+        // A month/day swap: 07-11-2025 reads as 7 November, 11-13-2025 cannot be a day-first date.
+        var parsed = ContextCsv.Parse("Date,Open,High,Low,Close\n07-11-2025,1,110,90,100\n11-13-2025,1,110,90,100\n", "nifty50.csv");
+
+        parsed.FileReject.ShouldBe(ContextCsvCodes.MixedDates);
+        parsed.Rows.ShouldBeEmpty();
     }
 }

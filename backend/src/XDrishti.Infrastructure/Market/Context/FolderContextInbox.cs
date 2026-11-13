@@ -23,20 +23,28 @@ internal sealed class FolderContextInbox(IOptions<DataOptions> options, TimeProv
     public ValueTask<IReadOnlyList<string>> ListAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var folder = new DirectoryInfo(Folder);
-        if (!folder.Exists)
+        try
         {
+            var folder = new DirectoryInfo(Folder);
+            if (!folder.Exists)
+            {
+                return ValueTask.FromResult<IReadOnlyList<string>>([]);
+            }
+
+            IReadOnlyList<string> names =
+            [
+                .. folder.EnumerateFiles("*.csv", SearchOption.TopDirectoryOnly)
+                    .Where(f => f.LinkTarget is null)
+                    .Select(f => f.Name)
+                    .Order(StringComparer.Ordinal),
+            ];
+            return ValueTask.FromResult(names);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // An unreadable folder is an empty one for this run; the next run tries again.
             return ValueTask.FromResult<IReadOnlyList<string>>([]);
         }
-
-        IReadOnlyList<string> names =
-        [
-            .. folder.EnumerateFiles("*.csv", SearchOption.TopDirectoryOnly)
-                .Where(f => f.LinkTarget is null)
-                .Select(f => f.Name)
-                .Order(StringComparer.Ordinal),
-        ];
-        return ValueTask.FromResult(names);
     }
 
     public async ValueTask<string?> ReadAsync(string name, CancellationToken cancellationToken)
@@ -62,11 +70,11 @@ internal sealed class FolderContextInbox(IOptions<DataOptions> options, TimeProv
     public ValueTask MoveAsync(string name, bool processed, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var target = Directory.CreateDirectory(Path.Combine(Folder, processed ? "done" : "failed"));
         var stamp = clock.GetUtcNow().ToString("yyyyMMdd'T'HHmmss", CultureInfo.InvariantCulture);
-        var destination = Path.Combine(target.FullName, stamp + "_" + name);
         try
         {
+            var target = Directory.CreateDirectory(Path.Combine(Folder, processed ? "done" : "failed"));
+            var destination = Path.Combine(target.FullName, stamp + "_" + name);
             File.Move(PathOf(name), destination, overwrite: false);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

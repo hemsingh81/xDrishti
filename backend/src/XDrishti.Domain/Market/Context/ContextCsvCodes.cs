@@ -15,4 +15,7 @@ public static class ContextCsvCodes
     public const string NotFinal = "not_final";
     public const string Unreadable = "unreadable";
     public const string Empty = "empty";
+    public const string UnknownIndex = "unknown_index";
+    public const string MixedDates = "mixed_date_format";
+    public const string Conflict = "conflict";
 }
