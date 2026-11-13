@@ -13,6 +13,7 @@ using XDrishti.Application.Paper;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Research;
 using XDrishti.Application.Tests.Research;
+using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Paper;
@@ -118,6 +119,30 @@ public sealed class CapturePaperFillsHandlerTests
         (result.Value.Sessions, result.Value.EntriesWritten, result.Value.FailedSessions).ShouldBe((0, 0, 0));
         await _gate.DidNotReceiveWithAnyArgs().ResolveAsync(default!, Ct);
         await _paper.DidNotReceiveWithAnyArgs().WriteSessionAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task A_live_mode_account_or_a_disabled_paper_account_is_not_a_paper_account_and_the_capture_stays_a_no_op()
+    {
+        _paper.CurrentEpochAsync(Ct).Returns((EpochRow?)null);
+        _accounts.ListActiveAsync(Ct).Returns([PaperLedgerFixture.Make("1000000022", 100_000m, TradingMode.ManualLive), PaperLedgerFixture.Make("1000000023", 100_000m, TradingMode.Paper, tradingRole: false)]);
+
+        var result = await Handler().HandleAsync(new CapturePaperFillsCommand(null, false), Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Sessions.ShouldBe(0);
+        await _gate.DidNotReceiveWithAnyArgs().ResolveAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task A_failing_account_read_is_not_swallowed_so_no_epoch_is_opened_on_a_guess()
+    {
+        _paper.CurrentEpochAsync(Ct).Returns((EpochRow?)null);
+        _accounts.ListActiveAsync(Ct).Returns<IReadOnlyList<BrokerAccount>>(_ => throw new InvalidOperationException("away"));
+
+        await Should.ThrowAsync<InvalidOperationException>(async () => await Handler().HandleAsync(new CapturePaperFillsCommand(null, false), Ct));
+
+        await _gate.DidNotReceiveWithAnyArgs().ResolveAsync(default!, Ct);
     }
 
     [Fact]

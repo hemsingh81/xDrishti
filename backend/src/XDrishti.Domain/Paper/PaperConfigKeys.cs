@@ -212,6 +212,7 @@ public static class PaperConfigKeys
             return ByField(key[AutonomyPrefix.Length..], AutonomyFields, before, after);
         }
 
+        // shortcut: an ON set by env before AM-01a and flipped OFF before the first snapshot is not seen as a loosening; upgrade if the env value is ever recorded earlier.
         if (key == SmartRulesPrefix + ListFiltersEnabled && before is null && after is not null)
         {
             return IsOn(after) ? ConfigClass.RiskDown : ConfigClass.Free;

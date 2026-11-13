@@ -20,7 +20,7 @@ internal sealed class KillEndpoints : IEndpointModule
 
         group.MapGet("/kill-proposals", ListAsync)
             .WithName("ListKillProposals")
-            .WithSummary("The kill proposals, newest first (state proposed, applied or dismissed; strategy; limit 1 to 200, default 50), each with its rule, numbers, the cells it would pause and who applied it, with the automatic setting (default OFF) and the thresholds beside them. Read only. 400 paper.invalid")
+            .WithSummary("The kill proposals, newest first (state proposed, applied or dismissed; strategy; limit 1 to 200, default 50), each with its rule, numbers, the cells it would pause and who applied it, with the automatic setting (ON by default through the system default row of ADR 0282) and the thresholds beside them. Read only. 400 paper.invalid")
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
         group.MapPost("/kill-proposals/{id:long}/apply", ApplyAsync)

@@ -80,7 +80,7 @@ After the next deploy the evidence loops run by themselves: the shadow record wr
 7. **Table B unchanged.** A test pins the defaults of table B (OFF).
 
 ## Contract
-- **Data:** AM-01a migration `ApplyAutoModeDefaults` (seed row for `confidence.kill.auto`; service enables where the owner never acted). AM-01b migration `AddEvidenceSets` (`paper.evidence_sets`, insert-only; `trial_kind` gains `evidence_set`; seed row for `paper.shadow.enabled`).
+- **Data:** AM-01a migration `ApplyAutoModeDefaults` (the `system:default` seed row for `confidence.kill.auto`, written only by the migration into an empty table and sealed by the stamp trigger; no service rows: a service with no row runs on its enabled definition). AM-01b migration `AddEvidenceSets` (`paper.evidence_sets`, insert-only; `trial_kind` gains `evidence_set`; seed row for `paper.shadow.enabled`).
 - **API (AM-01b):** `GET /api/paper/shadow/evidence-set`; `PUT /api/paper/shadow/evidence-set` (fresh password) with `{ versions[], reason }`; `gen-api`.
 - **Config:** `XD_SELECTION_LIST_FILTERS_ENABLED` default `true` in `deploy/compose.yaml`; the code default of `ListSettings.Enabled` true.
 - **UI (AM-01b):** the Shadow tab shows the set, its state (open or frozen) and the replace dialog; the Auto screen's evidence block shows the new states.

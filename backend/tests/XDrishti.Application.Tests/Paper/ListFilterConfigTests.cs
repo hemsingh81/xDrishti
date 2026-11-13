@@ -24,7 +24,7 @@ public sealed class ListFilterConfigTests
         settings.Enabled.Returns(enabled);
         return new ConfigSnapshotSource(
             Substitute.For<IPlanningSettingsReader>(), Substitute.For<IAutonomySettingsStore>(), Substitute.For<IAccountStore>(), Substitute.For<IRiskProfileStore>(), Substitute.For<ILearningChangelog>(),
-            Substitute.For<IStrategyStore>(), Substitute.For<ICellStatsStore>(), Substitute.For<IModelRegistry>(), Substitute.For<ISimulationEngine>(), Substitute.For<IGradeSettings>(), Substitute.For<ICostSheetStore>(), null, settings);
+            Substitute.For<IStrategyStore>(), Substitute.For<ICellStatsStore>(), Substitute.For<IModelRegistry>(), Substitute.For<ISimulationEngine>(), Substitute.For<IGradeSettings>(), Substitute.For<ICostSheetStore>(), eventFilter: null, listFilters: settings);
     }
 
     [Theory]

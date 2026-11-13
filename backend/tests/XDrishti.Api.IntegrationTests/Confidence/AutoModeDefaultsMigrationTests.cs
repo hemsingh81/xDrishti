@@ -50,6 +50,27 @@ public sealed class AutoModeDefaultsMigrationTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task The_runtime_role_is_refused_the_seed_row_even_into_an_empty_table()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_am01a_role_probe", Ct);
+        await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+        await connection.OpenAsync(Ct);
+        await RunAsync(connection, "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'xd_app') THEN CREATE ROLE xd_app NOLOGIN; END IF; END $$");
+        await using var transaction = await connection.BeginTransactionAsync(Ct);
+        await RunAsync(connection, "DELETE FROM confidence.kill_settings");
+        await RunAsync(connection, "GRANT USAGE ON SCHEMA confidence TO xd_app"); // the scratch database has no init script: give the role what the real one has, inside the transaction that is rolled back
+        await RunAsync(connection, "GRANT SELECT, INSERT ON confidence.kill_settings TO xd_app");
+        await RunAsync(connection, "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA confidence TO xd_app");
+        await RunAsync(connection, "GRANT EXECUTE ON FUNCTION pg_advisory_xact_lock(bigint) TO xd_app");
+        await RunAsync(connection, "SET LOCAL ROLE xd_app");
+
+        var refused = await Should.ThrowAsync<PostgresException>(() => RunAsync(connection, "INSERT INTO confidence.kill_settings (auto, actor, reason) VALUES (true, 'system:default', 'ADR 0282')"));
+
+        refused.SqlState.ShouldBe("23514", "the role clause of the trigger, not the emptiness clause: the table was empty");
+        await transaction.RollbackAsync(Ct);
+    }
+
+    [Fact]
     public async Task The_migration_keeps_an_owner_row_and_seeds_nothing_when_the_table_is_not_empty()
     {
         await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_am01a_owner_probe", Ct);

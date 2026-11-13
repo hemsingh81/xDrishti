@@ -4351,7 +4351,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The kill proposals, newest first (state proposed, applied or dismissed; strategy; limit 1 to 200, default 50), each with its rule, numbers, the cells it would pause and who applied it, with the automatic setting (default OFF) and the thresholds beside them. Read only. 400 paper.invalid */
+    /** The kill proposals, newest first (state proposed, applied or dismissed; strategy; limit 1 to 200, default 50), each with its rule, numbers, the cells it would pause and who applied it, with the automatic setting (ON by default through the system default row of ADR 0282) and the thresholds beside them. Read only. 400 paper.invalid */
     get: operations['ListKillProposals'];
     put?: never;
     post?: never;
@@ -15388,7 +15388,7 @@ export interface components {
     };
     /** @description The body of the automatic kill switch. The owner is never part of it: the actor comes from the signed-in session. */
     KillSwitchRequest: {
-      /** @description The new value of `confidence.kill.auto` (default OFF): ON lets the daily decay-monitor demote the cells of a strategy when a kill rule fires, except for the CF-09 failure boundary. */
+      /** @description The new value of `confidence.kill.auto` (ON by default through the system default row of ADR 0282): ON lets the daily decay-monitor demote the cells of a strategy when a kill rule fires, except for the CF-09 failure boundary. */
       auto: boolean;
       /** @description Why, 1 to 500 characters. */
       reason: null | string;
