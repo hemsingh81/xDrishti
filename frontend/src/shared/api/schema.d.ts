@@ -12603,6 +12603,12 @@ export interface components {
       unexplainedChanges: number;
       /** @description Why the epoch started. */
       reason: string;
+      /**
+       * Format: int32
+       * @description Noted cell-statistics refreshes in the epoch (decision 9, ADR 0286).
+       * @default 0
+       */
+      cellsRefreshed: number;
     };
     /** @description One point of an equity curve: the running R after the exits of a date and its fall from the running peak. */
     EquityPointView: {

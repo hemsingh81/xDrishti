@@ -52,6 +52,15 @@ public sealed class PaperPhaseCheckTests
     private static string Verdict(PaperPhaseReport r, string id) => r.Criteria.Single(c => c.Id == id).Verdict;
 
     [Fact]
+    public void Noted_cell_refreshes_of_the_epoch_are_a_caveat_in_the_label()
+    {
+        var facts = Facts();
+        var report = PaperPhaseCheck.Evaluate(facts with { Epoch = facts.Epoch! with { CellsRefreshed = 3 } });
+
+        report.ExitCriterion.ShouldBe("MET (point estimate; 90% interval [-0.12, +0.51] includes 0; 2 risk-down changes: the population was censored; cells_refreshed: 3)");
+    }
+
+    [Fact]
     public void Day_85_with_coverage_083_and_61_trades_is_met_and_the_caveats_stack_in_the_label()
     {
         var report = PaperPhaseCheck.Evaluate(Facts());

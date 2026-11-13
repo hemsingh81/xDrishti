@@ -39891,6 +39891,12 @@
           "reason": {
             "type": "string",
             "description": "Why the epoch started."
+          },
+          "cellsRefreshed": {
+            "type": "integer",
+            "description": "Noted cell-statistics refreshes in the epoch (decision 9, ADR 0286).",
+            "format": "int32",
+            "default": 0
           }
         },
         "description": "One epoch as the API shows it (spec P10-05). Epochs are never pooled: each carries its own count."

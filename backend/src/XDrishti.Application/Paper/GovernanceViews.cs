@@ -14,7 +14,8 @@ namespace XDrishti.Application.Paper;
 /// <param name="RiskDownChanges">Risk-down changes noted in the epoch.</param>
 /// <param name="UnexplainedChanges">Changes with neither an explanation nor a note.</param>
 /// <param name="Reason">Why the epoch started.</param>
-public sealed record EpochView(long Id, string Kind, DateOnly StartedOn, DateOnly? EndedOn, string? Fingerprint, int Counted, int Straddle, int RiskDownChanges, int UnexplainedChanges, string Reason);
+/// <param name="CellsRefreshed">Noted cell-statistics refreshes in the epoch (decision 9, ADR 0286).</param>
+public sealed record EpochView(long Id, string Kind, DateOnly StartedOn, DateOnly? EndedOn, string? Fingerprint, int Counted, int Straddle, int RiskDownChanges, int UnexplainedChanges, string Reason, int CellsRefreshed = 0);
 
 /// <summary>One stored difference of the configuration.</summary>
 /// <param name="Id">The id.</param>

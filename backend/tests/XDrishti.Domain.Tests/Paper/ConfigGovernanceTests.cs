@@ -89,12 +89,15 @@ public sealed class ConfigGovernanceTests
     [InlineData("smart_rules.gate_enabled", "true", "false", ConfigClass.Frozen)]
     [InlineData("smart_rules.correlation_max", "0.6", "0.8", ConfigClass.Frozen)]
     [InlineData("smart_rules.honesty_fraction", "0.5", "0.4", ConfigClass.Frozen)]
-    [InlineData("cells.snapshot", "a", "b", ConfigClass.Frozen)]
+    [InlineData("cells.snapshot", "a", "b", ConfigClass.Free)]
+    [InlineData("cells.basis", "a", "b", ConfigClass.Frozen)]
+    [InlineData("cells.basis", null, "b", ConfigClass.Free)]
+    [InlineData("cells.basis", "a", null, ConfigClass.Frozen)]
     [InlineData("models.champion", "1", "2", ConfigClass.Frozen)]
     [InlineData("engine.version", "sim-6", "sim-7", ConfigClass.Frozen)]
     [InlineData("planning.builder:useselection", "false", "true", ConfigClass.Frozen)]
     [InlineData("planning.openbook:assumedempty", "true", "false", ConfigClass.Frozen)]
-    public void The_direction_of_a_change_decides_its_class(string key, string before, string after, ConfigClass expected) =>
+    public void The_direction_of_a_change_decides_its_class(string key, string? before, string? after, ConfigClass expected) =>
         PaperConfigKeys.Classify(key, before, after).ShouldBe(expected);
 
     [Fact]

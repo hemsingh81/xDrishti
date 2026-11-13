@@ -99,6 +99,41 @@ public sealed class ConfigGovernanceTests
     }
 
     [Fact]
+    public async Task A_cell_statistics_refresh_with_the_same_basis_is_noted_in_the_same_epoch_and_the_entries_stay_measured()
+    {
+        _components = [.. _components, new("cells.snapshot", "snapA"), new("cells.basis", "basisX")];
+        await RunAsync(D(11, 2));
+        _components = [.. _components.Where(c => c.Key != "cells.snapshot"), new("cells.snapshot", "snapB")];
+
+        var r = await RunAsync(D(11, 3));
+
+        r.MeasureStatus[D(11, 3)].ShouldBe("measured");
+        _store.Epochs.Count.ShouldBe(1);
+        _store.Changes.Single().ShouldBe(new NewChange("cells.snapshot", "free", "snapA", "snapB", "noted", null));
+    }
+
+    [Fact]
+    public async Task A_changed_cells_basis_starts_a_new_epoch_and_the_first_basis_after_the_deploy_does_not()
+    {
+        _components = [.. _components, new("cells.snapshot", "snapA")];
+        await RunAsync(D(11, 2));
+        _components = [.. _components, new("cells.basis", "basisX")]; // first capture after the deploy with an epoch open
+
+        var added = await RunAsync(D(11, 3));
+
+        added.MeasureStatus[D(11, 3)].ShouldBe("measured");
+        _store.Epochs.Count.ShouldBe(1);
+        _store.Changes.Single().ShouldBe(new NewChange("cells.basis", "free", null, "basisX", "noted", null));
+
+        _components = [.. _components.Where(c => c.Key != "cells.basis"), new("cells.basis", "basisY")];
+        var changed = await RunAsync(D(11, 4));
+
+        changed.MeasureStatus[D(11, 4)].ShouldBe("straddle");
+        _store.Epochs.Count.ShouldBe(2);
+        _store.Changes.Last().Class.ShouldBe("frozen");
+    }
+
+    [Fact]
     public async Task A_catch_up_of_three_sessions_over_a_frozen_change_sets_all_three_aside_and_the_new_epoch_starts_after_the_last()
     {
         await RunAsync(D(11, 2));
@@ -308,7 +343,7 @@ public sealed class ConfigGovernanceTests
     }
 
     [Fact]
-    public async Task An_enabled_cell_statistics_refresh_shows_as_a_blocker_during_an_epoch()
+    public async Task An_enabled_cell_statistics_refresh_is_no_longer_a_blocker_during_an_epoch()
     {
         await RunAsync(D(11, 2));
         var services = Substitute.For<IServiceScheduleReader>();
@@ -316,14 +351,13 @@ public sealed class ConfigGovernanceTests
 
         var view = (await new GetConfigHandler(_source, _store, services).HandleAsync(new GetConfigQuery(), Ct)).Value;
 
-        view.Blockers.Select(b => b.ServiceId).ShouldBe(["cells-refresh"]);
-        view.Blockers[0].Text.ShouldContain("each run restarts the count");
+        view.Blockers.ShouldBeEmpty("a refresh is a noted change (decision 9, ADR 0286)");
     }
 
     [Fact]
     public void The_pinned_learning_writers_are_cells_retrain_and_weekly()
     {
-        PaperConfigKeys.LearningWriterServices.ShouldBe(["cells", "retrain", "weekly", "cells-refresh"]);
+        PaperConfigKeys.LearningWriterServices.ShouldBe(["cells", "retrain", "weekly"]);
     }
 
     private sealed class FakeStore : IGovernanceStore
