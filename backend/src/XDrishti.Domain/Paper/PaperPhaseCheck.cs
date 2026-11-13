@@ -313,6 +313,11 @@ public static class PaperPhaseCheck
             caveats.Add(string.Create(c, $"{epoch.RiskDownChanges} risk-down {(epoch.RiskDownChanges == 1 ? "change" : "changes")}: the population was censored"));
         }
 
+        if (epoch.CellsRefreshed > 0)
+        {
+            caveats.Add(string.Create(c, $"cells_refreshed: {epoch.CellsRefreshed}"));
+        }
+
         var auto = facts.Counted.Count(t => t.ApprovalKind == "auto");
         if (auto > 0)
         {

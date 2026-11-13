@@ -22,7 +22,8 @@ public sealed record PhaseSessionFact(DateOnly Date, bool PlanPublished, int Fai
 /// <param name="Counted">Entries that count (as stored).</param>
 /// <param name="UnexplainedChanges">Changes with no explanation.</param>
 /// <param name="RiskDownChanges">Risk-down changes noted in the epoch.</param>
-public sealed record PhaseEpochFact(long Id, DateOnly StartedOn, string Kind, string Reason, int Counted, int UnexplainedChanges, int RiskDownChanges);
+/// <param name="CellsRefreshed">Noted cell-statistics snapshot changes in the epoch (decision 9).</param>
+public sealed record PhaseEpochFact(long Id, DateOnly StartedOn, string Kind, string Reason, int Counted, int UnexplainedChanges, int RiskDownChanges, int CellsRefreshed = 0);
 
 /// <summary>A configuration change of the current epoch.</summary>
 /// <param name="Session">The session of the capture run that found it; null when unknown.</param>

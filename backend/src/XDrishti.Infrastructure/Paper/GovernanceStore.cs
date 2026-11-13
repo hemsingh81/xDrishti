@@ -1,6 +1,7 @@
 using Npgsql;
 using NpgsqlTypes;
 using XDrishti.Application.Abstractions.Paper;
+using XDrishti.Domain.Paper;
 
 namespace XDrishti.Infrastructure.Paper;
 
@@ -148,14 +149,17 @@ internal sealed class GovernanceStore(NpgsqlDataSource dataSource) : IGovernance
                    (SELECT count(*) FROM paper.entries n WHERE n.epoch_id = e.id AND n.measure_status = 'straddle')::int,
                    (SELECT count(*) FROM paper.config_changes c WHERE c.epoch_id = e.id AND c."class" = 'risk_down')::int,
                    (SELECT count(*) FROM paper.config_changes c WHERE c.epoch_id = e.id AND c."class" <> 'free' AND c.explained_by IS NULL
-                        AND NOT EXISTS (SELECT 1 FROM paper.epoch_notes n WHERE n.change_id = c.id))::int
+                        AND NOT EXISTS (SELECT 1 FROM paper.epoch_notes n WHERE n.change_id = c.id))::int,
+                   (SELECT count(*) FROM paper.config_changes c WHERE c.epoch_id = e.id AND c."key" = @snapshotKey AND c."class" = 'free'
+                        AND NOT EXISTS (SELECT 1 FROM paper.config_changes f WHERE f.to_snapshot_id = c.to_snapshot_id AND f."class" = 'frozen'))::int
             FROM paper.epochs e ORDER BY e.id DESC
             """);
+        select.Parameters.AddWithValue("snapshotKey", NpgsqlDbType.Varchar, PaperConfigKeys.CellsSnapshot);
         await using var reader = await select.ExecuteReaderAsync(cancellationToken);
         var result = new List<EpochSummary>();
         while (await reader.ReadAsync(cancellationToken))
         {
-            result.Add(new EpochSummary(Epoch(reader), reader.IsDBNull(6) ? null : reader.GetString(6), reader.GetInt32(7), reader.GetInt32(8), reader.GetInt32(9), reader.GetInt32(10)));
+            result.Add(new EpochSummary(Epoch(reader), reader.IsDBNull(6) ? null : reader.GetString(6), reader.GetInt32(7), reader.GetInt32(8), reader.GetInt32(9), reader.GetInt32(10), reader.GetInt32(11)));
         }
 
         return result;

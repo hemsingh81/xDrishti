@@ -29,7 +29,7 @@ public sealed class EventFilterConfigAndTagTests
 
     private static ConfigSnapshotSource Source(IEventFilterDecisions? decisions) => new(
         Substitute.For<IPlanningSettingsReader>(), Substitute.For<IAutonomySettingsStore>(), Substitute.For<IAccountStore>(), Substitute.For<IRiskProfileStore>(), Substitute.For<ILearningChangelog>(),
-        Substitute.For<IStrategyStore>(), Substitute.For<ICellStatsStore>(), Substitute.For<IModelRegistry>(), Substitute.For<ISimulationEngine>(), Substitute.For<IGradeSettings>(), Substitute.For<ICostSheetStore>(), decisions);
+        Substitute.For<IStrategyStore>(), Substitute.For<ICellStatsStore>(), Substitute.For<IRunStore>(), Substitute.For<IModelRegistry>(), Substitute.For<ISimulationEngine>(), Substitute.For<IGradeSettings>(), Substitute.For<ICostSheetStore>(), decisions);
 
     private static IEventFilterDecisions History(params EventFilterRow[] rows)
     {

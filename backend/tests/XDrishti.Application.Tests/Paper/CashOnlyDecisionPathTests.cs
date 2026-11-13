@@ -37,7 +37,7 @@ public sealed class CashOnlyDecisionPathTests
     {
         var cell = new CellId("ORB", "15m", "BUY", "intraday", "FIXED_RR", Expression: expression);
         var row = new CellStatsRow(cell, CellWindow.All, new DateOnly(2026, 10, 23), true, 40, 20, 40, 0.5, 0.5, posterior, 0.5, 0.6, 2, -1, 0.5, 1.5, 3, 0.3, 0.8, 0.5, 1.5, true);
-        return new StoredCellStats(snapshot, DateTimeOffset.UnixEpoch, new CellStatsOptions(), "sources", row);
+        return new StoredCellStats(snapshot, DateTimeOffset.UnixEpoch, new CellStatsOptions(), "run1:intraday:FIXED_RR", row);
     }
 
     private static async Task<List<string>> ComponentsAsync(IEnumerable<ChangelogEntry> log, params StoredCellStats[] stats)
@@ -47,8 +47,11 @@ public sealed class CashOnlyDecisionPathTests
         var cellStats = Substitute.For<ICellStatsStore>();
         cellStats.ListLatestCashAsync(null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<StoredCellStats>>(stats));
         var strategies = Substitute.For<IStrategyStore>();
+        var runs = Substitute.For<IRunStore>();
+        runs.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<StoredRunHeader?>(Learning.Jobs.JobFixtures.Header()));
+        runs.ReadRecordTextAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<string?>(Learning.Jobs.JobFixtures.Record()));
         var source = new ConfigSnapshotSource(
-            Substitute.For<IPlanningSettingsReader>(), Substitute.For<IAutonomySettingsStore>(), Substitute.For<IAccountStore>(), Substitute.For<IRiskProfileStore>(), changelog, strategies, cellStats,
+            Substitute.For<IPlanningSettingsReader>(), Substitute.For<IAutonomySettingsStore>(), Substitute.For<IAccountStore>(), Substitute.For<IRiskProfileStore>(), changelog, strategies, cellStats, runs,
             Substitute.For<IModelRegistry>(), Substitute.For<ISimulationEngine>(), Substitute.For<IGradeSettings>(), Substitute.For<ICostSheetStore>());
 
         var reading = await source.ReadAsync(Ct);

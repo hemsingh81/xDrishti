@@ -71,7 +71,7 @@ export function EvidenceServices() {
               name="Cells refresh"
               state={stateOf(find('cells-refresh'))}
               to="/services"
-              note="Auto resumes this one (with the owner's password); each refresh restarts the paper count during an epoch."
+              note="Auto resumes this one (with the owner's password); each refresh is noted in the paper epoch."
             />
           </Stack>
         </>
