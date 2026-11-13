@@ -6038,6 +6038,68 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.EvidenceSetRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("EdgeEpoch")
+                        .HasColumnType("bigint")
+                        .HasColumnName("edge_epoch");
+
+                    b.Property<DateTimeOffset?>("FirstWriteAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_write_at");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("mode");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("SetHash")
+                        .IsRequired()
+                        .HasColumnType("char(64)")
+                        .HasColumnName("set_hash");
+
+                    b.Property<string>("Versions")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("versions");
+
+                    b.HasKey("Id")
+                        .HasName("pk_evidence_sets");
+
+                    b.HasIndex("EdgeEpoch", "Id")
+                        .HasDatabaseName("ix_evidence_sets_edge_epoch_id");
+
+                    b.ToTable("evidence_sets", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_evidence_sets_shape", "edge_epoch >= 0 AND jsonb_typeof(versions) = 'array' AND jsonb_array_length(versions) BETWEEN 1 AND 500 AND set_hash ~ '^[0-9a-f]{64}$' AND ((mode = 'auto' AND actor = 'system:default' AND reason IS NULL) OR (mode = 'owner' AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND reason IS NOT NULL AND length(btrim(reason)) > 0) OR (mode = 'backfill' AND actor = 'system:migration' AND reason = 'AM-01b backfill: every version written before evidence sets existed; not pre-registered'))");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperCaptureRunRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -6909,7 +6971,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("shadow_settings", "paper", t =>
                         {
-                            t.HasCheckConstraint("ck_shadow_settings_shape", "actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND length(btrim(reason)) > 0");
+                            t.HasCheckConstraint("ck_shadow_settings_shape", "(actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND length(btrim(reason)) > 0) OR (actor = 'system:default' AND enabled AND reason = 'ADR 0282')");
                         });
                 });
 
@@ -11003,7 +11065,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_test_ledger_hash", "strategy_hash ~ '^[0-9a-f]{64}$' AND window_from <= window_to");
 
-                            t.HasCheckConstraint("ck_test_ledger_trial", "trial_kind IN ('run','replan','null','training_sweep','system_replay','cells_refresh') AND extra_trials >= 0");
+                            t.HasCheckConstraint("ck_test_ledger_trial", "trial_kind IN ('run','replan','null','training_sweep','system_replay','cells_refresh','evidence_set') AND extra_trials >= 0");
                         });
                 });
 

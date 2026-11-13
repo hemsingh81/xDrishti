@@ -33,7 +33,7 @@ public sealed class GetSequentialStatusHandlerTests
     private void Epoch(long id) => _ledger.EpochAsync(null, Ct).Returns(new EpochRow(id, Start, DateTimeOffset.UnixEpoch, "first", "default", "system"));
 
     private static ShadowResultRow Row(int day, string key, double? r, string status = "graded", long? epoch = 1, bool edge = true) =>
-        new(Start.AddDays(day), key, "primary", edge, status, r, r is null ? null : "gross", null, r, epoch);
+        new(Start.AddDays(day), key, "primary", edge, status, r, r is null ? null : "gross", null, r, epoch, InSet: true);
 
     /// <summary>One candidate a session (design effect 1), R given in order.</summary>
     private void Series(params double[] rs) => _reader.ResultsAsync(Ct).Returns([.. rs.Select((r, i) => Row(i, $"s|SYM{i}|Buy|d", r))]);
@@ -135,7 +135,7 @@ public sealed class GetSequentialStatusHandlerTests
     [Fact]
     public async Task The_edge_series_uses_the_gross_r_until_the_charge_sheet_is_confirmed_and_says_so()
     {
-        _reader.ResultsAsync(Ct).Returns([new ShadowResultRow(Start, "k", "primary", true, "graded", 0.8, "net", "flat-10", 1.0, 1L)]);
+        _reader.ResultsAsync(Ct).Returns([new ShadowResultRow(Start, "k", "primary", true, "graded", 0.8, "net", "flat-10", 1.0, 1L, InSet: true)]);
         _costs.ConfirmedOnAsync("flat-10", Ct).Returns((DateOnly?)null);
 
         var unconfirmed = (await RunAsync()).Value;
@@ -279,7 +279,7 @@ public sealed class GetSequentialStatusHandlerTests
     [Fact]
     public async Task A_graded_trade_with_no_gross_figure_is_left_out_and_the_note_says_so()
     {
-        _reader.ResultsAsync(Ct).Returns([new ShadowResultRow(Start, "k", "primary", true, "graded", 0.8, "net", "flat-10", null, 1L), Row(1, "g", -1.0)]);
+        _reader.ResultsAsync(Ct).Returns([new ShadowResultRow(Start, "k", "primary", true, "graded", 0.8, "net", "flat-10", null, 1L, InSet: true), Row(1, "g", -1.0)]);
         _costs.ConfirmedOnAsync("flat-10", Ct).Returns((DateOnly?)null);
 
         var edge = (await RunAsync()).Value.Edge;

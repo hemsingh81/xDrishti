@@ -132,6 +132,20 @@ public sealed class LabDeflationTests
     }
 
     [Fact]
+    public async Task Evidence_set_registration_rows_are_not_looks_and_do_not_raise_the_trial_count()
+    {
+        var results = Results();
+        var service = Service(new DeflationOptions(AssumedTrialSrSd: 0.05), 16);
+        var registrations = Enumerable.Range(100, 5).Select(i => Ledger(i) with { TrialKind = XDrishti.Domain.Shadow.EvidenceSetRules.TrialKind });
+        _ledger.ListAsync(Family, Arg.Any<CancellationToken>()).Returns([.. Enumerable.Range(1, 16).Select(Ledger), .. registrations]);
+
+        var view = (await service.ComputeAsync(Family, Verdict(100), results, [MainRow(results)], Ct))!;
+
+        view.Trials.ShouldBe(16, "five evidence_set rows with other hashes change nothing");
+        Ledger(1).IsEvidenceSet.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task The_latest_row_of_a_variant_counts_and_this_runs_row_replaces_a_stored_one()
     {
         var results = Results();

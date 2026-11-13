@@ -64,7 +64,7 @@ export function ShadowSwitchDialog({ turnOn, onClose }: { turnOn: boolean; onClo
         <Stack spacing={2}>
           <DialogContentText component="div">
             {turnOn
-              ? 'Switching on only allows the shadow-write and shadow-grade services to work; they start paused and you resume them on the Services screen. The forward count cannot be rewound. No order is placed.'
+              ? 'Switching on lets the shadow-write and shadow-grade services work (they start enabled; the record is ON by default once an evidence set exists). The forward count cannot be rewound. No order is placed.'
               : 'Switching off stops the shadow-write and shadow-grade services. Rows already stored stay. No order is placed.'}
           </DialogContentText>
           <TextField

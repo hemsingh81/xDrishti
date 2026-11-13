@@ -15,7 +15,8 @@ public sealed record GetShadowSummaryQuery : IQuery<ShadowSummaryView>;
 /// <param name="Pending">Edge candidates with no stored grade yet.</param>
 /// <param name="NotTriggered">Edge candidates graded as not triggered.</param>
 /// <param name="NotGradable">Edge candidates graded as not gradable.</param>
-public sealed record ShadowCountsView(int Behavioural, int EdgeRaw, double EdgeEffective, int Candidates, int EdgeCandidates, int Pending, int NotTriggered, int NotGradable);
+/// <param name="OutsideSet">Candidates that would count for edge but whose strategy version is outside the epoch's frozen evidence set (spec AM-01 GAP-09): written and graded, labelled <c>outside_set</c>, left out of every edge figure.</param>
+public sealed record ShadowCountsView(int Behavioural, int EdgeRaw, double EdgeEffective, int Candidates, int EdgeCandidates, int Pending, int NotTriggered, int NotGradable, int OutsideSet = 0);
 
 /// <summary>The effective n of the edge count and the pace (criteria 8 and 9).</summary>
 /// <param name="RawN">Graded shadow trades that count for edge.</param>

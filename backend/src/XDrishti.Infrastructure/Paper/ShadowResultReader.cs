@@ -3,15 +3,17 @@ using XDrishti.Application.Abstractions.Shadow;
 
 namespace XDrishti.Infrastructure.Paper;
 
-/// <summary>The read of shadow outcomes behind <see cref="IShadowResultReader"/> (spec CF-08 part B, ADR 0212): select only, for the summary. Nothing that chooses what to approve may name the port (an architecture test).</summary>
+/// <summary>The read of shadow outcomes behind <see cref="IShadowResultReader"/> (spec CF-08 part B, ADR 0212): select only, for the summary. A row's <c>InSet</c> is read from the newest evidence set of its epoch (spec AM-01 GAP-09); no set means false. Nothing that chooses what to approve may name the port (an architecture test).</summary>
 internal sealed class ShadowResultReader(NpgsqlDataSource dataSource) : IShadowResultReader
 {
     public async ValueTask<IReadOnlyList<ShadowResultRow>> ResultsAsync(CancellationToken cancellationToken)
     {
         await using var select = dataSource.CreateCommand("""
-            SELECT e.session_date, e.trade_key, e.ticket_group, e.counts_for_edge, COALESCE(g.status, 'pending'), g.r_sim, g.r_basis, g.sheet_id, g.r_gross, e.edge_epoch
+            SELECT e.session_date, e.trade_key, e.ticket_group, e.counts_for_edge, COALESCE(g.status, 'pending'), g.r_sim, g.r_basis, g.sheet_id, g.r_gross, e.edge_epoch,
+                   COALESCE(jsonb_exists(s.versions, e.strategy_hash::text), false)
             FROM paper.shadow_entries e
             LEFT JOIN paper.shadow_grades g ON g.entry_id = e.id
+            LEFT JOIN LATERAL (SELECT versions FROM paper.evidence_sets WHERE edge_epoch = COALESCE(e.edge_epoch, 0) ORDER BY id DESC LIMIT 1) s ON true
             ORDER BY e.session_date, e.id
             """);
         var result = new List<ShadowResultRow>();
@@ -20,7 +22,7 @@ internal sealed class ShadowResultReader(NpgsqlDataSource dataSource) : IShadowR
         {
             result.Add(new ShadowResultRow(
                 DateOnly.FromDateTime(reader.GetDateTime(0)), reader.GetString(1), reader.GetString(2), reader.GetBoolean(3), reader.GetString(4),
-                reader.IsDBNull(5) ? null : reader.GetDouble(5), reader.IsDBNull(6) ? null : reader.GetString(6), reader.IsDBNull(7) ? null : reader.GetString(7), reader.IsDBNull(8) ? null : reader.GetDouble(8), reader.IsDBNull(9) ? null : reader.GetInt64(9)));
+                reader.IsDBNull(5) ? null : reader.GetDouble(5), reader.IsDBNull(6) ? null : reader.GetString(6), reader.IsDBNull(7) ? null : reader.GetString(7), reader.IsDBNull(8) ? null : reader.GetDouble(8), reader.IsDBNull(9) ? null : reader.GetInt64(9), reader.GetBoolean(10)));
         }
 
         return result;

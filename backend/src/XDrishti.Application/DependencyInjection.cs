@@ -406,9 +406,9 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, XDrishti.Application.OpeningBars.OpeningBarsService>(); // BK-03b: the opening-minute recorder, shown and edited here, run by xd-feed; starts paused, "Run now" refused
         services.AddSingleton<IScheduledService, PlanExpiryService>(); // expires the day's armed tickets after the close (P7-11); starts paused
         services.AddSingleton<IScheduledService, PaperCaptureService>(); // paper fills of armed tickets after the end-of-day run (P10-01); starts enabled (ADR 0282) but opens no epoch before a paper account exists, no order
-        services.AddSingleton<IScheduledService, ShadowWriteService>(); // the shadow record of every nightly candidate, written before the open (CF-08); starts paused, setting paper.shadow.enabled OFF, no order
-        services.AddSingleton<IScheduledService, ShadowGradeService>(); // grades the shadow record after the close with the same replay as paper (CF-08 part B); starts paused, setting paper.shadow.enabled OFF, no order
-        services.AddSingleton<IScheduledService, ShadowDigestService>(); // copies the newest chain digest to a log outside the database every week (CF-08 review fix 4, ADR 0232); starts paused, nothing exported while paper.shadow.enabled is OFF
+        services.AddSingleton<IScheduledService, ShadowWriteService>(); // the shadow record of every nightly candidate, written before the open (CF-08); starts enabled (ADR 0282), writes only while paper.shadow.enabled is ON and an evidence set exists, no order
+        services.AddSingleton<IScheduledService, ShadowGradeService>(); // grades the shadow record after the close with the same replay as paper (CF-08 part B); starts enabled (ADR 0282), grades only while paper.shadow.enabled is ON, no order
+        services.AddSingleton<IScheduledService, ShadowDigestService>(); // copies the newest chain digest to a log outside the database every week (CF-08 review fix 4, ADR 0232); starts enabled (ADR 0282), nothing exported while paper.shadow.enabled is OFF
         services.AddSingleton<IScheduledService, DecayMonitorService>(); // the daily kill-rule evaluation of each strategy's forward series, after the shadow grading (CF-12 part 12b); starts enabled (ADR 0282), automatic demotion pauses only while confidence.kill.auto is ON (ON by default, owner password to change), no order
         services.AddSingleton<IScheduledService, MlMonitorService>(); // the daily rollback evaluation of each champion, after the decay monitor (CF-10 part 10d-1); starts enabled (ADR 0282), automatic acts only with the owner's settings ON (default OFF), no order
         services.AddSingleton<IScheduledService, HoldOutEpochsService>(); // the evening seal steps of the hold-out chain (HO-01b, ADR 0283); enabled at first start, acts only through the auto settings, no order
@@ -1181,6 +1181,8 @@ public static class DependencyInjection
         services.AddScoped<IBellNoticeSource, KillProposalNotices>(); // the open kill proposals as bell notices, derived on read (CF-12 part 12b)
         services.AddScoped<IQueryHandler<VerifyShadowChainQuery, ShadowChainCheckView>, VerifyShadowChainHandler>(); // recomputes the digest chain from the stored rows (CF-08 part B)
         services.AddScoped<ICommandHandler<ChangeShadowSwitchCommand, ShadowSwitched>, ChangeShadowSwitchHandler>(); // the owner's switch, behind a fresh password in the endpoint (CF-08 part B)
+        services.AddScoped<IQueryHandler<GetEvidenceSetQuery, EvidenceSetView>, GetEvidenceSetHandler>(); // the evidence set of the current edge epoch, stored or the default it would get (AM-01b, GAP-09)
+        services.AddScoped<ICommandHandler<ReplaceEvidenceSetCommand, EvidenceSetReplaced>, ReplaceEvidenceSetHandler>(); // the owner replaces the set before the first shadow write of the epoch, behind a fresh password in the endpoint (AM-01b)
         services.AddScoped<IQueryHandler<ListPaperEntriesQuery, Result<PaperEntryList>>, ListPaperEntriesHandler>();
         services.AddScoped<IQueryHandler<ListCaptureRunsQuery, Result<CaptureRunList>>, ListCaptureRunsHandler>();
         services.AddScoped<PaperLedgerService>(); // the derived paper ledger of each paper account, from the stored trades only (P10-02, ADR 0118)

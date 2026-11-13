@@ -40,7 +40,7 @@ internal sealed class GetShadowSummaryHandler(
         var chain = await reader.ChainAsync(cancellationToken);
         var behavioural = await BehaviouralAsync(cancellationToken);
 
-        var edgeRows = rows.Where(r => r.CountsForEdge).ToList();
+        var edgeRows = rows.Where(r => r.CountsForEdge && r.InSet).ToList(); // only rows inside the epoch's frozen evidence set count (spec AM-01 GAP-09); the others are written, graded and labelled outside_set
         var graded = edgeRows.Where(r => r.Status == "graded" && r.RSim is not null).ToList();
         var days = edgeRows.GroupBy(r => r.SessionDate).Select(g => new EdgeDay(g.Count(), g.Count(r => r.Status == "graded" && r.RSim is not null)));
         var edge = EdgeCount.Compute(days);
@@ -57,7 +57,7 @@ internal sealed class GetShadowSummaryHandler(
         var byGroup = graded.Where(r => ShadowCostBasis.Figure(r, costs) is not null).ToLookup(r => r.TicketGroup, r => ShadowCostBasis.Figure(r, costs)!.Value);
 
         var counts = new ShadowCountsView(
-            behavioural, edge.RawN, edge.EffectiveN, rows.Count, edgeRows.Count, edgeRows.Count(r => r.Status == "pending"), edgeRows.Count(r => r.Status == "not_triggered"), edgeRows.Count(r => r.Status == "not_gradable"));
+            behavioural, edge.RawN, edge.EffectiveN, rows.Count, edgeRows.Count, edgeRows.Count(r => r.Status == "pending"), edgeRows.Count(r => r.Status == "not_triggered"), edgeRows.Count(r => r.Status == "not_gradable"), rows.Count(r => r.CountsForEdge && !r.InSet));
         var edgeView = new ShadowEdgeView(
             edge.RawN, edge.EffectiveN, edge.Rho, edge.RhoIsPlaceholder, edge.RhoIsPlaceholder ? ShadowWording.PlaceholderRho : null, pace.Sessions, TargetEffectiveN, eta,
             EtaText(edge, pace, eta));

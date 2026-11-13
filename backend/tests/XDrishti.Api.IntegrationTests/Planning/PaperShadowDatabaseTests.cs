@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using XDrishti.Api.IntegrationTests.Data;
 using XDrishti.Api.IntegrationTests.Infrastructure;
@@ -47,10 +48,31 @@ public sealed class PaperShadowDatabaseTests(ApiFactory factory) : DataTestBase(
         await scope.ServiceProvider.GetRequiredService<IPlanStore>().PublishAsync(plan, Ct);
     }
 
-    private async Task SwitchAsync(bool enabled)
+    private async Task SwitchAsync(bool enabled, bool ownerSet = true)
     {
         await using var connection = await OpenAsync();
         await ExecuteAsync(connection, "INSERT INTO paper.shadow_settings (enabled, actor, reason) VALUES (@e, 'owner:test@example.com', 'test')", ("e", enabled));
+        if (enabled && ownerSet)
+        {
+            // AM-01b: the shadow record writes only with an evidence set; the owner names the version of these plans (no paper epoch: key 0)
+            await ExecuteAsync(connection, "INSERT INTO paper.evidence_sets (edge_epoch, versions, set_hash, mode, actor, reason) VALUES ((SELECT COALESCE(max(id), 0) FROM paper.epochs), to_jsonb(ARRAY[repeat('a', 64)]), repeat('d', 64), 'owner', 'owner:test@example.com', 'test')");
+        }
+    }
+
+    /// <summary>The configuration reading of a host in which the eligible cell of these plans resolves to the version of the plan items.</summary>
+    private sealed class FixedConfiguration(bool partial = false) : XDrishti.Application.Abstractions.Paper.IConfigSnapshotSource
+    {
+        public ValueTask<XDrishti.Application.Abstractions.Paper.ConfigReading> ReadAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new XDrishti.Application.Abstractions.Paper.ConfigReading([new ConfigComponent("cells.eligible/" + Cell, new string('a', 64))], partial ? ["cells"] : []));
+    }
+
+    private async Task<ShadowWriteOutcome> RunWithConfigurationAsync(bool partial = false)
+    {
+        using var host = Factory.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddScoped<XDrishti.Application.Abstractions.Paper.IConfigSnapshotSource>(_ => new FixedConfiguration(partial))));
+        using var scope = host.Services.CreateScope();
+        var result = await scope.ServiceProvider.GetRequiredService<ICommandHandler<WriteShadowCommand, ShadowWriteOutcome>>().HandleAsync(new WriteShadowCommand(null), Ct);
+        result.IsSuccess.ShouldBeTrue();
+        return result.Value;
     }
 
     private async Task<ShadowWriteOutcome> RunAsync(DateOnly? session = null)
@@ -95,6 +117,100 @@ public sealed class PaperShadowDatabaseTests(ApiFactory factory) : DataTestBase(
         (await ScalarAsync<int>("SELECT n_rows FROM paper.shadow_sessions WHERE session_date = @d", ("d", Monday))).ShouldBe(7);
         (await ScalarAsync<long>("SELECT count(*) FROM paper.shadow_entries e JOIN trading.plan_items i ON i.id = e.plan_item_id AND i.plan_id = e.plan_id")).ShouldBe(7);
         (await ScalarAsync<long>("SELECT count(*) FROM paper.shadow_entries WHERE written_at >= (session_date + time '09:00') AT TIME ZONE 'Asia/Kolkata'")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task The_first_write_of_an_epoch_registers_one_automatic_set_before_the_entries_and_a_replace_after_it_is_refused_by_the_database()
+    {
+        await PublishNightlyPlanAsync("shadow-set", Monday, "NSE:");
+        await SwitchAsync(true, ownerSet: false);
+
+        await RunWithConfigurationAsync();
+        await RunWithConfigurationAsync();
+
+        (await ScalarAsync<long>("SELECT count(*) FROM paper.evidence_sets")).ShouldBe(1);
+        (await ScalarAsync<string>("SELECT mode || '/' || actor || '/' || (first_write_at IS NOT NULL)::text || '/' || edge_epoch::text FROM paper.evidence_sets")).ShouldBe("auto/system:default/true/0");
+        (await ScalarAsync<string>("SELECT versions::text FROM paper.evidence_sets")).ShouldBe("[\"" + new string('a', 64) + "\"]");
+        (await ScalarAsync<long>("SELECT count(*) FROM lab.test_ledger WHERE trial_kind = 'evidence_set' AND strategy_hash = repeat('a', 64)")).ShouldBe(0, "a hash that is no stored version has no ledger row");
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var rows = await scope.ServiceProvider.GetRequiredService<IShadowResultReader>().ResultsAsync(Ct);
+            rows.Count.ShouldBe(7);
+            rows.ShouldAllBe(r => r.InSet);
+        }
+
+        await using var connection = await OpenAsync();
+        var refused = await Should.ThrowAsync<Npgsql.PostgresException>(() => ExecuteAsync(connection, "INSERT INTO paper.evidence_sets (edge_epoch, versions, set_hash, mode, actor, reason) VALUES (0, to_jsonb(ARRAY[repeat('b', 64)]), repeat('d', 64), 'owner', 'owner:me@x.test', 'late')"));
+        refused.SqlState.ShouldBe("23514");
+    }
+
+    [Fact]
+    public async Task A_row_of_a_version_outside_the_set_is_written_and_labelled()
+    {
+        await PublishNightlyPlanAsync("shadow-out", Monday, "NSE:");
+        await SwitchAsync(true, ownerSet: false);
+        await using (var connection = await OpenAsync())
+        {
+            // the owner's set names another version before the first write
+            await ExecuteAsync(connection, "INSERT INTO paper.evidence_sets (edge_epoch, versions, set_hash, mode, actor, reason) VALUES (0, to_jsonb(ARRAY[repeat('b', 64)]), repeat('d', 64), 'owner', 'owner:me@x.test', 'mine')");
+        }
+
+        var outcome = await RunWithConfigurationAsync();
+
+        outcome.Rows.ShouldBe(7);
+        (await ScalarAsync<long>("SELECT count(*) FROM paper.evidence_sets")).ShouldBe(1, "the owner's set stands; no automatic one is added");
+        using var scope = Factory.Services.CreateScope();
+        var rows = await scope.ServiceProvider.GetRequiredService<IShadowResultReader>().ResultsAsync(Ct);
+        rows.ShouldAllBe(r => !r.InSet);
+    }
+
+    [Fact]
+    public async Task An_owner_set_that_is_uncommitted_when_the_first_write_starts_is_waited_for_and_stands_with_no_automatic_set_added()
+    {
+        await PublishNightlyPlanAsync("shadow-race", Monday, "NSE:");
+        await SwitchAsync(true, ownerSet: false);
+
+        // connection A: the owner's replace has inserted its set (the guard holds the epoch's lock) but has not committed
+        await using var owner = await OpenAsync();
+        await using var transaction = await owner.BeginTransactionAsync(Ct);
+        await using (var insert = new Npgsql.NpgsqlCommand("INSERT INTO paper.evidence_sets (edge_epoch, versions, set_hash, mode, actor, reason) VALUES (0, to_jsonb(ARRAY[repeat('b', 64)]), repeat('d', 64), 'owner', 'owner:me@x.test', 'mine')", owner, transaction))
+        {
+            await insert.ExecuteNonQueryAsync(Ct);
+        }
+
+        // connection B: the writer read no set (A's is not visible), so it carries the automatic one; its transaction must wait for A's lock
+        var writer = RunWithConfigurationAsync();
+        var waiting = false;
+        for (var i = 0; i < 200 && !waiting; i++)
+        {
+            waiting = await ScalarAsync<long>("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted") > 0;
+            if (!waiting)
+            {
+                await Task.Delay(50, Ct); // real waiting on a real database lock: there is no clock to fake
+            }
+        }
+
+        waiting.ShouldBeTrue("the first write must wait for the owner's uncommitted set");
+        writer.IsCompleted.ShouldBeFalse();
+        await transaction.CommitAsync(Ct);
+        var outcome = await writer;
+
+        outcome.Rows.ShouldBe(7);
+        (await ScalarAsync<long>("SELECT count(*) FROM paper.evidence_sets")).ShouldBe(1, "the owner's set stands; the writer added no automatic one");
+        (await ScalarAsync<string>("SELECT mode FROM paper.evidence_sets")).ShouldBe("owner");
+    }
+
+    [Fact]
+    public async Task With_no_set_stored_and_a_partial_configuration_reading_nothing_is_written()
+    {
+        await PublishNightlyPlanAsync("shadow-none", Monday, "NSE:");
+        await SwitchAsync(true, ownerSet: false);
+
+        var outcome = await RunWithConfigurationAsync(partial: true);
+
+        outcome.EvidenceSetMissing.ShouldBeTrue();
+        (await ScalarAsync<long>("SELECT count(*) FROM paper.shadow_entries")).ShouldBe(0);
+        (await ScalarAsync<long>("SELECT count(*) FROM paper.evidence_sets")).ShouldBe(0);
     }
 
     [Fact]

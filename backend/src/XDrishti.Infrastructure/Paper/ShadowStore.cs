@@ -28,6 +28,14 @@ internal sealed class ShadowStore(NpgsqlDataSource dataSource) : IShadowStore
         try
         {
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            if (session.EvidenceSet is not null || session.Entries.Count > 0)
+            {
+                // Taken first, before any other statement, whenever the session carries a set or entries (so a session with a set and no entries cannot replace an uncommitted owner set, and the lock order is the same as the guard's). Serialised against the owner's replace of the epoch's evidence set (the trigger of paper.evidence_sets takes the same lock): either the owner's set commits first and is seen below, or these entries commit first and the replace is refused. Held to the end of the transaction.
+                await using var gate = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtextextended('paper.evidence_sets', @key))", connection, transaction);
+                gate.Parameters.AddWithValue("key", NpgsqlDbType.Bigint, session.EvidenceSet?.EdgeKey ?? session.Entries[0].EdgeEpoch ?? 0L);
+                await gate.ExecuteNonQueryAsync(cancellationToken);
+            }
+
             await using (var head = new NpgsqlCommand("INSERT INTO paper.shadow_sessions (session_date, n_rows, status, digest, prev_digest) VALUES (@date, @n, @status, @digest, @prev)", connection, transaction))
             {
                 head.Parameters.AddWithValue("date", NpgsqlDbType.Date, session.SessionDate);
@@ -36,6 +44,12 @@ internal sealed class ShadowStore(NpgsqlDataSource dataSource) : IShadowStore
                 head.Parameters.AddWithValue("digest", NpgsqlDbType.Char, session.Digest);
                 head.Parameters.AddWithValue("prev", NpgsqlDbType.Char, (object?)session.PrevDigest ?? DBNull.Value);
                 await head.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            // The epoch's evidence set goes in first, in this transaction, so a first write never exists without its set (spec AM-01 GAP-09). A set stored meanwhile (the owner's) is left as it is.
+            if (session.EvidenceSet is { } evidenceSet)
+            {
+                await EvidenceSetStore.InsertAsync(connection, transaction, evidenceSet, firstWrite: true, cancellationToken);
             }
 
             foreach (var e in session.Entries)

@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { buildPhase, mountPhase } from '@/test/phaseFixtures';
 import { renderRoutes } from '@/test/render';
 import { problemResponse, server } from '@/test/server';
-import { buildShadowSummary, mountShadow } from '@/test/shadowFixtures';
+import { buildEvidenceSet, buildShadowSummary, mountShadow } from '@/test/shadowFixtures';
 import { PaperPage } from './components/PaperPage';
 
 const open = (tab: string) =>
@@ -177,5 +177,81 @@ describe('Phase tab sequential line', () => {
       await user.click(screen.getByRole('button', { name: 'Switch on' }));
       expect(await screen.findByText(text)).toBeInTheDocument();
     });
+  });
+});
+
+describe('Evidence set card (AM-01b)', () => {
+  it('shows a frozen automatic set as the system default with no replace action', async () => {
+    mountShadow();
+    open('shadow');
+    expect(await screen.findByText('Frozen: never replaceable')).toBeInTheDocument();
+    expect(screen.getByText(/System default/)).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Evidence set versions' }).querySelectorAll('li')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: /Replace the set/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Outside the evidence set/)).toBeInTheDocument();
+  });
+
+  it('shows an open owner set and replaces it with a reason and a fresh password, clearing the password after a refusal', async () => {
+    mountShadow(
+      buildShadowSummary(),
+      buildEvidenceSet({
+        state: 'open',
+        mode: 'owner',
+        actor: 'owner:me@x.test',
+        reason: 'my pick',
+        firstWriteAt: null,
+      }),
+    );
+    let body: unknown = null;
+    server.use(
+      http.put('/api/paper/shadow/evidence-set', async ({ request }) => {
+        body = await request.json();
+        return problemResponse({ title: 'Frozen.', code: 'paper.evidence_set_frozen' }, 409);
+      }),
+    );
+    const user = userEvent.setup();
+    open('shadow');
+    expect(await screen.findByText(/Owner \(owner:me@x.test\)/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Replace the set…' }));
+    await user.type(await screen.findByLabelText(/reason/i), 'the ones I trade');
+    await user.type(screen.getByLabelText(/your password/i), 'secret');
+    await user.click(screen.getByRole('button', { name: 'Replace' }));
+    expect(await screen.findByText(/set is frozen and cannot be replaced/i)).toBeInTheDocument();
+    expect(body).toMatchObject({ reason: 'the ones I trade', password: 'secret' });
+    expect(screen.getByLabelText(/your password/i)).toHaveValue('');
+  });
+
+  it('shows a migration backfill as not pre-registered', async () => {
+    mountShadow(
+      buildShadowSummary(),
+      buildEvidenceSet({
+        mode: 'backfill',
+        actor: 'system:migration',
+        reason: 'AM-01b backfill: not pre-registered',
+        firstWriteAt: null,
+      }),
+    );
+    open('shadow');
+    expect(await screen.findByText(/Migration backfill/)).toBeInTheDocument();
+    expect(screen.getByText(/NOT pre-registered/)).toBeInTheDocument();
+    expect(screen.queryByText(/System default/)).not.toBeInTheDocument();
+  });
+
+  it('shows a pending set with the versions the default would register', async () => {
+    mountShadow(
+      buildShadowSummary(),
+      buildEvidenceSet({
+        state: 'pending',
+        mode: null,
+        actor: null,
+        setHash: null,
+        createdAt: null,
+        firstWriteAt: null,
+      }),
+    );
+    open('shadow');
+    expect(await screen.findByText('Pending: no set stored yet')).toBeInTheDocument();
+    expect(screen.getByText(/Versions the default would register: 2/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replace the set…' })).toBeInTheDocument();
   });
 });

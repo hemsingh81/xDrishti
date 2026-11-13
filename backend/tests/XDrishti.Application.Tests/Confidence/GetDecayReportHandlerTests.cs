@@ -105,7 +105,7 @@ public sealed class GetDecayReportHandlerTests
     }
 
     private static ShadowResultRow Row(int day, string strategy, double net, double? gross, string basis = "net", string status = "graded") =>
-        new(Start.AddDays(day), $"{strategy}|SYM{day}|Buy|d{day}", "primary", true, status, net, basis, basis == "net" ? "flat-10" : null, gross, 1);
+        new(Start.AddDays(day), $"{strategy}|SYM{day}|Buy|d{day}", "primary", true, status, net, basis, basis == "net" ? "flat-10" : null, gross, 1, InSet: true);
 
     /// <summary>One candidate a session for <paramref name="count"/> sessions; net R <paramref name="net"/>, gross R <paramref name="net"/> + 0.12 (charges of 0.12 R).</summary>
     private void Series(int count, double net, string strategy = "ORB", string basis = "net") =>

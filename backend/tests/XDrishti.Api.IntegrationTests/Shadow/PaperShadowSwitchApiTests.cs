@@ -186,14 +186,14 @@ public sealed class PaperShadowSwitchApiTests(ApiFactory factory) : DataTestBase
     }
 
     [Fact]
-    public async Task The_two_services_are_listed_paused_by_default()
+    public async Task The_three_shadow_services_are_listed_enabled_by_default_since_AM_01b()
     {
         foreach (var id in new[] { "shadow-write", "shadow-grade", "shadow-digest" })
         {
             var service = await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/services/" + id, UriKind.Relative), Ct);
 
             service.GetProperty("id").GetString().ShouldBe(id);
-            service.GetProperty("enabled").GetBoolean().ShouldBeFalse();
+            service.GetProperty("enabled").GetBoolean().ShouldBeTrue();
         }
     }
 }

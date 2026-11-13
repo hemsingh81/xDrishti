@@ -107,3 +107,25 @@ internal sealed class ShadowSettingRecord
 
     public DateTimeOffset ChangedAt { get; set; }
 }
+
+/// <summary>A row of <c>paper.evidence_sets</c>: the frozen evidence set of an edge epoch (spec AM-01 GAP-09). Insert-only; the newest row of an epoch is current. The store reads and writes it with SQL; the class exists for the model and the migration.</summary>
+internal sealed class EvidenceSetRecord
+{
+    public long Id { get; set; }
+
+    public long EdgeEpoch { get; set; }
+
+    public string Versions { get; set; } = "[]";
+
+    public string SetHash { get; set; } = string.Empty;
+
+    public string Mode { get; set; } = string.Empty;
+
+    public string Actor { get; set; } = string.Empty;
+
+    public string? Reason { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset? FirstWriteAt { get; set; }
+}
