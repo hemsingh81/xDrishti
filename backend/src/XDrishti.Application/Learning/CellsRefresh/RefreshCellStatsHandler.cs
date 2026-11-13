@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Lab;
 using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
@@ -60,6 +61,7 @@ internal sealed class RefreshCellStatsHandler(
         var calendar = await tradingCalendar.GetAsync(cancellationToken);
         var session = calendar.LastClosedSession(now);
         var block = await holdOut.CurrentAsync(cancellationToken);
+        var released = await holdOut.ReleasedAsync(cancellationToken); // read before anything is written: a failed read ends the run with nothing stored
         if (CellsRefreshRules.RefreshEnd(session, block?.Start, holdOutOptions.TrainingEmbargoDays) is not { } end)
         {
             return Fail(CellsRefreshErrors.NoHoldOut(null));
@@ -150,7 +152,7 @@ internal sealed class RefreshCellStatsHandler(
         }
 
         CellsRefreshLog.Completed(logger, computed.Value.SnapshotKey[..12], kept.Count, extended.Count, newRuns);
-        return Result.Success(new RefreshCellStatsOutcome(session, end, computed.Value.SnapshotKey, computed.Value.AlreadyStored, kept, extended, newRuns));
+        return Result.Success(new RefreshCellStatsOutcome(session, end, computed.Value.SnapshotKey, computed.Value.AlreadyStored, kept, extended, newRuns, Domain.Lab.SeenHoldOut.Labels(released, DateOnly.MinValue, end)));
     }
 
     private Result<RefreshCellStatsOutcome> Fail(Error error)

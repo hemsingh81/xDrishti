@@ -33,6 +33,23 @@ public sealed class TrainingStoreWindowTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task After_a_release_the_gate_follows_the_block_in_force_and_only_moves_forward()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_train_release", Ct);
+        await StoreKit.ExecuteAsync(scratch.ConnectionString, "INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2031-01-01', '2026-01-01', '2031-06-30', 12, repeat('a', 64), now())", Ct);
+        var embargo = new XDrishti.Domain.Confidence.HoldOutOptions().TrainingEmbargoDays;
+        var oldCut = BlockStart.AddDays(-1 - embargo);
+        var newCut = new DateOnly(2031, 7, 1).AddDays(-1 - embargo);
+        (await StoreAsync(scratch, newCut)).IsFailure.ShouldBeTrue("before the release the later window reaches the block");
+
+        await StoreKit.ExecuteAsync(scratch.ConnectionString, "INSERT INTO lab.holdout_releases (block_start, released_at, mode, actor, setting_hash, looked, next_block_start) VALUES ('2031-01-01', now(), 'owner', 'owner:x', repeat('a', 64), true, '2031-07-01'); INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at, prev_start) VALUES ('2031-07-01', '2026-01-01', '2031-12-31', 6, repeat('a', 64), now(), '2031-01-01')", Ct);
+
+        (await StoreAsync(scratch, newCut)).IsSuccess.ShouldBeTrue("the cut moved forward with the release");
+        (await StoreAsync(scratch, newCut.AddDays(1))).IsFailure.ShouldBeTrue("the new embargo is kept");
+        (await StoreAsync(scratch, oldCut)).IsSuccess.ShouldBeTrue("an earlier window is still clear: the cut never moves back");
+    }
+
+    [Fact]
     public async Task A_training_run_is_refused_when_it_ends_inside_the_embargo_or_the_block_and_stored_when_clear()
     {
         await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_train_window", Ct);

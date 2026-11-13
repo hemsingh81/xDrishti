@@ -446,6 +446,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(RegistrationRequest))]
 [JsonSerializable(typeof(RegistrationView))]
 [JsonSerializable(typeof(HoldOutUnlockRequest))]
+[JsonSerializable(typeof(HoldOutReleaseRequest))]
+[JsonSerializable(typeof(HoldOutBlockView))]
 [JsonSerializable(typeof(HoldOutResultView))]
 [JsonSerializable(typeof(HoldOutView))]
 [JsonSerializable(typeof(LabVerdictView))]

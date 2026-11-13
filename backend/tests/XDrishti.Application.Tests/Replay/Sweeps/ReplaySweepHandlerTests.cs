@@ -41,6 +41,7 @@ public sealed class ReplaySweepHandlerTests
         private static IReplayFacts Setup(IReplayFacts facts)
         {
             facts.LastReadableSessionAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Last));
+            facts.ReleasedHoldOutAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<(DateOnly Start, DateOnly End)>>([]));
             return facts;
         }
 

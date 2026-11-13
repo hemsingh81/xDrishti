@@ -148,15 +148,15 @@ Block 2 seals when the session of 2027-05-04 closes. Looks at block 2:
    - After 20 sealed sessions without release: one notice naming the reason.
 8. **Strategy auto look at the seal.** With AutoUnlock ON, on the evening block 2 seals, the look is claimed for ORB v3 (newest pre-dated version with a development pass), not v4; with AutoUnlock OFF nothing is claimed. On the evening block 1 is in force and sealed, with AutoUnlock ON and a passing version, nothing is claimed either (block 1 is the owner's), and a Lab run that passes does not claim block 1.
 9. **Scorecard row 12 and the ML gate.** A pass on block 1 followed by a fail on block 2 reads fail, for a version (row 12) and for a model family (the gate). After block 2 is released, the model's block-2 figures are still read.
-10. **Labels.** `seen_holdout` appears on LC-01 rows, run labels and replay sessions.
+10. **Labels.** `seen_holdout:<start>` appears on Lab run labels, replay sessions and the run message of the LC-01 refresh (HO-01a). The per-row label on the LC-01 cell rows (the cell tables have no label column) moves to HO-01b.
 11. **Fences.** Pinned by architecture tests:
     - no code outside `HoldOutStore` names `lab.holdout_blocks` or `lab.holdout_releases`;
     - nothing references `XDrishti.Execution`.
 
 ## Contract
 - **API:**
-  - `GET /api/lab/holdout` adds `blocks[]` with `{ start, end, state, looks: { strategy, model, system }, releasedAt, mode, blockedBy? }` and `autoRelease`.
-  - `POST /api/lab/holdout/blocks/{start}/release` takes `{ password, forfeitLook? }` and answers 200 `HoldOutBlockView`, or the codes of AC 4.
+  - `GET /api/lab/holdout` adds `blocks[]` and `autoRelease`. Built in HO-01a: each block is a `HoldOutBlockView` with `{ start, historyFirst, historyLast (its end), lengthMonths, settingHash, createdAt, state, freshLook, releasedAt, mode }`; HO-01b replaces `freshLook` by `looks: { strategy, model, system }` and adds `blockedBy?`.
+  - `POST /api/lab/holdout/blocks/{start}/release` takes `{ password, forfeitLook? }` and answers 200 `HoldOutBlockView` of the released block, or the codes of AC 4 (a start later than the block in force is `lab.holdout_order`, an unknown earlier date 404, a malformed date 422). Each release also writes a best-effort `LabHoldOutReleased` audit row (no database change).
   - `gen-api` in the same change.
 - **Data** (migration `AddHoldOutEpochs`, HO-01a; `WidenHoldOutLooks`, HO-01b):
   - `lab.holdout_blocks` gains `prev_start date null unique` and `orphan bool not null default false`.
@@ -165,7 +165,8 @@ Block 2 seals when the session of 2027-05-04 closes. Looks at block 2:
   - `Down` refuses while a release or a `system` row exists.
 - **Settings:**
   - `Confidence:HoldOut:BlockMonths` (6, 3–12).
-  - `Confidence:HoldOut:AutoRelease` (**true**; a change in either direction needs a fresh password).
+  - `Confidence:HoldOut:AutoRelease` (**true**; a change in either direction needs a fresh password). The auto release fails closed (`no_strategy_slot`) until HO-01b registers the strategy look slot.
+  - `Confidence:HoldOut:Enforce` default ON is built in HO-01b, with the deploy of 01a and 01b.
   - `Confidence:HoldOut:AutoUnlock` default becomes **true** (ADR 0282), for blocks k ≥ 2 only; block 1 is never looked automatically.
 - **Service:** `holdout-epochs` (D10).
 - **UI:** the Lab hold-out card lists the blocks with their states, the three looks and what blocks a release. The release button sits behind the step-up dialog, which shows the forfeit sentence for an unlooked block.

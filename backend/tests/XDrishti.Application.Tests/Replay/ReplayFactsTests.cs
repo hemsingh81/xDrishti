@@ -88,7 +88,7 @@ public sealed class ReplayFactsTests
     {
         var world = new ReplayWorld().WithDefaults("AAA");
         var facts = world.Facts();
-        var holdOut = Substitute.For<XDrishti.Application.Abstractions.Lab.IHoldOutStore>();
+        var holdOut = TestHoldOutStores.NoReleases();
         holdOut.CurrentAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<XDrishti.Application.Abstractions.Lab.HoldOutBlock?>(null));
         var bars = new ClampedBars(holdOut, new XDrishti.Domain.Confidence.HoldOutOptions(), Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarStore>(), Substitute.For<XDrishti.Application.Abstractions.Market.History.IBackfillSeams>(), Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarQueries>());
 

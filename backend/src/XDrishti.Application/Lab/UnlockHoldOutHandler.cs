@@ -35,14 +35,15 @@ internal sealed class UnlockHoldOutHandler(HoldOutUnlocker unlocker, ILabRunStor
 }
 
 /// <summary>Reads the hold-out: the block (or the proposal) and the looks taken. Numbers only in a look that was taken.</summary>
-internal sealed class GetHoldOutHandler(IHoldOutStore store, LabHoldOutGuard guard, HoldOutOptions options) : IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>
+internal sealed class GetHoldOutHandler(IHoldOutStore store, LabHoldOutGuard guard, HoldOutOptions options, HoldOutEpochs epochs) : IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>
 {
     public async ValueTask<Result<HoldOutView>> HandleAsync(GetHoldOutQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var block = await store.CurrentAsync(cancellationToken);
+        var chain = await epochs.StatusAsync(cancellationToken);
+        var inForce = chain.FirstOrDefault(b => b.State != XDrishti.Domain.Lab.HoldOutBlockState.Released);
         HoldOutPlanView? proposed = null;
-        if (block is null && await guard.HistoryAsync(cancellationToken) is { } h)
+        if (inForce is null && await guard.HistoryAsync(cancellationToken) is { } h)
         {
             var p = guard.Plan(h.First, h.Last);
             proposed = new HoldOutPlanView(p.HistoryMonths, p.LengthMonths, p.DevelopmentMonths, p.Folds, p.Start, p.Status);
@@ -52,8 +53,10 @@ internal sealed class GetHoldOutHandler(IHoldOutStore store, LabHoldOutGuard gua
         return Result.Success(new HoldOutView(
             options.Enforce,
             options.AutoUnlock,
-            block is null ? null : new HoldOutBlockView(block.Start, block.HistoryFirst, block.HistoryLast, block.LengthMonths, block.SettingHash, block.CreatedAt),
+            inForce is null ? null : BlockViews.Of(inForce),
             proposed,
-            [.. unlocks.Select(u => u.Result)]));
+            [.. unlocks.Select(u => u.Result)],
+            [.. chain.Select(BlockViews.Of)],
+            options.AutoRelease));
     }
 }

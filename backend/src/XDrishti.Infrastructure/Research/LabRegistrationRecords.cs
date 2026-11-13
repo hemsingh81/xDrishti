@@ -50,6 +50,30 @@ internal sealed class HoldOutBlockRecord
     public string SettingHash { get; set; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>The start of the block before it in the chain; null for block 1 (HO-01).</summary>
+    public DateOnly? PrevStart { get; set; }
+
+    /// <summary>A second first block left by the ADR 0207 race; marked by the migration and never read.</summary>
+    public bool Orphan { get; set; }
+}
+
+/// <summary>A row of <c>lab.holdout_releases</c> (HO-01, ADR 0283): the release of a block, insert-only.</summary>
+internal sealed class HoldOutReleaseRecord
+{
+    public DateOnly BlockStart { get; set; }
+
+    public DateTimeOffset ReleasedAt { get; set; }
+
+    public string Mode { get; set; } = string.Empty;
+
+    public string Actor { get; set; } = string.Empty;
+
+    public string SettingHash { get; set; } = string.Empty;
+
+    public bool Looked { get; set; }
+
+    public DateOnly NextBlockStart { get; set; }
 }
 
 /// <summary>A row of <c>lab.holdout_unlocks</c> (CF-06, ADR 0207).</summary>

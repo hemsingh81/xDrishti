@@ -27,14 +27,17 @@ public sealed record HoldOutResultView(
     string Actor,
     IReadOnlyList<string> Notes);
 
-/// <summary>The locked block as served.</summary>
-public sealed record HoldOutBlockView(DateOnly Start, DateOnly HistoryFirst, DateOnly HistoryLast, int LengthMonths, string SettingHash, DateTimeOffset CreatedAt);
+/// <summary>
+/// A block of the hold-out chain as served (HO-01): <c>HistoryLast</c> is its last date. <c>State</c> is <c>filling</c>, <c>sealed</c>, <c>looked</c> or <c>released</c>; <c>FreshLook</c> says whether a fresh look was taken (for a released block, whether it had one when
+/// released); <c>ReleasedAt</c> and <c>Mode</c> (<c>owner</c> or <c>auto</c>) are set once it is released.
+/// </summary>
+public sealed record HoldOutBlockView(DateOnly Start, DateOnly HistoryFirst, DateOnly HistoryLast, int LengthMonths, string SettingHash, DateTimeOffset CreatedAt, string? State = null, bool? FreshLook = null, DateTimeOffset? ReleasedAt = null, string? Mode = null);
 
 /// <summary>The sizing the policy gives for the stored history now (D4).</summary>
 public sealed record HoldOutPlanView(double HistoryMonths, int LengthMonths, double DevelopmentMonths, int Folds, DateOnly? Start, string Status);
 
-/// <summary><c>GET /api/lab/holdout</c>: the block (or what it would be), whether the Lab enforces it, and every look taken. Numbers appear only in an unlock that was taken.</summary>
-public sealed record HoldOutView(bool Enforce, bool AutoUnlock, HoldOutBlockView? Block, HoldOutPlanView? Proposed, IReadOnlyList<HoldOutResultView> Unlocks);
+/// <summary><c>GET /api/lab/holdout</c>: the block in force (or what it would be), whether the Lab enforces it, the auto options, the chain of <c>Blocks</c> with their states, and every look taken. Numbers appear only in an unlock that was taken.</summary>
+public sealed record HoldOutView(bool Enforce, bool AutoUnlock, HoldOutBlockView? Block, HoldOutPlanView? Proposed, IReadOnlyList<HoldOutResultView> Unlocks, IReadOnlyList<HoldOutBlockView>? Blocks = null, bool AutoRelease = true);
 
 /// <summary>The registration row of a report (spec CF-06, AC12): <c>registered</c> or <c>not_registered</c>, and the texts when registered.</summary>
 public sealed record ReportRegistrationView(string State, bool Enforce, RegistrationView? Registration, string Text);
