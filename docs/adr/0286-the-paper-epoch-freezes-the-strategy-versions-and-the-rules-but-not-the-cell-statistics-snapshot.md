@@ -17,3 +17,8 @@ A 12-week frozen cell snapshot can never pass the nightly selection gate, whose 
 ## Consequences
 - The paper count measures the frozen versions and rules with statistics refreshed from research runs, not one fixed snapshot (P10-05 question 2 had rejected that; the owner chose it).
 - The Auto evidence block says each refresh is noted in the paper epoch.
+- Each source's identity in the basis is read from the stored record (the replay baseline): definition hash, parameters, timeframe, run data options, csv flag, fills, cost choice with capital and profile, exit and time stop, universe and start. A record the reader cannot rebuild (for example fills with a delay) makes the cells group unreadable (fail closed).
+- **One-time deploy window:** the first appearance of `cells.basis` is `free`, so the owner should not run `xd learn cells` with other sources or options across the deploy; that change would be absorbed instead of starting an epoch.
+- **Blind captures:** a snapshot whose source run is not a research run (before AU-11) or cannot be rebuilt makes the cells group unreadable, and the captures are partial. After the deploy check that `GET /api/paper/config` shows no unreadable groups.
+- Not in the basis yet: the regime and universe splits and the Confidence/Shrinkage options. Add them once a gate or the selection reads them.
+- The epoch view counts only refreshes whose capture holds no frozen change.

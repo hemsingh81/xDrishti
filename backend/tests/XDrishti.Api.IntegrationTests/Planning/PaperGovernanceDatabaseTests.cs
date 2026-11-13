@@ -91,6 +91,36 @@ public sealed class PaperGovernanceDatabaseTests(ApiFactory factory) : DataTestB
     }
 
     [Fact]
+    public async Task A_committed_cells_snapshot_change_is_counted_as_a_refresh_unless_its_capture_also_holds_a_frozen_change()
+    {
+        var first = await WithAsync(p => p.GetRequiredService<IEpochGate>().ResolveAsync([Session], Ct).AsTask());
+        var latest = await WithAsync(p => p.GetRequiredService<IGovernanceStore>().LatestSnapshotAsync(true, Ct).AsTask());
+        var refresh = await WithAsync(p => p.GetRequiredService<IGovernanceStore>().CommitAsync(
+            new GovernanceCommit(
+                new NewSnapshot(DateTimeOffset.UtcNow, Session.AddDays(1), new string('d', 64), "{}", false, "xd-api"),
+                latest!.Id,
+                null,
+                first.Epoch.Id,
+                [new NewChange(PaperConfigKeys.CellsSnapshot, "free", "snapA", "snapB", "noted", null)]),
+            Ct).AsTask());
+        var mixed = await WithAsync(p => p.GetRequiredService<IGovernanceStore>().CommitAsync(
+            new GovernanceCommit(
+                new NewSnapshot(DateTimeOffset.UtcNow, Session.AddDays(2), new string('e', 64), "{}", false, "xd-api"),
+                refresh.SnapshotId,
+                new NewDetectedEpoch(Session.AddDays(3), DateTimeOffset.UtcNow, new string('e', 64), "the configuration changed"),
+                refresh.EpochId,
+                [new NewChange(PaperConfigKeys.CellsSnapshot, "free", "snapB", "snapC", "noted", null), new NewChange("planning.builder:useselection", "frozen", "false", "true", "new_epoch", null)]),
+            Ct).AsTask());
+
+        await ResignInAsync();
+        var epochs = await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/paper/epochs", UriKind.Relative), Ct);
+
+        mixed.EpochId.ShouldNotBe(refresh.EpochId);
+        epochs.GetProperty("items").EnumerateArray().Sum(e => e.GetProperty("cellsRefreshed").GetInt32()).ShouldBe(1);
+        epochs.GetProperty("items").EnumerateArray().Single(e => e.GetProperty("id").GetInt64() == first.Epoch.Id).GetProperty("cellsRefreshed").GetInt32().ShouldBe(1);
+    }
+
+    [Fact]
     public async Task The_database_refuses_a_second_snapshot_of_a_day_and_hash_a_bad_class_and_a_change_without_an_epoch()
     {
         var insert = "INSERT INTO paper.config_snapshots (taken_at, session_date, hash, components, partial, process) VALUES (now(), '2099-02-02', repeat('c', 64), '{}', false, 'xd-api')";

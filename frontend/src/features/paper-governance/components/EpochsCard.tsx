@@ -40,6 +40,7 @@ export function EpochsCard() {
                 <TableCell align="right">Counted</TableCell>
                 <TableCell align="right">Set aside</TableCell>
                 <TableCell align="right">Risk-down</TableCell>
+                <TableCell align="right">Cell refreshes</TableCell>
                 <TableCell align="right">Unexplained</TableCell>
               </TableRow>
             </TableHead>
@@ -54,6 +55,7 @@ export function EpochsCard() {
                   <TableCell align="right">{e.counted}</TableCell>
                   <TableCell align="right">{e.straddle}</TableCell>
                   <TableCell align="right">{e.riskDownChanges}</TableCell>
+                  <TableCell align="right">{e.cellsRefreshed}</TableCell>
                   <TableCell align="right">{e.unexplainedChanges}</TableCell>
                 </TableRow>
               ))}

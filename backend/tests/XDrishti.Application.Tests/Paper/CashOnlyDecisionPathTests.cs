@@ -40,9 +40,6 @@ public sealed class CashOnlyDecisionPathTests
         return new StoredCellStats(snapshot, DateTimeOffset.UnixEpoch, new CellStatsOptions(), "run1:intraday:FIXED_RR", row);
     }
 
-    private static StoredRunHeader Header() =>
-        new(1, "run1", "sim-1", 1, 1, "ORB", "def1", new DateOnly(2024, 1, 1), new DateOnly(2026, 10, 1), "index", "NIFTY 50", 50, 50, 10, 10, 10, 0, false, "next_open", null, null, 1, "r", "t", DateTimeOffset.UnixEpoch, "owner");
-
     private static async Task<List<string>> ComponentsAsync(IEnumerable<ChangelogEntry> log, params StoredCellStats[] stats)
     {
         var changelog = Substitute.For<ILearningChangelog>();
@@ -51,7 +48,8 @@ public sealed class CashOnlyDecisionPathTests
         cellStats.ListLatestCashAsync(null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<StoredCellStats>>(stats));
         var strategies = Substitute.For<IStrategyStore>();
         var runs = Substitute.For<IRunStore>();
-        runs.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<StoredRunHeader?>(Header()));
+        runs.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<StoredRunHeader?>(Learning.Jobs.JobFixtures.Header()));
+        runs.ReadRecordTextAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<string?>(Learning.Jobs.JobFixtures.Record()));
         var source = new ConfigSnapshotSource(
             Substitute.For<IPlanningSettingsReader>(), Substitute.For<IAutonomySettingsStore>(), Substitute.For<IAccountStore>(), Substitute.For<IRiskProfileStore>(), changelog, strategies, cellStats, runs,
             Substitute.For<IModelRegistry>(), Substitute.For<ISimulationEngine>(), Substitute.For<IGradeSettings>(), Substitute.For<ICostSheetStore>());

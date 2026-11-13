@@ -51,7 +51,7 @@ public sealed class CellsRefreshApiTests(ApiFactory factory) : DataTestBase(fact
     }
 
     [Fact]
-    public async Task Resuming_with_the_fresh_password_resumes_it_with_an_audit_row_and_it_then_shows_as_a_paper_blocker()
+    public async Task Resuming_with_the_fresh_password_resumes_it_with_an_audit_row_and_it_is_no_paper_blocker_because_a_refresh_is_a_noted_change()
     {
         var resumed = await ResumeAsync("cells-refresh", new { password = Factory.OwnerPassword });
         var config = await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/paper/config", UriKind.Relative), Ct);
@@ -60,7 +60,7 @@ public sealed class CellsRefreshApiTests(ApiFactory factory) : DataTestBase(fact
         resumed.Status.ShouldBe(HttpStatusCode.OK);
         resumed.Body.GetProperty("enabled").GetBoolean().ShouldBeTrue();
         audit.ShouldBe(["ServiceResumed"]);
-        config.GetProperty("blockers").EnumerateArray().Select(b => b.GetProperty("serviceId").GetString()).ShouldContain("cells-refresh");
+        config.GetProperty("blockers").EnumerateArray().Select(b => b.GetProperty("serviceId").GetString()).ShouldNotContain("cells-refresh");
     }
 
     [Fact]

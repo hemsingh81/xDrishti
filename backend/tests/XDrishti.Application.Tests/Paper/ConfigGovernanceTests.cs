@@ -99,6 +99,41 @@ public sealed class ConfigGovernanceTests
     }
 
     [Fact]
+    public async Task A_cell_statistics_refresh_with_the_same_basis_is_noted_in_the_same_epoch_and_the_entries_stay_measured()
+    {
+        _components = [.. _components, new("cells.snapshot", "snapA"), new("cells.basis", "basisX")];
+        await RunAsync(D(11, 2));
+        _components = [.. _components.Where(c => c.Key != "cells.snapshot"), new("cells.snapshot", "snapB")];
+
+        var r = await RunAsync(D(11, 3));
+
+        r.MeasureStatus[D(11, 3)].ShouldBe("measured");
+        _store.Epochs.Count.ShouldBe(1);
+        _store.Changes.Single().ShouldBe(new NewChange("cells.snapshot", "free", "snapA", "snapB", "noted", null));
+    }
+
+    [Fact]
+    public async Task A_changed_cells_basis_starts_a_new_epoch_and_the_first_basis_after_the_deploy_does_not()
+    {
+        _components = [.. _components, new("cells.snapshot", "snapA")];
+        await RunAsync(D(11, 2));
+        _components = [.. _components, new("cells.basis", "basisX")]; // first capture after the deploy with an epoch open
+
+        var added = await RunAsync(D(11, 3));
+
+        added.MeasureStatus[D(11, 3)].ShouldBe("measured");
+        _store.Epochs.Count.ShouldBe(1);
+        _store.Changes.Single().ShouldBe(new NewChange("cells.basis", "free", null, "basisX", "noted", null));
+
+        _components = [.. _components.Where(c => c.Key != "cells.basis"), new("cells.basis", "basisY")];
+        var changed = await RunAsync(D(11, 4));
+
+        changed.MeasureStatus[D(11, 4)].ShouldBe("straddle");
+        _store.Epochs.Count.ShouldBe(2);
+        _store.Changes.Last().Class.ShouldBe("frozen");
+    }
+
+    [Fact]
     public async Task A_catch_up_of_three_sessions_over_a_frozen_change_sets_all_three_aside_and_the_new_epoch_starts_after_the_last()
     {
         await RunAsync(D(11, 2));

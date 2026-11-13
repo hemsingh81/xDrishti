@@ -184,9 +184,11 @@ internal sealed class ConfigSnapshotSource(
     }
 
     /// <summary>
-    /// SHA-256 of the options and the sources of the newest cash snapshots without their window ends (ADR 0286): per source the run's strategy definition hash, universe, start, fills, cost choice and the style and exit labels. A refresh only moves ends and
-    /// keeps it. A source that cannot be read throws, so the group is reported as unreadable (the snapshot is then partial), never guessed.
+    /// SHA-256 of the options and the sources of the newest cash snapshots without their window ends (ADR 0286). Each source's identity is built from its stored request (the replay baseline of the record), every field except the end and the resolved
+    /// instrument ids: definition hash, parameters, timeframe, run data options, csv flag, fills, cost choice with capital and profile, exit and time stop, universe (the basket id or the label) and start, with the style and exit labels. A refresh only moves ends and keeps it.
+    /// A source that cannot be read throws, so the group is reported as unreadable (the snapshot is then partial), never guessed.
     /// </summary>
+    // shortcut: the regime and universe splits of the snapshot and the Confidence/Shrinkage options are not in the basis; add them to it once a gate or the selection reads them.
     private async Task<string> BasisAsync(IReadOnlyList<StoredCellStats> snapshots, CancellationToken cancellationToken)
     {
         if (snapshots.Count == 0)
@@ -194,6 +196,7 @@ internal sealed class ConfigSnapshotSource(
             return "none";
         }
 
+        var identities = new Dictionary<string, string>(StringComparer.Ordinal); // one read per run key: the same run is often a source of several snapshots
         var parts = new List<string>();
         foreach (var snapshot in snapshots.GroupBy(s => s.SnapshotKey, StringComparer.Ordinal).Select(g => g.First()).OrderBy(s => s.SnapshotKey, StringComparer.Ordinal))
         {
@@ -202,8 +205,13 @@ internal sealed class ConfigSnapshotSource(
             var lines = new List<string>();
             foreach (var source in sources)
             {
-                var run = await runs.FindAsync(source.RunKey, cancellationToken) ?? throw new InvalidOperationException("A source run is not stored.");
-                lines.Add(string.Join('|', run.DefinitionSha256, run.UniverseKind, run.UniverseLabel, run.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), run.Fills, run.AcknowledgeCsvAdjusted ? "adj" : "raw", run.CostsSheetId ?? "-", run.CostsRatesSha256 ?? "-", source.Style, source.Exit));
+                if (!identities.TryGetValue(source.RunKey, out var identity))
+                {
+                    identity = await SourceIdentityAsync(source.RunKey, cancellationToken);
+                    identities[source.RunKey] = identity;
+                }
+
+                lines.Add(identity + "|" + source.Style + "|" + source.Exit);
             }
 
             lines.Sort(StringComparer.Ordinal);
@@ -211,6 +219,28 @@ internal sealed class ConfigSnapshotSource(
         }
 
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n--\n", parts))));
+    }
+
+    private async Task<string> SourceIdentityAsync(string runKey, CancellationToken cancellationToken)
+    {
+        var header = await runs.FindAsync(runKey, cancellationToken) ?? throw new InvalidOperationException("A source run is not stored.");
+        var record = await runs.ReadRecordTextAsync(runKey, cancellationToken) ?? throw new InvalidOperationException("A source run's record is not stored.");
+        var read = XDrishti.Application.Learning.Jobs.ReplayBaselineReader.Read(header, record);
+        if (read.IsFailure)
+        {
+            throw new InvalidOperationException("A source run cannot be rebuilt from its record.");
+        }
+
+        var b = read.Value;
+        var inv = CultureInfo.InvariantCulture;
+        var costs = b.Costs is XDrishti.Application.Research.CostChoice.SheetChoice sheet
+            ? string.Create(inv, $"sheet:{sheet.SheetId}:{sheet.Capital}:{sheet.Profile}:{sheet.MaxCostR}:{header.CostsRatesSha256}")
+            : "gross";
+        var exit = b.Exit?.Id ?? "none";
+        var timeStop = b.TimeStop is { } t ? string.Create(inv, $"{t.MinProgressRr:R}/{t.IntradayBars}/{t.SwingSessions}") : "none";
+        var parameters = string.Join(',', b.Parameters.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => string.Create(inv, $"{p.Key}={p.Value:R}")));
+        var universe = b.BasketId is { } basket ? "basket:" + basket.ToString("N") : "list:" + header.UniverseLabel;
+        return string.Join('|', b.DefinitionSha256, parameters, b.Timeframe, string.Create(inv, $"{b.Options.MinSessionCompleteness:R}/{b.Options.DiscontinuityThreshold:R}"), b.AcknowledgeCsvAdjusted ? "adj" : "raw", b.Fills.ToCanonicalJson(), costs, exit, timeStop, universe, b.From.ToString("yyyy-MM-dd", inv));
     }
 
     private async Task<List<ConfigComponent>> ModelsAsync(CancellationToken cancellationToken)
