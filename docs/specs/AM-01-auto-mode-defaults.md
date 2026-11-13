@@ -24,7 +24,7 @@ After the next deploy the evidence loops run by themselves: the shadow record wr
 | Switch | Today | Where | Why ON is safe | Built in |
 |---|---|---|---|---|
 | `Confidence:HoldOut:AutoRelease` (new) | — | HO-01 D4 | Releases only a sealed block with a fresh look and no look still available; an unlooked block stays the owner's. | HO-01a/b |
-| `Confidence:HoldOut:AutoUnlock` | OFF (`Domain/Confidence/HoldOutOptions.cs:15`) | CF-06 D6, HO-01 D10 | Takes the strategy look by a fixed rule (pre-dated version, every development row a pass) at the seal; removes the choice after seeing forward results. | HO-01a (default), HO-01b (seal step) |
+| `Confidence:HoldOut:AutoUnlock` | OFF (`Domain/Confidence/HoldOutOptions.cs:15`) | CF-06 D6, HO-01 D10 | Takes the strategy look by a fixed rule (pre-dated version, every development row a pass) at the seal; removes the choice after seeing forward results. Blocks k ≥ 2 only; block 1's look stays the owner's act. | HO-01a (default), HO-01b (seal step) |
 | `Confidence:HoldOut:Enforce` | OFF (`HoldOutOptions.cs:15`) | CF-06 | A tightening: an explicit Lab window into the block in force is refused. Nothing is lost: released blocks are development. | HO-01a |
 | `replay.holdout.auto_register` (new) | — | SR-03 D5 | Registers the system as it stands on the last evening before a block begins; fixed before any data of the block exists. | SR-03 |
 | `replay.holdout.auto_run` (new) | — | SR-03 D5 | Runs a registration fixed before the block began, once, at the seal. | SR-03 |

@@ -27,7 +27,7 @@ The standing rule of 2026-10-23 says: anything that needs a manual approval also
 
 ## Consequences
 - The evidence loops run from the first deploy after the builds, without the owner flipping each switch.
-- A first automatic look will spend block 1's strategy slot on the newest version with a stored development pass (HO-01 risk); the owner can turn `HoldOut:AutoUnlock` OFF before deploy to choose himself.
+- `HoldOut:AutoUnlock` ON never claims block 1 (coordinator, 2026-11-13): block 1 has no pre-dating horizon and its look is irreversible, so its look (or its release with the forfeit) stays the owner's act; automatic looks start at block 2.
 - `Selection:ListFilters:Enabled` ON changes the live plan wherever a dated ban or surveillance row exists (a tightening). If a paper epoch is open, the change is classed as P10-05 says.
 - Tests that pinned the old defaults (`EvidenceComposeRulesTests`, the settings descriptor tests, the service definition tests) are updated to the new defaults, never deleted.
 - docs/design/17 and deploy/CLAUDE.md list the new defaults at build time.

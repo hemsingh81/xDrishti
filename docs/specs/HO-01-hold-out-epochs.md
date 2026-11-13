@@ -80,7 +80,7 @@ New sessions reach learning on a fixed, announced schedule. A hold-out never mov
   - Deferred to a later, separate spec, shown beside the research basis and never pooled with it.
 - **D10. The seal step.** (Due diligence change 4.) A new service `holdout-epochs`, `After eod`, `NotBeforeSessionEnd`, recovery class `LatestOnly`, **enabled at first start** (it acts only through the auto settings, each of which fails closed). Each evening it:
   1. marks a block sealed when its last session has closed;
-  2. **strategy auto look:** with `Confidence:HoldOut:AutoUnlock` ON (default ON by ADR 0282) and the strategy slot free, claims the look for the newest pre-dated version with a stored default-options full or robust Lab run whose development rows all pass (`HoldOutAutoGate`), ties broken by the earliest first freeze; the look is queued as the existing `holdout` Lab job, `auto`;
+  2. **strategy auto look:** with `Confidence:HoldOut:AutoUnlock` ON (default ON by ADR 0282) and the strategy slot free, claims the look for the newest pre-dated version with a stored default-options full or robust Lab run whose development rows all pass (`HoldOutAutoGate`), ties broken by the earliest first freeze; the look is queued as the existing `holdout` Lab job, `auto`. **Never for block 1** (coordinator, 2026-11-13): block 1 has no pre-dating horizon and its look is irreversible, so its strategy look stays the owner's act (a manual unlock, or a release with the forfeit); the post-Lab-run auto look (`LabRunner.cs:116`) also skips block 1;
   3. leaves room for the model step (CF-10e part 3) and the system step (SR-03), added by those slices;
   4. checks the auto release (D4).
 
@@ -146,7 +146,7 @@ Block 2 seals when the session of 2027-05-04 closes. Looks at block 2:
    - ON: an unlooked block, or any `unavailable` read, is never released.
    - OFF: nothing is released by itself.
    - After 20 sealed sessions without release: one notice naming the reason.
-8. **Strategy auto look at the seal.** With AutoUnlock ON, on the evening block 2 seals, the look is claimed for ORB v3 (newest pre-dated version with a development pass), not v4; with AutoUnlock OFF nothing is claimed.
+8. **Strategy auto look at the seal.** With AutoUnlock ON, on the evening block 2 seals, the look is claimed for ORB v3 (newest pre-dated version with a development pass), not v4; with AutoUnlock OFF nothing is claimed. On the evening block 1 is in force and sealed, with AutoUnlock ON and a passing version, nothing is claimed either (block 1 is the owner's), and a Lab run that passes does not claim block 1.
 9. **Scorecard row 12 and the ML gate.** A pass on block 1 followed by a fail on block 2 reads fail, for a version (row 12) and for a model family (the gate). After block 2 is released, the model's block-2 figures are still read.
 10. **Labels.** `seen_holdout` appears on LC-01 rows, run labels and replay sessions.
 11. **Fences.** Pinned by architecture tests:
@@ -166,7 +166,7 @@ Block 2 seals when the session of 2027-05-04 closes. Looks at block 2:
 - **Settings:**
   - `Confidence:HoldOut:BlockMonths` (6, 3–12).
   - `Confidence:HoldOut:AutoRelease` (**true**; a change in either direction needs a fresh password).
-  - `Confidence:HoldOut:AutoUnlock` default becomes **true** (ADR 0282).
+  - `Confidence:HoldOut:AutoUnlock` default becomes **true** (ADR 0282), for blocks k ≥ 2 only; block 1 is never looked automatically.
 - **Service:** `holdout-epochs` (D10).
 - **UI:** the Lab hold-out card lists the blocks with their states, the three looks and what blocks a release. The release button sits behind the step-up dialog, which shows the forfeit sentence for an unlooked block.
 
@@ -181,7 +181,7 @@ Block 2 seals when the session of 2027-05-04 closes. Looks at block 2:
 - **A released block was judged once.** Strategies built after its release are tuned on data that judged others; the label says so.
 - **Swing cells may stay inconclusive.** A 6-month block may hold fewer than 30 trades for them.
 - **A release changes run keys.** It changes every default window, as the first block did (ADR 0207, "Consequences").
-- **The first auto look spends block 1.** With AutoUnlock ON, the first seal-step evening after deploy claims block 1's strategy look for the newest version with a stored development pass, if one exists. That is the intended use of block 1; the owner can turn AutoUnlock OFF before deploy to choose himself.
+- **Block 1 waits for the owner.** The auto look never claims block 1 (coordinator's change, 2026-11-13: an irreversible look the morning after a deploy would surprise the owner). Until the owner takes block 1's strategy look or releases it with the forfeit, block 1 stays in force, AutoRelease cannot fire for it, and no new session reaches learning. This is an owner to-do, named in the roadmap.
 - **A kind not yet built cannot hold a block.** If HO-01b is deployed before CF-10e part 3, block 1 may be released before any model could look at it. Deploy the two together if a champion exists and its block-1 look matters.
 - **Three looks per block.** The multiple-testing cost of three kinds is bounded and each look is counted in the ledger; a reader must not pick the best of the three.
 
