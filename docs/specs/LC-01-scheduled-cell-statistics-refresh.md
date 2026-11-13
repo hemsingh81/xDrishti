@@ -1,9 +1,9 @@
 # LC-01 — Scheduled cell-statistics refresh
 
-- **Status:** Built 2026-11-12, not deployed (approved by the coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended).
+- **Status:** Built 2026-11-12, merged and deployed 2026-11-13 (approved by the coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision as recommended). **Roadmap open decision 9 answered by the owner on 2026-11-13: option (a)**, built as slice DEC9 (see *Decision 9*).
 - **Phase / roadmap row:** LC — Learning loop, row LC-01 (gap GAP-01 of the due-diligence review of 2026-11-12).
 - **Size:** about 2.5 agent-days (service and handler 1, owner-act resume and screen 0.5, notice, gate text, Auto chain, paper list and ledger kind 0.5, tests 0.5).
-- **Needs:** nothing unbuilt (P6-01, P7-08, CF-06, CF-08, P10-05, AU-02, AU-11, AU-17 are built). HO-01 (Draft) is what lets new sessions in; until then the behaviour is the one under "Before HO-01".
+- **Needs:** nothing unbuilt (P6-01, P7-08, CF-06, CF-08, P10-05, AU-02, AU-11, AU-17 are built). HO-01 (Approved 2026-11-13, not built) is what lets new sessions in; until then the behaviour is the one under "Before HO-01".
 - **Safety:** light. It writes a decision input (the snapshot the nightly ranks cells with) with no human in between, so: paused by default, resuming is a fresh-password owner act, it fails closed on every missing input, it never stores a partial snapshot, it leaves the gate's rule unchanged, and it has no order, approval or arming path.
 - **Design refs:** docs/design/09-learning-engine.md; ADRs 0064, 0086, 0207, 0240, 0243, 0252; specs P6-01, P7-08, CF-08 D6, P10-05 AC 11a. Decision record: [ADR 0277](../adr/0277-the-cell-statistics-refresh-repeats-the-newest-snapshot-to-the-hold-out-cut-fails-closed-and-resumes-only-with-the-owners-password.md), amending ADR 0252 §1.
 
@@ -134,7 +134,7 @@ The cut is fixed (block start − 31 days). After the first run, which may exten
 - **Frontend (MSW):** the dialog for a flagged service; other services unchanged.
 
 ## Risks
-- **The paper freeze cannot pass the gate (this conflict predates LC-01).** P10-00 D8 freezes the snapshot for a 12-week epoch, and the gate fails after 5 sessions. With the refresh on, the paper count restarts every session; with it off, the nightly fails. This needs an owner decision outside this slice. An epoch-pinned snapshot accepted by the gate would be a loosening and needs the password rule.
+- **The paper freeze cannot pass the gate (this conflict predates LC-01).** *Decided 2026-11-13: option (a), see* Decision 9. P10-00 D8 freezes the snapshot for a 12-week epoch, and the gate fails after 5 sessions. With the refresh on, the paper count restarts every session; with it off, the nightly fails. This needs an owner decision outside this slice. An epoch-pinned snapshot accepted by the gate would be a loosening and needs the password rule.
 - **Before HO-01 a passing gate may look like learning.** The labels say otherwise.
 - **One evening after a release can be long.** It may re-simulate up to 50 sources. The run is after `eod`, outside market hours.
 
@@ -151,8 +151,39 @@ The cut is fixed (block start − 31 days). After the first run, which may exten
 
 ## As built (2026-11-12)
 Built on `feature/lc-01`, not deployed. Decisions D1 to D9 as written; ADR 0277 records them and amends ADR 0252 §1 (six services).
-- **Owner constraint: roadmap open decision 9 (paper epoch against cell refresh) is NOT decided.** The P10 paper-epoch rule (ADR 0119) is unchanged: a refresh remains a `frozen` change that restarts the paper count, and `cells-refresh` is only listed as a blocker while enabled (D7). The conflict in Risks stands until the owner decides.
+- **Owner constraint: roadmap open decision 9 (paper epoch against cell refresh) is NOT decided** (at build time; decided 2026-11-13, see *Decision 9*). The P10 paper-epoch rule (ADR 0119) is unchanged: a refresh remains a `frozen` change that restarts the paper count, and `cells-refresh` is only listed as a blocker while enabled (D7). The conflict in Risks stands until the owner decides.
 - **Code.** Domain: `CellsRefreshRules`, `ServiceConstraints.ResumeIsOwnerAct`, `TrialCounts.CellsRefreshes`. Application (`Learning/CellsRefresh`): `CellsRefreshService`, `RefreshCellStatsHandler`, `CellsRefreshState`, `CellsRefreshOptions`, `ISourceRequestPlanner` (the replay planner proves the exact request). Resume body, `ServiceView.resumeNeedsPassword`, gate reason, `cells_stale` notice, Auto chain, paper blocker list, ledger kind (migration `AddCellsRefreshTrialKind`), setting `Learning:CellsRefresh:NoticeAfterSessions` (Internal, 1 to 4, default 3). `gen-api` run.
 - **Deviations and shortcuts.** (1) A run with no snapshot fails before the hold-out is read, so with neither, the code is `cells_refresh.no_snapshot`. (2) Extra failure codes beyond the spec: `cells_refresh.not_rebuildable` (a source that needs extending and whose request cannot be proven, never guessed), `cells_refresh.source_failed`, `cells_refresh.template_unreadable`. (3) A source whose window ends after the refresh end is kept as `up_to_date` (no new failure code). (4) All simulations are made first and held in memory (up to 50) so a failed one stores nothing; the ledger row follows the store without a shared transaction, its id derived from the run key. (5) The frontend step-up dialog and the Services-screen text are not built here (frontend untouched; OPS-01 does the Auto screen); the API contract carries `resumeNeedsPassword`. (6) `MustFollow = [eod]` is declared on the service itself.
 - **Review fixes.** The ledger row is appended for every extended source (idempotent by run key); the Services screen asks for the password in a dialog (`PasswordReasonDialog`, no reason) and `/api/services/{id}/resume` is a password-check path of the client, so a wrong password never signs out; more than 50 sources fails closed (`cells_refresh.too_many_sources`); one formula for the cut (`HoldOutOptions.TrainingCut`). Decision 9 follow-up: with an epoch open, Auto ON resumes `cells-refresh` and each run restarts the paper count; the owner decides this with decision 9.
 - **Tests.** Domain rules; handler with fakes (ACs 4 to 6, 11, all or nothing); service definition, resume, gate text, state and notice (ACs 1 to 3, 6, 8); architecture fences (AC 10 and D9); integration for resume with and without the password, the paper blocker and the ledger kind (ACs 2, 9); `RecoveryClassTableTests` row.
+
+## Decision 9 (owner, 2026-11-13)
+**Answer:** option (a). The paper epoch freezes the strategy versions and the rules, but not the cell-statistics snapshot. The owner approved it in chat on 2026-11-13 with HO-01 and SR-03 ("Consider my approval and you do due diligence also consider mostly things should be in auto mode with best default values"). Options (b), keep the snapshot frozen and let Auto stop after 5 sessions, and (c), raise the age rule for the epoch, are not taken.
+
+**What "paused" and "frozen" mean in the code today (main at 2918c76e):**
+- `cells-refresh` is registered disabled (`Application/Learning/CellsRefresh/CellsRefreshService.cs:28`), so it is paused at first start. Its resume is a fresh-password owner act (`ServiceConstraints.ResumeIsOwnerAct`), and Auto ON resumes it (`Application/AutoSwitch/AutoSwitchService.cs:44`).
+- The paper fingerprint carries the snapshot keys as one component, `cells.snapshot` (`Application/Paper/ConfigSnapshotSource.cs:179`). The key is in no table of `PaperConfigKeys`, so it falls through to `Frozen` (`Domain/Paper/PaperConfigKeys.cs:38, 233`). A new key between two captures starts a new epoch (P10-05 rule 4).
+- `cells-refresh` is in `PaperConfigKeys.LearningWriterServices` (`:70`), so `GET /api/paper/config` lists it as a blocker while enabled (`Application/Paper/GovernanceQueryHandlers.cs:85-91`), with the text "enabled during an epoch: each run restarts the count" (`PaperConfigKeys.cs:73`).
+- The gate's age rule is a constant of 5 sessions (`Domain/Planning/NightlyRules.cs:16`; `Application/Planning/NightlyGates.cs:131-133`).
+- The P10-04 band reads the newest snapshot before the epoch start (`Application/Paper/BacktestReferenceReader.cs`), so it does not depend on later snapshots.
+
+**What changes (slice DEC9, about 1 agent-day, SAFETY light, Opus reviewer):**
+1. `cells.snapshot` is classified `free`: a new snapshot is a `noted` change and never restarts the count. `Describe` says "noted: a cell-statistics refresh (decision 9)".
+2. A new component `cells.basis`, classified `frozen`: the SHA-256 of the options of the newest cash snapshots and their sorted source identities **without the window end** (strategy hash, parameters, timeframe, exits, universe, cost choice, start). A refresh only moves ends, so it keeps the basis; a manual `xd learn cells` with other sources or options changes it and starts a new epoch. So the rules that produce the statistics stay frozen; only the data moves. Its first appearance (no value before) is `free`, so the deploy itself does not restart an open epoch.
+3. `cells-refresh` leaves `LearningWriterServices`; `cells`, `retrain` and `weekly` stay (a champion change is still `frozen`).
+4. The epoch view and the P10-06 phase check add the caveat `cells_refreshed: N` (noted snapshot changes in the epoch). The P10-04 reference is unchanged.
+5. The OPS-01 Auto block line for `cells-refresh` says "each refresh is noted in the paper epoch" instead of "restarts the paper count".
+6. The age rule stays 5 sessions: with Auto ON the refresh keeps the snapshot inside it.
+7. CF-08 D6 still holds: cell statistics never read shadow grades (LC-01 D9 fence). The parenthetical "the pre-flight keeps cell snapshots frozen in an epoch" no longer applies.
+
+**Acceptance criteria (DEC9):**
+- A refresh between two captures, same basis: one `free` change with effect `noted`, the same epoch, entries `measured`.
+- A recompute with another source set: `cells.basis` changes, `frozen`, a new epoch.
+- The first capture after deploy, with an epoch open: `cells.basis` added as `free`; the epoch continues.
+- `GET /api/paper/config` with `cells-refresh` enabled: no blocker.
+- The P10-04 output for a fixed fixture is byte-identical before and after (golden).
+- The `PaperConfigKeys` reflection and classification tests are updated, not relaxed elsewhere.
+
+**Records.** ADR **0286** (number reserved) amends ADR 0119 (the snapshot is no longer frozen) and ADR 0277 §7 and §11; P10-00 D8 and pre-flight step 4 and P10-05 criterion 11a and question 2 carry an amendment line.
+
+**Honest cost.** The paper count now measures "the frozen versions and rules, with statistics refreshed from research runs", not one fixed snapshot. P10-05 question 2 had rejected that; the owner chose it on 2026-11-13 because the alternative stops the nightly plan after 5 sessions. After a HO-01 release, one refresh can add a block of trades; the epoch shows it as a noted change.
