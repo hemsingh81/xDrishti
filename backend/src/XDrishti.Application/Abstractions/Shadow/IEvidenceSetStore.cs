@@ -6,7 +6,7 @@ namespace XDrishti.Application.Abstractions.Shadow;
 /// <param name="Versions">The strategy version hashes, canonical order.</param>
 /// <param name="SetHash">The identity of the set.</param>
 /// <param name="Mode"><c>auto</c> (the rule, at the epoch's first shadow write), <c>owner</c> (named before it) or <c>backfill</c> (written by the AM-01b migration for rows that already existed: not a pre-registration).</param>
-/// <param name="Actor"><c>system:default</c> or <c>owner:...</c>.</param>
+/// <param name="Actor"><c>system:default</c>, <c>owner:...</c>, or <c>system:migration</c> (a backfill).</param>
 /// <param name="Reason">The owner's reason, or null for the automatic set.</param>
 /// <param name="CreatedAt">When stored (the database clock).</param>
 /// <param name="FirstWriteAt">When the automatic set's first shadow write was stored (the same instant); null for an owner set, whose freeze is read from the rows.</param>

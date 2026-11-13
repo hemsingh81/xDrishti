@@ -24,6 +24,6 @@ public sealed record ShadowWriteOutcome(bool Enabled, int Sessions, int Rows, in
     public string Summary => !Enabled
         ? "Switched off (paper.shadow.enabled): nothing written."
         : EvidenceSetMissing
-            ? string.Create(CultureInfo.InvariantCulture, $"No evidence set is stored or can be named from the configuration snapshot (no eligible cell): no session written, nothing counted. {Gaps} gap(s) recorded.")
+            ? string.Create(CultureInfo.InvariantCulture, $"No evidence set is stored or can be named from the configuration reading (no eligible cell, or the cells could not be read): no session written, nothing counted. {Gaps} gap(s) recorded.")
             : string.Create(CultureInfo.InvariantCulture, $"{Sessions} session(s) written with {Rows} row(s), {EdgeRows} counting for edge; {Gaps} gap(s) recorded; {DroppedSameKey} candidate(s) with an earlier same trade key left out.");
 }

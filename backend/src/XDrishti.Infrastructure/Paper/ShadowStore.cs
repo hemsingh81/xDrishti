@@ -28,11 +28,11 @@ internal sealed class ShadowStore(NpgsqlDataSource dataSource) : IShadowStore
         try
         {
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-            if (session.Entries.Count > 0)
+            if (session.EvidenceSet is not null || session.Entries.Count > 0)
             {
-                // Serialised against the owner's replace of the epoch's evidence set (the trigger of paper.evidence_sets takes the same lock): either the owner's set commits first and is seen below, or these entries commit first and the replace is refused. Held to the end of the transaction.
+                // Taken first, before any other statement, whenever the session carries a set or entries (so a session with a set and no entries cannot replace an uncommitted owner set, and the lock order is the same as the guard's). Serialised against the owner's replace of the epoch's evidence set (the trigger of paper.evidence_sets takes the same lock): either the owner's set commits first and is seen below, or these entries commit first and the replace is refused. Held to the end of the transaction.
                 await using var gate = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtextextended('paper.evidence_sets', @key))", connection, transaction);
-                gate.Parameters.AddWithValue("key", NpgsqlDbType.Bigint, session.Entries[0].EdgeEpoch ?? 0L);
+                gate.Parameters.AddWithValue("key", NpgsqlDbType.Bigint, session.EvidenceSet?.EdgeKey ?? session.Entries[0].EdgeEpoch ?? 0L);
                 await gate.ExecuteNonQueryAsync(cancellationToken);
             }
 

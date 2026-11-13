@@ -38,7 +38,7 @@ internal static partial class ShadowLog
     [LoggerMessage(EventId = 5410, Level = LogLevel.Information, Message = "shadow.evidence_set: replaced by the owner, {Versions} version(s)")]
     public static partial void EvidenceSetReplaced(ILogger logger, int versions);
 
-    [LoggerMessage(EventId = 5411, Level = LogLevel.Warning, Message = "shadow.evidence_set: none is stored and none can be named from the configuration snapshot (no eligible cell or no full snapshot): nothing is written")]
+    [LoggerMessage(EventId = 5411, Level = LogLevel.Warning, Message = "shadow.evidence_set: none is stored and none can be named from the configuration reading (no eligible cell, or the cells could not be read): nothing is written")]
     public static partial void EvidenceSetMissing(ILogger logger);
 
     [LoggerMessage(EventId = 5412, Level = LogLevel.Information, Message = "shadow.evidence_set: registered as auto with the first write of the epoch, {Versions} version(s)")]

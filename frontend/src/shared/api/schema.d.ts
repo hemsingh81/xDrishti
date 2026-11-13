@@ -4572,7 +4572,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The frozen evidence set of the current edge epoch of the shadow record (spec AM-01 GAP-09, ADR 0282): the strategy versions whose shadow rows count for the edge count and the readiness forward rows, its state (pending: none stored, the first shadow write registers the default of the eligible cells' versions; open: stored, no shadow row of the epoch yet, the owner may replace it; frozen: never replaceable), who or what froze it (mode auto = system:default, or owner) and why. Rows of other versions are still written and graded, labelled outside_set, and left out of the edge figures. Read only (a session; not one of the assistant's evidence GETs); no order exists */
+    /** The frozen evidence set of the current edge epoch of the shadow record (spec AM-01 GAP-09, ADR 0282): the strategy versions whose shadow rows count for the edge count and the readiness forward rows, its state (pending: none stored, the first shadow write registers the default, the versions of the eligible cells from a fresh configuration reading; open: stored, no shadow row of the epoch yet, the owner may replace it; frozen: never replaceable), who or what froze it (mode auto = system:default, owner, or backfill = the migration's set for rows that already existed, NOT a pre-registration) and why. Rows of other versions are still written and graded, labelled outside_set, and left out of the edge figures. Read only (a session; not one of the assistant's evidence GETs); no order exists */
     get: operations['GetShadowEvidenceSet'];
     /** Replace the evidence set of the current edge epoch as the owner, before the first shadow write of the epoch and never after. Stores one audited row and registers the versions in the trial ledger (a registration, not a look). Needs a session, the CSRF token and the password in the body, checked on EVERY change. 401 auth.invalid_credentials, 423 auth.locked, 403 paper.evidence_set_owner_only, 400 paper.evidence_set_reason_invalid, 400 paper.evidence_set_versions_invalid, 400 paper.evidence_set_unknown_version, 409 paper.evidence_set_frozen (a shadow row of the epoch exists), 429 auth.rate_limited */
     put: operations['ReplaceShadowEvidenceSet'];
@@ -12870,9 +12870,9 @@ export interface components {
       versions: string[];
       /** @description The identity of the stored set, or null while pending. */
       setHash: null | string;
-      /** @description `auto` (the system default rule) or `owner`; null while pending. */
+      /** @description `auto` (the system default rule), `owner`, or `backfill` (written by the AM-01b migration for rows that already existed: not a pre-registration); null while pending. */
       mode: null | string;
-      /** @description `system:default` or the owner's actor; null while pending. */
+      /** @description `system:default`, `system:migration` (a backfill) or the owner's actor; null while pending. */
       actor: null | string;
       /** @description The owner's reason; null for an automatic set or while pending. */
       reason: null | string;

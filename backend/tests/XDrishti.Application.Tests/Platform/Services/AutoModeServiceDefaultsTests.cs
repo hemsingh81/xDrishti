@@ -1,4 +1,5 @@
 using NSubstitute;
+using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Confidence;
 using XDrishti.Application.LearnedSettings;
@@ -72,6 +73,8 @@ public sealed class AutoModeServiceDefaultsTests
         new RegistrationOptions().CountInFactor.ShouldBeFalse();
         new NullOptions().Enforce.ShouldBeFalse();
         new CostStressOptions().Enforce.ShouldBeFalse();
+        // the three ML switches read OFF with no row (the stored-row read is pinned by EvidenceSetApiTests.Table_B_ML_switches_read_OFF_with_nothing_stored)
         MlSwitch.Names.ShouldBe([MlSwitch.Influence, MlSwitch.AutoPromote, MlSwitch.AutoRollback]);
+        (MlSwitches.AllOff.Influence.On, MlSwitches.AllOff.AutoPromote.On, MlSwitches.AllOff.AutoRollback.On).ShouldBe((false, false, false));
     }
 }

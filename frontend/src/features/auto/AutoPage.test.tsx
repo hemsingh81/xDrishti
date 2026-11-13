@@ -242,6 +242,19 @@ describe('Auto page', () => {
     ).toBeInTheDocument();
   });
 
+  it('says the evidence set is unreadable, never plain ON, when it cannot be read', async () => {
+    server.use(
+      http.get('/api/services', () =>
+        HttpResponse.json({ items: [buildServiceView({ id: 'shadow-write', enabled: true })] }),
+      ),
+      http.get('/api/paper/shadow/summary', () => HttpResponse.json({ enabled: true })),
+      http.get('/api/paper/shadow/evidence-set', () => problemResponse({ title: 'Down.', code: 'x.down' }, 500)),
+    );
+    renderWithProviders(<AutoPage />);
+    const list = await screen.findByRole('list', { name: 'Evidence services' });
+    expect(await within(list).findByText(/Shadow record switch: ON, evidence set unreadable/)).toBeInTheDocument();
+  });
+
   it('shows an error, never running, when the services cannot be read', async () => {
     server.use(http.get('/api/services', () => problemResponse({ title: 'Down.', code: 'x.down' }, 500)));
     renderWithProviders(<AutoPage />);

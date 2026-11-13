@@ -28,10 +28,12 @@ function shadowState(
   shadow: Schemas['ShadowSummaryView'] | undefined,
   failed: boolean,
   evidenceSet: Schemas['EvidenceSetView'] | undefined,
+  evidenceSetFailed: boolean,
 ): string {
   if (failed) return 'unavailable';
   if (!shadow) return 'loading';
   if (!shadow.enabled) return 'OFF';
+  if (evidenceSetFailed) return 'ON, evidence set unreadable';
   return evidenceSet?.state === 'pending' && evidenceSet.versions.length === 0
     ? 'ON, writing nothing: no evidence set'
     : 'ON';
@@ -68,7 +70,7 @@ export function EvidenceServices() {
         <Stack component="ul" aria-label="Evidence services" spacing={0.5} sx={{ m: 0, pl: 2.5 }}>
           <Row
             name="Shadow record switch"
-            state={shadowState(shadow.data, shadow.isError, evidenceSet.data)}
+            state={shadowState(shadow.data, shadow.isError, evidenceSet.data, evidenceSet.isError)}
             to="/paper?tab=shadow"
           />
           {evidence.map(({ id, name }) => (

@@ -128,6 +128,59 @@ public sealed class EvidenceSetApiTests(ApiFactory factory) : DataTestBase(facto
     }
 
     [Fact]
+    public async Task A_replace_issued_while_the_writers_transaction_is_open_waits_for_it_and_is_then_409_frozen()
+    {
+        var plan = await ScalarAsync<long>(
+            "INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at) VALUES (@k, '2099-03-05', '2099-03-05 03:35:00+00', 1, repeat('a', 64), 'b', true, 'n', 'l', 'probe', '1999-12-31 00:00:00+00') RETURNING id",
+            ("k", "evw-" + Guid.NewGuid().ToString("N")));
+        var item = await ScalarAsync<long>(
+            "INSERT INTO trading.plan_items (plan_id, item_rank, item_group, symbol, side, strategy_id, strategy_version_hash, trigger_text, stop_text, target_text, validity_text, reasons, cell_key, trades, data_range, p_win_basis, unavailable) VALUES (@p, 1, 'primary', 's', 'BUY', 'DEC', 'h', 't', 's', 't', 'v', '{}', 'c', 1, 'd', 'b', '{}') RETURNING id",
+            ("p", plan));
+
+        // the writer's transaction: the epoch's lock first (as ShadowStore does), then a session and its entry, not yet committed
+        await using var writer = await OpenAsync();
+        await using var transaction = await writer.BeginTransactionAsync(Ct);
+        foreach (var sql in new[]
+        {
+            "SELECT pg_advisory_xact_lock(hashtextextended('paper.evidence_sets', 0))",
+            "INSERT INTO paper.shadow_sessions (session_date, n_rows, status, digest, prev_digest, written_at) VALUES ('2099-03-05', 1, 'ok', repeat('a', 64), NULL, '2000-01-01')",
+        })
+        {
+            await using var command = new Npgsql.NpgsqlCommand(sql, writer, transaction);
+            await command.ExecuteNonQueryAsync(Ct);
+        }
+
+        await using (var entry = new Npgsql.NpgsqlCommand(
+            "INSERT INTO paper.shadow_entries (session_date, plan_id, plan_item_id, trade_key, ticket_group, cell_key, strategy_hash, symbol, side, time_rule, counts_for_edge, written_at, row_hash) VALUES ('2099-03-05', @p, @i, @k, 'primary', 'c', repeat('a', 64), 's', 'BUY', 'v', true, '2000-01-01', repeat('b', 64))", writer, transaction))
+        {
+            entry.Parameters.AddWithValue("p", plan);
+            entry.Parameters.AddWithValue("i", item);
+            entry.Parameters.AddWithValue("k", "DEC|S|Buy|2099-03-05|" + Guid.NewGuid().ToString("N"));
+            await entry.ExecuteNonQueryAsync(Ct);
+        }
+
+        var replace = PutAsync(Factory.OwnerPassword);
+        var waiting = false;
+        for (var i = 0; i < 200 && !waiting; i++)
+        {
+            waiting = await ScalarAsync<long>("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted") > 0;
+            if (!waiting)
+            {
+                await Task.Delay(50, Ct); // a real wait on a real database lock: there is no clock to fake
+            }
+        }
+
+        waiting.ShouldBeTrue("the owner's replace must wait for the writer's open transaction");
+        replace.IsCompleted.ShouldBeFalse();
+        await transaction.CommitAsync(Ct);
+        var result = await replace;
+
+        result.Status.ShouldBe(HttpStatusCode.Conflict);
+        result.Body.GetProperty("code").GetString().ShouldBe("paper.evidence_set_frozen");
+        (await ScalarAsync<long>("SELECT count(*) FROM paper.evidence_sets")).ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Once_a_shadow_row_of_the_epoch_exists_the_replace_is_409_frozen_and_nothing_is_stored()
     {
         await using (var connection = await OpenAsync())

@@ -6,7 +6,7 @@ using XDrishti.Domain.Paper;
 namespace XDrishti.Domain.Shadow;
 
 /// <summary>
-/// The rules of the frozen evidence set of an edge epoch (spec AM-01 GAP-09, ADR 0282): the strategy versions whose shadow rows count for edge and for the readiness forward rows. By default the versions of the eligible cells of the newest full configuration snapshot,
+/// The rules of the frozen evidence set of an edge epoch (spec AM-01 GAP-09, ADR 0282): the strategy versions whose shadow rows count for edge and for the readiness forward rows. By default the versions of the eligible cells of a fresh configuration reading,
 /// fixed by this rule before any forward result of the epoch exists; the owner may replace the set until the epoch's first shadow write. Pure: no clock and no I/O.
 /// </summary>
 public static partial class EvidenceSetRules

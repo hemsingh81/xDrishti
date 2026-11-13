@@ -92,8 +92,12 @@ internal sealed class WriteShadowHandler(
 
             if (session.EvidenceSet is { } registered && context is not null)
             {
-                ShadowLog.EvidenceSetRegistered(logger, registered.Versions.Count);
                 context.PendingSet = null; // only the epoch's first session carries the set
+                // The store inserts it only when the epoch has none yet (an owner's set stored meanwhile wins), so say "registered" only when the stored set is ours.
+                if (await evidenceSets.CurrentAsync(registered.EdgeKey, cancellationToken) is { Mode: EvidenceSetRules.ModeAuto } stored && stored.SetHash == registered.SetHash)
+                {
+                    ShadowLog.EvidenceSetRegistered(logger, registered.Versions.Count);
+                }
             }
 
             previous = session.Digest;
