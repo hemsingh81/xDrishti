@@ -12,4 +12,5 @@ namespace XDrishti.Application.Replay;
 /// <param name="Sheet">The stored sheet; null when gross.</param>
 /// <param name="Calendar">The trading calendar.</param>
 /// <param name="LastAllowed">The last session that may be read.</param>
-internal sealed record ReplayRunContext(ReplayParams Parameters, ReplaySettingsSnapshot Settings, CostChoice Costs, CostSheet? Sheet, TradingCalendar Calendar, DateOnly LastAllowed);
+/// <param name="ReleasedHoldOut">The released hold-out blocks (start, end): a session inside one carries the <c>seen_holdout:&lt;start&gt;</c> label (HO-01 D7). Null reads as none.</param>
+internal sealed record ReplayRunContext(ReplayParams Parameters, ReplaySettingsSnapshot Settings, CostChoice Costs, CostSheet? Sheet, TradingCalendar Calendar, DateOnly LastAllowed, IReadOnlyList<(DateOnly Start, DateOnly End)>? ReleasedHoldOut = null);

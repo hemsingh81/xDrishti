@@ -67,7 +67,7 @@ public sealed class SimAllApiTests(ApiFactory factory) : DataTestBase(factory)
         await TrackedAsync("ABB", ReplayDays.Join(ReplayDays.Flat(ReplayDays.D1, 99.00), ReplayDays.F1(ReplayDays.D2), ReplayDays.Flat(ReplayDays.D3, 105.00)));
         await TrackedAsync("TCS", ReplayDays.Join(ReplayDays.F2(ReplayDays.D1), ReplayDays.Flat(ReplayDays.D2, 98.50), ReplayDays.Flat(ReplayDays.D3, 98.50)));
         await using var connection = await OpenAsync();
-        await ExecuteAsync(connection, "INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2031-01-01', '2026-03-02', '2031-06-30', 12, repeat('a', 64), now())");
+        await ExecuteAsync(connection, "DELETE FROM lab.holdout_releases; DELETE FROM lab.holdout_blocks; INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2031-01-01', '2026-03-02', '2031-06-30', 12, repeat('a', 64), now())");
     }
 
     private static async Task<JsonElement> ReadAsync(HttpResponseMessage response, HttpStatusCode expected)

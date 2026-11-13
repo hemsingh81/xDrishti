@@ -2,6 +2,7 @@
 
 - **Status:** Proposed (built in CF-06 part A from the owner-Approved spec, 2026-11-04). Becomes Accepted when the owner has read it. **Safety slice: light** (an irreversible record, the unlock; no order, no broker, no network; with every switch off no stored verdict outcome, gate or run key changes, except that a default Lab window now ends before the hold-out block, see 3).
 - **Date:** 2026-11-04.
+- **Amended by:** [0283](0283-the-hold-out-is-a-chain-of-fixed-blocks-released-by-an-owner-act-or-the-auto-option-and-every-cut-follows-the-block-in-force.md) (the hold-out is a chain of blocks; sections 3 and 4 of this record are amended).
 - **Relation to other ADRs:** extends [0059](0059-the-test-ledger-and-the-verdict-evaluator.md) (the ledger and the gates), [0062](0062-robustness-sensitivity-monte-carlo-by-year-and-a-sign-flip-baseline.md) (the sweep points are variants), [0067](0067-validation-harness-and-baselines-purged-folds-and-an-honest-eligibility-rule.md) (the ML hold-out now takes the shared start), [0206](0206-the-lab-verdict-shows-a-cost-stress-at-1x-1-5x-and-2x-and-a-fill-one-minute-later-test-beside-the-outcome-in-report-only-mode-and-enforce-is-the-owners-switch.md) (same switch rule: shown beside, decides nothing by default, settings recorded with the figure).
 
 ## Context

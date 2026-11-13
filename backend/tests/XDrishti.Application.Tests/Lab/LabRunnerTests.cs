@@ -918,7 +918,7 @@ public sealed class LabRunnerTests
         var easy = LabSettings.Default with { Gates = new XDrishti.Domain.Lab.QualificationGates(0, -1000, 0, 0, 1000, 1000), MinFoldsForPass = 0 };
         var verdicts = new List<LabVerdictView>();
         _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
-        var store = Substitute.For<XDrishti.Application.Abstractions.Lab.IHoldOutStore>();
+        var store = TestHoldOutStores.NoReleases();
         var bars = Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarQueries>();
         var first = new DateTimeOffset(2026, 2, 2, 9, 15, 0, TimeSpan.FromHours(5.5));
         bars.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new XDrishti.Application.Abstractions.Market.Bars.BarTotals(2, 1000, first, first.AddMonths(3), 0, 0));
@@ -939,7 +939,7 @@ public sealed class LabRunnerTests
         var easy = LabSettings.Default with { Gates = new XDrishti.Domain.Lab.QualificationGates(0, -1000, 0, 0, 1000, 1000), MinFoldsForPass = 0 };
         var verdicts = new List<LabVerdictView>();
         _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
-        var store = Substitute.For<XDrishti.Application.Abstractions.Lab.IHoldOutStore>();
+        var store = TestHoldOutStores.NoReleases();
         store.CurrentAsync(Arg.Any<CancellationToken>()).Returns(new XDrishti.Application.Abstractions.Lab.HoldOutBlock(new DateOnly(2026, 5, 1), new DateOnly(2026, 1, 5), new DateOnly(2026, 10, 30), 6, new string('d', 64), DateTimeOffset.UnixEpoch));
         var bars = Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarQueries>();
         var first = new DateTimeOffset(2026, 1, 5, 9, 15, 0, TimeSpan.FromHours(5.5));
@@ -952,7 +952,7 @@ public sealed class LabRunnerTests
 
     // CF-06 D6: the auto unlock follows the finish, because it reloads the run and needs it stored as succeeded
 
-    private async Task<MemoryHoldOutStore> RunWithAutoUnlockAsync(bool autoOn, string scenario = "succeeded")
+    private async Task<MemoryHoldOutStore> RunWithAutoUnlockAsync(bool autoOn, string scenario = "succeeded", bool blockOneReleased = true)
     {
         ArrangeFullTest();
         var run = scenario == "quick" ? Run() : FullRun();
@@ -982,8 +982,18 @@ public sealed class LabRunnerTests
         var freezes = Substitute.For<IPlanFreezeStore>();
         freezes.FirstAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new string('f', 64));
         var store = new MemoryHoldOutStore();
+        if (blockOneReleased)
+        {
+            // HO-01: the auto look never claims block 1, so the run is made with block 1 released and block 2 in force
+            var hash = new string('a', 64);
+            var one = new HoldOutBlock(new DateOnly(2026, 5, 1), new DateOnly(2024, 10, 1), new DateOnly(2026, 9, 30), 6, hash, DateTimeOffset.UnixEpoch);
+            store.Blocks.Add(one);
+            store.Releases.Add(new StoredRelease(one.Start, DateTimeOffset.UnixEpoch, "owner", "owner:x", hash, false, new DateOnly(2026, 10, 1)));
+            store.Blocks.Add(new HoldOutBlock(new DateOnly(2026, 10, 1), one.HistoryFirst, new DateOnly(2026, 10, 21), 6, hash, DateTimeOffset.UnixEpoch, one.Start));
+        }
+
         var options = new HoldOutOptions(AutoUnlock: autoOn);
-        var unlocker = new HoldOutUnlocker(_runs, _results, store, freezes, new StubPass(), new LabHoldOutGuard(store, bars, options, _time), options, _time,
+        var unlocker = new HoldOutUnlocker(_runs, _results, store, freezes, new StubPass(), new LabHoldOutGuard(store, bars, options, _time), new HoldOutEpochs(store, new FixedCalendar(), _time), options, _time,
             Substitute.For<XDrishti.Application.Abstractions.Accounts.IAccountEventLog>(), Substitute.For<XDrishti.Application.Abstractions.Accounts.IAccountUnitOfWork>(), NullLogger<HoldOutUnlocker>.Instance);
 
         await RunnerWithTrials(new RegistrationOptions(), null, 1, unlocker: unlocker).ExecuteAsync(run, Ct);
@@ -1012,6 +1022,14 @@ public sealed class LabRunnerTests
         unlock.Mode.ShouldBe("auto");
         unlock.Actor.ShouldBe("system:auto-unlock");
         unlock.StrategyId.ShouldBe("LAB_TEST");
+    }
+
+    [Fact]
+    public async Task With_the_auto_option_on_a_passing_run_never_claims_block_1()
+    {
+        var store = await RunWithAutoUnlockAsync(autoOn: true, blockOneReleased: false);
+
+        store.Unlocks.ShouldBeEmpty("block 1's look stays the owner's act (HO-01)");
     }
 
     [Fact]
@@ -1063,7 +1081,7 @@ public sealed class LabRunnerTests
     /// <summary>The runner with the null and a stored hold-out block that starts on <paramref name="blockStart"/> (CF-06 + CF-07: an explicit window may reach it, and the null must not).</summary>
     private LabRunner RunnerWithNullsAndBlock(DateOnly blockStart)
     {
-        var store = Substitute.For<XDrishti.Application.Abstractions.Lab.IHoldOutStore>();
+        var store = TestHoldOutStores.NoReleases();
         store.CurrentAsync(Arg.Any<CancellationToken>()).Returns(new XDrishti.Application.Abstractions.Lab.HoldOutBlock(blockStart, new DateOnly(2025, 5, 1), new DateOnly(2026, 4, 30), 2, new string('d', 64), DateTimeOffset.UnixEpoch));
         var bars = Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarQueries>();
         var first = new DateTimeOffset(2025, 5, 1, 9, 15, 0, TimeSpan.FromHours(5.5));

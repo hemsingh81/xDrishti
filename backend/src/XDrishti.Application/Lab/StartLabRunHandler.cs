@@ -82,6 +82,7 @@ internal sealed class StartLabRunHandler(
 
         universe = dated;
         string? holdOutNote = null;
+        IReadOnlyList<string> seenHoldOut = [];
         if (holdOut is not null && await holdOut.EnsureAsync(firstSession, lastSession, cancellationToken) is { } block)
         {
             // CF-06: the block is fixed at the first post and no default Lab window reads it, whatever the setting; enforcement only refuses an explicit window that reaches it
@@ -92,6 +93,8 @@ internal sealed class StartLabRunHandler(
             }
 
             (to, holdOutNote) = cut.Value;
+            // HO-01 D7: a window that reaches a released block is allowed and labelled; the label is not part of the run key
+            seenHoldOut = SeenHoldOut.Labels(await holdOut.ReleasedAsync(cancellationToken), from, to);
         }
 
         var (basis, basisLabel) = await CostBasisAsync(from, cancellationToken);
@@ -130,6 +133,8 @@ internal sealed class StartLabRunHandler(
         {
             labels = [.. labels, holdOutNote];
         }
+
+        labels = [.. labels, .. seenHoldOut];
 
         if (options.ConservativeSlippage)
         {

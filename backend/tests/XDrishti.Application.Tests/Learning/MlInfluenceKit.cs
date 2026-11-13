@@ -30,6 +30,12 @@ internal static class MlInfluenceKit
 
         public ValueTask<HoldOutBlock?> CurrentAsync(CancellationToken cancellationToken) => ValueTask.FromResult(Block);
 
+        public ValueTask<IReadOnlyList<StoredBlock>> ListBlocksAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<StoredBlock>>(Block is null ? [] : [new StoredBlock(Block, null)]);
+
+        public ValueTask<bool> HasFreshLookAsync(DateOnly blockStart, CancellationToken cancellationToken) => ValueTask.FromResult(Unlocks.Any(u => u.BlockStart == blockStart && !u.ReusedWindow));
+
+        public ValueTask<ReleaseOutcome> ReleaseAsync(StoredRelease release, HoldOutBlock next, CancellationToken cancellationToken) => ValueTask.FromResult(ReleaseOutcome.ChainConflict);
+
         public ValueTask<bool> InsertBlockAsync(HoldOutBlock b, CancellationToken cancellationToken) => ValueTask.FromResult(false);
 
         public ValueTask<StoredUnlock?> GetUnlockAsync(string strategyId, int version, string kind, CancellationToken cancellationToken) =>

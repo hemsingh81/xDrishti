@@ -46,6 +46,34 @@ public static class LabErrors
     /// <summary>The stored history is too short to keep a hold-out, or the plan cannot be run on it (CF-06): 409.</summary>
     public const string HoldOutUnavailableCode = "lab.holdout_unavailable";
 
+    /// <summary>The block is still filling: its last session has not closed (HO-01): 409.</summary>
+    public const string HoldOutFillingCode = "lab.holdout_filling";
+
+    /// <summary>The block is not the earliest unreleased one (HO-01): 409.</summary>
+    public const string HoldOutOrderCode = "lab.holdout_order";
+
+    /// <summary>The block has no fresh look and the release did not say it forfeits it (HO-01): 409.</summary>
+    public const string HoldOutUnlookedCode = "lab.holdout_unlooked";
+
+    /// <summary>The block is released already (HO-01): 409.</summary>
+    public const string HoldOutReleasedCode = "lab.holdout_released";
+
+    /// <summary>A block that is still filling cannot be looked at or released; it seals when its last session has closed.</summary>
+    public static Error HoldOutFilling(DateOnly start, DateOnly end) =>
+        Error.Conflict(HoldOutFillingCode, $"The hold-out block that starts on {start:yyyy-MM-dd} is still filling; it seals when the session of {end:yyyy-MM-dd} (or the last session before it) has closed.");
+
+    /// <summary>A release out of order.</summary>
+    public static Error HoldOutOrder(DateOnly start, DateOnly earliest) =>
+        Error.Conflict(HoldOutOrderCode, $"The hold-out block that starts on {start:yyyy-MM-dd} is not the earliest unreleased block; that is the block that starts on {earliest:yyyy-MM-dd}.");
+
+    /// <summary>An unlooked block released without the forfeit.</summary>
+    public static Error HoldOutUnlooked(DateOnly start) =>
+        Error.Conflict(HoldOutUnlookedCode, $"The hold-out block that starts on {start:yyyy-MM-dd} has no fresh look. Releasing it forfeits its fresh looks for good; send forfeitLook: true to release it anyway.");
+
+    /// <summary>A second release.</summary>
+    public static Error HoldOutReleased(DateOnly start) =>
+        Error.Conflict(HoldOutReleasedCode, $"The hold-out block that starts on {start:yyyy-MM-dd} is already released; the release is permanent.");
+
     /// <summary>A full test on a basket that is not in the owner's registered list (BK-11).</summary>
     public const string UniverseNotRegisteredCode = "lab.universe_not_registered";
 

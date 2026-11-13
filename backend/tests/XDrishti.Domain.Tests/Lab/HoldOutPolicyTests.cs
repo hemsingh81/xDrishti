@@ -70,11 +70,11 @@ public sealed class HoldOutPolicyTests
     }
 
     [Fact]
-    public void The_options_default_to_the_spec_proposals_off_and_valid_and_range_checked()
+    public void The_options_default_to_the_spec_proposals_with_the_auto_unlock_on_and_valid_and_range_checked()
     {
         var o = new HoldOutOptions();
 
-        (o.Enforce, o.AutoUnlock, o.MinMonths, o.SharePercent, o.MinTrades, o.Retention).ShouldBe((false, false, 6, 20.0, 30, 0.5));
+        (o.Enforce, o.AutoUnlock, o.MinMonths, o.SharePercent, o.MinTrades, o.Retention).ShouldBe((false, true, 6, 20.0, 30, 0.5)); // AutoUnlock defaults ON (ADR 0282)
         o.Problems().ShouldBeEmpty();
         new HoldOutOptions(MinMonths: 0).Problems().ShouldNotBeEmpty();
         new HoldOutOptions(SharePercent: 4).Problems().ShouldNotBeEmpty();
@@ -90,7 +90,9 @@ public sealed class HoldOutPolicyTests
 
         a.Length.ShouldBe(64);
         new HoldOutOptions(Enforce: true).SnapshotHash().ShouldNotBe(a);
-        new HoldOutOptions(AutoUnlock: true).SnapshotHash().ShouldNotBe(a);
+        new HoldOutOptions(AutoUnlock: false).SnapshotHash().ShouldNotBe(a);
+        new HoldOutOptions(AutoRelease: false).SnapshotHash().ShouldNotBe(a);
+        new HoldOutOptions(BlockMonths: 3).SnapshotHash().ShouldNotBe(a);
         new HoldOutOptions(MinTrades: 31).SnapshotHash().ShouldNotBe(a);
         new RegistrationOptions(true).SnapshotHash().ShouldNotBe(new RegistrationOptions().SnapshotHash());
         new RegistrationOptions(false, true).SnapshotHash().ShouldNotBe(new RegistrationOptions().SnapshotHash());

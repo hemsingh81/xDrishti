@@ -31,6 +31,8 @@ internal sealed class StubReplayFacts : IReplayFacts, IReplayInputs
 
     public ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken) => ValueTask.FromResult(Last);
 
+    public ValueTask<IReadOnlyList<(DateOnly Start, DateOnly End)>> ReleasedHoldOutAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<(DateOnly Start, DateOnly End)>>([]);
+
     public ValueTask<IReadOnlyList<(DateOnly Session, double Close)>> DayClosesAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<(DateOnly Session, double Close)>>([]);
 

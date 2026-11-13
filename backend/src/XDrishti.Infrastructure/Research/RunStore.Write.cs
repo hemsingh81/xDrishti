@@ -29,14 +29,14 @@ internal sealed partial class RunStore
         ArgumentNullException.ThrowIfNull(run);
         try
         {
-            await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-
-            if (run.Purpose == RunPurpose.Training && await TrainingWindowProblemAsync(connection, transaction, run, cancellationToken) is { } refusal)
+            // the gate reads the block in force through the port; a cut only moves forward, so a release between this read and the insert cannot make the window unsafe
+            if (run.Purpose == RunPurpose.Training && await TrainingWindowProblemAsync(run, cancellationToken) is { } refusal)
             {
-                await transaction.RollbackAsync(cancellationToken);
                 return Result.Failure<StoreOutcome>(StoreErrors.TrainingWindowRefused(refusal));
             }
+
+            await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
             long? id;
             await using (var insert = new NpgsqlCommand(InsertRun, connection, transaction))
@@ -94,18 +94,16 @@ internal sealed partial class RunStore
             : $"The database refused the write (SQLSTATE {failure.SqlState}{(failure.ConstraintName is { } name ? ", constraint " + name : string.Empty)}); nothing was stored.";
 
     /// <summary>
-    /// The last gate of a training run, inside the write transaction and independent of any caller: the stored block must exist and the window must end at least the embargo before its start. Returns the reason, or null when the window is clear.
+    /// The last gate of a training run, before the write and independent of any caller (the block in force is read through the hold-out store port): the stored block must exist and the window must end at least the embargo before its start. Returns the reason, or null when the window is clear.
     /// </summary>
-    private async Task<string?> TrainingWindowProblemAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, RunToStore run, CancellationToken cancellationToken)
+    private async Task<string?> TrainingWindowProblemAsync(RunToStore run, CancellationToken cancellationToken)
     {
-        await using var command = new NpgsqlCommand("SELECT start_date FROM lab.holdout_blocks ORDER BY created_at ASC, id ASC LIMIT 1", connection, transaction);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
+        if (await holdOuts.CurrentAsync(cancellationToken) is not { } block)
         {
             return "No hold-out block is stored, so a training run cannot be kept clear of it; nothing was stored.";
         }
 
-        var start = reader.GetFieldValue<DateOnly>(0);
+        var start = block.Start;
 
         var latest = XDrishti.Domain.Confidence.HoldOutOptions.TrainingCut(start, holdOut.TrainingEmbargoDays);
         return run.Run.To > latest || run.Run.From > latest

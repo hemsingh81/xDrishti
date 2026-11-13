@@ -224,7 +224,7 @@ public sealed class LabConfidenceApiTests(ApiFactory factory) : DataTestBase(fac
 
         var verdict = new LabVerdictView("PASS", 1, 1, new EvidenceView(100, 0.2, 1.5, 6, 5, 3, 0, "walk_forward"), [], [], [], [], []);
         (await scope.ServiceProvider.GetRequiredService<ILabResultStore>().AppendAsync(created.Run.Id, "ORB", version.Hash, verdict, DateTimeOffset.UtcNow, Ct)).ShouldBeTrue();
-        (await scope.ServiceProvider.GetRequiredService<IHoldOutStore>().InsertBlockAsync(new HoldOutBlock(new DateOnly(2026, 5, 1), new DateOnly(2024, 10, 1), new DateOnly(2026, 10, 30), 6, Hash, DateTimeOffset.UtcNow), Ct)).ShouldBeTrue();
+        (await scope.ServiceProvider.GetRequiredService<IHoldOutStore>().InsertBlockAsync(new HoldOutBlock(new DateOnly(2026, 5, 1), new DateOnly(2024, 10, 1), new DateOnly(2026, 9, 30), 6, Hash, DateTimeOffset.UtcNow), Ct)).ShouldBeTrue();
         await scope.ServiceProvider.GetRequiredService<IPlanFreezeStore>().FreezeAsync("ORB", 1, new string('f', 64), created.Run.Id, DateTimeOffset.UtcNow, Ct);
         return created.Run.Id;
     }

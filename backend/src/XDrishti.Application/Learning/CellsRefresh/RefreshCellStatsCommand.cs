@@ -14,10 +14,12 @@ public sealed record RefreshCellStatsCommand(string Actor) : ICommand;
 /// <param name="Kept">Sources kept as they were (up to date or not registered).</param>
 /// <param name="Extended">Sources simulated again over a longer window.</param>
 /// <param name="NewRuns">Runs newly stored by this refresh (each is one ledger row).</param>
-public sealed record RefreshCellStatsOutcome(DateOnly AsOf, DateOnly DataThrough, string SnapshotKey, bool AlreadyStored, IReadOnlyList<string> Kept, IReadOnlyList<string> Extended, int NewRuns)
+/// <param name="Labels">The <c>seen_holdout:&lt;start&gt;</c> labels of the released hold-out blocks the refresh end reaches (HO-01 D7); empty until a block is released.</param>
+public sealed record RefreshCellStatsOutcome(DateOnly AsOf, DateOnly DataThrough, string SnapshotKey, bool AlreadyStored, IReadOnlyList<string> Kept, IReadOnlyList<string> Extended, int NewRuns, IReadOnlyList<string>? Labels = null)
 {
     /// <summary>The run message: what was done and the drift note (every message has it).</summary>
     public string Message =>
         $"Snapshot {SnapshotKey[..12]} as of {AsOf:yyyy-MM-dd} {(AlreadyStored ? "was stored already; nothing written" : "stored")}: {Kept.Count} source(s) kept, {Extended.Count} simulated again, {NewRuns} new run(s). "
-        + XDrishti.Domain.Learning.CellsRefreshRules.DriftNote(DataThrough) + ".";
+        + XDrishti.Domain.Learning.CellsRefreshRules.DriftNote(DataThrough) + "."
+        + (Labels is { Count: > 0 } ? " Labels: " + string.Join(", ", Labels) + "." : string.Empty);
 }

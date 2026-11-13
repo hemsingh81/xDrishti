@@ -54,6 +54,28 @@ internal sealed class HoldOutBlockRecordConfiguration : IEntityTypeConfiguration
         builder.Property(x => x.SettingHash).HasColumnType("character(64)").IsRequired();
         builder.Property(x => x.CreatedAt).IsRequired();
         builder.HasIndex(x => x.StartDate).IsUnique().HasDatabaseName("uq_holdout_blocks_start");
+        builder.Property(x => x.PrevStart).HasColumnType("date");
+        builder.Property(x => x.Orphan).HasDefaultValue(false).IsRequired();
+        // HO-01: a block has at most one successor, and the chain has one first block (every non-orphan row has orphan = false, so a unique index on it, filtered to the first blocks, admits one row)
+        builder.HasIndex(x => x.PrevStart).IsUnique().HasDatabaseName("uq_holdout_blocks_prev");
+        builder.HasIndex(x => x.Orphan).IsUnique().HasFilter("prev_start IS NULL AND NOT orphan").HasDatabaseName("uq_holdout_blocks_first");
+    }
+}
+
+/// <summary><c>lab.holdout_releases</c> (HO-01, ADR 0283): the release of a block, owner or auto, with the setting snapshot and the next block it opened. Insert-only for the runtime role; never changed.</summary>
+internal sealed class HoldOutReleaseRecordConfiguration : IEntityTypeConfiguration<HoldOutReleaseRecord>
+{
+    public void Configure(EntityTypeBuilder<HoldOutReleaseRecord> builder)
+    {
+        builder.ToTable("holdout_releases", Schemas.Lab, t => t.HasCheckConstraint("ck_holdout_releases_shape", "mode IN ('owner','auto') AND setting_hash ~ '^[0-9a-f]{64}$' AND next_block_start > block_start AND length(actor) > 0"));
+        builder.HasKey(x => x.BlockStart).HasName("pk_holdout_releases");
+        builder.Property(x => x.BlockStart).HasColumnType("date");
+        builder.Property(x => x.ReleasedAt).IsRequired();
+        builder.Property(x => x.Mode).HasColumnType("text").IsRequired();
+        builder.Property(x => x.Actor).HasColumnType("text").IsRequired();
+        builder.Property(x => x.SettingHash).HasColumnType("character(64)").IsRequired();
+        builder.Property(x => x.Looked).IsRequired();
+        builder.Property(x => x.NextBlockStart).HasColumnType("date").IsRequired();
     }
 }
 

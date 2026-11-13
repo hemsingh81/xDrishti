@@ -51,7 +51,7 @@ public sealed class LabStoreMigrationTests(ApiFactory factory)
         await using var connection = new NpgsqlConnection(scratch.ConnectionString);
         await connection.OpenAsync(Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["expression_profiles", "holdout_blocks", "holdout_unlocks", "lab_results", "lab_runs", "plan_freezes", "registrations", "strategies", "strategy_versions", "test_ledger", "variant_stats"]); // expression_profiles is P14-06, variant_stats is CF-03
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["expression_profiles", "holdout_blocks", "holdout_releases", "holdout_unlocks", "lab_results", "lab_runs", "plan_freezes", "registrations", "strategies", "strategy_versions", "test_ledger", "variant_stats"]); // expression_profiles is P14-06, variant_stats is CF-03
         (await ListAsync(connection, Columns("strategies"))).Order(StringComparer.Ordinal).ShouldBe(
             new[] { C("id", "text"), C("style", "text"), C("built_in", "boolean"), C("created_at", "timestamp with time zone") }.Order(StringComparer.Ordinal));
         (await ListAsync(connection, Columns("strategy_versions"))).Order(StringComparer.Ordinal).ShouldBe(
@@ -86,7 +86,7 @@ public sealed class LabStoreMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["expression_profiles", "holdout_blocks", "holdout_unlocks", "lab_results", "lab_runs", "plan_freezes", "registrations", "strategies", "strategy_versions", "test_ledger", "variant_stats"]); // expression_profiles is P14-06, variant_stats is CF-03
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["expression_profiles", "holdout_blocks", "holdout_releases", "holdout_unlocks", "lab_results", "lab_runs", "plan_freezes", "registrations", "strategies", "strategy_versions", "test_ledger", "variant_stats"]); // expression_profiles is P14-06, variant_stats is CF-03
     }
 
     [Fact]

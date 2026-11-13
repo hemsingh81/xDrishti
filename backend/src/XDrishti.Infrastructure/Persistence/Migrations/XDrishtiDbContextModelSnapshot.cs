@@ -9646,6 +9646,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("length_months");
 
+                    b.Property<bool>("Orphan")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("orphan");
+
+                    b.Property<DateOnly?>("PrevStart")
+                        .HasColumnType("date")
+                        .HasColumnName("prev_start");
+
                     b.Property<string>("SettingHash")
                         .IsRequired()
                         .HasColumnType("character(64)")
@@ -9658,6 +9668,15 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_holdout_blocks");
 
+                    b.HasIndex("Orphan")
+                        .IsUnique()
+                        .HasDatabaseName("uq_holdout_blocks_first")
+                        .HasFilter("prev_start IS NULL AND NOT orphan");
+
+                    b.HasIndex("PrevStart")
+                        .IsUnique()
+                        .HasDatabaseName("uq_holdout_blocks_prev");
+
                     b.HasIndex("StartDate")
                         .IsUnique()
                         .HasDatabaseName("uq_holdout_blocks_start");
@@ -9665,6 +9684,48 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("holdout_blocks", "lab", t =>
                         {
                             t.HasCheckConstraint("ck_holdout_blocks_shape", "history_first < start_date AND start_date <= history_last AND length_months >= 1 AND setting_hash ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.HoldOutReleaseRecord", b =>
+                {
+                    b.Property<DateOnly>("BlockStart")
+                        .HasColumnType("date")
+                        .HasColumnName("block_start");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
+
+                    b.Property<bool>("Looked")
+                        .HasColumnType("boolean")
+                        .HasColumnName("looked");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("mode");
+
+                    b.Property<DateOnly>("NextBlockStart")
+                        .HasColumnType("date")
+                        .HasColumnName("next_block_start");
+
+                    b.Property<DateTimeOffset>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at");
+
+                    b.Property<string>("SettingHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("setting_hash");
+
+                    b.HasKey("BlockStart")
+                        .HasName("pk_holdout_releases");
+
+                    b.ToTable("holdout_releases", "lab", t =>
+                        {
+                            t.HasCheckConstraint("ck_holdout_releases_shape", "mode IN ('owner','auto') AND setting_hash ~ '^[0-9a-f]{64}$' AND next_block_start > block_start AND length(actor) > 0");
                         });
                 });
 

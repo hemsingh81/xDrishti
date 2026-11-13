@@ -43,6 +43,25 @@ public sealed class ReplaySessionRunnerTests
     }
 
     [Fact]
+    public async Task A_session_inside_a_released_hold_out_block_carries_its_seen_holdout_label_and_one_before_it_does_not()
+    {
+        var world = new ReplayWorld().WithDefaults("AAA");
+        world.Series("AAA", d => 100.0);
+        world.ReleasedBlock = (D2, D4);
+
+        var run = await Run(ReplayRig.Create(world), ReplayRig.Params(6));
+
+        On(run, D1).Labels.ShouldNotContain("seen_holdout:2026-10-06");
+        foreach (var day in new[] { D2, D3, D4 })
+        {
+            On(run, day).Labels.ShouldContain("seen_holdout:2026-10-06");
+        }
+
+        On(run, D5).Labels.ShouldNotContain("seen_holdout:2026-10-06");
+        run.Labels.ShouldContain("seen_holdout:2026-10-06");
+    }
+
+    [Fact]
     public async Task A_taken_ticket_is_filled_on_the_next_session_and_the_swing_position_holds_its_slot_until_its_exit()
     {
         var world = new ReplayWorld().WithDefaults("AAA", "BBB");

@@ -10233,6 +10233,107 @@
         }
       }
     },
+    "/api/lab/holdout/blocks/{start}/release": {
+      "post": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "Owner act, fresh password in the body (HO-01): release the earliest unreleased hold-out block once it is sealed. It becomes development data, labelled seen_holdout, every development cut moves forward, and the next block is stored in the same transaction. A block with no fresh look is released only with forfeitLook: true, which forfeits its looks for good. Irreversible. 200 the released block; 401 auth.invalid_credentials for a wrong password, 403 auth.step_up_required without one, 423 auth.locked, 409 lab.holdout_filling, lab.holdout_order, lab.holdout_unlooked, lab.holdout_released or lab.holdout_unavailable, 404 lab.not_found, 422 for a start that is not a date",
+        "operationId": "ReleaseLabHoldOutBlock",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldOutReleaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOutBlockView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/lessons/{id}/link": {
       "post": {
         "tags": [
@@ -45003,9 +45104,34 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "freshLook": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "releasedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "mode": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "The locked block as served."
+        "description": "A block of the hold-out chain as served (HO-01): `HistoryLast` is its last date. `State` is `filling`, `sealed`, `looked` or `released`; `FreshLook` says whether a fresh look was taken (for a released block, whether it had one when\nreleased); `ReleasedAt` and `Mode` (`owner` or `auto`) are set once it is released."
       },
       "HoldOutPlanView": {
         "required": [
@@ -45046,6 +45172,22 @@
           }
         },
         "description": "The sizing the policy gives for the stored history now (D4)."
+      },
+      "HoldOutReleaseRequest": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "forfeitLook": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "description": "Body of `POST /api/lab/holdout/blocks/{start}/release` (HO-01, D4): the owner's password, typed again for this act, and whether a block with no fresh look may be released (which forfeits its looks for good)."
       },
       "HoldOutResultView": {
         "required": [
@@ -45215,9 +45357,22 @@
             "items": {
               "$ref": "#/components/schemas/HoldOutResultView"
             }
+          },
+          "blocks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/HoldOutBlockView"
+            }
+          },
+          "autoRelease": {
+            "type": "boolean",
+            "default": true
           }
         },
-        "description": "`GET /api/lab/holdout`: the block (or what it would be), whether the Lab enforces it, and every look taken. Numbers appear only in an unlock that was taken."
+        "description": "`GET /api/lab/holdout`: the block in force (or what it would be), whether the Lab enforces it, the auto options, the chain of `Blocks` with their states, and every look taken. Numbers appear only in an unlock that was taken."
       },
       "HoldingGroup": {
         "required": [

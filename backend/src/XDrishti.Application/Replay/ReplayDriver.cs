@@ -66,7 +66,8 @@ internal sealed class ReplayDriver(IReplayFacts facts, ReplaySessionRunner runne
             }
         }
 
-        return Result.Success(new ReplayPrepared(new ReplayRunContext(parameters, settings, costs, sheet.Value, calendar, parameters.To), new ReplayBook(parameters.Capital), sessions));
+        var released = await facts.ReleasedHoldOutAsync(cancellationToken);
+        return Result.Success(new ReplayPrepared(new ReplayRunContext(parameters, settings, costs, sheet.Value, calendar, parameters.To, released), new ReplayBook(parameters.Capital), sessions));
     }
 
     /// <summary>Replays one session of a prepared run on its book.</summary>

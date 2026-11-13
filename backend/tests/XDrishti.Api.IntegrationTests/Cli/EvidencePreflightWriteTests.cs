@@ -16,7 +16,7 @@ public sealed class EvidencePreflightWriteTests(ApiFactory factory)
     public async Task The_preflight_prints_twelve_items_reads_seeded_rows_and_writes_nothing()
     {
         await factory.ResetAllAsync();
-        await ExecuteAsync("INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2031-01-01', '2026-03-02', '2031-06-30', 12, repeat('a', 64), now()); "
+        await ExecuteAsync("DELETE FROM lab.holdout_releases; DELETE FROM lab.holdout_blocks; INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2031-01-01', '2026-03-02', '2031-06-30', 12, repeat('a', 64), now()); "
             + "INSERT INTO platform.service_schedules (service_id, enabled, schedule, retries, timeout_minutes, catch_up, notify_on_failure, parameters, updated_by, updated_at) VALUES ('paper-capture', true, '{\"type\":\"daily\"}', 0, 5, true, true, '[]', 'test', now())");
         EvidencePreflightView view;
         try

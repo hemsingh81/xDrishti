@@ -44,6 +44,41 @@ internal sealed class LabConfidenceEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status423Locked);
+
+        api.MapPost("/lab/holdout/blocks/{start}/release", ReleaseAsync)
+            .WithTags("Lab")
+            .WithName("ReleaseLabHoldOutBlock")
+            .WithSummary("Owner act, fresh password in the body (HO-01): release the earliest unreleased hold-out block once it is sealed. It becomes development data, labelled seen_holdout, every development cut moves forward, and the next block is stored in the same transaction. A block with no fresh look is released only with forfeitLook: true, which forfeits its looks for good. Irreversible. 200 the released block; 401 auth.invalid_credentials for a wrong password, 403 auth.step_up_required without one, 423 auth.locked, 409 lab.holdout_filling, lab.holdout_order, lab.holdout_unlooked, lab.holdout_released or lab.holdout_unavailable, 404 lab.not_found, 422 for a start that is not a date")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status423Locked);
+    }
+
+    private static async Task<Results<Ok<HoldOutBlockView>, ProblemHttpResult>> ReleaseAsync(
+        string start,
+        HoldOutReleaseRequest request,
+        HttpContext http,
+        ICommandHandler<StepUpCommand, StepUpResult> passwordCheck,
+        ICommandHandler<ReleaseHoldOutCommand, HoldOutBlockView> handler,
+        CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var owner = await OwnerAct.FreshAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        if (!DateOnly.TryParseExact(start, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date))
+        {
+            return Problem(LabErrors.InvalidInput("The block start must be a date, yyyy-MM-dd."), http);
+        }
+
+        var result = await handler.HandleAsync(new ReleaseHoldOutCommand(date, request.ForfeitLook, owner.Value), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<RegistrationView>, ProblemHttpResult>> RegisterAsync(
