@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Messaging;
-using XDrishti.Application.Depth;
+using XDrishti.Application.Recording;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Filings;
 
@@ -46,15 +46,15 @@ internal sealed class IngestFilingsHandler(
                 continue;
             }
 
-            var verdict = DepthDiskGuard.Check(used, files.FreeBytes(), settings.MaxFilesBytes, settings.MinFreeBytes);
-            if (verdict is DepthDiskVerdict.OverBudget or DepthDiskVerdict.LowFree)
+            var verdict = RecorderDiskGuard.Check(used, files.FreeBytes(), settings.MaxFilesBytes, settings.MinFreeBytes);
+            if (verdict is RecorderDiskVerdict.OverBudget or RecorderDiskVerdict.LowFree)
             {
-                run.Stopped = verdict == DepthDiskVerdict.OverBudget ? DiskBudget : DiskFree;
+                run.Stopped = verdict == RecorderDiskVerdict.OverBudget ? DiskBudget : DiskFree;
                 FilingsIngestLog.DiskStop(logger, run.Stopped, used);
                 break;
             }
 
-            if (verdict == DepthDiskVerdict.Warning && !warned)
+            if (verdict == RecorderDiskVerdict.Warning && !warned)
             {
                 warned = true;
                 FilingsIngestLog.DiskWarning(logger, used, settings.MaxFilesBytes);

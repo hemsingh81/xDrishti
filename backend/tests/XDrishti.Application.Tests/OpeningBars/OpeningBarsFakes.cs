@@ -1,14 +1,13 @@
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.OpeningBars;
-using XDrishti.Application.Tests.Ticks;
 
 namespace XDrishti.Application.Tests.OpeningBars;
 
-/// <summary>The opening-minute recorder's connector over the same scripted connection as the tick tests; it counts the connection attempts.</summary>
+/// <summary>The opening-minute recorder's connector over a scripted connection; it counts the connection attempts.</summary>
 internal sealed class FakeOpeningConnector : IOpeningBarsFeedConnector
 {
-    public List<FakeTickConnection> Connections { get; } = [];
+    public List<FakeFeedConnection> Connections { get; } = [];
 
     public Queue<FeedConnectResult> Scripted { get; } = new();
 
@@ -22,7 +21,7 @@ internal sealed class FakeOpeningConnector : IOpeningBarsFeedConnector
             return ValueTask.FromResult(scripted);
         }
 
-        var connection = new FakeTickConnection();
+        var connection = new FakeFeedConnection();
         Connections.Add(connection);
         return ValueTask.FromResult(FeedConnectResult.Connected(connection));
     }

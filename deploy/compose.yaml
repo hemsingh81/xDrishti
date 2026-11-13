@@ -246,10 +246,6 @@ services:
       <<: *dotnet-env
       # Must equal xd-api's value (same variable): the observer exists only while this is true (P7-20, ADR 0115).
       Planning__TicketAlerts__Enabled: ${XD_TICKET_ALERTS:-false}
-      # The depth recorder (P7-16, ADR 0135): the deployment gate, OFF by default. Recording also needs the owner's switch (PUT /api/depth/recorder, password) and the resumed service depth-recorder.
-      Depth__Enabled: ${XD_DEPTH_ENABLED:-false}
-      # The trade-tick recorder (P7-16b, ADR 0173): the deployment gate, OFF by default. A second Quote-mode socket to the same allowed host (api-feed.dhan.co); recording also needs the owner's switch (PUT /api/ticks/recorder, password) and the resumed service tick-recorder.
-      Ticks__Enabled: ${XD_TICKS_ENABLED:-false}
       # The option-chain recorder (P14-02, ADR 0176): the deployment gate, OFF by default. REST requests of the Data account to POST api.dhan.co/v2/optionchain and /v2/optionchain/expirylist only (the client's guard refuses every other endpoint), at most one per 3 seconds; recording also needs the owner's switch (PUT /api/options/chain-recorder, password) and the resumed service option-chain-recorder.
       Options__Chain__Enabled: ${XD_OPTIONS_CHAIN_ENABLED:-false}
       # The expired-options backfill (P14-03, ADR 0177): the deployment gate, OFF by default. REST requests of the Data account to POST api.dhan.co/v2/charts/rollingoption only (the client's guard refuses every other endpoint), at most one a second, only from 16:30 to 08:30 India time; fetching also needs the owner's acceptance of the probe result (PUT /api/options/backfill/probe-acceptance, password), the owner's switch (PUT /api/options/backfill, password) and the resumed service options-backfill.

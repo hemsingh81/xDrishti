@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.OptionChain;
-using XDrishti.Application.Depth;
 using XDrishti.Application.OptionChain;
 using XDrishti.Application.Platform.Services;
+using XDrishti.Application.Recording;
 using XDrishti.Application.Tests.Platform.Services;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Audit;
@@ -108,7 +108,7 @@ public sealed class OptionChainRecorderSwitchTests
     public async Task With_nothing_stored_the_reasons_name_each_closed_gate()
     {
         var (handler, _, beats, _) = Read();
-        beats.Status = Status(DepthStates.Disabled, deployment: false);
+        beats.Status = Status(RecorderStates.Disabled, deployment: false);
 
         var view = await handler.HandleAsync(new GetOptionChainRecorderQuery(), Ct);
 
@@ -128,7 +128,7 @@ public sealed class OptionChainRecorderSwitchTests
         store.Set(false);
         store.Set(true);
         data.Store(OptionChainRecorderService.Id, OptionChainRecorderService.Definition.Defaults with { Enabled = true });
-        beats.Status = Status(DepthStates.Recording);
+        beats.Status = Status(RecorderStates.Recording);
 
         var view = await handler.HandleAsync(new GetOptionChainRecorderQuery(), Ct);
 
@@ -147,7 +147,7 @@ public sealed class OptionChainRecorderSwitchTests
         beats.Status = Status(ChainStates.RatePaused);
         (await handler.HandleAsync(new GetOptionChainRecorderQuery(), Ct)).NotRunningBecause.ShouldHaveSingleItem().ShouldContain("15 minutes");
 
-        beats.Status = Status(DepthStates.DiskBudget);
+        beats.Status = Status(RecorderStates.DiskBudget);
         (await handler.HandleAsync(new GetOptionChainRecorderQuery(), Ct)).NotRunningBecause.ShouldHaveSingleItem().ShouldContain("nothing was deleted");
     }
 

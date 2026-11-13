@@ -1,13 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using XDrishti.Application.Abstractions.Depth;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.OptionChain;
 using XDrishti.Application.Abstractions.Platform;
-using XDrishti.Application.Depth;
 using XDrishti.Application.Live;
 using XDrishti.Application.Platform.Services;
+using XDrishti.Application.Recording;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Platform.Services;
@@ -101,7 +100,7 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
     internal async Task TickAsync(CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
-        var state = _waiting ?? DepthStates.Closed;
+        var state = _waiting ?? RecorderStates.Closed;
         try
         {
             _startedAt ??= now;
@@ -126,7 +125,7 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
         if (!settings.Enabled)
         {
             // Gate 1: nothing below this line runs - no credentials, no request, no store.
-            return DepthStates.Disabled;
+            return RecorderStates.Disabled;
         }
 
         await using var scope = scopes.CreateAsyncScope();
@@ -159,10 +158,10 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
 
             if (_running is not null)
             {
-                await StopRunAsync(runs, OptionChainRecorderService.Paused, DepthEndReasons.Paused, cancellationToken);
+                await StopRunAsync(runs, OptionChainRecorderService.Paused, RecorderEndReasons.Paused, cancellationToken);
             }
 
-            return DepthStates.Paused;
+            return RecorderStates.Paused;
         }
 
         var decision = FeedWindow.Decide(service, calendar, now, null);
@@ -175,7 +174,7 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
 
         if (_running is not null && !shouldBeUp)
         {
-            await StopRunAsync(runs, !switchOn || decision.DownState == FeedStates.Paused ? OptionChainRecorderService.Paused : OptionChainRecorderService.WindowEnded, DepthEndReasons.Paused, cancellationToken);
+            await StopRunAsync(runs, !switchOn || decision.DownState == FeedStates.Paused ? OptionChainRecorderService.Paused : OptionChainRecorderService.WindowEnded, RecorderEndReasons.Paused, cancellationToken);
         }
 
         if (_running is null && shouldBeUp)
@@ -199,10 +198,10 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
 
         if (shouldBeUp)
         {
-            return _waiting ?? DepthStates.Connecting;
+            return _waiting ?? RecorderStates.Connecting;
         }
 
-        return !switchOn ? DepthStates.SwitchOff : decision.DownState == FeedStates.Paused ? DepthStates.Paused : DepthStates.Closed;
+        return !switchOn ? RecorderStates.SwitchOff : decision.DownState == FeedStates.Paused ? RecorderStates.Paused : RecorderStates.Closed;
     }
 
     /// <summary>The first look of a process: the run the previous process left open is closed as failed (interrupted); a day with request rows and no end row is closed as crashed.</summary>
@@ -220,7 +219,7 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
         foreach (var date in days)
         {
             var stored = await SafeStoredBytesAsync(store, cancellationToken);
-            await store.RecordSessionAsync(new ChainSessionRecord(date, now, now, DepthEndReasons.Crashed, 0, 0, 0, 0, 0, stored, CrashedNote), cancellationToken);
+            await store.RecordSessionAsync(new ChainSessionRecord(date, now, now, RecorderEndReasons.Crashed, 0, 0, 0, 0, 0, stored, CrashedNote), cancellationToken);
         }
 
         if (days.Count > 0)
@@ -240,21 +239,21 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
         // Before each start: the disk guard (a stopped recorder stays stopped while the condition holds).
         var stored = await store.StoredBytesAsync(cancellationToken);
         var free = await store.FreeBytesAsync(cancellationToken);
-        var verdict = DepthDiskGuard.Check(stored, free, settings.MaxStoredBytes, settings.MinFreeBytes);
-        if (verdict is DepthDiskVerdict.OverBudget or DepthDiskVerdict.LowFree)
+        var verdict = RecorderDiskGuard.Check(stored, free, settings.MaxStoredBytes, settings.MinFreeBytes);
+        if (verdict is RecorderDiskVerdict.OverBudget or RecorderDiskVerdict.LowFree)
         {
-            var over = verdict == DepthDiskVerdict.OverBudget;
+            var over = verdict == RecorderDiskVerdict.OverBudget;
             _diskLatched = true;
-            _waiting = over ? DepthStates.DiskBudget : DepthStates.DiskFree;
+            _waiting = over ? RecorderStates.DiskBudget : RecorderStates.DiskFree;
             await SkipOncePerDayAsync(runs, today, over ? DiskBudgetMessage : DiskFreeMessage, now, cancellationToken);
-            DayOf(today, now).Last = over ? DepthEndReasons.DiskBudget : DepthEndReasons.DiskFree;
+            DayOf(today, now).Last = over ? RecorderEndReasons.DiskBudget : RecorderEndReasons.DiskFree;
             return;
         }
 
         var day = await BuildDayAsync(services, today, cancellationToken);
         if (day.IsEmpty)
         {
-            _waiting = DepthStates.NoInstruments;
+            _waiting = RecorderStates.NoInstruments;
             await SkipOncePerDayAsync(runs, today, NoUnderlyingsMessage, now, cancellationToken);
             return;
         }
@@ -267,7 +266,7 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
 
         if (credentials is null)
         {
-            _waiting = _tokenRefused ? DepthStates.TokenRefused : DepthStates.NoToken;
+            _waiting = _tokenRefused ? RecorderStates.TokenRefused : RecorderStates.NoToken;
             if (!_tokenRefused)
             {
                 await SkipOncePerDayAsync(runs, today, NoTokenMessage, now, cancellationToken);
@@ -281,7 +280,7 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
         {
             if (_refusedFingerprint == fingerprint)
             {
-                _waiting = DepthStates.TokenRefused;
+                _waiting = RecorderStates.TokenRefused;
                 return;
             }
 
@@ -347,21 +346,21 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
         switch (result?.End)
         {
             case ChainSessionEnd.Completed:
-                (status, message, reason) = (ServiceRunStatus.Succeeded, DayDoneMessage, DepthEndReasons.WindowEnd);
+                (status, message, reason) = (ServiceRunStatus.Succeeded, DayDoneMessage, RecorderEndReasons.WindowEnd);
                 _endedOn = today;
                 _waiting = ChainStates.DayDone;
                 break;
             case ChainSessionEnd.TokenRefused:
-                (status, message, reason) = (ServiceRunStatus.Failed, TokenRefusedMessage, DepthEndReasons.TokenRefused);
+                (status, message, reason) = (ServiceRunStatus.Failed, TokenRefusedMessage, RecorderEndReasons.TokenRefused);
                 _tokenRefused = true;
                 _refusedFingerprint = running.Fingerprint;
                 _nextTokenCheck = now + TokenCheckInterval;
-                _waiting = DepthStates.TokenRefused;
+                _waiting = RecorderStates.TokenRefused;
                 break;
             case ChainSessionEnd.NotSubscribed:
-                (status, message, reason) = (ServiceRunStatus.Failed, NotSubscribedMessage, DepthEndReasons.NotSubscribed);
+                (status, message, reason) = (ServiceRunStatus.Failed, NotSubscribedMessage, RecorderEndReasons.NotSubscribed);
                 _endedOn = today;
-                _waiting = DepthStates.NotSubscribed;
+                _waiting = RecorderStates.NotSubscribed;
                 break;
             case ChainSessionEnd.RatePaused:
                 // Shortcut: the 15-minute pause lives in memory (_resumeAt). A restart of xd-feed inside it forgets the pause; the 3-second throttle still holds, and a repeated limit pauses again after three slots (ADR 0176).
@@ -370,26 +369,26 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
                 _waiting = ChainStates.RatePaused;
                 break;
             case ChainSessionEnd.NoToken:
-                (status, message, reason) = (ServiceRunStatus.Failed, NoTokenLostMessage, DepthEndReasons.TokenRefused);
-                _waiting = DepthStates.NoToken;
+                (status, message, reason) = (ServiceRunStatus.Failed, NoTokenLostMessage, RecorderEndReasons.TokenRefused);
+                _waiting = RecorderStates.NoToken;
                 break;
             case ChainSessionEnd.DiskBudget:
-                (status, message, reason) = (ServiceRunStatus.Failed, DiskBudgetMessage, DepthEndReasons.DiskBudget);
+                (status, message, reason) = (ServiceRunStatus.Failed, DiskBudgetMessage, RecorderEndReasons.DiskBudget);
                 _diskLatched = true;
-                _waiting = DepthStates.DiskBudget;
+                _waiting = RecorderStates.DiskBudget;
                 break;
             case ChainSessionEnd.DiskFree:
-                (status, message, reason) = (ServiceRunStatus.Failed, DiskFreeMessage, DepthEndReasons.DiskFree);
+                (status, message, reason) = (ServiceRunStatus.Failed, DiskFreeMessage, RecorderEndReasons.DiskFree);
                 _diskLatched = true;
-                _waiting = DepthStates.DiskFree;
+                _waiting = RecorderStates.DiskFree;
                 break;
             case ChainSessionEnd.Stopped:
-                (status, message, reason) = (ServiceRunStatus.Succeeded, running.StopReason ?? OptionChainRecorderService.Stopped, running.EndReason ?? DepthEndReasons.WindowEnd);
+                (status, message, reason) = (ServiceRunStatus.Succeeded, running.StopReason ?? OptionChainRecorderService.Stopped, running.EndReason ?? RecorderEndReasons.WindowEnd);
                 break;
             default:
-                (status, message, reason) = (ServiceRunStatus.Failed, CrashMessage, DepthEndReasons.Crashed);
+                (status, message, reason) = (ServiceRunStatus.Failed, CrashMessage, RecorderEndReasons.Crashed);
                 _resumeAt = now + CrashPause;
-                _waiting = DepthStates.Connecting;
+                _waiting = RecorderStates.Connecting;
                 break;
         }
 
@@ -411,7 +410,7 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
     {
         var running = _running!;
         running.StopReason ??= reason;
-        running.EndReason ??= reason == OptionChainRecorderService.WindowEnded ? DepthEndReasons.WindowEnd : endReason;
+        running.EndReason ??= reason == OptionChainRecorderService.WindowEnded ? RecorderEndReasons.WindowEnd : endReason;
         await running.Stop.CancelAsync();
         try
         {
@@ -454,7 +453,7 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
 
         var stored = await SafeStoredBytesAsync(store, cancellationToken);
         var note = session.FreeSpaceReadable ? null : "Free disk space could not be read; only the size cap was in force.";
-        await store.RecordSessionAsync(new ChainSessionRecord(day.Date, day.StartedAt, now, day.Last ?? DepthEndReasons.WindowEnd, day.Slots, day.Requests, day.Ok, day.Gaps, day.Rows, stored, note), cancellationToken);
+        await store.RecordSessionAsync(new ChainSessionRecord(day.Date, day.StartedAt, now, day.Last ?? RecorderEndReasons.WindowEnd, day.Slots, day.Requests, day.Ok, day.Gaps, day.Rows, stored, note), cancellationToken);
         _day = null;
     }
 
@@ -544,11 +543,11 @@ internal sealed class OptionChainSupervisor(IServiceScopeFactory scopes, IChainS
                 }
                 else
                 {
-                    await StopRunAsync(runs, OptionChainRecorderService.Stopped, DepthEndReasons.Paused, wait.Token);
+                    await StopRunAsync(runs, OptionChainRecorderService.Stopped, RecorderEndReasons.Paused, wait.Token);
                 }
             }
 
-            await scope.ServiceProvider.GetRequiredService<IOptionChainHeartbeats>().ReportAsync(DepthStates.Stopped, new ChainHeartbeat(settings.Enabled, 0, 0, 0, 0, 0, session.FreeSpaceReadable), application.Instance, application.Version, wait.Token);
+            await scope.ServiceProvider.GetRequiredService<IOptionChainHeartbeats>().ReportAsync(RecorderStates.Stopped, new ChainHeartbeat(settings.Enabled, 0, 0, 0, 0, 0, session.FreeSpaceReadable), application.Instance, application.Version, wait.Token);
         }
 #pragma warning disable CA1031 // the process is going down; the record is closed as interrupted at the next start if this fails
         catch (Exception ex)

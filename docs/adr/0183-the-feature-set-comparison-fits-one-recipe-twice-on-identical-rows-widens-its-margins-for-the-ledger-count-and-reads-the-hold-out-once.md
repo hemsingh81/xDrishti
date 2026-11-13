@@ -27,3 +27,7 @@ P13 (`md-1`, tick and depth features) and P15 (`ev-1`, `fu-1`, `llm-1`) each ask
 - Gross R unless the charge sheet makes the set net (ISS-25); survivorship (ISS-22); ten or eleven months of depth is one regime, so NOT_EVALUABLE is the likely first answer.
 - The session list must hold every row's trade date and reach back `EmbargoSessions` sessions before the first window, else the comparison is refused (`extensions.sessions`). A list that runs into the future (a forward calendar) says nothing about whether the data reach a window's end, so a window with no rows yet is used as empty or skipped, not treated as complete data; the caller must not read a future-dated list as coverage. The 5-session block grid starts at the session of the first paired row, not of the first row.
 - The hold-out reading has its own record (`ExtensionHoldOutRecords`): its verdict is the hold-out outcome (confirmed = KEEP, not confirmed = INCONCLUSIVE, unreadable = NOT_EVALUABLE), never the development verdict.
+
+
+## Amendment (2026-11-13): the depth and tick features are dropped
+P13 is dropped and the depth and tick recorders are removed ([ADR 0288](0288-p13-tick-and-depth-features-are-dropped-the-depth-and-tick-recorders-are-removed-and-the-feature-set-comparison-stays.md)). The comparison core stays as built; its users are P14 and P15, and the `md-1` depth and tick feature set it was written to judge will not exist.

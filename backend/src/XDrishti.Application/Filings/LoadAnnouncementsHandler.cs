@@ -2,7 +2,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Messaging;
-using XDrishti.Application.Depth;
+using XDrishti.Application.Recording;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Filings;
 
@@ -65,10 +65,10 @@ internal sealed class LoadAnnouncementsHandler(
 
     private async ValueTask<(int Rows, string? FileReject)> LoadFileAsync(FilingEntry entry, RowLoadCounts counts, CancellationToken cancellationToken)
     {
-        var verdict = DepthDiskGuard.Check(await files.UsedBytesAsync(cancellationToken), files.FreeBytes(), settings.MaxFilesBytes, settings.MinFreeBytes);
-        if (verdict is DepthDiskVerdict.OverBudget or DepthDiskVerdict.LowFree)
+        var verdict = RecorderDiskGuard.Check(await files.UsedBytesAsync(cancellationToken), files.FreeBytes(), settings.MaxFilesBytes, settings.MinFreeBytes);
+        if (verdict is RecorderDiskVerdict.OverBudget or RecorderDiskVerdict.LowFree)
         {
-            var stop = verdict == DepthDiskVerdict.OverBudget ? IngestFilingsHandler.DiskBudget : IngestFilingsHandler.DiskFree;
+            var stop = verdict == RecorderDiskVerdict.OverBudget ? IngestFilingsHandler.DiskBudget : IngestFilingsHandler.DiskFree;
             counts.Reject(stop);
             return (0, stop);
         }

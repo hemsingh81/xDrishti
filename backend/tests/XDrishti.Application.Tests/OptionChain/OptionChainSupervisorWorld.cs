@@ -4,7 +4,6 @@ using XDrishti.Application.Abstractions.OptionChain;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.OptionChain;
 using XDrishti.Application.Platform.Services;
-using XDrishti.Application.Tests.Depth;
 using XDrishti.Application.Tests.Live;
 using XDrishti.Application.Tests.Platform.Services;
 using XDrishti.Domain.Platform.Services;

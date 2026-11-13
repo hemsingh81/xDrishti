@@ -31,8 +31,6 @@ public sealed class OptionChainRecordingArchitectureTests
     [InlineData("XDrishti.Application.Lab")]
     [InlineData("XDrishti.Application.Reporting")]
     [InlineData("XDrishti.Application.Paper")]
-    [InlineData("XDrishti.Application.Depth")]
-    [InlineData("XDrishti.Application.Ticks")]
     public void The_decision_live_and_recorder_code_references_no_chain_type(string area)
     {
         var result = Types.InAssembly(Application).That().ResideInNamespaceStartingWith(area).ShouldNot().HaveDependencyOnAny(ChainNamespaces).GetResult();
@@ -89,10 +87,6 @@ public sealed class OptionChainRecordingArchitectureTests
         chainTypes.ShouldNotContain(t => provider.IsAssignableFrom(t));
 
         var result = Types.InAssembly(Application).That().ResideInNamespace("XDrishti.Application.OptionChain").ShouldNot().HaveDependencyOnAny(
-            "XDrishti.Application.Abstractions.Depth.IDepthStore",
-            "XDrishti.Application.Abstractions.Depth.IDepthSwitchStore",
-            "XDrishti.Application.Abstractions.Ticks",
-            "XDrishti.Application.Ticks",
             "XDrishti.Application.Abstractions.Planning",
             "XDrishti.Application.Abstractions.Live.ILiveFlush",
             "XDrishti.Application.Abstractions.Live.ILiveFeedConnector",

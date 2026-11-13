@@ -2,8 +2,6 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { problemResponse, server } from '@/test/server';
-import { createServicesFake } from '@/test/servicesFake';
-import { buildServiceView } from '@/test/servicesFixtures';
 import { buildBackfillView, buildOptionRecorderView } from '@/test/optionsFixtures';
 import { renderServices } from './testing';
 
@@ -14,7 +12,7 @@ const view = (over: object = {}) => ({
   switchId: null,
   state: null,
   lastSeenAt: null,
-  notRunningBecause: ['Your switch is OFF.', 'The service tick-recorder is paused on the Services screen.'],
+  notRunningBecause: ['Your switch is OFF.', 'The service opening-bars is paused on the Services screen.'],
   notice: 'Off until the deployment flag, your switch (with your password) and the service are all on.',
   history: [],
   ...over,
@@ -29,32 +27,19 @@ interface Put {
   body: Record<string, unknown>;
 }
 
-function mockRecorders(
-  depth = view(),
-  ticks = view(),
-  chain = buildOptionRecorderView(),
-  backfill = buildBackfillView(),
-  opening = view(),
-) {
+function mockRecorders(opening = view(), chain = buildOptionRecorderView(), backfill = buildBackfillView()) {
   const puts: Put[] = [];
   const reads: string[] = [];
   let refuse = false;
   server.use(
-    http.get('/api/depth/recorder', () => {
-      reads.push('depth');
-      return HttpResponse.json(depth);
+    http.get('/api/options/chain-recorder', () => {
+      reads.push('chain');
+      return HttpResponse.json(chain);
     }),
-    http.get('/api/ticks/recorder', () => {
-      reads.push('ticks');
-      return HttpResponse.json(ticks);
-    }),
-    http.get('/api/options/chain-recorder', () => HttpResponse.json(chain)),
     http.get('/api/options/backfill', () => HttpResponse.json(backfill)),
     http.get('/api/opening-bars/recorder', () => HttpResponse.json(opening)),
     ...(
       [
-        ['depth', '/api/depth/recorder'],
-        ['ticks', '/api/ticks/recorder'],
         ['chain', '/api/options/chain-recorder'],
         ['backfill', '/api/options/backfill'],
         ['opening', '/api/opening-bars/recorder'],
@@ -82,45 +67,41 @@ function mockRecorders(
 
 async function openSection() {
   await userEvent.click(await screen.findByRole('button', { name: 'Recorders' }));
-  return screen.findByRole('region', { name: 'Trade tick recorder' });
+  return screen.findByRole('region', { name: 'Opening-minute bars recorder' });
 }
 
 describe('Services: recorders', () => {
-  it('shows both recorders off, with the reasons and the notice, and reads nothing until opened', async () => {
+  it('shows the recorders off, with the reasons and the notice, and reads nothing until opened', async () => {
     const m = mockRecorders();
     renderServices();
     await screen.findByRole('list', { name: 'Services' });
     expect(m.reads).toEqual([]);
 
-    const ticks = await openSection();
-    const depth = await screen.findByRole('region', { name: 'Depth recorder' });
-    expect(await within(ticks).findByText('Switch OFF')).toBeInTheDocument();
-    expect(within(ticks).getByText('Your switch is OFF.')).toBeInTheDocument();
-    expect(within(ticks).getByText(/Off until the deployment flag/)).toBeInTheDocument();
-    expect(within(depth).getByRole('button', { name: 'Turn on Depth recorder' })).toBeInTheDocument();
-    expect(within(ticks).getByText('The switch was never changed.')).toBeInTheDocument();
+    const opening = await openSection();
+    expect(await within(opening).findByText('Switch OFF')).toBeInTheDocument();
+    expect(within(opening).getByText('Your switch is OFF.')).toBeInTheDocument();
+    expect(within(opening).getByText(/Off until the deployment flag/)).toBeInTheDocument();
+    expect(within(opening).getByRole('button', { name: 'Turn on Opening-minute bars recorder' })).toBeInTheDocument();
+    expect(within(opening).getByText('The switch was never changed.')).toBeInTheDocument();
   });
 
   it('shows an ON recorder with its state and history', async () => {
-    mockRecorders(
-      view(),
-      view({ enabled: true, switchId: 2, state: 'recording', notRunningBecause: [], history: onHistory }),
-    );
+    mockRecorders(view({ enabled: true, switchId: 2, state: 'recording', notRunningBecause: [], history: onHistory }));
     renderServices();
-    const ticks = await openSection();
-    expect(await within(ticks).findByText('Switch ON')).toBeInTheDocument();
-    expect(within(ticks).getByText('State: recording')).toBeInTheDocument();
-    expect(within(ticks).getByText('pilot day')).toBeInTheDocument();
-    expect(within(ticks).getByText(/Turned on by owner:me@x.in/)).toBeInTheDocument();
-    expect(within(ticks).getByRole('button', { name: 'Turn off Trade tick recorder' })).toBeInTheDocument();
+    const opening = await openSection();
+    expect(await within(opening).findByText('Switch ON')).toBeInTheDocument();
+    expect(within(opening).getByText('State: recording')).toBeInTheDocument();
+    expect(within(opening).getByText('pilot day')).toBeInTheDocument();
+    expect(within(opening).getByText(/Turned on by owner:me@x.in/)).toBeInTheDocument();
+    expect(within(opening).getByRole('button', { name: 'Turn off Opening-minute bars recorder' })).toBeInTheDocument();
   });
 
   it('sends nothing before confirm or after cancel, then one PUT with the password only in that body', async () => {
     const m = mockRecorders();
     renderServices();
     await openSection();
-    await userEvent.click(await screen.findByRole('button', { name: 'Turn on Trade tick recorder' }));
-    let dialog = await screen.findByRole('dialog', { name: /Turn on the trade tick recorder/ });
+    await userEvent.click(await screen.findByRole('button', { name: 'Turn on Opening-minute bars recorder' }));
+    let dialog = await screen.findByRole('dialog', { name: /Turn on the opening-minute bars recorder/ });
     expect(within(dialog).getByRole('button', { name: 'Turn on' })).toBeDisabled();
     await userEvent.type(within(dialog).getByLabelText(/Reason/), 'pilot day');
     await userEvent.type(within(dialog).getByLabelText(/Password/), 'secret-pw');
@@ -131,23 +112,23 @@ describe('Services: recorders', () => {
     });
     expect(m.puts).toEqual([]);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Turn on Trade tick recorder' }));
-    dialog = await screen.findByRole('dialog', { name: /Turn on the trade tick recorder/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Turn on Opening-minute bars recorder' }));
+    dialog = await screen.findByRole('dialog', { name: /Turn on the opening-minute bars recorder/ });
     expect(within(dialog).getByLabelText(/Password/)).toHaveValue('');
     expect(within(dialog).getByLabelText(/Reason/)).toHaveValue('');
     await userEvent.type(within(dialog).getByLabelText(/Reason/), 'pilot day');
     await userEvent.type(within(dialog).getByLabelText(/Password/), 'secret-pw');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Turn on' }));
     expect(await screen.findByText('The switch was changed.')).toBeInTheDocument();
-    expect(m.puts).toEqual([{ kind: 'ticks', body: { enabled: true, reason: 'pilot day', password: 'secret-pw' } }]);
+    expect(m.puts).toEqual([{ kind: 'opening', body: { enabled: true, reason: 'pilot day', password: 'secret-pw' } }]);
   });
 
   it('turns an ON recorder off with enabled false', async () => {
     const m = mockRecorders(view({ enabled: true, switchId: 2, history: onHistory, notRunningBecause: [] }));
     renderServices();
     await openSection();
-    await userEvent.click(await screen.findByRole('button', { name: 'Turn off Depth recorder' }));
-    const dialog = await screen.findByRole('dialog', { name: /Turn off the depth recorder/ });
+    await userEvent.click(await screen.findByRole('button', { name: 'Turn off Opening-minute bars recorder' }));
+    const dialog = await screen.findByRole('dialog', { name: /Turn off the opening-minute bars recorder/ });
     await userEvent.type(within(dialog).getByLabelText(/Reason/), 'done piloting');
     await userEvent.type(within(dialog).getByLabelText(/Password/), 'secret-pw');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Turn off' }));
@@ -155,7 +136,7 @@ describe('Services: recorders', () => {
       expect(m.puts).toHaveLength(1);
     });
     expect(m.puts[0]).toEqual({
-      kind: 'depth',
+      kind: 'opening',
       body: { enabled: false, reason: 'done piloting', password: 'secret-pw' },
     });
   });
@@ -165,8 +146,8 @@ describe('Services: recorders', () => {
     m.refuse();
     renderServices();
     await openSection();
-    await userEvent.click(await screen.findByRole('button', { name: 'Turn on Depth recorder' }));
-    const dialog = await screen.findByRole('dialog', { name: /Turn on the depth recorder/ });
+    await userEvent.click(await screen.findByRole('button', { name: 'Turn on Opening-minute bars recorder' }));
+    const dialog = await screen.findByRole('dialog', { name: /Turn on the opening-minute bars recorder/ });
     await userEvent.type(within(dialog).getByLabelText(/Reason/), 'why');
     await userEvent.type(within(dialog).getByLabelText(/Password/), 'bad');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Turn on' }));
@@ -179,8 +160,8 @@ describe('Services: recorders', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
     expect(m.puts).toHaveLength(1);
-    await userEvent.click(screen.getByRole('button', { name: 'Turn on Depth recorder' }));
-    const again = await screen.findByRole('dialog', { name: /Turn on the depth recorder/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Turn on Opening-minute bars recorder' }));
+    const again = await screen.findByRole('dialog', { name: /Turn on the opening-minute bars recorder/ });
     expect(within(again).getByLabelText(/Password/)).toHaveValue('');
     expect(within(again).getByLabelText(/Reason/)).toHaveValue('');
     expect(within(again).queryByText('The password is not right.')).not.toBeInTheDocument();
@@ -198,40 +179,12 @@ describe('Services: recorders', () => {
 
   it('says a recorder that could not be read', async () => {
     mockRecorders();
-    server.use(http.get('/api/depth/recorder', () => problemResponse({ title: 'Down', code: 'x' }, 500)));
+    server.use(http.get('/api/options/chain-recorder', () => problemResponse({ title: 'Down', code: 'x' }, 500)));
     renderServices();
-    const ticks = await openSection();
-    expect(await within(ticks).findByText('Switch OFF')).toBeInTheDocument();
-    const depth = screen.getByRole('region', { name: 'Depth recorder' });
-    expect(await within(depth).findByRole('alert')).toBeInTheDocument();
-  });
-});
-
-describe('Services: the tick recorder service', () => {
-  const tick = buildServiceView({
-    id: 'tick-recorder',
-    name: 'Trade tick recorder',
-    enabled: false,
-    status: 'paused',
-    scheduleWords: 'Weekdays 09:14 to 15:31 IST',
-  });
-
-  it('is listed, and Run now shows the refusal the server gives', async () => {
-    const fake = createServicesFake({ services: [tick] });
-    renderServices({
-      fake,
-      handlers: [
-        http.post('/api/services/:id/run', () =>
-          problemResponse(
-            { title: 'This service is started by its own host.', code: 'services.run_now_unavailable' },
-            409,
-          ),
-        ),
-      ],
-    });
-    const card = await screen.findByRole('listitem', { name: 'Trade tick recorder' });
-    await userEvent.click(within(card).getByRole('button', { name: 'Run now: Trade tick recorder' }));
-    expect(await screen.findByText('This service is started by its own host.')).toBeInTheDocument();
+    const opening = await openSection();
+    expect(await within(opening).findByText('Switch OFF')).toBeInTheDocument();
+    const chain = screen.getByRole('region', { name: 'Option chain recorder' });
+    expect(await within(chain).findByRole('alert')).toBeInTheDocument();
   });
 });
 
@@ -249,7 +202,6 @@ describe('Services: the option recorders', () => {
 
   it('shows the backfill progress and the accepted probe', async () => {
     mockRecorders(
-      view(),
       view(),
       buildOptionRecorderView(),
       buildBackfillView({
@@ -296,7 +248,6 @@ describe('Services: the option recorders', () => {
 
   it('turns the chain recorder off with enabled false', async () => {
     const m = mockRecorders(
-      view(),
       view(),
       buildOptionRecorderView({ enabled: true, switchId: 2, notRunningBecause: [], history: onHistory }),
     );

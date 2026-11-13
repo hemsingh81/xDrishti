@@ -49,9 +49,7 @@ public sealed class RecoveryClassTableTests
         ["live-settle"] = RecoveryClass.TimeBound,
         ["live-feed"] = RecoveryClass.TimeBound,
         ["holdings-quotes"] = RecoveryClass.TimeBound,
-        ["tick-recorder"] = RecoveryClass.TimeBound,
         ["opening-bars"] = RecoveryClass.TimeBound,
-        ["depth-recorder"] = RecoveryClass.TimeBound,
         ["option-chain-recorder"] = RecoveryClass.TimeBound,
     };
 

@@ -65,15 +65,6 @@ internal static class BrokerEndpoints
     /// <summary>The query keys of the feed URL, each exactly once and nothing else.</summary>
     public static readonly IReadOnlyList<string> FeedQueryKeys = ["version", "token", "clientId", "authType"];
 
-    /// <summary>
-    /// Dhan's 20-level market depth WebSocket (ADR 0133 and 0135, P7-16; unverified until the first real session): <c>wss://depth-api-feed.dhan.co/twentydepth</c> with exactly the query keys <see cref="DepthQueryKeys"/> - no <c>version</c>. Read-only
-    /// market data on the Data account's token. The 200-level host and every other path stay refused. Checked by <see cref="IsAllowedDepthSocket"/> before the connection is made.
-    /// </summary>
-    public static readonly Uri DhanDepth = new("wss://depth-api-feed.dhan.co/twentydepth");
-
-    /// <summary>The query keys of the depth URL, each exactly once and nothing else (no <c>version</c>).</summary>
-    public static readonly IReadOnlyList<string> DepthQueryKeys = ["token", "clientId", "authType"];
-
     /// <summary>Browser page: Dhan's consent login (query <c>consentAppId</c>).</summary>
     public const string DhanLoginPage = "https://auth.dhan.co/login/consentApp-login";
 
@@ -118,7 +109,6 @@ internal static class BrokerEndpoints
     [
         .. Rules.Select(r => r.Description)
             .Append($"WSS {DhanFeed.Host}?{string.Join('&', FeedQueryKeys.Order(StringComparer.Ordinal))}")
-            .Append($"WSS {DhanDepth.Host}{DhanDepth.AbsolutePath}?{string.Join('&', DepthQueryKeys.Order(StringComparer.Ordinal))}")
             .Order(StringComparer.Ordinal),
     ];
 
@@ -213,17 +203,6 @@ internal static class BrokerEndpoints
     /// a value, in any order, spelled exactly (case matters) - and nothing else.
     /// </summary>
     public static bool IsAllowedWebSocket(Uri? uri) => IsExactSocket(uri, DhanFeed, FeedQueryKeys);
-
-    /// <summary>The URL of the depth feed for a Data account: <c>wss://depth-api-feed.dhan.co/twentydepth?token=…&amp;clientId=…&amp;authType=2</c> (no <c>version</c>). The values are escaped; the result is never logged.</summary>
-    public static Uri BuildDepthUri(string clientId, string token)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(token);
-        return new Uri($"{DhanDepth.Scheme}://{DhanDepth.Host}{DhanDepth.AbsolutePath}?token={Uri.EscapeDataString(token)}&clientId={Uri.EscapeDataString(clientId)}&authType=2");
-    }
-
-    /// <summary>True only for the exact depth endpoint (ADR 0133): scheme <c>wss</c>, host <c>depth-api-feed.dhan.co</c>, the default port, the path <c>/twentydepth</c> and a query of exactly the keys <see cref="DepthQueryKeys"/>, each once with a value, spelled exactly.</summary>
-    public static bool IsAllowedDepthSocket(Uri? uri) => IsExactSocket(uri, DhanDepth, DepthQueryKeys);
 
     private static bool IsExactSocket(Uri? uri, Uri endpoint, IReadOnlyList<string> queryKeys)
     {

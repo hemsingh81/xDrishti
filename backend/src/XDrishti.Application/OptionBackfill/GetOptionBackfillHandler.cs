@@ -1,7 +1,7 @@
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.OptionBackfill;
-using XDrishti.Application.Depth;
 using XDrishti.Application.Platform.Services;
+using XDrishti.Application.Recording;
 
 namespace XDrishti.Application.OptionBackfill;
 
@@ -66,12 +66,12 @@ internal sealed class GetOptionBackfillHandler(IOptionBackfillSwitchStore switch
 
     private static string? Explain(string state) => state switch
     {
-        DepthStates.NoToken => "The Data account has no usable token.",
-        DepthStates.TokenRefused => "Dhan refused the Data account's token; waiting for a new one.",
-        DepthStates.NotSubscribed => "Dhan says the Data APIs are not part of the plan (DH-902); the backfill ended for the day.",
-        DepthStates.DiskBudget => "The stored backfill is over its cap; fetching stopped and nothing was deleted.",
-        DepthStates.DiskFree => "The free disk space is under its floor; fetching stopped and nothing was deleted.",
-        DepthStates.NoInstruments => "No NIFTY, BANKNIFTY or share targets in the option underlyings.",
+        RecorderStates.NoToken => "The Data account has no usable token.",
+        RecorderStates.TokenRefused => "Dhan refused the Data account's token; waiting for a new one.",
+        RecorderStates.NotSubscribed => "Dhan says the Data APIs are not part of the plan (DH-902); the backfill ended for the day.",
+        RecorderStates.DiskBudget => "The stored backfill is over its cap; fetching stopped and nothing was deleted.",
+        RecorderStates.DiskFree => "The free disk space is under its floor; fetching stopped and nothing was deleted.",
+        RecorderStates.NoInstruments => "No NIFTY, BANKNIFTY or share targets in the option underlyings.",
         BackfillStates.OutsideWindow => "It is outside the night window (16:30 to 08:30 India time).",
         BackfillStates.DailyCap => "The day's request cap was reached; it goes on the next India day.",
         BackfillStates.RatePaused => "Dhan rate limited five answers in a row; the backfill waits 15 minutes.",

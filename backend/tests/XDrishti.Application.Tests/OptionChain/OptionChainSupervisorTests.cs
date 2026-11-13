@@ -1,8 +1,8 @@
 using XDrishti.Application.Abstractions.OptionChain;
 using XDrishti.Application.Abstractions.Platform;
-using XDrishti.Application.Depth;
 using XDrishti.Application.Live;
 using XDrishti.Application.OptionChain;
+using XDrishti.Application.Recording;
 using XDrishti.Domain.Platform.Services;
 using static XDrishti.Application.Tests.OptionChain.ChainSamples;
 using static XDrishti.Application.Tests.OptionChain.OptionChainSupervisorWorld;
@@ -28,7 +28,7 @@ public sealed class OptionChainSupervisorTests
         world.Targets.Loads.ShouldBe(0);
         world.Session.Starts.ShouldBe(0);
         world.Runs.ShouldBeEmpty();
-        world.LastState.ShouldBe(DepthStates.Disabled);
+        world.LastState.ShouldBe(RecorderStates.Disabled);
         world.Heartbeats.Reports[^1].Details.DeploymentEnabled.ShouldBeFalse();
     }
 
@@ -41,7 +41,7 @@ public sealed class OptionChainSupervisorTests
 
         world.Credentials.Reads.ShouldBe(0);
         world.Session.Starts.ShouldBe(0);
-        world.LastState.ShouldBe(DepthStates.SwitchOff);
+        world.LastState.ShouldBe(RecorderStates.SwitchOff);
     }
 
     [Fact]
@@ -54,7 +54,7 @@ public sealed class OptionChainSupervisorTests
 
         world.Credentials.Reads.ShouldBe(0);
         world.Session.Starts.ShouldBe(0);
-        world.LastState.ShouldBe(DepthStates.Paused);
+        world.LastState.ShouldBe(RecorderStates.Paused);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class OptionChainSupervisorTests
         await world.TickAsync();
 
         world.Credentials.Reads.ShouldBe(0);
-        world.LastState.ShouldBe(DepthStates.Closed);
+        world.LastState.ShouldBe(RecorderStates.Closed);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class OptionChainSupervisorTests
         await world.TickAsync();
 
         world.Session.Starts.ShouldBe(1);
-        world.LastState.ShouldBe(DepthStates.Paused);
+        world.LastState.ShouldBe(RecorderStates.Paused);
         world.Runs.ShouldHaveSingleItem().Status.ShouldBe(ServiceRunStatus.Succeeded);
     }
 
@@ -96,7 +96,7 @@ public sealed class OptionChainSupervisorTests
         await world.TickAsync();
 
         world.Runs.ShouldHaveSingleItem().Status.ShouldBe(ServiceRunStatus.Succeeded);
-        world.LastState.ShouldBe(DepthStates.SwitchOff);
+        world.LastState.ShouldBe(RecorderStates.SwitchOff);
     }
 
     // ---- the start ----
@@ -113,7 +113,7 @@ public sealed class OptionChainSupervisorTests
         world.Session.LastDay!.Indices.Select(t => t.Symbol).ShouldBe(["NSE:NIFTY", "NSE:BANKNIFTY"], "FINNIFTY has no expiry rule and is not asked");
         world.Session.LastDay.Stocks.Select(t => t.Symbol).ShouldBe(["NSE:RELIANCE"]);
         world.Credentials.Reads.ShouldBe(1);
-        world.LastState.ShouldBe(DepthStates.Recording);
+        world.LastState.ShouldBe(RecorderStates.Recording);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public sealed class OptionChainSupervisorTests
 
         world.Credentials.Reads.ShouldBe(0);
         world.Runs.ShouldHaveSingleItem().Status.ShouldBe(ServiceRunStatus.Skipped);
-        world.LastState.ShouldBe(DepthStates.NoInstruments);
+        world.LastState.ShouldBe(RecorderStates.NoInstruments);
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public sealed class OptionChainSupervisorTests
 
         world.Session.Starts.ShouldBe(0);
         world.Runs.ShouldHaveSingleItem().Message.ShouldBe(OptionChainSupervisor.NoTokenMessage);
-        world.LastState.ShouldBe(DepthStates.NoToken);
+        world.LastState.ShouldBe(RecorderStates.NoToken);
     }
 
     // ---- ends ----
@@ -193,7 +193,7 @@ public sealed class OptionChainSupervisorTests
         world.SetClock(At(12, 9, 23));
         await world.TickAsync();
         world.Session.Starts.ShouldBe(1);
-        world.LastState.ShouldBe(DepthStates.TokenRefused);
+        world.LastState.ShouldBe(RecorderStates.TokenRefused);
 
         world.Credentials.Token = "a-new-token";
         world.SetClock(At(12, 9, 25));
@@ -218,7 +218,7 @@ public sealed class OptionChainSupervisorTests
 
         world.Runs.ShouldHaveSingleItem().Message.ShouldBe(OptionChainSupervisor.NotSubscribedMessage);
         world.Session.Starts.ShouldBe(1, "the day is over for this recorder, whatever the token");
-        world.LastState.ShouldBe(DepthStates.NotSubscribed);
+        world.LastState.ShouldBe(RecorderStates.NotSubscribed);
     }
 
     [Fact]
@@ -257,7 +257,7 @@ public sealed class OptionChainSupervisorTests
         world.Session.Starts.ShouldBe(0, "it stays stopped until the owner resumes");
         world.Credentials.Reads.ShouldBe(0);
         world.Runs.ShouldHaveSingleItem().Status.ShouldBe(ServiceRunStatus.Skipped);
-        world.LastState.ShouldBe(DepthStates.DiskBudget);
+        world.LastState.ShouldBe(RecorderStates.DiskBudget);
     }
 
     [Fact]
@@ -269,7 +269,7 @@ public sealed class OptionChainSupervisorTests
         await world.TickAsync();
 
         world.Session.Starts.ShouldBe(0);
-        world.LastState.ShouldBe(DepthStates.DiskFree);
+        world.LastState.ShouldBe(RecorderStates.DiskFree);
     }
 
     [Fact]
@@ -363,7 +363,7 @@ public sealed class OptionChainSupervisorTests
         await loop;
 
         world.Runs.ShouldHaveSingleItem().Status.ShouldBe(ServiceRunStatus.Succeeded);
-        world.LastState.ShouldBe(DepthStates.Stopped);
+        world.LastState.ShouldBe(RecorderStates.Stopped);
     }
 
     [Fact]

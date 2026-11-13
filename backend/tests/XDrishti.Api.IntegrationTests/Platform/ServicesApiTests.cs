@@ -157,13 +157,13 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
 
         var list = await response.ReadAsync<ServiceList>(Ct);
 
-        list.Items.Select(s => s.Id).ShouldBe(["live-capture", "live-settle", "live-estimates", "eod", "instrument-master", "holdings-quotes", "portfolio-broker-history", "nightly", "suggestions", "review-cutoff", "preopen", "system-baskets", "derived-baskets", "opening-bars", "plan-expiry", "paper-capture", "shadow-write", "shadow-grade", "shadow-digest", "decay-monitor", "ml-monitor", "holdout-epochs", "cells-refresh", "weekly", "briefing", "weekly-review", "proposals", "learned-settings", "paper-review", "live-feed", "depth-recorder", "tick-recorder", "option-chain-recorder", "options-backfill", "options-quality", "filings-ingest", "history-eod", "history-backfill", "post-trade-prompts", "readiness-snapshot", "fake-job", "account-sync"]);
+        list.Items.Select(s => s.Id).ShouldBe(["live-capture", "live-settle", "live-estimates", "eod", "instrument-master", "holdings-quotes", "portfolio-broker-history", "nightly", "suggestions", "review-cutoff", "preopen", "system-baskets", "derived-baskets", "opening-bars", "plan-expiry", "paper-capture", "shadow-write", "shadow-grade", "shadow-digest", "decay-monitor", "ml-monitor", "holdout-epochs", "cells-refresh", "weekly", "briefing", "weekly-review", "proposals", "learned-settings", "paper-review", "live-feed", "option-chain-recorder", "options-backfill", "options-quality", "filings-ingest", "history-eod", "history-backfill", "post-trade-prompts", "readiness-snapshot", "fake-job", "account-sync"]);
         var feed = list.Items.Single(s => s.Id == "live-feed");
         (feed.Name, feed.RunsAs, feed.Enabled, feed.Schedule.Type, feed.Schedule.From, feed.Schedule.To).ShouldBe(("Live feed", "xd-feed", true, "window", "09:00", "15:35")); // run by xd-feed, shown and edited here
         feed.Live.ShouldNotBeNull();
-        var depth = list.Items.Single(s => s.Id == "depth-recorder");
-        (depth.RunsAs, depth.Enabled, depth.Schedule.Type, depth.Schedule.From, depth.Schedule.To).ShouldBe(("xd-feed", false, "window", "09:14", "15:31")); // starts paused, run by xd-feed
-        depth.Live.ShouldBeNull(); // the live feed's health and manual run are not the depth recorder's
+        var chain = list.Items.Single(s => s.Id == "option-chain-recorder");
+        (chain.RunsAs, chain.Enabled).ShouldBe(("xd-feed", false)); // starts paused, run by xd-feed
+        chain.Live.ShouldBeNull(); // the live feed's health and manual run are not the recorder's
         var fake = list.Items.Single(s => s.Id == FakeJobService.Id);
         (fake.Name, fake.RunsAs, fake.Enabled, fake.Status, fake.IsDefault, fake.Revision, fake.NextRun).ShouldBe(("Fake job", "xd-test", true, "healthy", true, 0L, new DateTimeOffset(2026, 10, 13, 10, 0, 0, TimeSpan.FromMinutes(330))));
         fake.Parameters.Single().Name.ShouldBe("lookback");

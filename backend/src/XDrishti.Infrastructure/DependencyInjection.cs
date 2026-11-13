@@ -12,7 +12,6 @@ using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Capabilities;
 using XDrishti.Application.Abstractions.ChargeSheet;
 using XDrishti.Application.Abstractions.Confidence;
-using XDrishti.Application.Abstractions.Depth;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
@@ -35,7 +34,6 @@ using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Abstractions.Shadow;
 using XDrishti.Application.Abstractions.SimAll;
-using XDrishti.Application.Abstractions.Ticks;
 using XDrishti.Application.Execution;
 using XDrishti.Application.Market.Bars.Dhan;
 using XDrishti.Application.Market.Strength;
@@ -52,7 +50,6 @@ using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Capabilities;
 using XDrishti.Infrastructure.Confidence;
-using XDrishti.Infrastructure.Depth;
 using XDrishti.Infrastructure.Execution;
 using XDrishti.Infrastructure.Lab;
 using XDrishti.Infrastructure.Learning;
@@ -76,7 +73,6 @@ using XDrishti.Infrastructure.Platform;
 using XDrishti.Infrastructure.Portfolio;
 using XDrishti.Infrastructure.Reporting;
 using XDrishti.Infrastructure.Research;
-using XDrishti.Infrastructure.Ticks;
 
 namespace XDrishti.Infrastructure;
 
@@ -332,11 +328,9 @@ public static class DependencyInjection
         services.AddScoped<IExecutionRecordsReader, ExecutionRecordsReader>(); // the phase check's read-only SQL over the execution tables (P12-12)
         services.AddScoped<IExecutionScreenReader, ExecutionScreenReader>(); // the execution screens' bounded reads, SELECT only (P12-10)
         services.AddScoped<IExecutionFactsReader, ExecutionFactsReader>(); // the execution service's heartbeat and record, read only (P12-01b)
-        services.AddScoped<IDepthSwitchStore, DepthSwitchStore>(); // the owner's depth-recorder switch, insert-only; no row = OFF (P7-16)
         services.AddScoped<IOpeningBarsQueries, OpeningBarsQueries>(); // BK-03b: what the derived job reads of the opening minutes (live rows, history, the day's events)
         services.AddScoped<IOpeningBarsStore, OpeningBarsStore>(); // BK-03b: insert-only writes of the opening-minute bars and events
         services.AddScoped<IOpeningBarsSwitchStore, OpeningBarsSwitchStore>(); // BK-03b: the owner's switch baskets.opening_bars, insert-only; no row = OFF
-        services.AddScoped<ITickSwitchStore, TickSwitchStore>(); // the owner's tick-recorder switch, insert-only; no row = OFF (P7-16b)
         services.AddScoped<IOptionChainSwitchStore, OptionChainSwitchStore>(); // the owner's option-chain-recorder switch, insert-only; no row = OFF (P14-02)
         services.AddScoped<IOptionBackfillSwitchStore, OptionBackfillSwitchStore>(); // the owner's expired-options-backfill switch, insert-only; no row = OFF (P14-03)
         services.AddScoped<IBackfillProbeAckStore, BackfillProbeAckStore>(); // the owner's acceptance of the probe result, insert-only; no row = not accepted (P14-03)
@@ -752,32 +746,10 @@ public static class DependencyInjection
         return services;
     }
 
-    /// <summary>
-    /// The adapters of the depth recorder (P7-16) - for the <c>xd-feed</c> host: the Dhan 20-level depth connector (behind its own allow-list entry), the write-only depth store and the read-only liquidity ranking. No port here reads a depth row.
-    /// </summary>
-    public static IServiceCollection AddDepthRecording(this IServiceCollection services)
-    {
-        services.AddSingleton<IDepthFeedConnector, DhanDepthConnector>();
-        services.AddScoped<IDepthStore, DepthStore>();
-        services.AddScoped<IDepthUniverse, DepthUniverse>();
-        return services;
-    }
-
     /// <summary>The connector of the opening-minute recorder (BK-03b) - for the <c>xd-feed</c> host: a separate socket to the live feed's allowed host, no new allow-list entry. The stores are registered with the rest of the infrastructure.</summary>
     public static IServiceCollection AddOpeningBarsRecording(this IServiceCollection services)
     {
         services.AddSingleton<IOpeningBarsFeedConnector, OpeningBarsFeedConnector>();
-        return services;
-    }
-
-    /// <summary>
-    /// The adapters of the trade-tick recorder (P7-16b) - for the <c>xd-feed</c> host: its own feed connector (a second socket to the live feed's allowed host, no new allow-list entry), the write-only tick store and the owner's switch store. No port here
-    /// reads a tick row. The depth universe it builds a set from when depth is off comes from <see cref="AddDepthRecording"/>.
-    /// </summary>
-    public static IServiceCollection AddTickRecording(this IServiceCollection services)
-    {
-        services.AddSingleton<ITickFeedConnector, TickFeedConnector>();
-        services.AddScoped<ITickStore, TickStore>();
         return services;
     }
 

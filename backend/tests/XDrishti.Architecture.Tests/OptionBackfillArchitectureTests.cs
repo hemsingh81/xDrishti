@@ -32,8 +32,6 @@ public sealed class OptionBackfillArchitectureTests
     [InlineData("XDrishti.Application.Lab")]
     [InlineData("XDrishti.Application.Reporting")]
     [InlineData("XDrishti.Application.Paper")]
-    [InlineData("XDrishti.Application.Depth")]
-    [InlineData("XDrishti.Application.Ticks")]
     [InlineData("XDrishti.Application.OptionChain")]
     public void The_decision_live_and_recorder_code_references_no_backfill_type(string area)
     {
@@ -92,10 +90,6 @@ public sealed class OptionBackfillArchitectureTests
         types.ShouldNotContain(t => provider.IsAssignableFrom(t));
 
         var result = Types.InAssembly(Application).That().ResideInNamespace("XDrishti.Application.OptionBackfill").ShouldNot().HaveDependencyOnAny(
-            "XDrishti.Application.Abstractions.Depth.IDepthStore",
-            "XDrishti.Application.Abstractions.Depth.IDepthSwitchStore",
-            "XDrishti.Application.Abstractions.Ticks",
-            "XDrishti.Application.Ticks",
             "XDrishti.Application.Abstractions.OptionChain",
             "XDrishti.Application.OptionChain",
             "XDrishti.Application.Abstractions.Planning",

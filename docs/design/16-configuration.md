@@ -320,7 +320,6 @@ reports: { default_range_days: 90, weekly_pack: true }
 execution:     { enabled: false, broker_side_stop_required: true, max_orders_per_second: 2, price_band_pct: 2.0 }
 # As built (P12-09, ADR 0167): auto_live keys exec.auto_live_allow_auto_approved false, exec.auto_live_require_day_unlock true, exec.auto_live_require_attended true,
 # exec.auto_live_attended_min 10 (1..30); the per-account limits sheet is a record (execution.limits), empty by default, and an empty sheet allows nothing.
-feed_recorder: { enabled: false, depth_levels: 20, max_instruments: 50 }
 options:       { enabled: false, underlyings: [NIFTY, BANKNIFTY], structures: [option_buy, debit_spread, credit_spread] }
 fundamentals:  { enabled: false, quality_filter: { min_profit_quarters_of_last_4: 3, max_promoter_pledge_pct: 25 } }
 ```
@@ -420,32 +419,7 @@ Live:
   ManualRunMinutes: 30           # 1–240: how long Run now keeps the connection open outside the window
 ```
 
-### Depth recorder (`Depth:*`, [ADR 0135](../adr/0135-the-depth-recorder-stores-the-20-level-book-of-up-to-50-shares-about-once-a-second-behind-three-gates-a-disk-guard-and-no-reader.md), P7-16)
-
-`appsettings.json` / environment of `xd-feed` (`Depth__Enabled`; compose passes `XD_DEPTH_ENABLED`); bounds are checked at start-up. **Off by default, three gates:** this deployment flag (restart to change), the owner's stored switch (`PUT /api/depth/recorder`, the password typed again for every change, ON and OFF) and the service `depth-recorder` (starts paused; window 09:14–15:31 on trading days, edited on the Services screen). Only 09:15:00–15:30:00 is stored.
-
-```yaml
-Depth:
-  Enabled: false          # the deployment gate; false = nothing is read, built or opened
-  MaxInstruments: 50      # 1–50: Dhan allows 50 on one 20-level connection
-  MaxArmed: 20            # 0–50: how many of them are today's armed tickets (rank order), then PinnedSymbols, then the most liquid
-  PinnedSymbols: []       # canonical symbols always recorded, e.g. ["NSE:RELIANCE"]
-  SampleMs: 1000          # 500–5000: at most one snapshot per instrument per this long, only when the book changed
-  FlushSeconds: 5         # 1–30: how often the queue is written (COPY); rows unwritten for 30 s are dropped, oldest first
-  MaxStoredGb: 40         # 1–500: the stored size above which recording stops (the app never deletes data)
-  MinFreeGb: 20           # 5–500: free disk space below which recording stops
-```
-
-### Trade-tick recorder (`Ticks:*`, [ADR 0173](../adr/0173-the-trade-tick-recorder-stores-last-trade-updates-of-the-depth-set-when-cumulative-volume-rises-on-a-second-quote-socket-behind-three-gates-its-own-cap-and-no-reader.md), P7-16b)
-
-`appsettings.json` / environment of `xd-feed` (`Ticks__Enabled`; compose passes `XD_TICKS_ENABLED`); bounds are checked at start-up. **Off by default, three gates:** this deployment flag (restart to change), the owner's stored switch (`PUT /api/ticks/recorder`, the password typed again for every change, ON and OFF) and the service `tick-recorder` (starts paused; window 09:14–15:31 on trading days). The day's set is the depth recorder's (or built the same way from `Depth:*` when none is stored by 09:14:30); the free-space floor is the shared `Depth:MinFreeGb`. Only 09:15:00–15:30:00 is stored, a row only when the cumulative volume rose.
-
-```yaml
-Ticks:
-  Enabled: false          # the deployment gate; false = nothing is read, built or opened
-  FlushSeconds: 5         # 1–30: how often the queue is written (COPY); rows unwritten for 30 s are dropped, oldest first
-  MaxStoredGb: 12         # 1–500: the stored size of market.trade_ticks above which recording stops (the app never deletes data)
-```
+The depth recorder (`Depth:*`) and the trade-tick recorder (`Ticks:*`) were removed with P13 ([ADR 0288](../adr/0288-p13-tick-and-depth-features-are-dropped-the-depth-and-tick-recorders-are-removed-and-the-feature-set-comparison-stays.md)); the opening-minute recorder has its own free-space floor, `OpeningBars:MinFreeGb` (5–500 GiB, default 20), and the option recorders keep `Options:MinFreeGb`.
 
 ### Option-chain recorder (`Options:*`, [ADR 0176](../adr/0176-the-option-chain-recorder-stores-five-minute-index-chains-and-a-daily-stock-pass-from-two-new-allow-listed-data-api-endpoints-behind-three-gates-its-own-cap-and-no-reader.md), P14-02)
 

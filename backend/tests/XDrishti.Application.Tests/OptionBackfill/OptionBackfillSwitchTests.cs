@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.OptionBackfill;
-using XDrishti.Application.Depth;
 using XDrishti.Application.OptionBackfill;
 using XDrishti.Application.Platform.Services;
+using XDrishti.Application.Recording;
 using XDrishti.Application.Tests.Platform.Services;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Audit;
@@ -127,7 +127,7 @@ public sealed class OptionBackfillSwitchTests
     public async Task With_nothing_stored_the_reasons_name_each_closed_gate()
     {
         var (handler, _, _, beats, _) = Read();
-        beats.Status = Status(DepthStates.Disabled, deployment: false);
+        beats.Status = Status(RecorderStates.Disabled, deployment: false);
 
         var view = await handler.HandleAsync(new GetOptionBackfillQuery(), Ct);
 
@@ -168,7 +168,7 @@ public sealed class OptionBackfillSwitchTests
         ack.Accept();
         data.Store(OptionBackfillService.Id, OptionBackfillService.Definition.Defaults with { Enabled = true });
 
-        beats.Status = Status(DepthStates.DiskBudget);
+        beats.Status = Status(RecorderStates.DiskBudget);
         (await handler.HandleAsync(new GetOptionBackfillQuery(), Ct)).NotRunningBecause.ShouldHaveSingleItem().ShouldContain("nothing was deleted");
         beats.Status = Status(BackfillStates.DailyCap);
         (await handler.HandleAsync(new GetOptionBackfillQuery(), Ct)).NotRunningBecause.ShouldHaveSingleItem().ShouldContain("next India day");
