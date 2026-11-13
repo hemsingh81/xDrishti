@@ -31,7 +31,7 @@ public sealed class MlHoldOutScoresGrantsTests(ResearchGrantsTests.DedicatedServ
         """;
 
     private static string Score(long model, string block, string mode = "owner", string actor = "owner:me@x.test") =>
-        string.Create(CultureInfo.InvariantCulture, $"INSERT INTO research.ml_holdout_scores (model_id, block_start, look_key, row_count, day_count, logloss_model, logloss_baseline, baseline_name, p_better, low, high, policy_effect_r, input_hash, setting_hash, mode, actor, dropped, block_end, look_id) VALUES ({model}, '{block}', 'model-family:tf-1@{block}', 140, 30, 0.652, 0.671, 'cell_rate', 0.97, 0.001, 0.03, 0.04, '{Hash}', '{Hash}', '{mode}', '{actor}', 2, '2027-04-30', '{LookId}')");
+        string.Create(CultureInfo.InvariantCulture, $"INSERT INTO research.ml_holdout_scores (model_id, block_start, look_key, row_count, day_count, logloss_model, logloss_baseline, baseline_name, p_better, low, high, policy_effect_r, input_hash, setting_hash, mode, actor, dropped, block_end, look_id) VALUES ({model}, '{block}', 'model-family:tf-1@{block}', 140, 30, 0.652, 0.671, 'cell_rate', 0.97, 0.001, 0.03, 0.04, '{Hash}', '{Hash}', '{mode}', '{actor}', 2, '{block}'::date + 30, '{LookId}')");
 
     private static string Unlock(string block, bool reused = false) =>
         $"INSERT INTO lab.holdout_unlocks (strategy_id, version, kind, unlocked_at, mode, actor, setting_hash, reused_window, block_start, lab_run_id, result) VALUES ('model-family:tf-1@{block}', 1, 'model', now(), 'owner', 'owner:me@x.test', '{Hash}', {reused.ToString().ToLowerInvariant()}, '{block}', '{LookId}', '{{}}'::jsonb)";

@@ -149,18 +149,22 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
     }
 
     /// <summary>The trades the real engine makes in the block: the probe that fixes which cells exist.</summary>
-    private async Task<List<SimTrade>> ProbeAsync(IServiceProvider sp)
+    private async Task<(List<SimTrade> Trades, List<SimulationRequest> Runnable)> ProbeAsync(IServiceProvider sp)
     {
         var simulation = sp.GetRequiredService<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>();
         var trades = new List<SimTrade>();
+        var runnable = new List<SimulationRequest>();
         foreach (var request in await RequestsAsync(sp))
         {
             var run = await simulation.HandleAsync(new RunSimulationQuery(request), Ct);
-            run.IsSuccess.ShouldBeTrue(run.IsFailure ? run.Error.Message : string.Empty);
-            trades.AddRange(run.Value.Trades.Select(t => t.Trade));
+            if (run.IsSuccess)
+            {
+                runnable.Add(request);
+                trades.AddRange(run.Value.Trades.Select(t => t.Trade));
+            }
         }
 
-        return trades;
+        return (trades, runnable);
     }
 
     /// <summary>Closed training trades before the block for every cell the probe saw: 40 per cell, alternating win and loss (the flipped variant gives the snapshot of the block's first day other figures).</summary>
@@ -217,7 +221,8 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
         var rows = Enumerable.Range(0, 300).Select(i =>
         {
             var features = Enumerable.Range(0, TradeFeatureCatalog.All.Count).Select(_ => random.NextDouble()).ToImmutableArray();
-            return new ValidationRow("r" + i, features[0] > 0.5 ? 1 : 0, 0, new DateOnly(2026, 1, 5).AddDays(i % 40), 0, 0, "c|15m|BUY|swing|simulated|*", features);
+            var date = new DateOnly(2026, 1, 5).AddDays(i / 5);
+            return new ValidationRow("r" + i, features[0] > 0.5 ? 1 : 0, features[0] - 0.5, date, Day.Epoch(date, Day.Minute("09:45")) + i, Day.Epoch(date, Day.Minute("15:00")) + i, "c|15m|BUY|swing|simulated|*", features);
         }).ToList();
         var trained = sp.GetRequiredService<IModelTrainer>().Train(rows);
         trained.IsSuccess.ShouldBeTrue(trained.IsFailure ? trained.Error.Message : string.Empty);
@@ -262,7 +267,7 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
 
     private sealed record World(ModelHoldOutScorer Scorer, ModelHoldOutPass Pass, RecordingBars Bars, RecordingExtractor Extractor);
 
-    private static World Assemble(IServiceProvider sp, List<SimTrade> training, IReadOnlyList<SimulationRequest> requests, bool simAll)
+    private static World Assemble(IServiceProvider sp, List<SimTrade> training, List<SimulationRequest> requests, bool simAll, string tradingStrategy)
     {
         var bars = new RecordingBars(sp.GetRequiredService<IBarStore>());
         var extractor = new RecordingExtractor(sp.GetRequiredService<ITradeFeatureExtractor>());
@@ -282,7 +287,7 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
         var planner = Substitute.For<ISourceRequestPlanner>();
         if (!simAll)
         {
-            var first = requests[0];
+            var first = requests.First(r => r.StrategyId == tradingStrategy);
             runs.FindAsync(RunKey, Arg.Any<CancellationToken>()).Returns(new StoredRunHeader(1, RunKey, "sim-5", 8, 5, first.StrategyId, first.StrategyHash!, S, E, "symbols", "x", 2, 2, 0, 0, 0, 0, false, "{}", null, null, 2, new string('2', 64), new string('3', 64), DateTimeOffset.UnixEpoch, "test"));
             runs.ReadRecordTextAsync(RunKey, Arg.Any<CancellationToken>()).Returns("{}");
             planner.PlanAsync(Arg.Any<StoredRunHeader>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(first)));
@@ -312,10 +317,9 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
     private async Task<(long Model, World World, List<SimTrade> Probe)> ArrangeAsync(IServiceProvider sp, bool simAll)
     {
         await SeedWorldAsync();
-        var probe = await ProbeAsync(sp);
+        var (probe, requests) = await ProbeAsync(sp);
         probe.Count.ShouldBeGreaterThan(0, "the real engine must trade on the shaped days, or the probe has no cell to train on");
         var training = TrainingTrades(probe, flipped: false);
-        var requests = await RequestsAsync(sp);
         var model = await RegisterChampionAsync(sp, simAll ? $"sim-all:{JobId}" : $"{RunKey}:swing:simulated");
         if (!simAll)
         {
@@ -323,7 +327,7 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
             await StoreSnapshotAsync(sp, TrainingTrades(probe, flipped: true), S, 'd'); // the first day of the block: never used
         }
 
-        return (model, Assemble(sp, simAll ? training : [], requests, simAll), probe);
+        return (model, Assemble(sp, simAll ? training : [], requests, simAll, probe[0].StrategyId), probe);
     }
 
     private static void AssertNoBarAfterTheBlock(World world)
@@ -371,7 +375,7 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
 
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Code + ": " + result.Error.Message : string.Empty);
         result.Value.Rows.ShouldBeGreaterThan(0);
-        (result.Value.Rows + result.Value.Dropped).ShouldBe(probe.Count);
+        (result.Value.Rows + result.Value.Dropped).ShouldBe(probe.Count(t => t.StrategyId == probe[0].StrategyId), "the one version the stored run names");
         AssertNoBarAfterTheBlock(world);
         (await CountAsync("lab.holdout_unlocks")).ShouldBe(1);
         (await CountAsync("research.ml_holdout_scores")).ShouldBe(1);

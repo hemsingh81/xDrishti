@@ -288,12 +288,17 @@ internal sealed class ModelHoldOutPass(
     private async ValueTask<Result<List<Candidate>>> SimulateAsync(IReadOnlyList<PlannedRun> plan, HoldOutBlock block, CancellationToken cancellationToken)
     {
         var result = new List<Candidate>();
+        var failed = 0;
+        Error? lastFailure = null;
         foreach (var v in plan)
         {
             var run = await simulation.HandleAsync(new RunSimulationQuery(v.Request with { From = block.Start, To = block.HistoryLast, Purpose = RunPurpose.Research }), cancellationToken);
             if (run.IsFailure)
             {
-                return Result.Failure<List<Candidate>>(run.Error);
+                // a version that cannot run (as a failed chunk of the training job) contributes no candidate; if none runs at all the act is refused below
+                failed++;
+                lastFailure = run.Error;
+                continue;
             }
 
             foreach (var rt in run.Value.Trades)
@@ -304,7 +309,7 @@ internal sealed class ModelHoldOutPass(
             }
         }
 
-        return Result.Success(result);
+        return failed == plan.Count && lastFailure is not null ? Result.Failure<List<Candidate>>(lastFailure) : Result.Success(result);
     }
 
     private async ValueTask<IReadOnlyList<Guid>> InstrumentsAsync(DateOnly asOf, CancellationToken cancellationToken)
