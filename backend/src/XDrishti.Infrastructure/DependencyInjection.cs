@@ -414,6 +414,9 @@ public static class DependencyInjection
         services.AddScoped<IRegistrationStore, RegistrationStore>(); // the frozen pre-registration of a strategy version (CF-06, ADR 0207)
         services.AddScoped<IPlanFreezeStore, PlanFreezeStore>(); // the frozen plan hash of a version (CF-06)
         services.AddScoped<IHoldOutStore, HoldOutStore>(); // the locked hold-out block and the looks taken (CF-06)
+        services.AddScoped<XDrishti.Infrastructure.HoldOutReplay.HoldOutRegistrationStore>(); // the pre-registrations, results and switches of the system replay over a hold-out block (SR-03)
+        services.AddScoped<XDrishti.Application.Abstractions.Replay.IHoldOutRegistrationStore>(sp => sp.GetRequiredService<XDrishti.Infrastructure.HoldOutReplay.HoldOutRegistrationStore>());
+        services.AddScoped<XDrishti.Application.Abstractions.Replay.IHoldOutAutoSettings>(sp => sp.GetRequiredService<XDrishti.Infrastructure.HoldOutReplay.HoldOutRegistrationStore>());
         services.AddScoped<IVariantStatsStore, VariantStatsStore>(); // the per-variant statistics that give the spread of the trial Sharpe ratios (CF-03, ADR 0205)
         services.AddScoped<ILabRunStore, LabRunStore>(); // the Lab runs and their queue (spec P5-02)
         services.AddSingleton<IStrategyChecker, StrategyChecker>(); // the strategy file library behind its port for the Lab (spec P5-01): stateless, no I/O

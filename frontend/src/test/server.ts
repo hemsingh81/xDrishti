@@ -62,6 +62,9 @@ export const handlers = [
   http.get('/api/assistant/briefings/:kind', () =>
     problemResponse({ title: 'No briefing is stored.', code: 'assistant.briefing_not_found' }, 404),
   ),
+  // Hold-out replay (SR-03): nothing registered, both switches on; its tests bring their own.
+  http.get('/api/replay/holdout-registrations', () => HttpResponse.json([])),
+  http.get('/api/replay/settings', () => HttpResponse.json({ autoRegister: true, autoRun: true })),
   // Hold-out blocks (HO-01b): none fixed; the hold-out tests bring their own.
   http.get('/api/lab/holdout', () =>
     HttpResponse.json({

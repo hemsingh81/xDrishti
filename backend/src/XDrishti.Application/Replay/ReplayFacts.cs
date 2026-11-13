@@ -65,7 +65,7 @@ internal sealed class ReplayFacts(
 
     private static readonly TimeSpan IndiaOffset = TimeSpan.FromHours(5.5);
 
-    private readonly ClampedBars _bars = new(holdOut, holdOutOptions, minuteBars, seams, dayBars, options.ReadAheadSessions);
+    private ClampedBars _bars = new(holdOut, holdOutOptions, minuteBars, seams, dayBars, options.ReadAheadSessions);
     private readonly Dictionary<string, StoredVersion?> _startVersions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<StoredVersion>> _allVersions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<ChangelogEntry>> _histories = new(StringComparer.Ordinal);
@@ -79,6 +79,9 @@ internal sealed class ReplayFacts(
     private IReadOnlyList<CellInput>? _learningInputs;
     private ReplaySettingsSnapshot? _settings;
     private TradingCalendar? _calendar;
+
+    /// <summary>SR-03: reads through the reader of a claimed hold-out block (up to its end) instead of the training clamp. Only the system-replay runner calls it, after the claim; call before <see cref="BeginRun"/>.</summary>
+    internal void UseBlock(HoldOut.HoldOutBlockReader reader) => _bars = new ClampedBars(holdOut, holdOutOptions, minuteBars, seams, dayBars, options.ReadAheadSessions, reader);
 
     public ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken) => _bars.LastReadableAsync(cancellationToken);
 

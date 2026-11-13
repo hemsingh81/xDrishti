@@ -40,6 +40,21 @@ internal sealed class CostSheetStore(XDrishtiDbContext db) : ICostSheetStore
             : Result.Failure<CostSheet>(CostErrors.SheetInvalid("id", CostErrors.InvalidValue, "The stored text names another sheet than its key."));
     }
 
+    public async ValueTask<IReadOnlyList<CostSheet>> ListCheckedAsync(CancellationToken cancellationToken)
+    {
+        var rows = await db.AppSettings.AsNoTracking().Where(x => x.Id.StartsWith(AppSettingKeys.CostSheetPrefix)).OrderByDescending(x => x.UpdatedAt).Select(x => x.Value).ToListAsync(cancellationToken);
+        var sheets = new List<CostSheet>();
+        foreach (var text in rows)
+        {
+            if (CostSheetJson.Parse(text) is { IsSuccess: true } parsed && parsed.Value.Checked is not null && !parsed.Value.IsTest)
+            {
+                sheets.Add(parsed.Value);
+            }
+        }
+
+        return sheets;
+    }
+
     public async ValueTask SaveAsync(CostSheet sheet, string actor, DateTimeOffset now, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(sheet);

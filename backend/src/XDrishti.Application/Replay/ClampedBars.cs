@@ -12,7 +12,7 @@ namespace XDrishti.Application.Replay;
 /// The only way the replay reaches stored bars (SR-01, AC 3): every read is asked for a session <c>cut</c>, and a cut after the hold-out start less one day and less the embargo throws <see cref="ReplayHoldOutException"/> before anything is read. With no hold-out block fixed it
 /// fails closed. A bar after the close of the cut is never returned.
 /// </summary>
-internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options, IBarStore minutes, IBackfillSeams seams, IBarQueries days, int readAheadSessions = 40)
+internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options, IBarStore minutes, IBackfillSeams seams, IBarQueries days, int readAheadSessions = 40, HoldOut.HoldOutBlockReader? block = null)
 {
     private readonly int _readAheadDays = (readAheadSessions * 7 / 5) + 3;
 
@@ -33,8 +33,13 @@ internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options,
             return known;
         }
 
-        var block = await holdOut.CurrentAsync(cancellationToken) ?? throw new ReplayHoldOutException();
-        _last = HoldOutOptions.TrainingCut(block.Start, options.TrainingEmbargoDays); // the one shared cut formula; it moves forward only when the block in force is released (HO-01)
+        if (block is not null)
+        {
+            return (_last = block.End).Value; // the SR-03 reader after its claim: up to the end of the claimed block, never past it
+        }
+
+        var current = await holdOut.CurrentAsync(cancellationToken) ?? throw new ReplayHoldOutException();
+        _last = HoldOutOptions.TrainingCut(current.Start, options.TrainingEmbargoDays); // the one shared cut formula; it moves forward only when the block in force is released (HO-01)
         return _last.Value;
     }
 

@@ -52,6 +52,9 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
     private ActiveRun? _active;
     private bool _recovered;
 
+    /// <summary>Whether a run is in hand now (SR-03: the hold-out replay waits while it is, so two heavy replays never share the memory budget).</summary>
+    public bool Busy => _active is not null;
+
     /// <summary>The loop of the host: recover once, then look every poll interval until the host stops.</summary>
     public async Task RunAsync(CancellationToken stoppingToken)
     {
