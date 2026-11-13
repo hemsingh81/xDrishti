@@ -5,8 +5,15 @@ using XDrishti.Application.Abstractions.Learning;
 namespace XDrishti.Infrastructure.Learning;
 
 /// <summary><c>research.training_sets</c> behind <see cref="ITrainingSetStore"/> (spec P6-04, ADR 0066): raw SQL, insert only (the runtime role has no more). The set id is the idempotency key.</summary>
-internal sealed class TrainingSetStore(NpgsqlDataSource dataSource) : ITrainingSetStore
+internal sealed class TrainingSetStore(NpgsqlDataSource dataSource) : ITrainingSetStore, ITrainingSetSources
 {
+    public async ValueTask<string?> SourcesAsync(string setId, CancellationToken cancellationToken)
+    {
+        await using var select = dataSource.CreateCommand("SELECT sources FROM research.training_sets WHERE set_id = @id");
+        select.Parameters.AddWithValue("id", NpgsqlDbType.Char, setId);
+        return await select.ExecuteScalarAsync(cancellationToken) as string;
+    }
+
     public async ValueTask<bool> StoreAsync(TrainingSetToStore record, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(record);

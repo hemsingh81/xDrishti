@@ -60,8 +60,9 @@ describe('Learning, Models tab', () => {
     expect(dialog.getByText('atr_ratio')).toBeInTheDocument();
     expect(dialog.getByText('Registered.')).toBeInTheDocument();
     expect(dialog.getByText('Advisory: a model changes no plan.')).toBeInTheDocument();
-    // Read only: the only button is the close button.
-    expect(dialog.getAllByRole('button')).toHaveLength(1);
+    // Nothing here writes: the buttons are close and the owner's hold-out score, which asks a password in its own dialog.
+    expect(dialog.getAllByRole('button').map((b) => b.textContent)).toContain('Score on hold-out');
+    expect(dialog.getAllByRole('button')).toHaveLength(2);
   });
 
   it('says so when the calibration list is empty', async () => {

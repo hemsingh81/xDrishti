@@ -28,6 +28,17 @@ public sealed class MlSwitchTests
         MlSwitch.NeedsFreshPassword(influence, autoPromote).ShouldBe(needed);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Any_change_of_the_auto_hold_out_score_needs_a_fresh_password_and_a_missing_value_does_not(bool value)
+    {
+        MlSwitch.AutoHoldOutScore.ShouldBe("ml.holdout.auto_score");
+        MlSwitch.NeedsFreshPassword(null, null, value).ShouldBeTrue();
+        MlSwitch.NeedsFreshPassword(null, null, null).ShouldBeFalse();
+        MlSwitch.IsKnown(MlSwitch.AutoHoldOutScore).ShouldBeFalse("it is not one of the three safety switches");
+    }
+
     private static MlTermResult T(string name, MlTermState state) => new(name, state, state == MlTermState.Holds ? [] : [new MlInfluenceReason("x", "y")]);
 
     private static MlInfluenceResult Result(MlTermState holdOut = MlTermState.Holds, MlTermState forward = MlTermState.Holds, MlTermState alarm = MlTermState.Holds, MlTermState sw = MlTermState.Fails) =>

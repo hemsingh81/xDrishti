@@ -31,18 +31,29 @@ export const holdOutStateLabel = (state: string): string =>
     state,
   );
 
-export type SwitchKey = 'influence' | 'autoPromote' | 'autoRollback';
+export type SwitchKey = 'influence' | 'autoPromote' | 'autoRollback' | 'autoHoldOutScore';
 
-export const switchKeys: readonly SwitchKey[] = ['influence', 'autoPromote', 'autoRollback'];
+export const switchKeys: readonly SwitchKey[] = ['influence', 'autoPromote', 'autoRollback', 'autoHoldOutScore'];
 
 export const switchName = (key: SwitchKey): string =>
-  ({ influence: 'ml.influence.enabled', autoPromote: 'ml.auto_promote', autoRollback: 'ml.auto_rollback' })[key];
+  ({
+    influence: 'ml.influence.enabled',
+    autoPromote: 'ml.auto_promote',
+    autoRollback: 'ml.auto_rollback',
+    autoHoldOutScore: 'ml.holdout.auto_score',
+  })[key];
 
 export const switchTitle = (key: SwitchKey): string =>
-  ({ influence: 'Model influence', autoPromote: 'Automatic promotion', autoRollback: 'Automatic rollback' })[key];
+  ({
+    influence: 'Model influence',
+    autoPromote: 'Automatic promotion',
+    autoRollback: 'Automatic rollback',
+    autoHoldOutScore: 'Automatic hold-out score',
+  })[key];
 
-/** Turning influence or automatic promotion ON asks for a fresh password; every other change does not. */
-export const needsPassword = (key: SwitchKey, on: boolean): boolean => on && key !== 'autoRollback';
+/** Turning influence or automatic promotion ON asks for a fresh password, and so does any change of the automatic hold-out score (ADR 0282); every other change does not. */
+export const needsPassword = (key: SwitchKey, on: boolean): boolean =>
+  key === 'autoHoldOutScore' || (on && key !== 'autoRollback');
 
 /** What each switch means in each position. ON never opens anything alone and no switch places an order. */
 export const switchMeaning = (key: SwitchKey, on: boolean): string => {
@@ -59,6 +70,10 @@ export const switchMeaning = (key: SwitchKey, on: boolean): string => {
       return on
         ? 'ON: the daily run may apply a rollback proposal. The act is recorded as "auto" with the switch row, never as an owner approval. It lowers reliance on ML.'
         : 'OFF (default, manual approval): a trigger only writes a proposal. Nothing moves until the owner applies it.';
+    case 'autoHoldOutScore':
+      return on
+        ? 'ON (default, ADR 0282): on the evening a hold-out block seals, the pre-dated champion is scored on it once, recorded as "auto". The model is chosen by a fixed rule, never by results; it widens nothing and places no order.'
+        : 'OFF: the owner scores a model on the hold-out by hand, from the model drawer.';
   }
 };
 

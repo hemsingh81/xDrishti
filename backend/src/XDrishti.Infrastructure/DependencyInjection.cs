@@ -205,7 +205,10 @@ public static class DependencyInjection
         services.AddScoped<IExtensionExtractionStore, ExtensionExtractionStore>(); // what an extension extraction was built from, insert-only; no decision path reads it (spec P15-05)
         services.AddScoped<IExtensionEvaluationReader>(sp => sp.GetRequiredService<IExtensionEvaluationStore>()); // the read side alone, for the P15 phase check (P15-12)
         services.AddScoped<IExtensionEvaluationStore, ExtensionEvaluationStore>(); // the evaluations of feature extensions, insert-only; the hold-out is read once (spec P13-05)
-        services.AddScoped<ITrainingSetStore, TrainingSetStore>(); // the training-set records (spec P6-04)
+        services.AddScoped<TrainingSetStore>(); // the training-set records (spec P6-04)
+        services.AddScoped<ITrainingSetStore>(sp => sp.GetRequiredService<TrainingSetStore>());
+        services.AddScoped<ITrainingSetSources>(sp => sp.GetRequiredService<TrainingSetStore>()); // what a set was made from (CF-10e part 3)
+        services.AddScoped<IMlHoldOutScores, MlHoldOutScores>(); // the figures of the model hold-out looks (CF-10e part 3, ADR 0285)
         services.AddOptions<ReportBenchmarkOptions>().Bind(configuration.GetSection(ReportBenchmarkOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // basket benchmarks (spec P8-07)
         services.AddScoped(sp => sp.GetRequiredService<IOptions<ReportBenchmarkOptions>>().Value);
         services.AddOptions<BasketProfileSettings>().Bind(configuration.GetSection(BasketProfileSettings.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the basket profile minimums and limits (spec BK-07, ADR 0262)

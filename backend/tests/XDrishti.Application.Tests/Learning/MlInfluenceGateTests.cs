@@ -31,7 +31,9 @@ public sealed class MlInfluenceGateTests
 
     private IMlInfluenceEvidence _evidence = new NoEvidence();
 
-    private MlInfluenceEvaluator Evaluator() => new(_registry, new ModelHoldOutLooks(_holdOuts, _time), _evidence, _switch, _options);
+    private GetMlInfluenceHandler Handler() => new(Evaluator(), new ModelHoldOutLooks(_holdOuts, _time, new MlInfluenceKit.NoScores()), new XDrishti.Application.Lab.HoldOutEpochs(_holdOuts, new XDrishti.Application.Tests.Lab.FixedCalendar(), _time), _options);
+
+    private MlInfluenceEvaluator Evaluator() => new(_registry, new ModelHoldOutLooks(_holdOuts, _time, new MlInfluenceKit.NoScores()), _evidence, _switch, _options);
 
     private MlInfluenceGate Gate() => new(Evaluator(), _checks, _scorer, _time);
 
@@ -91,7 +93,7 @@ public sealed class MlInfluenceGateTests
     public async Task A_spent_hold_out_is_refused_as_holdout_reused()
     {
         _registry.FindAsync(8, Ct).Returns(Model(8, hash: 'b'));
-        await new ModelHoldOutLooks(_holdOuts, _time).ClaimAsync(Model(7), "owner", "owner", new string('d', 64), Ct);
+        await new ModelHoldOutLooks(_holdOuts, _time, new MlInfluenceKit.NoScores()).ClaimAsync(Model(7), "owner", "owner", new string('d', 64), Ct);
 
         var answer = await Gate().AnswerAsync(8, Ct);
 
@@ -139,7 +141,7 @@ public sealed class MlInfluenceGateTests
     public async Task The_view_lists_the_terms_and_reasons_and_changes_nothing()
     {
         _registry.FindAsync(7, Ct).Returns(Model());
-        var handler = new GetMlInfluenceHandler(Evaluator(), _options);
+        var handler = Handler();
 
         var view = (await handler.HandleAsync(new GetMlInfluenceQuery(7), Ct)).Value;
 
@@ -162,7 +164,7 @@ public sealed class MlInfluenceGateTests
     {
         _registry.FindAsync(7, Ct).Returns(Model(role: ModelRole.Challenger));
 
-        var view = (await new GetMlInfluenceHandler(Evaluator(), _options).HandleAsync(new GetMlInfluenceQuery(7), Ct)).Value;
+        var view = (await Handler().HandleAsync(new GetMlInfluenceQuery(7), Ct)).Value;
 
         view.Role.ShouldBe("challenger");
         view.Reasons.Select(r => r.Code).ShouldContain("not_champion");
@@ -173,7 +175,7 @@ public sealed class MlInfluenceGateTests
     {
         _registry.FindAsync(99, Ct).Returns((StoredModel?)null);
 
-        var result = await new GetMlInfluenceHandler(Evaluator(), _options).HandleAsync(new GetMlInfluenceQuery(99), Ct);
+        var result = await Handler().HandleAsync(new GetMlInfluenceQuery(99), Ct);
 
         result.Error.Code.ShouldBe(ModelErrors.NotFoundCode);
     }
@@ -194,7 +196,7 @@ public sealed class MlInfluenceGateTests
     private async Task<MlInfluenceGate> AllowingGateAsync(StoredModel model, bool switchOn = true, MlHoldOutFigures? figures = null, MlForwardFacts? forward = null, bool? alarm = false)
     {
         _registry.FindAsync(model.Id, Ct).Returns(model);
-        (await new ModelHoldOutLooks(_holdOuts, _time).ClaimAsync(model, "owner", "owner", new string('d', 64), Ct)).IsSuccess.ShouldBeTrue();
+        (await new ModelHoldOutLooks(_holdOuts, _time, new MlInfluenceKit.NoScores()).ClaimAsync(model, "owner", "owner", new string('d', 64), Ct)).IsSuccess.ShouldBeTrue();
         var evidence = Substitute.For<IMlInfluenceEvidence>();
         evidence.ReadAsync(model, Ct).Returns(new MlInfluenceEvidence(figures ?? new MlHoldOutFigures(150, 0.97, 0.05), forward ?? new MlForwardFacts(40, 6, 0.1, 3), alarm));
         _evidence = evidence;
@@ -248,7 +250,7 @@ public sealed class MlInfluenceGateTests
     {
         // the figures are good, but the family's look at this block belongs to another model: they are dropped and the term fails as reused
         var other = Model(8, hash: 'b');
-        (await new ModelHoldOutLooks(_holdOuts, _time).ClaimAsync(Model(7), "owner", "owner", new string('d', 64), Ct)).IsSuccess.ShouldBeTrue();
+        (await new ModelHoldOutLooks(_holdOuts, _time, new MlInfluenceKit.NoScores()).ClaimAsync(Model(7), "owner", "owner", new string('d', 64), Ct)).IsSuccess.ShouldBeTrue();
         _registry.FindAsync(8, Ct).Returns(other);
         var evidence = Substitute.For<IMlInfluenceEvidence>();
         evidence.ReadAsync(other, Ct).Returns(new MlInfluenceEvidence(new MlHoldOutFigures(150, 0.99, 1), new MlForwardFacts(40, 6, 0.1, 3), false));
@@ -270,7 +272,7 @@ public sealed class MlInfluenceGateTests
         await _checks.AppendIfChangedAsync(Arg.Do<MlInfluenceCheck>(c => seen = c), Ct);
 
         await Gate().AnswerAsync(7, Ct);
-        var view = (await new GetMlInfluenceHandler(Evaluator(), _options).HandleAsync(new GetMlInfluenceQuery(7), Ct)).Value;
+        var view = (await Handler().HandleAsync(new GetMlInfluenceQuery(7), Ct)).Value;
 
         view.Terms.Select(t => t.Name).ShouldBe(seen!.Terms.Select(t => t.Name));
         view.Terms.Select(t => t.Name).ShouldContain("IsChampion");

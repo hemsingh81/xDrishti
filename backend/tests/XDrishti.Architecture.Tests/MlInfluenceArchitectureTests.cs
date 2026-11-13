@@ -38,6 +38,7 @@ public sealed class MlInfluenceArchitectureTests
         typeof(IMlInfluenceChecks).FullName!, typeof(IMlInfluenceSwitch).FullName!, typeof(IMlInfluenceEvidence).FullName!, typeof(MlInfluence).FullName!,
         "XDrishti.Application.Learning.ScoreWithModelQuery", "XDrishti.Application.Learning.ScoreWithModelHandler", "XDrishti.Application.Learning.ModelScoreView",
         "XDrishti.Application.Learning.MlInfluenceEvaluator", "XDrishti.Application.Learning.ModelHoldOutLooks", "XDrishti.Application.Learning.MlInfluenceGate",
+        "XDrishti.Application.Learning.ModelHoldOutScorer", "XDrishti.Application.Learning.IModelHoldOutPass", "XDrishti.Application.Learning.ModelHoldOutPass", "XDrishti.Application.Abstractions.Learning.IMlHoldOutScores", // CF-10e part 3: the model's hold-out look is named by none of the deciders
         "XDrishti.Application.Shadow.ShadowPlanFacts", // its AdvisoryPWin(NewPlanItem) parses the model's figure back out of a plan item
     ];
 
@@ -273,6 +274,19 @@ public sealed class MlInfluenceArchitectureTests
         Dependents(Production, typeof(IMlInfluenceEvidence))
             .ShouldBe(["XDrishti.Application.DependencyInjection", "XDrishti.Application.Learning.MlInfluenceEvaluator", "XDrishti.Application.Learning.ShadowMlInfluenceEvidence"]);
         Implementations([typeof(MlInfluenceEvidenceSentinel).Assembly], typeof(IMlInfluenceEvidence)).ShouldContain(typeof(MlInfluenceEvidenceSentinel).FullName!);
+    }
+
+    [Fact]
+    public void Only_the_scorer_names_the_model_hold_out_pass_and_no_look_names_an_order_or_execution_type()
+    {
+        // CF-10e part 3 (ADR 0285): the pass over the hold-out block is the second reader of it, reached from the scorer only (the owner handler and the seal step go through the scorer)
+        var users = Types.InAssembly(Application).That().HaveDependencyOnAny("XDrishti.Application.Learning.IModelHoldOutPass", "XDrishti.Application.Learning.ModelHoldOutPass").GetTypes().Where(t => t.DeclaringType is null)
+            .Select(t => t.Name.Split('`')[0]).Where(n => !n.StartsWith('<')).Distinct().Order(StringComparer.Ordinal).ToList();
+        users.ShouldBe(["DependencyInjection", "ModelHoldOutPass", "ModelHoldOutScorer"]);
+
+        var scorer = Types.InAssembly(Application).That().HaveNameMatching("^(ModelHoldOutScorer|ModelHoldOutPass|ModelAutoLookStep|ModelLookSlot|ModelHoldOutCandidates|ScoreModelHoldOutHandler)$").Should()
+            .NotHaveDependencyOnAny("XDrishti.Execution", "XDrishti.Application.Execution", "XDrishti.Application.Abstractions.Brokers", "XDrishti.Infrastructure", "XDrishti.Application.Planning", "XDrishti.Application.Selection", "XDrishti.Application.Autonomy").GetResult();
+        scorer.IsSuccessful.ShouldBeTrue(string.Join(", ", scorer.FailingTypeNames ?? []));
     }
 
     [Fact]

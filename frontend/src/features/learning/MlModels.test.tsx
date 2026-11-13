@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { buildModel, buildModelDetail, mountRecords } from '@/test/learningFixtures';
-import { buildHoldingInfluence, buildRollback, buildSettings } from '@/test/mlFixtures';
+import { buildHoldingInfluence, buildInfluence, buildRollback, buildSettings } from '@/test/mlFixtures';
 import { pinClock } from '@/test/pinClock';
 import { server } from '@/test/server';
 import { renderLearning } from './testing';
@@ -41,7 +41,9 @@ describe('Models drawer, calibration and influence', () => {
     const odds = dialog.getByText('Odds of beating the best no-ML baseline').nextElementSibling;
     expect(odds).toHaveTextContent('Not available');
     expect(odds).not.toHaveTextContent(/\d/);
-    expect(dialog.getByText('Interval').nextElementSibling).toHaveTextContent('Not available');
+    expect(dialog.getByText('Interval of the gain over the baseline').nextElementSibling).toHaveTextContent(
+      'Not available',
+    );
 
     // Calibration: the stored error is shown, the rest says why it is missing.
     expect(dialog.getByText('Pooled calibration error').nextElementSibling).toHaveTextContent('2.50 percentage points');
@@ -50,16 +52,19 @@ describe('Models drawer, calibration and influence', () => {
     );
     expect(dialog.getByText('Ladder rung').nextElementSibling).toHaveTextContent('Not available');
 
-    // The three switches, OFF, read only here.
+    // Three switches OFF and the automatic hold-out score ON (ADR 0282), read only here.
     const switches = within(dialog.getByRole('list', { name: 'ML switches' }));
     expect(switches.getAllByText('OFF')).toHaveLength(3);
-    expect(dialog.getAllByRole('button')).toHaveLength(1);
+    expect(dialog.getAllByRole('button')).toHaveLength(2); // close, and the owner's hold-out score
   });
 
   it('shows a model whose terms hold, with small figures at four decimals', async () => {
     mountRecords({
       ...models(),
-      ml: { influence: buildHoldingInfluence(), settings: buildSettings({ influenceEnabled: true }) },
+      ml: {
+        influence: buildHoldingInfluence(),
+        settings: buildSettings({ influenceEnabled: true, autoHoldOutScore: false }),
+      },
     });
     renderLearning('?tab=models&model=2');
     const dialog = within(await screen.findByRole('dialog', { name: 'Model #2' }));
@@ -261,7 +266,14 @@ describe('Models tab, ML switches and rollback', () => {
 
     expect(await dialog.findByText(/Saved: ml\.influence\.enabled is now ON/)).toBeInTheDocument();
     expect(ml.switchBodies).toEqual([
-      { influenceEnabled: true, autoPromote: null, autoRollback: null, reason: 'trial', password: 'correct-horse' },
+      {
+        influenceEnabled: true,
+        autoPromote: null,
+        autoRollback: null,
+        autoHoldOutScore: null,
+        reason: 'trial',
+        password: 'correct-horse',
+      },
     ]);
     expect(dialog.queryByLabelText(/^Your password for this change/)).toBeNull();
     await userEvent.click(dialog.getByRole('button', { name: 'Done' }));
@@ -292,7 +304,14 @@ describe('Models tab, ML switches and rollback', () => {
     await userEvent.click(dialog.getByRole('button', { name: 'Turn automatic rollback ON' }));
     await dialog.findByText(/Saved: ml\.auto_rollback is now ON/);
     expect(ml.switchBodies).toEqual([
-      { influenceEnabled: null, autoPromote: null, autoRollback: true, reason: 'less reliance', password: null },
+      {
+        influenceEnabled: null,
+        autoPromote: null,
+        autoRollback: true,
+        autoHoldOutScore: null,
+        reason: 'less reliance',
+        password: null,
+      },
     ]);
   });
 
@@ -309,9 +328,98 @@ describe('Models tab, ML switches and rollback', () => {
       influenceEnabled: false,
       autoPromote: null,
       autoRollback: null,
+      autoHoldOutScore: null,
       reason: 'enough',
       password: null,
     });
+  });
+
+  it('asks a password for any change of the automatic hold-out score, OFF included, and sends only that switch', async () => {
+    const { ml } = mountRecords(models());
+    renderLearning('?tab=models');
+    await userEvent.click(await screen.findByRole('button', { name: 'Turn off automatic hold-out score' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Turn automatic hold-out score OFF' }));
+    const submit = dialog.getByRole('button', { name: 'Turn automatic hold-out score OFF' });
+
+    await userEvent.type(dialog.getByLabelText(/^Reason/), 'I will choose myself');
+    expect(submit).toBeDisabled();
+    await userEvent.type(dialog.getByLabelText(/^Your password for this change/), 'pw');
+    await userEvent.click(submit);
+
+    await dialog.findByText(/Saved: ml\.holdout\.auto_score is now OFF/);
+    expect(ml.switchBodies).toEqual([
+      {
+        influenceEnabled: null,
+        autoPromote: null,
+        autoRollback: null,
+        autoHoldOutScore: false,
+        reason: 'I will choose myself',
+        password: 'pw',
+      },
+    ]);
+  });
+
+  it('scores a kept model on the hold-out only behind a password and then reads the figures again', async () => {
+    const { ml } = mountRecords(models());
+    renderLearning('?tab=models&model=2');
+    const drawer = within(await screen.findByRole('dialog', { name: 'Model #2' }));
+    await userEvent.click(await drawer.findByRole('button', { name: 'Score on hold-out' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Score model #2 on the hold-out' }));
+    const submit = dialog.getByRole('button', { name: 'Score on hold-out' });
+
+    expect(submit).toBeDisabled();
+    await userEvent.type(dialog.getByLabelText(/^Your password for this act/), 'pw');
+    await userEvent.click(submit);
+
+    expect(
+      await dialog.findByText(/Scored on 140 hold-out candidates of the block from 2026-10-31/),
+    ).toBeInTheDocument();
+    expect(ml.scoreBodies).toEqual([{ id: 2, password: 'pw' }]);
+    expect(dialog.queryByLabelText(/^Your password for this act/)).toBeNull();
+  });
+
+  it('says a refused look as the server sent it and offers no second try as a pass', async () => {
+    const { ml } = mountRecords(models());
+    ml.refuse = { status: 409, code: 'learning.holdout_reused', title: 'The family already looked.' };
+    renderLearning('?tab=models&model=2');
+    const drawer = within(await screen.findByRole('dialog', { name: 'Model #2' }));
+    await userEvent.click(await drawer.findByRole('button', { name: 'Score on hold-out' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Score model #2 on the hold-out' }));
+    await userEvent.type(dialog.getByLabelText(/^Your password for this act/), 'pw');
+    await userEvent.click(dialog.getByRole('button', { name: 'Score on hold-out' }));
+
+    expect(await dialog.findByRole('alert')).toHaveTextContent(/learning\.holdout_reused/);
+    expect(dialog.getByLabelText(/^Your password for this act/)).toHaveValue('');
+  });
+
+  it('offers no score button while the block fills or the family has looked (the server says canScore false)', async () => {
+    mountRecords({
+      ...models(),
+      ml: { influence: buildInfluence({ holdOut: { ...buildInfluence().holdOut, canScore: false } }) },
+    });
+    renderLearning('?tab=models&model=2');
+    const drawer = within(await screen.findByRole('dialog', { name: 'Model #2' }));
+
+    expect(await drawer.findByText(/Kept: not looked at yet/)).toBeInTheDocument();
+    expect(drawer.queryByRole('button', { name: 'Score on hold-out' })).toBeNull();
+  });
+
+  it('shows the stored hold-out figures and the interval of a scored model, and no score button', async () => {
+    mountRecords({
+      ...models(),
+      ml: {
+        influence: buildHoldingInfluence(),
+        settings: buildSettings(),
+      },
+    });
+    renderLearning('?tab=models&model=2');
+    const dialog = within(await screen.findByRole('dialog', { name: 'Model #2' }));
+
+    expect(await dialog.findByText('Interval of the gain over the baseline')).toBeInTheDocument();
+    expect(dialog.getByText('Interval of the gain over the baseline').nextElementSibling).toHaveTextContent(
+      '+0.001 to +0.03',
+    );
+    expect(dialog.queryByRole('button', { name: 'Score on hold-out' })).toBeNull();
   });
 
   it('says a wrong password was not accepted, clears it and does not end the session', async () => {

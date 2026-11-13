@@ -100,7 +100,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             }
         }
 
-        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "expression_legs", "expression_runs", "expression_trades", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "ml_influence_checks", "ml_monitor_checks", "ml_switch_settings", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "replay_holdout_registrations", "replay_holdout_results", "replay_holdout_settings", "replay_runs", "replay_sessions", "replay_sweeps", "replay_trades", "rollback_proposals", "sim_all_chunks", "sim_all_jobs", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "sim_training_runs", "trade_features", "trade_features_ext", "training_sets", "training_sim_cell_stats", "universe_settings_changes"]);
+        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "expression_legs", "expression_runs", "expression_trades", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "ml_holdout_scores", "ml_influence_checks", "ml_monitor_checks", "ml_switch_settings", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "replay_holdout_registrations", "replay_holdout_results", "replay_holdout_settings", "replay_runs", "replay_sessions", "replay_sweeps", "replay_trades", "rollback_proposals", "sim_all_chunks", "sim_all_jobs", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "sim_training_runs", "trade_features", "trade_features_ext", "training_sets", "training_sim_cell_stats", "universe_settings_changes"]);
         foreach (var name in names)
         {
             // a rollback proposal is inserted column by column (never as an already-decided row), so the role holds no table-level INSERT on it (RollbackGrantsTests covers its columns)
@@ -271,7 +271,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             (await SqlStateAsync(_app, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
 
-        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(45);
+        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(46);
     }
 
     [Fact]

@@ -127,7 +127,7 @@ internal static class LearnInfluenceCommand
         }
     }
 
-    private static IEnumerable<string> HoldOut(MlHoldOutView h)
+    internal static IEnumerable<string> HoldOut(MlHoldOutView h)
     {
         var block = h.BlockStart is { } b ? b.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "none";
         yield return string.Create(CultureInfo.InvariantCulture, $"hold-out: {LearnReportText.Clean(h.State)} (family {LearnReportText.Clean(h.Family)}, block start {block})");
@@ -144,9 +144,16 @@ internal static class LearnInfluenceCommand
         }
 
         yield return string.Create(CultureInfo.InvariantCulture, $"  effect of the take rule on realised R: {(h.PolicyEffectR is { } e ? LearnReportText.Figure(e) : "unavailable (not a pass)")}");
-        foreach (var line in LearnReportText.Wrap("unavailable: this version has no source for an interval of the hold-out probability. " + LearnReportText.UnavailableNote, "  interval: "))
+        if (h.GainLow is { } low && h.GainHigh is { } high)
         {
-            yield return line;
+            yield return string.Create(CultureInfo.InvariantCulture, $"  interval: the mean log-loss gain over the {LearnReportText.Clean(h.BaselineName ?? "baseline")} baseline lies in [{LearnReportText.Figure(low)}, {LearnReportText.Figure(high)}] (model {LearnReportText.Figure(h.LogLossModel)}, baseline {LearnReportText.Figure(h.LogLossBaseline)}; the look was taken as {LearnReportText.Clean(h.Mode ?? "unknown")})");
+        }
+        else
+        {
+            foreach (var line in LearnReportText.Wrap("unavailable: the model has no stored hold-out figures, or too few trade days for an interval. " + LearnReportText.UnavailableNote, "  interval: "))
+            {
+                yield return line;
+            }
         }
     }
 
@@ -163,7 +170,7 @@ internal static class LearnInfluenceCommand
         }
 
         var s = switches.Value.Settings;
-        yield return "ML switches (all default OFF; turning one on is the owner's act in the app):";
+        yield return "ML switches (the three safety switches default OFF; turning one on is the owner's act in the app):";
         yield return "  ml.influence.enabled: " + (s.InfluenceEnabled
             ? "ON (a model that meets every other term may influence a decision)"
             : "OFF (no model may influence a decision)");
@@ -173,5 +180,8 @@ internal static class LearnInfluenceCommand
         yield return "  ml.auto_rollback: " + (s.AutoRollback
             ? "ON (the daily run demotes a champion whose detector fires, recorded as auto)"
             : "OFF (a rollback proposal waits for the owner)");
+        yield return "  ml.holdout.auto_score: " + (s.AutoHoldOutScore
+            ? "ON (the evening seal service scores the pre-dated champion once per block, recorded as auto; the default of ADR 0282)"
+            : "OFF (the owner scores a model on the hold-out: xd learn holdout-score)");
     }
 }

@@ -83,7 +83,7 @@ internal sealed class SimAllChunkExecutor(
 
         var sheet = await sheets.FindAsync(labSettings.CostSheetId, cancellationToken);
         var costs = sheet.IsSuccess && sheet.Value.Schedules.Count > 0 && sheet.Value.Schedules[0].EffectiveFrom <= job.WindowFrom ? CostChoice.Sheet(sheet.Value.Id) : CostChoice.Gross;
-        var request = new SimulationRequest(chunk.StrategyId, new Dictionary<string, double>(), DefaultTimeframe(chunk.StrategyId, description).ToCode(), job.WindowFrom, job.WindowTo, [chunk.InstrumentId], null, costs, false, null, null, null, null, chunk.StrategyHash, RunPurpose.Training);
+        var request = new SimulationRequest(chunk.StrategyId, new Dictionary<string, double>(), XDrishti.Application.Learning.SimTraining.SimTrainingCells.DefaultTimeframe(engine, chunk.StrategyId, description).ToCode(), job.WindowFrom, job.WindowTo, [chunk.InstrumentId], null, costs, false, null, null, null, null, chunk.StrategyHash, RunPurpose.Training);
         var result = await simulation.HandleAsync(new RunSimulationQuery(request), cancellationToken);
         if (result.IsFailure)
         {
@@ -109,8 +109,4 @@ internal sealed class SimAllChunkExecutor(
         var millis = (long)time.GetElapsedTime(started).TotalMilliseconds;
         return new SimAllChunkResult(SimAllStates.Failed, null, 0, 0, millis, code.Length > 80 ? code[..80] : code, message.Length > 300 ? message[..300] : message);
     }
-
-    private Timeframe DefaultTimeframe(string strategyId, StrategyDescription description) =>
-        engine.BuiltIns.FirstOrDefault(b => string.Equals(b.Id, strategyId, StringComparison.Ordinal))?.DefaultTimeframe
-        ?? (description.Timeframes.Contains(Timeframe.M15) || description.Timeframes.Count == 0 ? Timeframe.M15 : description.Timeframes[0]);
 }

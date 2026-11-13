@@ -20,7 +20,7 @@ public sealed class ModelHoldOutLooksTests
     private (ModelHoldOutLooks Looks, FakeHoldOutStore Store) Make(HoldOutBlock? block)
     {
         var store = new FakeHoldOutStore(block);
-        return (new ModelHoldOutLooks(store, _time), store);
+        return (new ModelHoldOutLooks(store, _time, new NoScores()), store);
     }
 
     [Fact]

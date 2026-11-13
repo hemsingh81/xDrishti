@@ -4,7 +4,7 @@ using NetArchTest.Rules;
 namespace XDrishti.Architecture.Tests;
 
 /// <summary>
-/// Spec CF-06, test plan: the sessions inside the locked hold-out are read by one place only. <c>HoldOutPass</c> (the plain pass over the block) is named by its interface and its registration and by the unlock; no handler, report, dashboard or export names it.
+/// Spec CF-06, test plan: the sessions inside the locked hold-out are read by one place only. <c>HoldOutPass</c> (the plain pass over the block) is named by its interface and its registration and by the unlock; no handler, report, dashboard or export names it. CF-10e part 3 (ADR 0285) adds the one second reader, <c>ModelHoldOutPass</c> (the model's strategy versions, once per block), pinned in <c>MlInfluenceArchitectureTests</c>.
 /// The new Domain types are pure (no I/O, no clock), and no code path of the Lab can place an order.
 /// </summary>
 public sealed class LabHoldOutArchitectureTests

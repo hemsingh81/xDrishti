@@ -4488,7 +4488,7 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** Change the ML switches ml.influence.enabled, ml.auto_promote and ml.auto_rollback (all OFF by default; no row means OFF) as the owner; each change appends an audited row with the owner as actor. A switch that is not given is left alone. Turning ml.influence.enabled or ml.auto_promote ON needs the session, the CSRF token and the password in the body, checked on EVERY such change (403 auth.step_up_required with no password, 401 auth.invalid_credentials, 423 auth.locked); ml.auto_rollback, and turning any switch OFF, needs the session and the CSRF token only. ON opens nothing alone: influence still needs the predicate's evidence terms, an automatic rollback is recorded as actor auto with the setting row, never as an owner approval, and an automatic promotion needs the promotion rule and the predicate without the switch. 400 learning.ml_settings_invalid, 429 auth.rate_limited */
+    /** Change the ML switches ml.influence.enabled, ml.auto_promote and ml.auto_rollback (all OFF by default; no row means OFF) as the owner; each change appends an audited row with the owner as actor. A switch that is not given is left alone. Changing ml.holdout.auto_score (ON by default, ADR 0282) in either direction also needs the password. Turning ml.influence.enabled or ml.auto_promote ON needs the session, the CSRF token and the password in the body, checked on EVERY such change (403 auth.step_up_required with no password, 401 auth.invalid_credentials, 423 auth.locked); ml.auto_rollback, and turning any switch OFF, needs the session and the CSRF token only. ON opens nothing alone: influence still needs the predicate's evidence terms, an automatic rollback is recorded as actor auto with the setting row, never as an owner approval, and an automatic promotion needs the promotion rule and the predicate without the switch. 400 learning.ml_settings_invalid, 429 auth.rate_limited */
     put: operations['ChangeMlSettings'];
     post?: never;
     delete?: never;
@@ -4508,6 +4508,23 @@ export interface paths {
     put?: never;
     /** Promote a model to champion as the owner, with the P6-08 changelog row. A challenger needs 30 graded candidates over 4 weeks, the paired bootstrap against the champion at 0.95, a P6-12 counterfactual that is not FrozenBetter and the champion rule; a retired previous champion is re-promoted only if its latest evaluation still satisfies the predicate without the owner's switch. A figure that is not available is never a pass (the sources of the first three do not exist yet, so every promotion is refused with the reason). Promotion never turns ml.influence.enabled on. Needs a session, the CSRF token and a fresh password in the body. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 404 models.not_found, 409 learning.promotion_refused or learning.repromotion_refused or models.not_eligible, 422 learning.invalid */
     post: operations['PromoteModel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/learning/models/{id}/holdout-score': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Score a model on the locked hold-out as the owner (CF-10e part 3, ADR 0285): claims the model family's one fresh look at the block in force (insert-only, burned even if nothing can be scored), runs the model's strategy versions once over the block and stores the figures (rows, log loss against the better no-ML baseline, the paired day-cluster bootstrap probability and interval, and the effect of the fixed take rule on realised R). The evening seal service does the same, recorded as auto, while ml.holdout.auto_score is on. Needs a session, the CSRF token and a fresh password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 404 models.not_found, 409 learning.holdout_reused (this family, or another model, already took the model slot of this block) or learning.holdout_unavailable (no block, model not kept out of the block, not registered before the block, or inputs missing), 422 learning.holdout_no_rows */
+    post: operations['ScoreModelHoldOut'];
     delete?: never;
     options?: never;
     head?: never;
@@ -17613,6 +17630,86 @@ export interface components {
       date: string;
       time: string;
     };
+    /** @description The body of the owner's hold-out score of a model. The owner is never part of it: the actor comes from the signed-in session. */
+    MlHoldOutScoreRequest: {
+      /** @description The owner's password, re-entered for THIS act. Missing: 403 auth.step_up_required; wrong: 401, counted toward the lockout. */
+      password: null | string;
+    };
+    /** @description `POST /api/learning/models/{id}/holdout-score`: the figures of the model's one look at the locked hold-out (CF-10e part 3, ADR 0285). */
+    MlHoldOutScoreView: {
+      /**
+       * Format: int64
+       * @description The registry id.
+       */
+      modelId: number;
+      /** @description The model family whose one look at the block it is. */
+      family: string;
+      /**
+       * Format: date
+       * @description The first day of the block.
+       */
+      blockStart: string;
+      /** @description `owner` or `auto`. */
+      mode: string;
+      /** @description The owner, or `system:auto-score`. */
+      actor: string;
+      /**
+       * Format: int32
+       * @description Candidates the model scored.
+       */
+      rows: number;
+      /**
+       * Format: int32
+       * @description Distinct trade days.
+       */
+      days: number;
+      /**
+       * Format: int32
+       * @description Candidates that could not be scored (no features or no cell statistics); never imputed.
+       */
+      dropped: number;
+      /**
+       * Format: double
+       * @description The model's mean log loss.
+       */
+      logLossModel: number;
+      /**
+       * Format: double
+       * @description The better no-ML baseline's mean log loss.
+       */
+      logLossBaseline: number;
+      /** @description `base_rate` or `cell_rate`. */
+      baselineName: string;
+      /**
+       * Format: double
+       * @description The paired bootstrap probability that the model beats that baseline, or null when it could not be assessed (not a pass).
+       */
+      probabilityBeatsNoMl: null | number;
+      /**
+       * Format: double
+       * @description The lower end of the interval of the mean log-loss gain, or null.
+       */
+      gainLow: null | number;
+      /**
+       * Format: double
+       * @description The upper end, or null.
+       */
+      gainHigh: null | number;
+      /**
+       * Format: double
+       * @description The effect of the fixed take rule on realised R per candidate.
+       */
+      policyEffectR: number;
+      /** @description SHA-256 of the thresholds and the setting snapshot. */
+      settingHash: string;
+      /** @description SHA-256 of the scored rows. */
+      inputHash: string;
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      scoredAt: string;
+    };
     /** @description Where the model stands with the locked hold-out. */
     MlHoldOutView: {
       /** @description `not_kept`, `kept`, `used` or `reused`. */
@@ -17639,6 +17736,39 @@ export interface components {
        * @description The effect of the take rule on realised R there, or null when not available.
        */
       policyEffectR: null | number;
+      /**
+       * Format: double
+       * @description The model's mean log loss there (CF-10e part 3), or null before the figures were stored.
+       */
+      logLossModel?: null | number;
+      /**
+       * Format: double
+       * @description The better no-ML baseline's mean log loss there, or null.
+       */
+      logLossBaseline?: null | number;
+      /** @description `base_rate` or `cell_rate`, or null. */
+      baselineName?: null | string;
+      /**
+       * Format: double
+       * @description The lower end of the interval of the mean log-loss gain over the baseline, or null.
+       */
+      gainLow?: null | number;
+      /**
+       * Format: double
+       * @description The upper end, or null.
+       */
+      gainHigh?: null | number;
+      /** @description `owner` or `auto` (how the look was taken), or null. */
+      mode?: null | string;
+      /**
+       * @description Whether the owner could take (or finish) the model's look now: the block in force is sealed, the model kept a hold-out before it, and its family has no finished look there. A hint for the button; the act decides.
+       * @default false
+       */
+      canScore: boolean;
+      /** @description How the look ended: `scored`, `no_rows` or `failed` (terminal, no figures), or null while it is open or not taken. */
+      outcome?: null | string;
+      /** @description Why a terminal look ended, or null. */
+      outcomeCode?: null | string;
     };
     /** @description `GET /api/learning/models/{id}/influence`: whether the model may influence a decision, term by term (CF-10 part 10c-2, ADR 0217). */
     MlInfluenceView: {
@@ -17692,6 +17822,8 @@ export interface components {
       reason: null | string;
       /** @description The owner's password, re-entered for THIS change. Required when the change turns ml.influence.enabled or ml.auto_promote ON (missing: 403 auth.step_up_required; wrong: 401, counted toward the lockout); ignored otherwise. */
       password: null | string;
+      /** @description `ml.holdout.auto_score` (ON by the ADR 0282 seed row): whether the evening seal service scores the pre-dated champion on the hold-out block. Any change (OFF or back ON) needs a fresh password. */
+      autoHoldOutScore?: null | boolean;
     };
     /** @description The three ML switches as they stand (all default OFF). */
     MlSettingsView: {
@@ -17716,6 +17848,16 @@ export interface components {
        * @description Its row in force, or null.
        */
       autoRollbackSettingId: null | number;
+      /**
+       * @description `ml.holdout.auto_score` (ON by the ADR 0282 seed row).
+       * @default false
+       */
+      autoHoldOutScore: boolean;
+      /**
+       * Format: int64
+       * @description Its row in force, or null.
+       */
+      autoHoldOutScoreSettingId?: null | number;
     };
     /** @description One of the three ML switches as stored: the newest row of its name, OFF with no id when none exists. */
     MlSwitchState: {
@@ -17735,6 +17877,7 @@ export interface components {
       autoPromote: components['schemas']['MlSwitchState'];
       /** @description `ml.auto_rollback`. */
       autoRollback: components['schemas']['MlSwitchState'];
+      autoHoldOutScore?: null | components['schemas']['MlSwitchState'];
     };
     /** @description One term of the influence predicate. */
     MlTermView: {
@@ -37138,6 +37281,59 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['PromotionOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ScoreModelHoldOut: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MlHoldOutScoreRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MlHoldOutScoreView'];
         };
       };
       /** @description Bad Request */

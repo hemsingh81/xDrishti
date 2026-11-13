@@ -26,7 +26,7 @@ internal sealed class GetRollbackProposalsHandler(IRollbackProposalReader reader
         var s = await switches.CurrentAsync(cancellationToken);
         return Result.Success(new RollbackProposalsView(
             [.. rows.Select(r => new RollbackProposalView(r.Id, r.Proposal.ModelId, r.Proposal.Trigger, r.Proposal.Value, r.Proposal.Limit, r.Proposal.Text, r.Proposal.Cells, r.Proposal.PreviousChampionId, r.Proposal.PreviousQualifies, r.Proposal.SettingsHash, r.ProposedOn, r.ProposedAt, r.State, r.Actor, r.DecidedAt, r.AutoSettingId))],
-            new MlSettingsView(s.Influence.On, s.Influence.Id, s.AutoPromote.On, s.AutoPromote.Id, s.AutoRollback.On, s.AutoRollback.Id),
+            new MlSettingsView(s.Influence.On, s.Influence.Id, s.AutoPromote.On, s.AutoPromote.Id, s.AutoRollback.On, s.AutoRollback.Id, s.AutoHoldOutScore?.On ?? false, s.AutoHoldOutScore?.Id),
             [
                 "A proposal changes nothing by itself. Applying it moves the champion to challenger (shadow); the owner applies it, or the automatic setting ml.auto_rollback does when it is ON (default OFF).",
                 "Re-promotion is always the owner's act with a fresh password. Applying a rollback never re-promotes the previous champion, even when it qualifies: there is no champion until the owner names one. No order is placed by any of this.",

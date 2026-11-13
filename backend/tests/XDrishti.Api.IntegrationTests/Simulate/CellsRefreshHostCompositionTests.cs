@@ -33,6 +33,8 @@ public sealed class CellsRefreshHostCompositionTests(ApiFactory factory)
 
         host.Services.GetRequiredService<ServiceRegistry>().Find("cells-refresh").ShouldNotBeNull();
         scope.ServiceProvider.GetService<ICommandHandler<RefreshCellStatsCommand, RefreshCellStatsOutcome>>().ShouldBeNull();
+        IsRegistered(host.Services, typeof(ISourceRequestPlanner)).ShouldBeTrue("the model's hold-out look (CF-10e part 3) needs the planner in every host");
+        IsRegistered(host.Services, typeof(XDrishti.Application.Learning.IModelHoldOutPass)).ShouldBeTrue();
     }
 
     // shortcut: mirrors the composition in XDrishti.Worker/Program.cs (without the heartbeat lines); if Program.cs gains
@@ -49,7 +51,11 @@ public sealed class CellsRefreshHostCompositionTests(ApiFactory factory)
         using var host = builder.Build();
 
         host.Services.GetRequiredService<ServiceRegistry>().Find("cells-refresh").ShouldNotBeNull();
+        IsRegistered(host.Services, typeof(ISourceRequestPlanner)).ShouldBeTrue();
+        IsRegistered(host.Services, typeof(XDrishti.Application.Learning.IModelHoldOutPass)).ShouldBeTrue();
     }
+
+    private static bool IsRegistered(IServiceProvider services, Type type) => services.GetRequiredService<IServiceProviderIsService>().IsService(type);
 
     [Fact]
     public void The_web_host_resolves_the_refresh_handler_where_the_services_run()

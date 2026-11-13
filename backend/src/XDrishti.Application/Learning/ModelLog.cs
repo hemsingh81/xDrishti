@@ -22,4 +22,16 @@ internal static partial class ModelLog
 
     [LoggerMessage(EventId = 4525, Level = LogLevel.Warning, Message = "learning.model.file_refused {ModelId} {Code}")]
     public static partial void FileRefused(ILogger logger, long modelId, string code);
+
+    [LoggerMessage(EventId = 4526, Level = LogLevel.Information, Message = "learning.model.holdout_scored {ModelId} {Mode}: {Rows} rows, {Dropped} dropped, {Millis} ms")]
+    public static partial void HoldOutScored(ILogger logger, long modelId, string mode, int rows, int dropped, long millis);
+
+    [LoggerMessage(EventId = 4527, Level = LogLevel.Warning, Message = "learning.model.holdout_pass_failed {ModelId} {Code}: the look stays burned")]
+    public static partial void HoldOutPassFailed(ILogger logger, long modelId, string code);
+
+    [LoggerMessage(EventId = 4528, Level = LogLevel.Information, Message = "learning.model.holdout_resumed {ModelId}: the model's own claimed look has no figures yet, so it is finished (not a second look)")]
+    public static partial void HoldOutResumed(ILogger logger, long modelId);
+
+    [LoggerMessage(EventId = 4529, Level = LogLevel.Warning, Message = "learning.model.holdout_terminal {ModelId} {Outcome} {Code}: the look ended without figures")]
+    public static partial void HoldOutTerminal(ILogger logger, long modelId, string outcome, string code);
 }

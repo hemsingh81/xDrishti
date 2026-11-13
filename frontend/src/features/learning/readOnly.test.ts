@@ -14,7 +14,7 @@ const sources = import.meta.glob<string>(['./**/*.{ts,tsx}', '!./**/*.test.{ts,t
 // CF-12: and the lazy password dialog of the execution feature, drawn only by KillActDialog.tsx.
 // CF-10 10d-2b: and the two lazy loaders of the owner acts of the Models tab (ActDialogs.tsx draws them; the write is in owner-acts).
 const allowedImports =
-  /^import \{ useCapability \} from '@\/features\/owner-acts';$|^import \{ BriefingCard \} from '@\/features\/briefing';$|^import \{ loadApplyRollbackDialog, loadMlSwitchDialog \} from '@\/features\/owner-acts';$|^import \{ PasswordReasonDialog \} from '@\/features\/execution';$/gm;
+  /^import \{ useCapability \} from '@\/features\/owner-acts';$|^import \{ BriefingCard \} from '@\/features\/briefing';$|^import \{ loadApplyRollbackDialog, loadHoldOutScoreDialog, loadMlSwitchDialog \} from '@\/features\/owner-acts';$|^import \{ PasswordReasonDialog \} from '@\/features\/execution';$/gm;
 
 /** The text with the one allowed import taken out, then asked for any other feature import. */
 const otherFeatureImports = (text: string): string[] =>
@@ -25,9 +25,11 @@ describe('the allow-list holds exactly one import', () => {
     expect(otherFeatureImports("import { useCapability } from '@/features/owner-acts';")).toEqual([]);
   });
 
-  it('lets the two Models-tab act loaders through', () => {
+  it('lets the three Models-tab act loaders through', () => {
     expect(
-      otherFeatureImports("import { loadApplyRollbackDialog, loadMlSwitchDialog } from '@/features/owner-acts';"),
+      otherFeatureImports(
+        "import { loadApplyRollbackDialog, loadHoldOutScoreDialog, loadMlSwitchDialog } from '@/features/owner-acts';",
+      ),
     ).toEqual([]);
   });
 

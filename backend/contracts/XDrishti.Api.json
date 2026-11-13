@@ -14740,7 +14740,7 @@
         "tags": [
           "Learning"
         ],
-        "summary": "Change the ML switches ml.influence.enabled, ml.auto_promote and ml.auto_rollback (all OFF by default; no row means OFF) as the owner; each change appends an audited row with the owner as actor. A switch that is not given is left alone. Turning ml.influence.enabled or ml.auto_promote ON needs the session, the CSRF token and the password in the body, checked on EVERY such change (403 auth.step_up_required with no password, 401 auth.invalid_credentials, 423 auth.locked); ml.auto_rollback, and turning any switch OFF, needs the session and the CSRF token only. ON opens nothing alone: influence still needs the predicate's evidence terms, an automatic rollback is recorded as actor auto with the setting row, never as an owner approval, and an automatic promotion needs the promotion rule and the predicate without the switch. 400 learning.ml_settings_invalid, 429 auth.rate_limited",
+        "summary": "Change the ML switches ml.influence.enabled, ml.auto_promote and ml.auto_rollback (all OFF by default; no row means OFF) as the owner; each change appends an audited row with the owner as actor. A switch that is not given is left alone. Changing ml.holdout.auto_score (ON by default, ADR 0282) in either direction also needs the password. Turning ml.influence.enabled or ml.auto_promote ON needs the session, the CSRF token and the password in the body, checked on EVERY such change (403 auth.step_up_required with no password, 401 auth.invalid_credentials, 423 auth.locked); ml.auto_rollback, and turning any switch OFF, needs the session and the CSRF token only. ON opens nothing alone: influence still needs the predicate's evidence terms, an automatic rollback is recorded as actor auto with the setting row, never as an owner approval, and an automatic promotion needs the promotion rule and the predicate without the switch. 400 learning.ml_settings_invalid, 429 auth.rate_limited",
         "operationId": "ChangeMlSettings",
         "requestBody": {
           "content": {
@@ -14811,6 +14811,78 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PromotionOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/learning/models/{id}/holdout-score": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Score a model on the locked hold-out as the owner (CF-10e part 3, ADR 0285): claims the model family's one fresh look at the block in force (insert-only, burned even if nothing can be scored), runs the model's strategy versions once over the block and stores the figures (rows, log loss against the better no-ML baseline, the paired day-cluster bootstrap probability and interval, and the effect of the fixed take rule on realised R). The evening seal service does the same, recorded as auto, while ml.holdout.auto_score is on. Needs a session, the CSRF token and a fresh password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 404 models.not_found, 409 learning.holdout_reused (this family, or another model, already took the model slot of this block) or learning.holdout_unavailable (no block, model not kept out of the block, not registered before the block, or inputs missing), 422 learning.holdout_no_rows",
+        "operationId": "ScoreModelHoldOut",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MlHoldOutScoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MlHoldOutScoreView"
                 }
               }
             }
@@ -54704,6 +54776,141 @@
         },
         "description": "A missing minute: the India date and the minute (`HH:mm`)."
       },
+      "MlHoldOutScoreRequest": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS act. Missing: 403 auth.step_up_required; wrong: 401, counted toward the lockout."
+          }
+        },
+        "description": "The body of the owner's hold-out score of a model. The owner is never part of it: the actor comes from the signed-in session."
+      },
+      "MlHoldOutScoreView": {
+        "required": [
+          "modelId",
+          "family",
+          "blockStart",
+          "mode",
+          "actor",
+          "rows",
+          "days",
+          "dropped",
+          "logLossModel",
+          "logLossBaseline",
+          "baselineName",
+          "probabilityBeatsNoMl",
+          "gainLow",
+          "gainHigh",
+          "policyEffectR",
+          "settingHash",
+          "inputHash",
+          "scoredAt"
+        ],
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "integer",
+            "description": "The registry id.",
+            "format": "int64"
+          },
+          "family": {
+            "type": "string",
+            "description": "The model family whose one look at the block it is."
+          },
+          "blockStart": {
+            "type": "string",
+            "description": "The first day of the block.",
+            "format": "date"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`owner` or `auto`."
+          },
+          "actor": {
+            "type": "string",
+            "description": "The owner, or `system:auto-score`."
+          },
+          "rows": {
+            "type": "integer",
+            "description": "Candidates the model scored.",
+            "format": "int32"
+          },
+          "days": {
+            "type": "integer",
+            "description": "Distinct trade days.",
+            "format": "int32"
+          },
+          "dropped": {
+            "type": "integer",
+            "description": "Candidates that could not be scored (no features or no cell statistics); never imputed.",
+            "format": "int32"
+          },
+          "logLossModel": {
+            "type": "number",
+            "description": "The model's mean log loss.",
+            "format": "double"
+          },
+          "logLossBaseline": {
+            "type": "number",
+            "description": "The better no-ML baseline's mean log loss.",
+            "format": "double"
+          },
+          "baselineName": {
+            "type": "string",
+            "description": "`base_rate` or `cell_rate`."
+          },
+          "probabilityBeatsNoMl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The paired bootstrap probability that the model beats that baseline, or null when it could not be assessed (not a pass).",
+            "format": "double"
+          },
+          "gainLow": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The lower end of the interval of the mean log-loss gain, or null.",
+            "format": "double"
+          },
+          "gainHigh": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The upper end, or null.",
+            "format": "double"
+          },
+          "policyEffectR": {
+            "type": "number",
+            "description": "The effect of the fixed take rule on realised R per candidate.",
+            "format": "double"
+          },
+          "settingHash": {
+            "type": "string",
+            "description": "SHA-256 of the thresholds and the setting snapshot."
+          },
+          "inputHash": {
+            "type": "string",
+            "description": "SHA-256 of the scored rows."
+          },
+          "scoredAt": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          }
+        },
+        "description": "`POST /api/learning/models/{id}/holdout-score`: the figures of the model's one look at the locked hold-out (CF-10e part 3, ADR 0285)."
+      },
       "MlHoldOutView": {
         "required": [
           "state",
@@ -54754,6 +54961,71 @@
             ],
             "description": "The effect of the take rule on realised R there, or null when not available.",
             "format": "double"
+          },
+          "logLossModel": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The model's mean log loss there (CF-10e part 3), or null before the figures were stored.",
+            "format": "double"
+          },
+          "logLossBaseline": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The better no-ML baseline's mean log loss there, or null.",
+            "format": "double"
+          },
+          "baselineName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`base_rate` or `cell_rate`, or null."
+          },
+          "gainLow": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The lower end of the interval of the mean log-loss gain over the baseline, or null.",
+            "format": "double"
+          },
+          "gainHigh": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The upper end, or null.",
+            "format": "double"
+          },
+          "mode": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`owner` or `auto` (how the look was taken), or null."
+          },
+          "canScore": {
+            "type": "boolean",
+            "description": "Whether the owner could take (or finish) the model's look now: the block in force is sealed, the model kept a hold-out before it, and its family has no finished look there. A hint for the button; the act decides.",
+            "default": false
+          },
+          "outcome": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "How the look ended: `scored`, `no_rows` or `failed` (terminal, no figures), or null while it is open or not taken."
+          },
+          "outcomeCode": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why a terminal look ended, or null."
           }
         },
         "description": "Where the model stands with the locked hold-out."
@@ -54909,6 +55181,13 @@
               "string"
             ],
             "description": "The owner's password, re-entered for THIS change. Required when the change turns ml.influence.enabled or ml.auto_promote ON (missing: 403 auth.step_up_required; wrong: 401, counted toward the lockout); ignored otherwise."
+          },
+          "autoHoldOutScore": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "`ml.holdout.auto_score` (ON by the ADR 0282 seed row): whether the evening seal service scores the pre-dated champion on the hold-out block. Any change (OFF or back ON) needs a fresh password."
           }
         },
         "description": "The body of a change of the ML switches. The owner is never part of it: the actor comes from the signed-in session. A switch that is not given is left alone."
@@ -54953,6 +55232,19 @@
             "description": "`ml.auto_rollback`."
           },
           "autoRollbackSettingId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Its row in force, or null.",
+            "format": "int64"
+          },
+          "autoHoldOutScore": {
+            "type": "boolean",
+            "description": "`ml.holdout.auto_score` (ON by the ADR 0282 seed row).",
+            "default": false
+          },
+          "autoHoldOutScoreSettingId": {
             "type": [
               "null",
               "integer"
@@ -55004,6 +55296,17 @@
           "autoRollback": {
             "description": "`ml.auto_rollback`.",
             "$ref": "#/components/schemas/MlSwitchState"
+          },
+          "autoHoldOutScore": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "`ml.holdout.auto_score` (CF-10e part 3): ON by the seed row of ADR 0282, OFF when no row exists.",
+                "$ref": "#/components/schemas/MlSwitchState"
+              }
+            ]
           }
         },
         "description": "The three ML switches as they stand (spec CF-10 D6 to D8): all default OFF."

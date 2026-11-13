@@ -3,9 +3,12 @@ import type { MlSettings } from '../api/mlQueries';
 import { switchKeys, switchMeaning, switchName, switchTitle, type SwitchKey } from '../lib/mlText';
 
 const stateOf = (settings: MlSettings, key: SwitchKey): boolean =>
-  ({ influence: settings.influenceEnabled, autoPromote: settings.autoPromote, autoRollback: settings.autoRollback })[
-    key
-  ];
+  ({
+    influence: settings.influenceEnabled,
+    autoPromote: settings.autoPromote,
+    autoRollback: settings.autoRollback,
+    autoHoldOutScore: settings.autoHoldOutScore,
+  })[key];
 
 interface MlSwitchListProps {
   settings: MlSettings;
@@ -13,7 +16,7 @@ interface MlSwitchListProps {
   onTurn?: (key: SwitchKey, on: boolean) => void;
 }
 
-/** The three ML switches, ON or OFF in words, with what each means. OFF is the default; no switch places an order. */
+/** The ML switches, ON or OFF in words, with what each means. OFF is the default; no switch places an order. */
 export function MlSwitchList({ settings, onTurn }: MlSwitchListProps) {
   return (
     <Box component="ul" aria-label="ML switches" sx={{ m: 0, p: 0, listStyle: 'none', display: 'grid', gap: 1.5 }}>
