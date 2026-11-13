@@ -17,9 +17,8 @@ public interface IReplayFacts
     /// <summary>The last session the replay may read: the hold-out start less one day and less the embargo. Throws <see cref="ReplayHoldOutException"/> when no block is fixed.</summary>
     ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken);
 
-    /// <summary>The released hold-out blocks as (start, end): sessions inside one are readable but carry the <c>seen_holdout:&lt;start&gt;</c> label (HO-01 D7). None by default.</summary>
-    ValueTask<IReadOnlyList<(DateOnly Start, DateOnly End)>> ReleasedHoldOutAsync(CancellationToken cancellationToken) =>
-        ValueTask.FromResult<IReadOnlyList<(DateOnly Start, DateOnly End)>>([]);
+    /// <summary>The released hold-out blocks as (start, end): sessions inside one are readable but carry the <c>seen_holdout:&lt;start&gt;</c> label (HO-01 D7). None before the first release.</summary>
+    ValueTask<IReadOnlyList<(DateOnly Start, DateOnly End)>> ReleasedHoldOutAsync(CancellationToken cancellationToken);
 
     /// <summary>The close of each day bar of an instrument (the benchmark index of the equity read) from <paramref name="from"/> to <paramref name="to"/> inclusive, through the same hold-out clamp as every other read of the replay (<see cref="ReplayHoldOutException"/> past it).</summary>
     ValueTask<IReadOnlyList<(DateOnly Session, double Close)>> DayClosesAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken);

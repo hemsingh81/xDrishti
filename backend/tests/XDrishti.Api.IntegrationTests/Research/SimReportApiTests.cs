@@ -36,7 +36,7 @@ public sealed class SimReportApiTests(ApiFactory factory) : DataTestBase(factory
         await using (var connection = await OpenAsync())
         {
             await ExecuteAsync(connection, "INSERT INTO lab.strategies (id, style, built_in, created_at) VALUES ('TRNA', 'intraday', false, now()), ('TRNB', 'swing', false, now()) ON CONFLICT DO NOTHING");
-            await ExecuteAsync(connection, "INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2031-01-01', '2026-03-02', '2031-06-30', 12, repeat('a', 64), now())");
+            await ExecuteAsync(connection, "DELETE FROM lab.holdout_releases; DELETE FROM lab.holdout_blocks; INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2031-01-01', '2026-03-02', '2031-06-30', 12, repeat('a', 64), now())");
         }
 
         _run1 = Build("TRNA", _a, "NSE:TRA", BasketX, 10, 5);

@@ -986,14 +986,14 @@ public sealed class LabRunnerTests
         {
             // HO-01: the auto look never claims block 1, so the run is made with block 1 released and block 2 in force
             var hash = new string('a', 64);
-            var one = new HoldOutBlock(new DateOnly(2026, 5, 1), new DateOnly(2024, 10, 1), new DateOnly(2026, 10, 30), 6, hash, DateTimeOffset.UnixEpoch);
+            var one = new HoldOutBlock(new DateOnly(2026, 5, 1), new DateOnly(2024, 10, 1), new DateOnly(2026, 9, 30), 6, hash, DateTimeOffset.UnixEpoch);
             store.Blocks.Add(one);
-            store.Releases.Add(new StoredRelease(one.Start, DateTimeOffset.UnixEpoch, "owner", "owner:x", hash, false, new DateOnly(2026, 10, 31)));
-            store.Blocks.Add(new HoldOutBlock(new DateOnly(2026, 10, 31), one.HistoryFirst, new DateOnly(2027, 4, 30), 6, hash, DateTimeOffset.UnixEpoch, one.Start));
+            store.Releases.Add(new StoredRelease(one.Start, DateTimeOffset.UnixEpoch, "owner", "owner:x", hash, false, new DateOnly(2026, 10, 1)));
+            store.Blocks.Add(new HoldOutBlock(new DateOnly(2026, 10, 1), one.HistoryFirst, new DateOnly(2026, 10, 21), 6, hash, DateTimeOffset.UnixEpoch, one.Start));
         }
 
         var options = new HoldOutOptions(AutoUnlock: autoOn);
-        var unlocker = new HoldOutUnlocker(_runs, _results, store, freezes, new StubPass(), new LabHoldOutGuard(store, bars, options, _time), options, _time,
+        var unlocker = new HoldOutUnlocker(_runs, _results, store, freezes, new StubPass(), new LabHoldOutGuard(store, bars, options, _time), new HoldOutEpochs(store, new FixedCalendar(), _time), options, _time,
             Substitute.For<XDrishti.Application.Abstractions.Accounts.IAccountEventLog>(), Substitute.For<XDrishti.Application.Abstractions.Accounts.IAccountUnitOfWork>(), NullLogger<HoldOutUnlocker>.Instance);
 
         await RunnerWithTrials(new RegistrationOptions(), null, 1, unlocker: unlocker).ExecuteAsync(run, Ct);

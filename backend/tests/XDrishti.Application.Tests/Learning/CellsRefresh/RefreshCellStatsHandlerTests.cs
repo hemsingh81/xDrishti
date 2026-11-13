@@ -1,3 +1,4 @@
+#pragma warning disable CA2012 // NSubstitute setup on ValueTask members is not awaited
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
@@ -135,6 +136,22 @@ public sealed class RefreshCellStatsHandlerTests
         await _simulation.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
         await _store.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
         await _ledger.DidNotReceiveWithAnyArgs().AppendAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task A_refresh_whose_end_reaches_a_released_block_carries_its_seen_holdout_label_and_without_a_release_none()
+    {
+        Newest(new CellSource(R1, "intraday", "E"));
+        Source(R1, Sha1, "ORB", End, registered: true);
+        var none = await Handler().HandleAsync(new RefreshCellStatsCommand("system:cells-refresh"), Ct);
+        var one = new HoldOutBlock(new DateOnly(2026, 2, 1), new DateOnly(2020, 1, 1), new DateOnly(2026, 5, 4), 6, "h", DateTimeOffset.UnixEpoch);
+        _holdOut.ListBlocksAsync(Ct).Returns(ValueTask.FromResult<IReadOnlyList<StoredBlock>>([new StoredBlock(one, new StoredRelease(one.Start, DateTimeOffset.UnixEpoch, "owner", "owner:x", new string('a', 64), true, new DateOnly(2026, 5, 5)))]));
+
+        var released = await Handler().HandleAsync(new RefreshCellStatsCommand("system:cells-refresh"), Ct);
+
+        none.Value.Labels.ShouldBeEmpty();
+        released.Value.Labels.ShouldBe(["seen_holdout:2026-02-01"]);
+        released.Value.Message.ShouldContain("seen_holdout:2026-02-01");
     }
 
     [Fact]

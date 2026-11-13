@@ -41,7 +41,7 @@ public sealed class HoldOutUnlockerTests
     private HoldOutUnlocker Unlocker(HoldOutOptions? options = null)
     {
         var o = options ?? new HoldOutOptions();
-        return new HoldOutUnlocker(_runs, _results, _store, _freezes, _pass, new LabHoldOutGuard(_store, _bars, o, _time), o, _time, _events, _unitOfWork, NullLogger<HoldOutUnlocker>.Instance);
+        return new HoldOutUnlocker(_runs, _results, _store, _freezes, _pass, new LabHoldOutGuard(_store, _bars, o, _time), new HoldOutEpochs(_store, new FixedCalendar(), _time), o, _time, _events, _unitOfWork, NullLogger<HoldOutUnlocker>.Instance);
     }
 
     private LabRun Run(string strategy = "FAM", int version = 1, DateOnly? to = null, string method = "robust", LabRunState state = LabRunState.Succeeded)
@@ -237,10 +237,29 @@ public sealed class HoldOutUnlockerTests
     private void ReleaseBlock1()
     {
         var one = new HoldOutBlock(new DateOnly(2026, 5, 1), new DateOnly(2024, 10, 1), new DateOnly(2026, 10, 30), 6, Hash, _time.GetUtcNow());
-        var two = new HoldOutBlock(new DateOnly(2026, 10, 31), new DateOnly(2024, 10, 1), new DateOnly(2027, 4, 30), 6, Hash, _time.GetUtcNow(), one.Start);
+        var two = new HoldOutBlock(new DateOnly(2026, 10, 31), new DateOnly(2024, 10, 1), new DateOnly(2026, 11, 3), 6, Hash, _time.GetUtcNow(), one.Start); // sealed: its last session closed on 2026-11-03, before the clock of 2026-11-04
         _store.Blocks.Add(one);
         _store.Releases.Add(new StoredRelease(one.Start, _time.GetUtcNow(), "owner", "owner:x", Hash, false, two.Start));
         _store.Blocks.Add(two);
+    }
+
+    [Fact]
+    public async Task A_filling_block_is_refused_for_a_manual_look_and_the_auto_option_does_not_run()
+    {
+        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
+        var run = Run();
+        ReleaseBlock1();
+        _store.Blocks.RemoveAll(b => b.PrevStart is not null);
+        var filling = new HoldOutBlock(new DateOnly(2026, 10, 31), new DateOnly(2024, 10, 1), new DateOnly(2027, 4, 30), 6, Hash, _time.GetUtcNow(), new DateOnly(2026, 5, 1));
+        _store.Blocks.Add(filling);
+
+        var manual = await Unlocker().UnlockAsync(run.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
+        var auto = await Unlocker(new HoldOutOptions(AutoUnlock: true)).TryAutoAsync(run.Id, Verdict(), Ct);
+
+        manual.Error.Code.ShouldBe(LabErrors.HoldOutFillingCode);
+        auto.ShouldBeNull();
+        _store.Unlocks.ShouldBeEmpty();
+        _pass.Calls.ShouldBe(0);
     }
 
     [Fact]

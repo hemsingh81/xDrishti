@@ -58,6 +58,6 @@ public interface IHoldOutStore
     /// <summary>The unlocks, newest first, at most <paramref name="limit"/>.</summary>
     ValueTask<IReadOnlyList<StoredUnlock>> ListUnlocksAsync(int limit, CancellationToken cancellationToken);
 
-    /// <summary>Stores the unlock; false (nothing written) when the version already has one of this kind, or when the look is fresh and another fresh look at the block exists (the database decides).</summary>
+    /// <summary>Stores the unlock; false (nothing written) when the version already has one of this kind, when the look is fresh and another fresh look at the block exists, or when the block is released already (the database decides; this closes the race between a look and a release).</summary>
     ValueTask<bool> InsertUnlockAsync(StoredUnlock unlock, CancellationToken cancellationToken);
 }

@@ -42,9 +42,8 @@ internal sealed class GetHoldOutHandler(IHoldOutStore store, LabHoldOutGuard gua
         ArgumentNullException.ThrowIfNull(query);
         var chain = await epochs.StatusAsync(cancellationToken);
         var inForce = chain.FirstOrDefault(b => b.State != XDrishti.Domain.Lab.HoldOutBlockState.Released);
-        var block = await store.CurrentAsync(cancellationToken);
         HoldOutPlanView? proposed = null;
-        if (block is null && await guard.HistoryAsync(cancellationToken) is { } h)
+        if (inForce is null && await guard.HistoryAsync(cancellationToken) is { } h)
         {
             var p = guard.Plan(h.First, h.Last);
             proposed = new HoldOutPlanView(p.HistoryMonths, p.LengthMonths, p.DevelopmentMonths, p.Folds, p.Start, p.Status);
@@ -54,7 +53,7 @@ internal sealed class GetHoldOutHandler(IHoldOutStore store, LabHoldOutGuard gua
         return Result.Success(new HoldOutView(
             options.Enforce,
             options.AutoUnlock,
-            inForce is not null && block is not null && inForce.Block.Start == block.Start ? BlockViews.Of(inForce) : block is null ? null : new HoldOutBlockView(block.Start, block.HistoryFirst, block.HistoryLast, block.LengthMonths, block.SettingHash, block.CreatedAt),
+            inForce is null ? null : BlockViews.Of(inForce),
             proposed,
             [.. unlocks.Select(u => u.Result)],
             [.. chain.Select(BlockViews.Of)],

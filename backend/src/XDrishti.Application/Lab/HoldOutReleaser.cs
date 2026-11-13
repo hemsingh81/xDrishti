@@ -1,4 +1,8 @@
+using System.Globalization;
+using Microsoft.Extensions.Logging;
+using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Lab;
@@ -12,7 +16,7 @@ internal sealed record AutoReleaseResult(bool Released, string Reason);
 /// Releases the block in force (HO-01 D4, ADR 0283): by the owner (the password was checked at the endpoint) or by the auto option. One transaction stores the release row and block k+1, <c>[end + 1 day, end + BlockMonths]</c> under the setting read now. A release is permanent
 /// and moves every development cut forward. The owner may release an unlooked block only with the explicit forfeit; the auto option never does, and any read that fails keeps the block. Reads no bar.
 /// </summary>
-internal sealed class HoldOutReleaser(HoldOutEpochs epochs, IHoldOutStore store, IEnumerable<IHoldOutLookSlot> slots, HoldOutOptions options, TimeProvider time)
+internal sealed class HoldOutReleaser(HoldOutEpochs epochs, IHoldOutStore store, IEnumerable<IHoldOutLookSlot> slots, HoldOutOptions options, TimeProvider time, IAccountEventLog events, IAccountUnitOfWork unitOfWork, ILogger<HoldOutReleaser> logger)
 {
     public const string OwnerMode = "owner";
     public const string AutoMode = "auto";
@@ -79,6 +83,12 @@ internal sealed class HoldOutReleaser(HoldOutEpochs epochs, IHoldOutStore store,
             return new AutoReleaseResult(false, "no_block");
         }
 
+        // fail closed: the strategy look is the one kind HO-01b registers first; without its slot the rule cannot know whether a strategy look is still available
+        if (!slots.Any(s => string.Equals(s.Kind, "strategy", StringComparison.Ordinal)))
+        {
+            return new AutoReleaseResult(false, "no_strategy_slot");
+        }
+
         var kinds = new List<LookAvailability>();
         foreach (var slot in slots)
         {
@@ -102,11 +112,30 @@ internal sealed class HoldOutReleaser(HoldOutEpochs epochs, IHoldOutStore store,
         var next = new HoldOutBlock(nextStart, target.Block.HistoryFirst, nextEnd, options.BlockMonths, hash, now, target.Block.Start);
         var release = new StoredRelease(target.Block.Start, now, mode, actor, hash, target.State == HoldOutBlockState.Looked, nextStart);
         var outcome = await store.ReleaseAsync(release, next, cancellationToken);
+        if (outcome == ReleaseOutcome.Released)
+        {
+            await AuditAsync(release, now);
+        }
+
         return outcome switch
         {
             ReleaseOutcome.Released => Result.Success(BlockViews.Of(new BlockStatus(target.Stored with { Release = release }, HoldOutBlockState.Released, target.FreshLook))),
             ReleaseOutcome.AlreadyReleased => Result.Failure<HoldOutBlockView>(LabErrors.HoldOutReleased(target.Block.Start)),
             _ => Result.Failure<HoldOutBlockView>(LabErrors.HoldOutUnavailable("The next block could not be stored, so nothing was released.")),
         };
+    }
+
+    /// <summary>The audit cross-index row, as the unlock writes it: ids and state words only. A failure of this second write is logged and does not undo the release, which is insert-only and already committed.</summary>
+    private async ValueTask AuditAsync(StoredRelease release, DateTimeOffset now)
+    {
+        try
+        {
+            events.Record(AccountEvent.Record(AccountEventType.LabHoldOutReleased, null, string.Create(CultureInfo.InvariantCulture, $"block={release.BlockStart:yyyy-MM-dd} mode={release.Mode} looked={(release.Looked ? "yes" : "no")} next={release.NextBlockStart:yyyy-MM-dd}"), release.Actor, now));
+            await unitOfWork.TrySaveChangesAsync(CancellationToken.None);
+        }
+        catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
+        {
+            LabRunLog.HoldOutReleaseAuditFailed(logger, release.BlockStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), failure.GetType().Name);
+        }
     }
 }

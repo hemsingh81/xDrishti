@@ -139,10 +139,20 @@ internal sealed class ReplayWorld
     /// <summary>Gives every symbol the same series of closes from the given days on (used to make a cluster), or its own.</summary>
     public void Series(string symbol, Func<DateOnly, double> close) => Close[symbol] = new SortedDictionary<DateOnly, double>(Sessions.ToDictionary(d => d, close));
 
+    /// <summary>A released hold-out block (start, end): its sessions are readable and carry the seen_holdout label (HO-01).</summary>
+    public (DateOnly Start, DateOnly End)? ReleasedBlock { get; set; }
+
     /// <summary>The real facts over stubs that answer by date range like the stores do.</summary>
     public ReplayFacts Facts(double incompleteShare = 0.2)
     {
         var holdOut = TestHoldOutStores.NoReleases();
+        if (ReleasedBlock is { } released)
+        {
+            var hash = new string('h', 64);
+            var block = new HoldOutBlock(released.Start, Start.AddYears(-3), released.End, 6, hash, DateTimeOffset.UnixEpoch);
+            holdOut.ListBlocksAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<StoredBlock>>([new StoredBlock(block, new StoredRelease(released.Start, DateTimeOffset.UnixEpoch, "owner", "owner:x", hash, true, released.End.AddDays(1)))]));
+        }
+
         holdOut.CurrentAsync(Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult<HoldOutBlock?>(NoHoldOut ? null : new HoldOutBlock(HoldOutStart, Start.AddYears(-3), Start, 6, "h", DateTimeOffset.UnixEpoch)));
 
         var baskets = Substitute.For<IBasketQueries>();

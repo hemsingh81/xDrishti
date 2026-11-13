@@ -1,3 +1,4 @@
+#pragma warning disable CA2012 // NSubstitute setup on ValueTask members is not awaited
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
@@ -172,6 +173,22 @@ public sealed class StartLabRunConfidenceTests
         cut.Value.Run.Window.To.ShouldBe(new DateOnly(2026, 4, 30), "a development run never reads the hold-out, enforcement or not");
         explicitWindow.IsSuccess.ShouldBeTrue("only enforcement refuses an explicit window");
         explicitWindow.Value.Run.Window.To.ShouldBe(new DateOnly(2026, 7, 1));
+    }
+
+    [Fact]
+    public async Task A_window_that_reaches_a_released_block_carries_its_seen_holdout_label_and_one_that_does_not_carries_none()
+    {
+        var hash = new string('d', 64);
+        var one = new HoldOutBlock(new DateOnly(2026, 5, 1), new DateOnly(2026, 1, 5), new DateOnly(2026, 10, 30), 6, hash, DateTimeOffset.UnixEpoch);
+        var two = new HoldOutBlock(new DateOnly(2026, 10, 31), one.HistoryFirst, new DateOnly(2027, 4, 30), 6, hash, DateTimeOffset.UnixEpoch, one.Start);
+        _holdOuts.CurrentAsync(Arg.Any<CancellationToken>()).Returns(two);
+        _holdOuts.ListBlocksAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<StoredBlock>>([new StoredBlock(one, new StoredRelease(one.Start, DateTimeOffset.UnixEpoch, "owner", "owner:x", hash, true, two.Start)), new StoredBlock(two, null)]));
+
+        var reaching = await Handler().HandleAsync(Full(), Ct);
+        var before = await Handler().HandleAsync(Full("full", new DateOnly(2026, 2, 1), new DateOnly(2026, 4, 30)), Ct);
+
+        reaching.Value.Run.Labels.ShouldContain("seen_holdout:2026-05-01");
+        before.Value.Run.Labels.ShouldNotContain(l => l.StartsWith("seen_holdout:", StringComparison.Ordinal));
     }
 
     [Fact]

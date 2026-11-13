@@ -148,7 +148,8 @@ internal sealed class HoldOutStore(NpgsqlDataSource dataSource) : IHoldOutStore
         ArgumentNullException.ThrowIfNull(unlock);
         await using var command = dataSource.CreateCommand("""
             INSERT INTO lab.holdout_unlocks (strategy_id, version, kind, unlocked_at, mode, actor, setting_hash, reused_window, block_start, lab_run_id, result)
-            VALUES (@id, @v, @kind, @now, @mode, @actor, @hash, @reused, @block, @run, @result)
+            SELECT @id, @v, @kind, @now, @mode, @actor, @hash, @reused, @block, @run, @result
+            WHERE NOT EXISTS (SELECT 1 FROM lab.holdout_releases r WHERE r.block_start = @block)
             ON CONFLICT DO NOTHING
             """);
         command.Parameters.AddWithValue("id", NpgsqlDbType.Text, unlock.StrategyId);

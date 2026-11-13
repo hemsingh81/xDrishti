@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using XDrishti.Api.IntegrationTests.Infrastructure;
+using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Research;
 using XDrishti.Infrastructure.Persistence;
 
 namespace XDrishti.Api.IntegrationTests.Research;
@@ -48,12 +50,16 @@ public sealed class HoldOutEpochsMigrationTests(ApiFactory factory)
         await using var connection = new NpgsqlConnection(scratch.ConnectionString);
         await connection.OpenAsync(Ct);
         await migrator.MigrateAsync(Before, Ct);
-        await ExecuteAsync(connection, $"INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2026-05-01', '2024-10-01', '2026-10-30', 6, {Hash}, '2026-11-01 10:00+00'), ('2026-06-01', '2024-10-01', '2026-10-30', 5, {Hash}, '2026-11-01 10:00:01+00')");
+        await ExecuteAsync(connection, $"INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2026-06-01', '2024-10-01', '2026-10-30', 5, {Hash}, '2026-11-01 10:00+00'), ('2026-05-01', '2024-10-01', '2026-10-30', 6, {Hash}, '2026-11-01 10:00:01+00')"); // the earliest-created row has the LATER start: it is block 1, as every reader saw it before
         await ExecuteAsync(connection, $"INSERT INTO lab.holdout_unlocks (strategy_id, version, kind, unlocked_at, mode, actor, setting_hash, reused_window, block_start, lab_run_id, result) VALUES ('ORB', 1, 'strategy', now(), 'owner', 'owner:x', {Hash}, false, '2026-05-01', gen_random_uuid(), '{{}}'), ('ORB', 2, 'strategy', now(), 'owner', 'owner:x', {Hash}, true, '2026-05-01', gen_random_uuid(), '{{}}')");
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT start_date::text || '|' || coalesce(prev_start::text, '-') || '|' || orphan::text FROM lab.holdout_blocks ORDER BY start_date")).ShouldBe(["2026-05-01|-|false", "2026-06-01|-|true"]);
+        (await ListAsync(connection, "SELECT start_date::text || '|' || coalesce(prev_start::text, '-') || '|' || orphan::text FROM lab.holdout_blocks ORDER BY start_date")).ShouldBe(["2026-05-01|-|true", "2026-06-01|-|false"]);
+        (await scope.ServiceProvider.GetRequiredService<IHoldOutStore>().CurrentAsync(Ct))!.Start.ShouldBe(new DateOnly(2026, 6, 1), "the store reads the earliest-created row, not the earliest start (AC2: the cut is unchanged)");
+        var embargo = new XDrishti.Domain.Confidence.HoldOutOptions().TrainingEmbargoDays;
+        var gate = await scope.ServiceProvider.GetRequiredService<IRunStore>().StoreAsync(StoreKit.ToStore(StoredRunFixtures.Run(to: new DateOnly(2026, 6, 1).AddDays(-1 - embargo)) with { IsTraining = true }), Ct);
+        gate.IsSuccess.ShouldBeTrue(gate.IsFailure ? gate.Error.Message : string.Empty); // a window that ends at the cut of the later-start block is clear; the orphan's earlier cut would have refused it
         (await ListAsync(connection, "SELECT version::text || '|' || reused_window::text FROM lab.holdout_unlocks ORDER BY version")).ShouldBe(["1|false", "2|true"]);
         (await ListAsync(connection, "SELECT indexname FROM pg_indexes WHERE schemaname = 'lab' AND tablename = 'holdout_blocks' ORDER BY 1")).ShouldBe(["pk_holdout_blocks", "uq_holdout_blocks_first", "uq_holdout_blocks_prev", "uq_holdout_blocks_start"]);
         await Should.ThrowAsync<PostgresException>(async () => await ExecuteAsync(connection, $"INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2026-07-01', '2024-10-01', '2026-10-30', 6, {Hash}, now())"), "a second first block is refused");

@@ -42,11 +42,17 @@ internal sealed class HoldOutEpochs(IHoldOutStore store, ITradingCalendar tradin
         return rows;
     }
 
+    /// <summary>Whether the block that ends on <paramref name="end"/> is sealed now (no trading day is left up to its end).</summary>
+    public async ValueTask<bool> IsSealedAsync(DateOnly end, CancellationToken cancellationToken)
+    {
+        var calendar = await tradingCalendar.GetAsync(cancellationToken);
+        return HoldOutChain.IsSealed(calendar, calendar.LastClosedSession(time.GetUtcNow()), end);
+    }
+
     /// <summary>The block in force with its state, or null when none is fixed.</summary>
     public async ValueTask<BlockStatus?> InForceAsync(CancellationToken cancellationToken) =>
         (await StatusAsync(cancellationToken)).FirstOrDefault(b => b.State != HoldOutBlockState.Released);
 
     /// <summary>The released blocks as (start, end) pairs, for the <c>seen_holdout</c> labels.</summary>
-    public async ValueTask<IReadOnlyList<(DateOnly Start, DateOnly End)>> ReleasedAsync(CancellationToken cancellationToken) =>
-        [.. (await store.ListBlocksAsync(cancellationToken)).Where(b => b.Release is not null).Select(b => (b.Block.Start, b.Block.HistoryLast))];
+    public ValueTask<IReadOnlyList<(DateOnly Start, DateOnly End)>> ReleasedAsync(CancellationToken cancellationToken) => store.ReleasedAsync(cancellationToken);
 }

@@ -20,6 +20,7 @@ internal sealed class HoldOutUnlocker(
     IPlanFreezeStore freezes,
     IHoldOutPass pass,
     LabHoldOutGuard guard,
+    HoldOutEpochs epochs,
     HoldOutOptions options,
     TimeProvider time,
     IAccountEventLog events,
@@ -65,6 +66,12 @@ internal sealed class HoldOutUnlocker(
         if (await BlockAsync(cancellationToken) is not { } block)
         {
             return Result.Failure<UnlockPlan>(LabErrors.HoldOutUnavailable("The stored history is too short to keep a hold-out."));
+        }
+
+        // D6: a block that is still filling has no valid look (its last session has not closed)
+        if (!await epochs.IsSealedAsync(block.HistoryLast, cancellationToken))
+        {
+            return Result.Failure<UnlockPlan>(LabErrors.HoldOutFilling(block.Start, block.HistoryLast));
         }
 
         return await freezes.FirstAsync(run.StrategyId, run.Version, cancellationToken) is null
@@ -180,6 +187,11 @@ internal sealed class HoldOutUnlocker(
         if (block is { PrevStart: null })
         {
             return null;
+        }
+
+        if (block is not null && !await epochs.IsSealedAsync(block.HistoryLast, cancellationToken))
+        {
+            return null; // a filling block is never looked at, by hand or by the auto option (D6)
         }
 
         var result = await UnlockAsync(runId, AutoMode, "system:auto-unlock", cancellationToken);

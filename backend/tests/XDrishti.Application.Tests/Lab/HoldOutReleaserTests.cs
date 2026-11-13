@@ -1,12 +1,15 @@
 #pragma warning disable CA2012 // NSubstitute setup on ValueTask members is not awaited
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Replay;
+using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Lab;
 using XDrishti.Domain.Market.Calendar;
@@ -39,8 +42,12 @@ public sealed class HoldOutReleaserTests
     public HoldOutReleaserTests() =>
         _store.Blocks.Add(new HoldOutBlock(One, new DateOnly(2024, 10, 1), OneEnd, 6, Hash, DateTimeOffset.UnixEpoch));
 
+    private readonly IAccountEventLog _events = Substitute.For<IAccountEventLog>();
+    private readonly IAccountUnitOfWork _unitOfWork = Substitute.For<IAccountUnitOfWork>();
+
+    // the strategy slot is registered by HO-01b; the tests stand in for it unless they say otherwise
     private HoldOutReleaser Releaser(HoldOutOptions? options = null, params IHoldOutLookSlot[] slots) =>
-        new(Epochs(), _store, slots, options ?? new HoldOutOptions(), _time);
+        new(Epochs(), _store, slots.Length == 0 ? [Slot("strategy", LookAvailability.Used)] : slots, options ?? new HoldOutOptions(), _time, _events, _unitOfWork, NullLogger<HoldOutReleaser>.Instance);
 
     private HoldOutEpochs Epochs() => new(_store, new FixedCalendar(), _time);
 
@@ -167,6 +174,29 @@ public sealed class HoldOutReleaserTests
         done.Released.ShouldBeTrue();
         var release = _store.Releases.Single();
         (release.Mode, release.Actor, release.Looked, release.SettingHash).ShouldBe(("auto", "system:auto-release", true, new HoldOutOptions().SnapshotHash()));
+    }
+
+    [Fact]
+    public async Task The_auto_release_fails_closed_when_no_strategy_slot_is_registered()
+    {
+        Look(One);
+        var bare = new HoldOutReleaser(Epochs(), _store, [], new HoldOutOptions(), _time, _events, _unitOfWork, NullLogger<HoldOutReleaser>.Instance);
+
+        (await bare.TryAutoAsync(Ct)).ShouldBe(new AutoReleaseResult(false, "no_strategy_slot"));
+
+        _store.Releases.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_release_writes_one_audit_row_naming_the_mode_and_the_actor_and_a_failed_audit_does_not_undo_it()
+    {
+        Look(One);
+        _unitOfWork.TrySaveChangesAsync(Arg.Any<CancellationToken>()).Returns<ValueTask<bool>>(_ => throw new InvalidOperationException("audit down"));
+
+        await Releaser().ReleaseByOwnerAsync(One, false, "owner:x", Ct);
+
+        _events.Received(1).Record(Arg.Is<AccountEvent>(e => e.Event == AccountEventType.LabHoldOutReleased && e.Actor == "owner:x" && e.Detail!.Contains("mode=owner", StringComparison.Ordinal)));
+        _store.Releases.Count.ShouldBe(1);
     }
 
     [Fact]
