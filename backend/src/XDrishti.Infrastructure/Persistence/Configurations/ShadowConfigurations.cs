@@ -80,16 +80,39 @@ internal sealed class ShadowGradeRecordConfiguration : IEntityTypeConfiguration<
     }
 }
 
-/// <summary><c>paper.shadow_settings</c>: the switch <c>paper.shadow.enabled</c> as an append-only audited row; the newest row is current and no row means OFF.</summary>
+/// <summary><c>paper.shadow_settings</c>: the switch <c>paper.shadow.enabled</c> as an append-only audited row; the newest row is current and no row means OFF. The seed row (actor <c>system:default</c>, ON, reason <c>ADR 0282</c>) is written once by the migration into an empty table and sealed by the stamp trigger (AM-01b).</summary>
 internal sealed class ShadowSettingRecordConfiguration : IEntityTypeConfiguration<ShadowSettingRecord>
 {
     public void Configure(EntityTypeBuilder<ShadowSettingRecord> builder)
     {
-        builder.ToTable("shadow_settings", Schemas.Paper, t => t.HasCheckConstraint("ck_shadow_settings_shape", "actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND length(btrim(reason)) > 0"));
+        builder.ToTable("shadow_settings", Schemas.Paper, t => t.HasCheckConstraint("ck_shadow_settings_shape", "(actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND length(btrim(reason)) > 0) OR (actor = 'system:default' AND enabled AND reason = 'ADR 0282')"));
         builder.HasKey(x => x.Id).HasName("pk_shadow_settings");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
         builder.Property(x => x.Actor).HasMaxLength(100).IsRequired();
         builder.Property(x => x.Reason).HasMaxLength(500).IsRequired();
         builder.Property(x => x.ChangedAt).HasDefaultValueSql("now()");
+    }
+}
+
+/// <summary>
+/// <c>paper.evidence_sets</c> (spec AM-01 GAP-09, ADR 0282): the frozen evidence set of an edge epoch, insert-only for the runtime role; the newest row of an epoch is current. <c>edge_epoch</c> is the paper epoch id, or 0 while none exists. The trigger that refuses a row once a
+/// shadow entry of the epoch exists, and the grants, are added in the migration.
+/// </summary>
+internal sealed class EvidenceSetRecordConfiguration : IEntityTypeConfiguration<EvidenceSetRecord>
+{
+    public void Configure(EntityTypeBuilder<EvidenceSetRecord> builder)
+    {
+        builder.ToTable("evidence_sets", Schemas.Paper, t => t.HasCheckConstraint(
+            "ck_evidence_sets_shape",
+            "edge_epoch >= 0 AND jsonb_typeof(versions) = 'array' AND jsonb_array_length(versions) BETWEEN 1 AND 500 AND set_hash ~ '^[0-9a-f]{64}$' AND ((mode = 'auto' AND actor = 'system:default' AND reason IS NULL) OR (mode = 'owner' AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND reason IS NOT NULL AND length(btrim(reason)) > 0))"));
+        builder.HasKey(x => x.Id).HasName("pk_evidence_sets");
+        builder.Property(x => x.Id).UseIdentityAlwaysColumn();
+        builder.Property(x => x.Versions).HasColumnType("jsonb").IsRequired();
+        builder.Property(x => x.SetHash).HasColumnType("char(64)").IsRequired();
+        builder.Property(x => x.Mode).HasMaxLength(5).IsRequired();
+        builder.Property(x => x.Actor).HasMaxLength(100).IsRequired();
+        builder.Property(x => x.Reason).HasMaxLength(500);
+        builder.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
+        builder.HasIndex(x => new { x.EdgeEpoch, x.Id }).HasDatabaseName("ix_evidence_sets_edge_epoch_id");
     }
 }

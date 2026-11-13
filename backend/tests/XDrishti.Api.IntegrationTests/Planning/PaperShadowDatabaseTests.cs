@@ -51,6 +51,11 @@ public sealed class PaperShadowDatabaseTests(ApiFactory factory) : DataTestBase(
     {
         await using var connection = await OpenAsync();
         await ExecuteAsync(connection, "INSERT INTO paper.shadow_settings (enabled, actor, reason) VALUES (@e, 'owner:test@example.com', 'test')", ("e", enabled));
+        // AM-01b: the shadow record writes only with an evidence set; the newest full snapshot names the eligible version, so the writer registers the automatic set with its first session
+        await ExecuteAsync(
+            connection,
+            "INSERT INTO paper.config_snapshots (taken_at, session_date, hash, components, partial, process) VALUES (now(), '2099-02-02', md5(random()::text) || md5(random()::text), jsonb_build_object('cells.eligible/' || @cell, repeat('a', 64)), false, 'xd-api')",
+            ("cell", Cell));
     }
 
     private async Task<ShadowWriteOutcome> RunAsync(DateOnly? session = null)
@@ -95,6 +100,68 @@ public sealed class PaperShadowDatabaseTests(ApiFactory factory) : DataTestBase(
         (await ScalarAsync<int>("SELECT n_rows FROM paper.shadow_sessions WHERE session_date = @d", ("d", Monday))).ShouldBe(7);
         (await ScalarAsync<long>("SELECT count(*) FROM paper.shadow_entries e JOIN trading.plan_items i ON i.id = e.plan_item_id AND i.plan_id = e.plan_id")).ShouldBe(7);
         (await ScalarAsync<long>("SELECT count(*) FROM paper.shadow_entries WHERE written_at >= (session_date + time '09:00') AT TIME ZONE 'Asia/Kolkata'")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task The_first_write_of_an_epoch_registers_one_automatic_set_before_the_entries_and_a_replace_after_it_is_refused_by_the_database()
+    {
+        await PublishNightlyPlanAsync("shadow-set", Monday, "NSE:");
+        await SwitchAsync(true);
+
+        await RunAsync();
+        await RunAsync();
+
+        (await ScalarAsync<long>("SELECT count(*) FROM paper.evidence_sets")).ShouldBe(1);
+        (await ScalarAsync<string>("SELECT mode || '/' || actor || '/' || (first_write_at IS NOT NULL)::text || '/' || edge_epoch::text FROM paper.evidence_sets")).ShouldBe("auto/system:default/true/0");
+        (await ScalarAsync<string>("SELECT versions::text FROM paper.evidence_sets")).ShouldBe("[\"" + new string('a', 64) + "\"]");
+        (await ScalarAsync<long>("SELECT count(*) FROM lab.test_ledger WHERE trial_kind = 'evidence_set' AND strategy_hash = repeat('a', 64)")).ShouldBe(0, "a hash that is no stored version has no ledger row");
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var rows = await scope.ServiceProvider.GetRequiredService<IShadowResultReader>().ResultsAsync(Ct);
+            rows.Count.ShouldBe(7);
+            rows.ShouldAllBe(r => r.InSet);
+        }
+
+        await using var connection = await OpenAsync();
+        var refused = await Should.ThrowAsync<Npgsql.PostgresException>(() => ExecuteAsync(connection, "INSERT INTO paper.evidence_sets (edge_epoch, versions, set_hash, mode, actor, reason) VALUES (0, to_jsonb(ARRAY[repeat('b', 64)]), repeat('d', 64), 'owner', 'owner:me@x.test', 'late')"));
+        refused.SqlState.ShouldBe("23514");
+    }
+
+    [Fact]
+    public async Task A_row_of_a_version_outside_the_set_is_written_and_labelled()
+    {
+        await PublishNightlyPlanAsync("shadow-out", Monday, "NSE:");
+        await SwitchAsync(true);
+        await using (var connection = await OpenAsync())
+        {
+            // the owner's set names another version before the first write
+            await ExecuteAsync(connection, "INSERT INTO paper.evidence_sets (edge_epoch, versions, set_hash, mode, actor, reason) VALUES (0, to_jsonb(ARRAY[repeat('b', 64)]), repeat('d', 64), 'owner', 'owner:me@x.test', 'mine')");
+        }
+
+        var outcome = await RunAsync();
+
+        outcome.Rows.ShouldBe(7);
+        (await ScalarAsync<long>("SELECT count(*) FROM paper.evidence_sets")).ShouldBe(1, "the owner's set stands; no automatic one is added");
+        using var scope = Factory.Services.CreateScope();
+        var rows = await scope.ServiceProvider.GetRequiredService<IShadowResultReader>().ResultsAsync(Ct);
+        rows.ShouldAllBe(r => !r.InSet);
+    }
+
+    [Fact]
+    public async Task With_no_set_stored_and_no_snapshot_nothing_is_written()
+    {
+        await PublishNightlyPlanAsync("shadow-none", Monday, "NSE:");
+        await using (var connection = await OpenAsync())
+        {
+            await ExecuteAsync(connection, "INSERT INTO paper.shadow_settings (enabled, actor, reason) VALUES (true, 'owner:test@example.com', 'test')");
+            await ExecuteAsync(connection, "DELETE FROM paper.config_snapshots");
+        }
+
+        var outcome = await RunAsync();
+
+        outcome.EvidenceSetMissing.ShouldBeTrue();
+        (await ScalarAsync<long>("SELECT count(*) FROM paper.shadow_entries")).ShouldBe(0);
+        (await ScalarAsync<long>("SELECT count(*) FROM paper.evidence_sets")).ShouldBe(0);
     }
 
     [Fact]

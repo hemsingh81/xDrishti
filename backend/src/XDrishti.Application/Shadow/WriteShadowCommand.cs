@@ -17,10 +17,13 @@ public sealed record WriteShadowCommand(DateOnly? Session) : ICommand;
 /// <param name="EdgeRows">Of those, rows that count for edge.</param>
 /// <param name="Gaps">Gap rows written.</param>
 /// <param name="DroppedSameKey">Candidates not stored because an earlier candidate of the session has the same trade key.</param>
-public sealed record ShadowWriteOutcome(bool Enabled, int Sessions, int Rows, int EdgeRows, int Gaps, int DroppedSameKey)
+/// <param name="EvidenceSetMissing">True when no evidence set was stored or nameable for the epoch, so no session was written (spec AM-01 GAP-09: fail closed).</param>
+public sealed record ShadowWriteOutcome(bool Enabled, int Sessions, int Rows, int EdgeRows, int Gaps, int DroppedSameKey, bool EvidenceSetMissing = false)
 {
     /// <summary>One line for the Services screen.</summary>
     public string Summary => !Enabled
         ? "Switched off (paper.shadow.enabled): nothing written."
-        : string.Create(CultureInfo.InvariantCulture, $"{Sessions} session(s) written with {Rows} row(s), {EdgeRows} counting for edge; {Gaps} gap(s) recorded; {DroppedSameKey} candidate(s) with an earlier same trade key left out.");
+        : EvidenceSetMissing
+            ? string.Create(CultureInfo.InvariantCulture, $"No evidence set is stored or can be named from the configuration snapshot (no eligible cell): no session written, nothing counted. {Gaps} gap(s) recorded.")
+            : string.Create(CultureInfo.InvariantCulture, $"{Sessions} session(s) written with {Rows} row(s), {EdgeRows} counting for edge; {Gaps} gap(s) recorded; {DroppedSameKey} candidate(s) with an earlier same trade key left out.");
 }

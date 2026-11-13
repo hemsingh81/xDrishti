@@ -38,6 +38,12 @@ internal sealed class ShadowStore(NpgsqlDataSource dataSource) : IShadowStore
                 await head.ExecuteNonQueryAsync(cancellationToken);
             }
 
+            // The epoch's evidence set goes in first, in this transaction, so a first write never exists without its set (spec AM-01 GAP-09). A set stored meanwhile (the owner's) is left as it is.
+            if (session.EvidenceSet is { } evidenceSet)
+            {
+                await EvidenceSetStore.InsertAsync(connection, transaction, evidenceSet, firstWrite: true, cancellationToken);
+            }
+
             foreach (var e in session.Entries)
             {
                 await using var insert = new NpgsqlCommand($"""

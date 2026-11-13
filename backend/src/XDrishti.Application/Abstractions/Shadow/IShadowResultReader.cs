@@ -11,7 +11,8 @@ namespace XDrishti.Application.Abstractions.Shadow;
 /// <param name="SheetId">The charge sheet that charged a net grade, or null.</param>
 /// <param name="RGross">The same trade's R before charges (the replay's filled R), or null while not graded.</param>
 /// <param name="EdgeEpoch">The paper epoch in force when the candidate was written, or null when there was none (spec CF-09 reads the current epoch's rows only).</param>
-public sealed record ShadowResultRow(DateOnly SessionDate, string TradeKey, string TicketGroup, bool CountsForEdge, string Status, double? RSim, string? RBasis, string? SheetId, double? RGross, long? EdgeEpoch = null);
+/// <param name="InSet">Whether the candidate's strategy version is in the frozen evidence set of its epoch (spec AM-01 GAP-09); false (labelled <c>outside_set</c>) also when the epoch has no set. Only a row inside the set counts for edge and for the readiness forward rows. The reader always sets it; the default is for callers that build a row by hand.</param>
+public sealed record ShadowResultRow(DateOnly SessionDate, string TradeKey, string TicketGroup, bool CountsForEdge, string Status, double? RSim, string? RBasis, string? SheetId, double? RGross, long? EdgeEpoch = null, bool InSet = true);
 
 /// <summary>The size and head of the chain, for the summary.</summary>
 /// <param name="Sessions">Stored sessions, ok and gap.</param>

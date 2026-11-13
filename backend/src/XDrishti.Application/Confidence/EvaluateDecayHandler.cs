@@ -25,7 +25,7 @@ internal sealed class EvaluateDecayHandler(
 
         // shortcut: every shadow row of every epoch is read to list the strategies; ask the reader for the epoch's strategies when the record grows.
         var strategies = (await shadow.ResultsAsync(cancellationToken))
-            .Where(r => r.CountsForEdge && r.EdgeEpoch == epoch?.Id && r.TradeKey.Contains('|', StringComparison.Ordinal))
+            .Where(r => r.CountsForEdge && r.InSet && r.EdgeEpoch == epoch?.Id && r.TradeKey.Contains('|', StringComparison.Ordinal))
             .Select(r => r.TradeKey[..r.TradeKey.IndexOf('|', StringComparison.Ordinal)])
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)

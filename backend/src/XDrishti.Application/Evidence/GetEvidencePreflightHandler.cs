@@ -172,7 +172,7 @@ internal sealed class GetEvidencePreflightHandler(
     private async ValueTask<(bool? Met, string Reason)> ShadowAsync(CancellationToken ct)
     {
         var s = await shadow.HandleAsync(new GetShadowSummaryQuery(), ct);
-        return (s.Enabled, s.Enabled ? "paper.shadow.enabled is ON" : "paper.shadow.enabled is OFF (the default)");
+        return (s.Enabled, s.Enabled ? "paper.shadow.enabled is ON" : "paper.shadow.enabled is OFF (the owner switched it off; the default is ON, ADR 0282)");
     }
 
     private async ValueTask<(bool? Met, string Reason)> CaptureAsync(CancellationToken ct)

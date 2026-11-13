@@ -61,6 +61,15 @@ describe('the one narrow exception: the Paper shadow switch (OPS-01, ADR 0278)',
   it('lets exactly that PUT and its one useMutation through', () => {
     expect(findWrites(withoutShadowSwitch(file, text))).toEqual([]);
   });
+  it('lets the one evidence-set PUT and its useMutation through, and only once', () => {
+    const evidence = "unwrap(await api.PUT('/api/paper/shadow/evidence-set', { body }))";
+    const both = `${text} const e = useMutation({ mutationFn: async (body) => ${evidence} });`;
+    expect(findWrites(withoutShadowSwitch(file, both))).toEqual([]);
+    expect(findWrites(withoutShadowSwitch(file, `${both} api.PUT('/api/paper/shadow/evidence-set', {});`))).not.toEqual(
+      [],
+    );
+    expect(findWrites(withoutShadowSwitch('../features/paper/api/other.ts', both))).not.toEqual([]);
+  });
   it('still catches any other write in that file, or the same text in any other file', () => {
     expect(findWrites(withoutShadowSwitch(file, `${text} api.POST('/api/x');`))).not.toEqual([]);
     expect(findWrites(withoutShadowSwitch(file, `${text} ${text}`))).not.toEqual([]);

@@ -18,12 +18,14 @@ namespace XDrishti.Application.Shadow;
 /// <summary>
 /// Writes the shadow record (spec CF-08, ADR 0211). For each session of a stored plan that has not opened it turns every plan item of any group into a row from the STORED plan record (levels, group, and the advisory figure when the plan holds one; no recomputation),
 /// and chains the session's digest after the newest one. A session that has opened is never written: it gets a gap row, and nothing is back-filled. Idempotent: a session already stored is left alone. With <c>paper.shadow.enabled</c> OFF it writes nothing at all.
-/// It reads the plan record and the paper epoch and writes only <c>paper.shadow_*</c>: no ticket moves, no order, no broker call, nothing the plan or the paper count reads changes.
+/// The first session of an edge epoch registers the epoch's evidence set first (spec AM-01 GAP-09: the versions of the eligible cells, <c>auto</c>, in the same transaction, before the entries); with no set stored and none nameable it writes no session at all (fail closed, logged).
+/// It reads the plan record and the paper epoch and writes only <c>paper.shadow_*</c> (and the set with its ledger rows): no ticket moves, no order, no broker call, nothing the plan or the paper count reads changes.
 /// </summary>
 internal sealed class WriteShadowHandler(
     IShadowSettings settings,
     IPlanStore plans,
     IShadowStore store,
+    IEvidenceSetStore evidenceSets,
     IPaperStore paper,
     IGovernanceStore governance,
     ITradingCalendar calendars,
@@ -58,6 +60,7 @@ internal sealed class WriteShadowHandler(
         var total = new Totals();
         string? previous = head?.Digest;
         Context? context = null;
+        var setMissing = false;
         foreach (var date in sessions)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -69,6 +72,14 @@ internal sealed class WriteShadowHandler(
             else
             {
                 context ??= await ReadContextAsync(cancellationToken);
+                if (!context.SetAvailable)
+                {
+                    // Fail closed: without an evidence set no session is written, so nothing is counted either; a later run tries again, and a session that opens meanwhile is recorded as a gap.
+                    setMissing = true;
+                    ShadowLog.EvidenceSetMissing(logger);
+                    break;
+                }
+
                 session = await BuildAsync(date, previous, calendar, context, total, cancellationToken);
             }
 
@@ -76,6 +87,12 @@ internal sealed class WriteShadowHandler(
             if (session is null || !await store.WriteSessionAsync(session, cancellationToken))
             {
                 break;
+            }
+
+            if (session.EvidenceSet is { } registered && context is not null)
+            {
+                ShadowLog.EvidenceSetRegistered(logger, registered.Versions.Count);
+                context.PendingSet = null; // only the epoch's first session carries the set
             }
 
             previous = session.Digest;
@@ -92,7 +109,7 @@ internal sealed class WriteShadowHandler(
         }
 
         ShadowLog.Written(logger, total.Sessions, total.Rows, total.EdgeRows, total.Gaps, total.Dropped);
-        return Result.Success(new ShadowWriteOutcome(true, total.Sessions, total.Rows, total.EdgeRows, total.Gaps, total.Dropped));
+        return Result.Success(new ShadowWriteOutcome(true, total.Sessions, total.Rows, total.EdgeRows, total.Gaps, total.Dropped, setMissing));
     }
 
     /// <summary>
@@ -149,7 +166,17 @@ internal sealed class WriteShadowHandler(
         // Read only: the epoch in force and the frozen fingerprint of the newest full snapshot; neither is created or changed here.
         var epoch = await paper.CurrentEpochAsync(cancellationToken);
         var snapshot = await governance.LatestSnapshotAsync(true, cancellationToken);
-        return new Context(epoch?.Id, snapshot?.Hash);
+        var key = EvidenceSetRules.EpochKey(epoch?.Id);
+        if (await evidenceSets.CurrentAsync(key, cancellationToken) is not null)
+        {
+            return new Context(epoch?.Id, snapshot?.Hash, true, null); // the epoch has a set (an owner's, or the automatic one of an earlier session)
+        }
+
+        // No set yet: the default rule, fixed from the stored snapshot before any forward result of the epoch exists. Nothing nameable means no write.
+        var versions = EvidenceSetRules.Default(snapshot?.ComponentsJson);
+        return versions is null
+            ? new Context(epoch?.Id, snapshot?.Hash, false, null)
+            : new Context(epoch?.Id, snapshot?.Hash, true, new NewEvidenceSet(key, versions, EvidenceSetRules.SetHash(versions), EvidenceSetRules.ModeAuto, EvidenceSetRules.AutoActor, null));
     }
 
     private async Task<NewShadowSession?> BuildAsync(DateOnly date, string? previous, TradingCalendar calendar, Context context, Totals total, CancellationToken cancellationToken)
@@ -207,10 +234,21 @@ internal sealed class WriteShadowHandler(
             }
         }
 
-        return new NewShadowSession(date, "ok", previous, ShadowDigest.Next(previous, date, "ok", entries.Select(e => e.RowHash)), entries, scores);
+        return new NewShadowSession(date, "ok", previous, ShadowDigest.Next(previous, date, "ok", entries.Select(e => e.RowHash)), entries, scores, context.PendingSet);
     }
 
-    private sealed record Context(long? EdgeEpoch, string? ConfigHash);
+    private sealed class Context(long? edgeEpoch, string? configHash, bool setAvailable, NewEvidenceSet? pendingSet)
+    {
+        public long? EdgeEpoch { get; } = edgeEpoch;
+
+        public string? ConfigHash { get; } = configHash;
+
+        /// <summary>Whether the epoch has a set or can be given the default one.</summary>
+        public bool SetAvailable { get; } = setAvailable;
+
+        /// <summary>The automatic set the next ok session stores with its entries; null once stored or when the epoch already has one.</summary>
+        public NewEvidenceSet? PendingSet { get; set; } = pendingSet;
+    }
 
     private sealed class Totals
     {

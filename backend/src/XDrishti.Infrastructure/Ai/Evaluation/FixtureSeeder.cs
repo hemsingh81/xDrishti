@@ -394,13 +394,18 @@ public static class FixtureSeeder
         // The shadow record: one plan of one session with an item per candidate, an entry per item and a gross grade per entry; the owner's switch is ON in this database.
         var shadow = evidence.Shadow;
         // The tables stamp every row with their own clock and refuse a row written after the open of its session (ADR 0211); a synthetic past session cannot pass that, so the owner of the fixture database switches those user triggers off for this one transaction (they are on again before it commits).
-        var shadowTables = new[] { "paper.shadow_settings", "paper.shadow_sessions", "paper.shadow_entries", "paper.shadow_grades" };
+        var shadowTables = new[] { "paper.shadow_settings", "paper.shadow_sessions", "paper.shadow_entries", "paper.shadow_grades", "paper.evidence_sets" };
         foreach (var table in shadowTables)
         {
             await Exec(c, t, $"ALTER TABLE {table} DISABLE TRIGGER USER", ct);
         }
 
         await Exec(c, t, "INSERT INTO paper.shadow_settings (enabled, actor, reason, changed_at) VALUES (true, 'owner:eval-fixture@example.test', 'eval fixture database', @stamp)", ct, ("stamp", NpgsqlDbType.TimestampTz, stamp));
+
+        // AM-01b (GAP-09): only rows inside the epoch's evidence set count for edge, so the fixture names the version of its candidates as the set (no paper epoch: key 0), as the owner would.
+        await Exec(
+            c, t, "INSERT INTO paper.evidence_sets (edge_epoch, versions, set_hash, mode, actor, reason) VALUES (0, to_jsonb(ARRAY[@version::text]), @set, 'owner', 'owner:eval-fixture@example.test', 'eval fixture database')", ct,
+            ("version", NpgsqlDbType.Text, Sha("eval-definition|VWAP_PULLBACK")), ("set", NpgsqlDbType.Char, Sha("eval-fixture-evidence-set")));
         var planId = (long)(await Scalar(
             c, t,
             """

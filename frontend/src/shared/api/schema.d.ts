@@ -4548,6 +4548,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/paper/shadow/evidence-set': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The frozen evidence set of the current edge epoch of the shadow record (spec AM-01 GAP-09, ADR 0282): the strategy versions whose shadow rows count for the edge count and the readiness forward rows, its state (pending: none stored, the first shadow write registers the default of the eligible cells' versions; open: stored, no shadow row of the epoch yet, the owner may replace it; frozen: never replaceable), who or what froze it (mode auto = system:default, or owner) and why. Rows of other versions are still written and graded, labelled outside_set, and left out of the edge figures. Read only (a session; not one of the assistant's evidence GETs); no order exists */
+    get: operations['GetShadowEvidenceSet'];
+    /** Replace the evidence set of the current edge epoch as the owner, before the first shadow write of the epoch and never after. Stores one audited row and registers the versions in the trial ledger (a registration, not a look). Needs a session, the CSRF token and the password in the body, checked on EVERY change. 401 auth.invalid_credentials, 423 auth.locked, 403 paper.evidence_set_owner_only, 400 paper.evidence_set_reason_invalid, 400 paper.evidence_set_versions_invalid, 400 paper.evidence_set_unknown_version, 409 paper.evidence_set_frozen (a shadow row of the epoch exists), 429 auth.rate_limited */
+    put: operations['ReplaceShadowEvidenceSet'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/paper/phase-check': {
     parameters: {
       query?: never;
@@ -12797,6 +12815,64 @@ export interface components {
       state: string;
       /** Format: int32 */
       n: null | number;
+    };
+    /** @description The answer of a replace: the set now in force. */
+    EvidenceSetReplaced: {
+      /**
+       * Format: int64
+       * @description The paper epoch, or null while none exists.
+       */
+      edgeEpoch: null | number;
+      /** @description The identity of the new set. */
+      setHash: string;
+      /**
+       * Format: int32
+       * @description How many versions it holds.
+       */
+      versions: number;
+    };
+    /** @description The body of the evidence-set replacement. The owner is never part of it: the actor comes from the signed-in session. */
+    EvidenceSetRequest: {
+      /** @description The strategy version hashes (64 lower-case hex characters each, stored versions) that make the set: 1 to 500, distinct. */
+      versions: null | string[];
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS change; checked on every request, wrong ones count toward the sign-in lockout. */
+      password: null | string;
+    };
+    /** @description The evidence set of the current edge epoch: the strategy versions whose shadow rows count for edge and for the readiness forward rows, and who or what froze it. */
+    EvidenceSetView: {
+      /**
+       * Format: int64
+       * @description The paper epoch the set belongs to, or null while no paper epoch exists.
+       */
+      edgeEpoch: null | number;
+      /** @description `pending` (no set stored: the first shadow write of the epoch registers the default), `open` (a set is stored, no shadow row of the epoch yet: the owner may still replace it) or `frozen` (a shadow row exists: never replaceable). */
+      state: string;
+      /** @description The versions of the stored set; for `pending` the versions the default rule would register now (empty when none is eligible). */
+      versions: string[];
+      /** @description The identity of the stored set, or null while pending. */
+      setHash: null | string;
+      /** @description `auto` (the system default rule) or `owner`; null while pending. */
+      mode: null | string;
+      /** @description `system:default` or the owner's actor; null while pending. */
+      actor: null | string;
+      /** @description The owner's reason; null for an automatic set or while pending. */
+      reason: null | string;
+      /**
+       * Format: date-time
+       * @description When the stored set was written; null while pending.
+       */
+      createdAt: null | string;
+      /**
+       * Format: date-time
+       * @description When the epoch's first shadow write was stored with the automatic set; null otherwise.
+       */
+      firstWriteAt: null | string;
+      /** @description Whether the switch `paper.shadow.enabled` is ON. */
+      shadowEnabled: boolean;
+      /** @description What the state means and what happens next, in words. */
+      note: string;
     };
     /** @description The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words. */
     EvidenceView: {
@@ -23586,6 +23662,12 @@ export interface components {
        * @description Edge candidates graded as not gradable.
        */
       notGradable: number;
+      /**
+       * Format: int32
+       * @description Candidates that would count for edge but whose strategy version is outside the epoch's frozen evidence set (spec AM-01 GAP-09): written and graded, labelled `outside_set`, left out of every edge figure.
+       * @default 0
+       */
+      outsideSet: number;
     };
     /** @description The effective n of the edge count and the pace (criteria 8 and 9). */
     ShadowEdgeView: {
@@ -36806,6 +36888,104 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ShadowSwitched'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetShadowEvidenceSet: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EvidenceSetView'];
+        };
+      };
+    };
+  };
+  ReplaceShadowEvidenceSet: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EvidenceSetRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EvidenceSetReplaced'];
         };
       };
       /** @description Bad Request */

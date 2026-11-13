@@ -32,7 +32,7 @@ public sealed class EvalFixtureDatabaseTests(ReadOnlyDatabase db) : IAsyncLifeti
         TRUNCATE ai.settings CASCADE;
         DELETE FROM ai.eval_baselines; DELETE FROM ai.eval_cases; DELETE FROM ai.eval_runs; DELETE FROM ai.eval_marker;
         DELETE FROM research.lessons; DELETE FROM research.hypotheses; DELETE FROM research.sim_trades; DELETE FROM research.sim_runs; DELETE FROM research.cell_stats;
-        DELETE FROM paper.shadow_grades; DELETE FROM paper.shadow_entries; DELETE FROM paper.shadow_sessions; DELETE FROM paper.shadow_settings;
+        DELETE FROM paper.shadow_grades; DELETE FROM paper.shadow_entries; DELETE FROM paper.shadow_sessions; DELETE FROM paper.shadow_settings; DELETE FROM paper.evidence_sets;
         DELETE FROM research.replay_trades; DELETE FROM research.replay_sessions; DELETE FROM research.replay_runs;
         DELETE FROM trading.plan_item_allocations; DELETE FROM trading.plan_items; DELETE FROM trading.plans;
         DELETE FROM portfolio.holding_lots; DELETE FROM portfolio.holdings; DELETE FROM accounts.portfolio_buckets; DELETE FROM accounts.broker_accounts;

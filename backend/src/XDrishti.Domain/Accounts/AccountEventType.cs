@@ -116,4 +116,5 @@ public enum AccountEventType
     LooseningSettingsChanged,
     HypothesisProposed,
     OpeningBarsSwitched,
+    EvidenceSetReplaced,
 }

@@ -165,6 +165,10 @@ public sealed class PaperShadowGradeEndToEndTests(ApiFactory factory) : DataTest
             await using (var connection = await OpenAsync())
             {
                 await ExecuteAsync(connection, "INSERT INTO paper.shadow_settings (enabled, actor, reason) VALUES (true, 'owner:test@example.com', 'test')");
+                await ExecuteAsync(
+                    connection,
+                    "INSERT INTO paper.config_snapshots (taken_at, session_date, hash, components, partial, process) VALUES (now(), '2099-02-02', md5(random()::text) || md5(random()::text), jsonb_build_object('cells.eligible/' || @cell, @hash::text), false, 'xd-api')",
+                    ("cell", SwingCell), ("hash", hash));
             }
 
             var written = await WithAsync(p => p.GetRequiredService<ICommandHandler<WriteShadowCommand, ShadowWriteOutcome>>().HandleAsync(new WriteShadowCommand(null), Ct).AsTask());
