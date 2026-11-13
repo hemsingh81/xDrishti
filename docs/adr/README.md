@@ -275,3 +275,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0286](0286-the-paper-epoch-freezes-the-strategy-versions-and-the-rules-but-not-the-cell-statistics-snapshot.md) | The paper epoch freezes the strategy versions and the rules but not the cell-statistics snapshot | Accepted |
 | [0287](0287-auto-scope-expands-basket-members-as-of-the-plan-session.md) | Auto scope expands basket members as of the plan session; a system basket before its known-since date is flagged, the scope definition is still not versioned | Accepted |
 | [0288](0288-p13-tick-and-depth-features-are-dropped-the-depth-and-tick-recorders-are-removed-and-the-feature-set-comparison-stays.md) | P13 (tick and depth features) is dropped; the depth and tick recorders are removed; the feature-set comparison stays | Accepted |
+| [0289](0289-basis-carry-family-is-dropped-from-p14.md) | The basis/carry family is dropped from P14; the phase check judges six families | Accepted |

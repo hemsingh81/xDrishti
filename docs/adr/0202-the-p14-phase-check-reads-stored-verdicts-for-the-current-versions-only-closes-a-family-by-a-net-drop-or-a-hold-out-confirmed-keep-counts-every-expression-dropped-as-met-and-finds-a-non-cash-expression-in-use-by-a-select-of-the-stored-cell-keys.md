@@ -30,3 +30,6 @@ P14's exit is "an option expression beats cash/futures OOS after costs, else sta
 ## Consequences
 - No migration, no API change, no frontend. One setting `Options:PhaseCheck:StaleAfterDays` (doc 16).
 - Expected answer for months: NOT EVALUABLE (`folds 0 of 6` until five years of bars, `spread_unavailable` until 60 usable sessions, gross until the owner loads charge lines).
+
+## Amendment 2026-11-13 ([ADR 0289](0289-basis-carry-family-is-dropped-from-p14.md))
+`basis:carry-1` is no longer a family: the check judges six families (`basis:carry-1` is an unknown family name for `--cut`, like any other). The recommendation in open question 1 to cut it first is moot. `--cut` itself is unchanged for the other families.
