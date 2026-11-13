@@ -8,7 +8,7 @@ internal sealed record OptionsPhaseCheckOptions(IReadOnlyList<string> Cut, bool 
     public const string Usage = """
         usage:
           xd options phase-check [--cut FAMILY[,FAMILY...]] [--json]
-            judges the P14 exit "an option expression beats cash OOS after costs, else stays disabled" from the stored verdicts of the seven families (expr:option_buy, expr:debit_spread, expr:credit_spread, expr:iron_condor, ext:iv-1, pairs:intraday-1, basis:carry-1),
+            judges the P14 exit "an option expression beats cash OOS after costs, else stays disabled" from the stored verdicts of the six families (expr:option_buy, expr:debit_spread, expr:credit_spread, expr:iron_condor, ext:iv-1, pairs:intraday-1),
             each for the current versions only, then prints MET, NOT MET or NOT EVALUABLE with every open family and its missing quantity, the violations (a stored plan item or paper entry with a non-cash cell key), the archive figures and the honest limits (always printed)
             --cut lists families as cut and leaves them out of the overall (default: none cut); --json prints the same fields as JSON
             nothing is written, no evaluation is run, no switch or setting is changed and no order is placed

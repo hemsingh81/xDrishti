@@ -30,7 +30,6 @@ public sealed class GetOptionsPhaseCheckHandlerTests
 
     private static readonly Guid Nifty = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-    private static readonly string[] CutBasis = [OptionsPhaseCheck.BasisCarry];
 
     private sealed class FakePhase : IOptionsPhaseReader
     {
@@ -158,7 +157,7 @@ public sealed class GetOptionsPhaseCheckHandlerTests
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("options.unknown_family");
         result.Error.Message.ShouldContain("expr:bogus");
-        result.Error.Message.ShouldContain("basis:carry-1");
+        result.Error.Message.ShouldContain("pairs:intraday-1");
         rig.Evaluations.Asked.ShouldBeEmpty();
         rig.Phase.Asked.ShouldBeEmpty();
     }
@@ -193,7 +192,7 @@ public sealed class GetOptionsPhaseCheckHandlerTests
         rig.Evaluations.Records.Add(Record(PairFamilies.Intraday, "DROP", """{"sources":{"charge_basis":"gross","fill_engine":"sim-9"}}""") with { Protocol = "S", VersionKey = "pairs-1" });
         rig.Phase.Recorder = true;
 
-        var report = await rig.RunAsync(OptionsPhaseCheck.BasisCarry);
+        var report = await rig.RunAsync();
 
         report.Verdict.ShouldBe(PhaseVerdicts.Met, string.Join(" | ", report.Open));
         report.ArchiveNote.ShouldNotBeNull().ShouldContain("archive still recording after DROP");
@@ -368,11 +367,11 @@ public sealed class GetOptionsPhaseCheckHandlerTests
     {
         var rig = new Rig();
 
-        var report = await rig.RunAsync(ExpressionFamilies.IronCondor, OptionsPhaseCheck.BasisCarry);
+        var report = await rig.RunAsync(ExpressionFamilies.IronCondor, IvFeatureCatalog.Family);
 
         rig.Evaluations.Asked.Select(a => a.Family).ShouldNotContain(ExpressionFamilies.IronCondor);
-        rig.Evaluations.Asked.Select(a => a.Family).ShouldNotContain(OptionsPhaseCheck.BasisCarry);
-        report.Cut.ShouldBe([ExpressionFamilies.IronCondor, OptionsPhaseCheck.BasisCarry]);
+        rig.Evaluations.Asked.Select(a => a.Family).ShouldNotContain(IvFeatureCatalog.Family);
+        report.Cut.ShouldBe([ExpressionFamilies.IronCondor, IvFeatureCatalog.Family]);
     }
 
     [Fact]

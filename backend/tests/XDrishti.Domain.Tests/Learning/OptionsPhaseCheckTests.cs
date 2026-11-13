@@ -9,7 +9,7 @@ public sealed class OptionsPhaseCheckTests
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 4, 6, 0, 0, TimeSpan.Zero);
 
-    private static readonly string[] CutBasis = [OptionsPhaseCheck.BasisCarry];
+    private static readonly string[] NoCut = [];
 
     private static Dictionary<string, string> Versions(string remark = "expr-1") => new Dictionary<string, string> { ["remark_version"] = remark, ["engine"] = "sim-9" };
 
@@ -34,26 +34,26 @@ public sealed class OptionsPhaseCheckTests
         new([.. families], new OptionsCellFacts(cellsReadable, rows ?? [], false), new OptionsArchiveFacts(years, [new OptionsUnderlyingFact("NIFTY", 12, 40, 2)], recorderOn, false), Now, 90, Now);
 
     private static OptionsPhaseFacts AllDropped(Func<string, OptionsFamilyFacts>? make = null) =>
-        Facts(OptionsPhaseCheck.Families.Select(f => f == OptionsPhaseCheck.BasisCarry ? Family(f) : (make ?? Dropped)(f)));
+        Facts(OptionsPhaseCheck.Families.Select(make ?? Dropped));
 
     [Fact]
     public void Every_expression_family_dropped_and_the_rest_dropped_or_cut_is_met_as_stays_disabled()
     {
-        var report = OptionsPhaseCheck.Evaluate(AllDropped(), CutBasis);
+        var report = OptionsPhaseCheck.Evaluate(AllDropped(), NoCut);
 
         report.Verdict.ShouldBe(PhaseVerdicts.Met);
         report.Summary.ShouldContain("option expressions stay disabled");
         report.Open.ShouldBeEmpty();
         report.Violations.ShouldBeEmpty();
         report.ArchiveNote.ShouldNotBeNull().ShouldContain("archive still recording after DROP: owner may switch it off");
-        report.Cut.ShouldBe(CutBasis);
+        report.Cut.ShouldBe(NoCut);
     }
 
     [Fact]
     public void The_archive_note_is_information_when_the_recorder_is_off_and_absent_when_a_family_is_kept()
     {
-        var off = OptionsPhaseCheck.Evaluate(Facts(OptionsPhaseCheck.Families.Select(f => f == OptionsPhaseCheck.BasisCarry ? Family(f) : Dropped(f)), recorderOn: false), CutBasis);
-        var kept = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? Kept(f) : Dropped(f)), CutBasis);
+        var off = OptionsPhaseCheck.Evaluate(Facts(OptionsPhaseCheck.Families.Select(Dropped), recorderOn: false), NoCut);
+        var kept = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? Kept(f) : Dropped(f)), NoCut);
 
         off.ArchiveNote.ShouldNotBeNull().ShouldContain("not recording");
         kept.ArchiveNote.ShouldBeNull();
@@ -62,7 +62,7 @@ public sealed class OptionsPhaseCheckTests
     [Fact]
     public void An_option_buy_keep_confirmed_on_the_hold_out_with_the_rest_resolved_is_met()
     {
-        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? Kept(f) : Dropped(f)), CutBasis);
+        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? Kept(f) : Dropped(f)), NoCut);
 
         report.Verdict.ShouldBe(PhaseVerdicts.Met);
         report.Families.Single(f => f.Family == ExpressionFamilies.OptionBuy).Resolved.ShouldBeTrue();
@@ -72,7 +72,7 @@ public sealed class OptionsPhaseCheckTests
     [Fact]
     public void Another_expression_family_kept_while_option_buy_is_dropped_is_met()
     {
-        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.DebitSpread ? Kept(f) : Dropped(f)), CutBasis);
+        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.DebitSpread ? Kept(f) : Dropped(f)), NoCut);
 
         report.Verdict.ShouldBe(PhaseVerdicts.Met);
     }
@@ -80,7 +80,7 @@ public sealed class OptionsPhaseCheckTests
     [Fact]
     public void A_development_keep_without_a_hold_out_record_is_not_evaluable_with_hold_out_not_read()
     {
-        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? Family(f, Record("dev", "KEEP", "O")) : Dropped(f)), CutBasis);
+        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? Family(f, Record("dev", "KEEP", "O")) : Dropped(f)), NoCut);
 
         report.Verdict.ShouldBe(PhaseVerdicts.NotEvaluable);
         report.Open.ShouldHaveSingleItem().ShouldContain("hold-out not read");
@@ -93,7 +93,7 @@ public sealed class OptionsPhaseCheckTests
     {
         var family = Family(ExpressionFamilies.OptionBuy, Record("hold", "NOT_EVALUABLE", "O", holdOut: true, missing: ["hold-out paired trades 40 of 100"], developmentRecord: "dev"), Record("dev", "KEEP", "O"));
 
-        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? family : Dropped(f)), CutBasis);
+        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? family : Dropped(f)), NoCut);
 
         report.Verdict.ShouldBe(PhaseVerdicts.NotEvaluable);
         report.Open.ShouldHaveSingleItem().ShouldContain("hold-out read, not confirmed");
@@ -105,7 +105,7 @@ public sealed class OptionsPhaseCheckTests
     {
         var family = Family(ExpressionFamilies.CreditSpread, Record("c1", "NOT_EVALUABLE", "O", rows: 0, missing: ["folds 0 of 6", "spread_unavailable"]));
 
-        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.CreditSpread ? family : Dropped(f)), CutBasis);
+        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.CreditSpread ? family : Dropped(f)), NoCut);
 
         report.Verdict.ShouldBe(PhaseVerdicts.NotEvaluable);
         report.Open.ShouldHaveSingleItem().ShouldContain("expr:credit_spread");
@@ -127,7 +127,7 @@ public sealed class OptionsPhaseCheckTests
     [Fact]
     public void A_violation_is_judged_even_when_the_family_is_cut_and_a_paper_entry_counts_too()
     {
-        var report = OptionsPhaseCheck.Evaluate(AllDropped() with { Cells = new OptionsCellFacts(true, [new OptionsCellRow("paper.entries", 9)], false) }, [.. CutBasis, ExpressionFamilies.IronCondor]);
+        var report = OptionsPhaseCheck.Evaluate(AllDropped() with { Cells = new OptionsCellFacts(true, [new OptionsCellRow("paper.entries", 9)], false) }, [.. NoCut, ExpressionFamilies.IronCondor]);
 
         report.Verdict.ShouldBe(PhaseVerdicts.NotMet);
         report.Violations.ShouldHaveSingleItem().Source.ShouldBe("paper.entries");
@@ -136,7 +136,7 @@ public sealed class OptionsPhaseCheckTests
     [Fact]
     public void Unreadable_plan_rows_can_never_be_met()
     {
-        var report = OptionsPhaseCheck.Evaluate(AllDropped() with { Cells = new OptionsCellFacts(false, [], false) }, CutBasis);
+        var report = OptionsPhaseCheck.Evaluate(AllDropped() with { Cells = new OptionsCellFacts(false, [], false) }, NoCut);
 
         report.Verdict.ShouldBe(PhaseVerdicts.NotEvaluable);
         report.Open.ShouldHaveSingleItem().ShouldContain("could not be read");
@@ -155,12 +155,11 @@ public sealed class OptionsPhaseCheckTests
     }
 
     [Fact]
-    public void The_basis_family_reads_none_stored_unless_cut_and_keeps_the_check_open()
+    public void The_basis_carry_family_is_not_a_family_and_the_six_decide_the_exit_without_a_cut()
     {
-        var report = OptionsPhaseCheck.Evaluate(AllDropped(), []);
-
-        report.Verdict.ShouldBe(PhaseVerdicts.NotEvaluable);
-        report.Open.ShouldHaveSingleItem().ShouldContain("basis:carry-1 (none): none stored");
+        OptionsPhaseCheck.Families.Count.ShouldBe(6);
+        OptionsPhaseCheck.Families.ShouldNotContain("basis:carry-1");
+        OptionsPhaseCheck.Evaluate(AllDropped(), []).Verdict.ShouldBe(PhaseVerdicts.Met);
     }
 
     [Fact]
@@ -168,7 +167,7 @@ public sealed class OptionsPhaseCheckTests
     {
         var family = Family(ExpressionFamilies.OptionBuy, Record("old", "KEEP", "O", remark: "expr-0"));
 
-        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? family : Dropped(f)), CutBasis);
+        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? family : Dropped(f)), NoCut);
 
         report.Verdict.ShouldBe(PhaseVerdicts.NotEvaluable);
         var line = report.Families.Single(f => f.Family == ExpressionFamilies.OptionBuy);
@@ -190,22 +189,22 @@ public sealed class OptionsPhaseCheckTests
         withoutKey.Remove(key);
         var missing = Record("r", "DROP", "O") with { Recorded = withoutKey, Current = current };
 
-        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? Family(f, differing) : Dropped(f)), CutBasis).Families[0].Status.ShouldBe(OptionsPhaseCheck.StatusStale);
-        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? Family(f, missing) : Dropped(f)), CutBasis).Families[0].Detail.ShouldContain(key + " not recorded");
+        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? Family(f, differing) : Dropped(f)), NoCut).Families[0].Status.ShouldBe(OptionsPhaseCheck.StatusStale);
+        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? Family(f, missing) : Dropped(f)), NoCut).Families[0].Detail.ShouldContain(key + " not recorded");
     }
 
     [Fact]
     public void An_archive_that_moved_on_more_than_the_bound_from_the_watermark_is_stale_and_a_stopped_archive_does_not_age_a_verdict()
     {
-        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(10, Now.AddDays(-91)), Now), CutBasis).Families[0].Status.ShouldBe(OptionsPhaseCheck.StatusStale);
-        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(10, Now.AddDays(-91)), Now), CutBasis).Families[0].Detail.ShouldContain("more than 90 days behind the newest fetch");
-        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(10, null), Now), CutBasis).Families[0].Detail.ShouldContain("archive watermark not found");
-        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(10, Now.AddDays(-89)), Now), CutBasis).Verdict.ShouldBe(PhaseVerdicts.Met);
-        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(0, null), Now), CutBasis).Verdict.ShouldBe(PhaseVerdicts.Met);
+        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(10, Now.AddDays(-91)), Now), NoCut).Families[0].Status.ShouldBe(OptionsPhaseCheck.StatusStale);
+        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(10, Now.AddDays(-91)), Now), NoCut).Families[0].Detail.ShouldContain("more than 90 days behind the newest fetch");
+        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(10, null), Now), NoCut).Families[0].Detail.ShouldContain("archive watermark not found");
+        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(10, Now.AddDays(-89)), Now), NoCut).Verdict.ShouldBe(PhaseVerdicts.Met);
+        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(0, null), Now), NoCut).Verdict.ShouldBe(PhaseVerdicts.Met);
         // the archive stopped long ago: the watermark is the newest fetch, so the verdict is still current a year later
-        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(10, Now.AddDays(-400)), Now.AddDays(-400)) with { Now = Now.AddDays(300) }, CutBasis).Verdict.ShouldBe(PhaseVerdicts.Met);
+        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(10, Now.AddDays(-400)), Now.AddDays(-400)) with { Now = Now.AddDays(300) }, NoCut).Verdict.ShouldBe(PhaseVerdicts.Met);
         // no fetch stored at all: a record that rests on the archive is stale
-        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(10, Now), null), CutBasis).Families[0].Detail.ShouldContain("no archive fetch is stored");
+        OptionsPhaseCheck.Evaluate(WithWatermark(new OptionsWatermarkFact(10, Now), null), NoCut).Families[0].Detail.ShouldContain("no archive fetch is stored");
 
         static OptionsPhaseFacts WithWatermark(OptionsWatermarkFact mark, DateTimeOffset? latest) => AllDropped(f => f == ExpressionFamilies.OptionBuy ? Family(f, Record("d", "DROP", "O", watermark: mark)) : Dropped(f)) with { LatestFetchEndedAt = latest };
     }
@@ -215,7 +214,7 @@ public sealed class OptionsPhaseCheckTests
     {
         var old = Record("iv", "DROP", "X", basis: "unavailable (protocol X may be gross)", watermark: new OptionsWatermarkFact(5, Now.AddDays(-120)));
 
-        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == IvFeatureCatalog.Family ? Family(f, old) : Dropped(f)), CutBasis);
+        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == IvFeatureCatalog.Family ? Family(f, old) : Dropped(f)), NoCut);
 
         var line = report.Families.Single(f => f.Family == IvFeatureCatalog.Family);
         (line.Status, line.Resolved).ShouldBe((OptionsPhaseCheck.StatusStale, false));
@@ -226,12 +225,12 @@ public sealed class OptionsPhaseCheckTests
     {
         var family = Family(ExpressionFamilies.OptionBuy, Record("dev-new", "KEEP", "O"), Record("hold", "KEEP", "O", holdOut: true, developmentRecord: "dev-old"));
 
-        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? family : Dropped(f)), CutBasis);
+        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? family : Dropped(f)), NoCut);
 
         report.Verdict.ShouldBe(PhaseVerdicts.NotEvaluable);
         report.Open.ShouldHaveSingleItem().ShouldContain("hold-out read for record dev-old, not for the newest development record dev-new");
         var named = Family(ExpressionFamilies.OptionBuy, Record("dev-new", "KEEP", "O"), Record("hold", "KEEP", "O", holdOut: true, developmentRecord: "dev-new"));
-        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? named : Dropped(f)), CutBasis).Verdict.ShouldBe(PhaseVerdicts.Met);
+        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? named : Dropped(f)), NoCut).Verdict.ShouldBe(PhaseVerdicts.Met);
     }
 
     [Fact]
@@ -242,9 +241,9 @@ public sealed class OptionsPhaseCheckTests
         var net = Family(IvFeatureCatalog.Family, Record("dev", "KEEP", "X", basis: "net"), Record("hold", "KEEP", "X", holdOut: true, basis: "net", developmentRecord: "dev"));
         var drop = Family(IvFeatureCatalog.Family, Record("d", "DROP", "X", basis: Unknown));
 
-        OptionsPhaseCheck.Evaluate(AllDropped(f => f == IvFeatureCatalog.Family ? gross : Dropped(f)), CutBasis).Open.ShouldHaveSingleItem().ShouldContain("net is required for a KEEP");
-        OptionsPhaseCheck.Evaluate(AllDropped(f => f == IvFeatureCatalog.Family ? net : Dropped(f)), CutBasis).Verdict.ShouldBe(PhaseVerdicts.Met);
-        var dropped = OptionsPhaseCheck.Evaluate(AllDropped(f => f == IvFeatureCatalog.Family ? drop : Dropped(f)), CutBasis);
+        OptionsPhaseCheck.Evaluate(AllDropped(f => f == IvFeatureCatalog.Family ? gross : Dropped(f)), NoCut).Open.ShouldHaveSingleItem().ShouldContain("net is required for a KEEP");
+        OptionsPhaseCheck.Evaluate(AllDropped(f => f == IvFeatureCatalog.Family ? net : Dropped(f)), NoCut).Verdict.ShouldBe(PhaseVerdicts.Met);
+        var dropped = OptionsPhaseCheck.Evaluate(AllDropped(f => f == IvFeatureCatalog.Family ? drop : Dropped(f)), NoCut);
         dropped.Verdict.ShouldBe(PhaseVerdicts.Met);
         dropped.ToText().ShouldContain("costs unavailable (protocol X may be gross)");
     }
@@ -258,7 +257,7 @@ public sealed class OptionsPhaseCheckTests
     {
         var family = Family(ExpressionFamilies.OptionBuy, Record("g", word, "O", basis: basis), Record("h", "KEEP", "O", holdOut: true, basis: basis, developmentRecord: "g"));
 
-        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? family : Dropped(f)), CutBasis);
+        var report = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? family : Dropped(f)), NoCut);
 
         report.Verdict.ShouldBe(PhaseVerdicts.NotEvaluable);
         report.Open.ShouldHaveSingleItem().ShouldContain($"costs are {basis}, net is required");
@@ -267,8 +266,8 @@ public sealed class OptionsPhaseCheckTests
     [Fact]
     public void A_gross_pairs_drop_is_valid_and_a_gross_pairs_keep_is_not()
     {
-        var drop = OptionsPhaseCheck.Evaluate(AllDropped(f => f == PairFamilies.Intraday ? Family(f, Record("s", "DROP", "S", basis: "gross")) : Dropped(f)), CutBasis);
-        var keep = OptionsPhaseCheck.Evaluate(AllDropped(f => f == PairFamilies.Intraday ? Family(f, Record("s", "KEEP", "S", basis: "gross"), Record("h", "KEEP", "S", holdOut: true, basis: "gross", developmentRecord: "s")) : Dropped(f)), CutBasis);
+        var drop = OptionsPhaseCheck.Evaluate(AllDropped(f => f == PairFamilies.Intraday ? Family(f, Record("s", "DROP", "S", basis: "gross")) : Dropped(f)), NoCut);
+        var keep = OptionsPhaseCheck.Evaluate(AllDropped(f => f == PairFamilies.Intraday ? Family(f, Record("s", "KEEP", "S", basis: "gross"), Record("h", "KEEP", "S", holdOut: true, basis: "gross", developmentRecord: "s")) : Dropped(f)), NoCut);
 
         drop.Verdict.ShouldBe(PhaseVerdicts.Met);
         keep.Verdict.ShouldBe(PhaseVerdicts.NotEvaluable);
@@ -280,8 +279,8 @@ public sealed class OptionsPhaseCheckTests
         var thinRows = Family(ExpressionFamilies.OptionBuy, Record("t", "DROP", "O", rows: 0));
         var thinMissing = Family(ExpressionFamilies.OptionBuy, Record("t", "DROP", "O", missing: ["latest epoch n 12 of 30"]));
 
-        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? thinRows : Dropped(f)), CutBasis).Open.ShouldHaveSingleItem().ShouldContain("no rows behind it");
-        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? thinMissing : Dropped(f)), CutBasis).Open.ShouldHaveSingleItem().ShouldContain("latest epoch n 12 of 30");
+        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? thinRows : Dropped(f)), NoCut).Open.ShouldHaveSingleItem().ShouldContain("no rows behind it");
+        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? thinMissing : Dropped(f)), NoCut).Open.ShouldHaveSingleItem().ShouldContain("latest epoch n 12 of 30");
     }
 
     [Fact]
@@ -290,8 +289,8 @@ public sealed class OptionsPhaseCheckTests
         var inconclusive = Family(ExpressionFamilies.DebitSpread, Record("i", "INCONCLUSIVE", "O"));
         var odd = Family(ExpressionFamilies.DebitSpread, Record("o", "MAYBE", "O"));
 
-        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.DebitSpread ? inconclusive : Dropped(f)), CutBasis).Open.ShouldHaveSingleItem().ShouldContain("(INCONCLUSIVE)");
-        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.DebitSpread ? odd : Dropped(f)), CutBasis).Open.ShouldHaveSingleItem().ShouldContain("unrecognised verdict word");
+        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.DebitSpread ? inconclusive : Dropped(f)), NoCut).Open.ShouldHaveSingleItem().ShouldContain("(INCONCLUSIVE)");
+        OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.DebitSpread ? odd : Dropped(f)), NoCut).Open.ShouldHaveSingleItem().ShouldContain("unrecognised verdict word");
     }
 
     [Fact]
@@ -299,7 +298,7 @@ public sealed class OptionsPhaseCheckTests
     {
         var facts = AllDropped(f => f == ExpressionFamilies.OptionBuy ? new OptionsFamilyFacts(f, false, []) : Dropped(f));
 
-        var report = OptionsPhaseCheck.Evaluate(facts, CutBasis);
+        var report = OptionsPhaseCheck.Evaluate(facts, NoCut);
 
         report.Verdict.ShouldBe(PhaseVerdicts.NotEvaluable);
         report.Families[0].Status.ShouldBe(OptionsPhaseCheck.StatusUnreadable);
@@ -308,12 +307,12 @@ public sealed class OptionsPhaseCheckTests
     [Fact]
     public void Cut_families_are_listed_as_cut_and_left_out_and_without_the_flag_nothing_is_cut()
     {
-        var cut = OptionsPhaseCheck.Evaluate(AllDropped(), [OptionsPhaseCheck.BasisCarry, ExpressionFamilies.IronCondor]);
+        var cut = OptionsPhaseCheck.Evaluate(AllDropped(), [IvFeatureCatalog.Family, ExpressionFamilies.IronCondor]);
         var none = OptionsPhaseCheck.Evaluate(AllDropped(), []);
 
-        cut.Cut.ShouldBe([ExpressionFamilies.IronCondor, OptionsPhaseCheck.BasisCarry]);
-        cut.Families.Where(f => f.Cut).Select(f => f.Family).ShouldBe([ExpressionFamilies.IronCondor, OptionsPhaseCheck.BasisCarry]);
-        cut.ToText().ShouldContain("cut: expr:iron_condor, basis:carry-1");
+        cut.Cut.ShouldBe([ExpressionFamilies.IronCondor, IvFeatureCatalog.Family]);
+        cut.Families.Where(f => f.Cut).Select(f => f.Family).ShouldBe([ExpressionFamilies.IronCondor, IvFeatureCatalog.Family]);
+        cut.ToText().ShouldContain("cut: expr:iron_condor, ext:iv-1");
         none.Cut.ShouldBeEmpty();
         none.ToText().ShouldContain("cut: none");
     }
@@ -322,7 +321,7 @@ public sealed class OptionsPhaseCheckTests
     public void Every_family_cut_and_every_expression_family_cut_are_not_evaluable()
     {
         var all = OptionsPhaseCheck.Evaluate(AllDropped(), OptionsPhaseCheck.Families.ToList());
-        var expressions = OptionsPhaseCheck.Evaluate(AllDropped(), [ExpressionFamilies.OptionBuy, ExpressionFamilies.DebitSpread, ExpressionFamilies.CreditSpread, ExpressionFamilies.IronCondor, OptionsPhaseCheck.BasisCarry]);
+        var expressions = OptionsPhaseCheck.Evaluate(AllDropped(), [ExpressionFamilies.OptionBuy, ExpressionFamilies.DebitSpread, ExpressionFamilies.CreditSpread, ExpressionFamilies.IronCondor]);
 
         all.Summary.ShouldContain("every family is cut");
         expressions.Summary.ShouldContain("every expression family is cut");
@@ -332,7 +331,7 @@ public sealed class OptionsPhaseCheckTests
     [Fact]
     public void The_limits_block_and_the_archive_figures_are_always_printed()
     {
-        var text = OptionsPhaseCheck.Evaluate(AllDropped(), CutBasis).ToText();
+        var text = OptionsPhaseCheck.Evaluate(AllDropped(), NoCut).ToText();
 
         text.ShouldContain("limits:");
         text.ShouldContain("Survivorship (ISS-22)");
@@ -368,7 +367,7 @@ public sealed class OptionsPhaseCheckTests
     {
         var odd = Record("n", "DROP", "O") with { DerivedExpiryShare = double.NaN, FallbackShare = double.PositiveInfinity };
 
-        var text = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? Family(f, odd) : Dropped(f)), CutBasis).ToText();
+        var text = OptionsPhaseCheck.Evaluate(AllDropped(f => f == ExpressionFamilies.OptionBuy ? Family(f, odd) : Dropped(f)), NoCut).ToText();
 
         text.ShouldContain("expr:option_buy: DROP (resolved); record n; N 3; costs net; hold-out not read; expiry derived unavailable; model-price fallback unavailable");
     }
@@ -376,7 +375,7 @@ public sealed class OptionsPhaseCheckTests
     [Fact]
     public void Json_has_the_same_fields_as_the_text()
     {
-        var report = OptionsPhaseCheck.Evaluate(AllDropped(), CutBasis);
+        var report = OptionsPhaseCheck.Evaluate(AllDropped(), NoCut);
 
         using var json = JsonDocument.Parse(report.ToJson());
         var names = json.RootElement.EnumerateObject().Select(p => p.Name).ToList();
@@ -392,8 +391,8 @@ public sealed class OptionsPhaseCheckTests
     [Fact]
     public void The_same_facts_give_identical_text_and_json()
     {
-        var a = OptionsPhaseCheck.Evaluate(AllDropped(), CutBasis);
-        var b = OptionsPhaseCheck.Evaluate(AllDropped(), CutBasis);
+        var a = OptionsPhaseCheck.Evaluate(AllDropped(), NoCut);
+        var b = OptionsPhaseCheck.Evaluate(AllDropped(), NoCut);
 
         (a.ToText(), a.ToJson()).ShouldBe((b.ToText(), b.ToJson()));
     }

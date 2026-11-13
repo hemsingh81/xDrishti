@@ -63,14 +63,14 @@ public sealed class OptionsPhaseCheckCommandTests
     {
         var fake = new Fake(_ => Report("NOT EVALUABLE"));
 
-        var (code, output, _) = await RunAsync(fake, "--json", "--cut", "basis:carry-1,expr:iron_condor");
+        var (code, output, _) = await RunAsync(fake, "--json", "--cut", "ext:iv-1,expr:iron_condor");
 
         code.ShouldBe(0);
         output.ShouldStartWith("{");
         output.ShouldContain("\"verdict\": \"NOT EVALUABLE\"");
         output.ShouldContain("\"limits\"");
         output.ShouldContain("\"stale_after_days\": 90");
-        fake.Seen.ShouldHaveSingleItem().Cut.ShouldBe(["basis:carry-1", "expr:iron_condor"]);
+        fake.Seen.ShouldHaveSingleItem().Cut.ShouldBe(["ext:iv-1", "expr:iron_condor"]);
     }
 
     [Fact]

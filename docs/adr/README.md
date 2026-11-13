@@ -274,3 +274,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0285](0285-the-model-looks-once-per-block-at-the-hold-out-by-a-fixed-rule-at-the-seal-and-the-ml-gate-reads-its-stored-figures.md) | The model looks once per block at the hold-out, by a fixed rule at the seal, and the ML gate reads its stored figures | Accepted |
 | [0286](0286-the-paper-epoch-freezes-the-strategy-versions-and-the-rules-but-not-the-cell-statistics-snapshot.md) | The paper epoch freezes the strategy versions and the rules but not the cell-statistics snapshot | Accepted |
 | [0287](0287-auto-scope-expands-basket-members-as-of-the-plan-session.md) | Auto scope expands basket members as of the plan session; a system basket before its known-since date is flagged, the scope definition is still not versioned | Accepted |
+| [0289](0289-basis-carry-family-is-dropped-from-p14.md) | The basis/carry family is dropped from P14; the phase check judges six families | Accepted |

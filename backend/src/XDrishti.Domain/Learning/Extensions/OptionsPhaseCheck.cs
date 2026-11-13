@@ -11,9 +11,6 @@ namespace XDrishti.Domain.Learning.Extensions;
 /// </summary>
 public static class OptionsPhaseCheck
 {
-    /// <summary>The basis family of P14-14/15; it does not exist yet, so it reads <c>none stored</c> unless the owner cut it.</summary>
-    public const string BasisCarry = "basis:carry-1";
-
     /// <summary>Years of underlying bars the expression study needs (CF-04).</summary>
     public const double YearsNeeded = 5;
 
@@ -36,7 +33,7 @@ public static class OptionsPhaseCheck
     /// <summary>The families the check judges, in the order the verb lists them. Built from constants, so this type names no family list.</summary>
     public static IReadOnlyList<string> Families { get; } =
     [
-        ExpressionFamilies.OptionBuy, ExpressionFamilies.DebitSpread, ExpressionFamilies.CreditSpread, ExpressionFamilies.IronCondor, IvFeatureCatalog.Family, PairFamilies.Intraday, BasisCarry,
+        ExpressionFamilies.OptionBuy, ExpressionFamilies.DebitSpread, ExpressionFamilies.CreditSpread, ExpressionFamilies.IronCondor, IvFeatureCatalog.Family, PairFamilies.Intraday,
     ];
 
     /// <summary>The limits that make a verdict weak; printed in every report.</summary>
@@ -164,7 +161,7 @@ public static class OptionsPhaseCheck
 
         if (facts.Records.Count == 0)
         {
-            return new OptionsFamilyLine(family, StatusNone, false, false, null, null, "unavailable", "unavailable", null, null, family == BasisCarry ? "none stored: the basis family is not built" : "no P14 evaluation stored for this family");
+            return new OptionsFamilyLine(family, StatusNone, false, false, null, null, "unavailable", "unavailable", null, null, "no P14 evaluation stored for this family");
         }
 
         var current = facts.Records.Where(r => Stale(r, latestFetch, staleAfterDays) is null).ToList();
