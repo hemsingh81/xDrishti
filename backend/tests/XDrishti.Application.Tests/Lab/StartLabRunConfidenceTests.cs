@@ -166,8 +166,8 @@ public sealed class StartLabRunConfidenceTests
             return true;
         });
 
-        var cut = await Handler().HandleAsync(Full(), Ct);
-        var explicitWindow = await Handler().HandleAsync(Full("full", new DateOnly(2026, 2, 1), new DateOnly(2026, 7, 1)), Ct);
+        var cut = await Handler(holdOut: new HoldOutOptions(Enforce: false)).HandleAsync(Full(), Ct);
+        var explicitWindow = await Handler(holdOut: new HoldOutOptions(Enforce: false)).HandleAsync(Full("full", new DateOnly(2026, 2, 1), new DateOnly(2026, 7, 1)), Ct);
 
         stored.ShouldNotBeNull().Start.ShouldBe(new DateOnly(2026, 5, 1));
         cut.Value.Run.Window.To.ShouldBe(new DateOnly(2026, 4, 30), "a development run never reads the hold-out, enforcement or not");

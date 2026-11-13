@@ -2,7 +2,7 @@ namespace XDrishti.Application.Lab;
 
 /// <summary>
 /// What the one look at the hold-out said, as served and as stored (spec CF-06, D5). <c>State</c> is <c>used</c> (the first look at the block) or <c>reused</c> (a later look: the numbers are shown, the result counts as a trial and cannot count toward a pass).
-/// <c>Mode</c> is <c>owner</c> or <c>auto</c> (the auto option, recorded as auto and never as an owner approval). <c>RunSawHoldOut</c> is true when the run the plan came from had a window reaching into the block: such a look is never a pass.
+/// <c>Mode</c> is <c>owner</c> or <c>auto</c> (the auto option, recorded as auto and never as an owner approval). <c>ReusedReason</c> is <c>not_predated</c> when the look was stored re-used because its subject was not frozen before the block's horizon (HO-01 D5). <c>RunSawHoldOut</c> is true when the run the plan came from had a window reaching into the block: such a look is never a pass.
 /// </summary>
 public sealed record HoldOutResultView(
     string StrategyId,
@@ -25,13 +25,23 @@ public sealed record HoldOutResultView(
     string? PlanHash,
     string SettingHash,
     string Actor,
-    IReadOnlyList<string> Notes);
+    IReadOnlyList<string> Notes,
+    string? ReusedReason = null);
 
 /// <summary>
-/// A block of the hold-out chain as served (HO-01): <c>HistoryLast</c> is its last date. <c>State</c> is <c>filling</c>, <c>sealed</c>, <c>looked</c> or <c>released</c>; <c>FreshLook</c> says whether a fresh look was taken (for a released block, whether it had one when
-/// released); <c>ReleasedAt</c> and <c>Mode</c> (<c>owner</c> or <c>auto</c>) are set once it is released.
+/// A block of the hold-out chain as served (HO-01): <c>HistoryLast</c> is its last date. <c>State</c> is <c>filling</c>, <c>sealed</c>, <c>looked</c> or <c>released</c>; <c>Looks</c> holds the three looks (strategy, model, system); <c>BlockedBy</c> names what keeps the block in force from being released by the auto option (set for the block in force only);
+/// <c>ReleasedAt</c> and <c>Mode</c> (<c>owner</c> or <c>auto</c>) are set once it is released.
 /// </summary>
-public sealed record HoldOutBlockView(DateOnly Start, DateOnly HistoryFirst, DateOnly HistoryLast, int LengthMonths, string SettingHash, DateTimeOffset CreatedAt, string? State = null, bool? FreshLook = null, DateTimeOffset? ReleasedAt = null, string? Mode = null);
+public sealed record HoldOutBlockView(DateOnly Start, DateOnly HistoryFirst, DateOnly HistoryLast, int LengthMonths, string SettingHash, DateTimeOffset CreatedAt, string? State = null, HoldOutLooksView? Looks = null, DateTimeOffset? ReleasedAt = null, string? Mode = null, string? BlockedBy = null);
+
+/// <summary>The three looks of a block (HO-01 D5): one per kind.</summary>
+public sealed record HoldOutLooksView(HoldOutLookView Strategy, HoldOutLookView Model, HoldOutLookView System);
+
+/// <summary>
+/// One kind's look at a block: <c>State</c> is <c>fresh</c> (the slot is taken, with its subject, verdict and mode), <c>available</c> (free, an eligible subject exists), <c>no_subject</c> (free, none exists or the kind's path is not built), <c>unavailable</c> (the read failed)
+/// or <c>none</c> (not read: the block is released without a look of this kind, or not in force).
+/// </summary>
+public sealed record HoldOutLookView(string State, string? Subject = null, bool? Passed = null, string? Status = null, DateTimeOffset? At = null, string? Mode = null);
 
 /// <summary>The sizing the policy gives for the stored history now (D4).</summary>
 public sealed record HoldOutPlanView(double HistoryMonths, int LengthMonths, double DevelopmentMonths, int Folds, DateOnly? Start, string Status);

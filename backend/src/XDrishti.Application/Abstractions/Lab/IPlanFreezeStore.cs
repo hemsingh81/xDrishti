@@ -11,4 +11,7 @@ public interface IPlanFreezeStore
 
     /// <summary>The first plan hash the version froze, or null.</summary>
     ValueTask<string?> FirstAsync(string strategyId, int version, CancellationToken cancellationToken);
+
+    /// <summary>When the version first froze a plan (the subject's freeze time for the pre-dating horizon of a hold-out look, HO-01 D5), or null.</summary>
+    ValueTask<DateTimeOffset?> FirstFrozenAtAsync(string strategyId, int version, CancellationToken cancellationToken);
 }

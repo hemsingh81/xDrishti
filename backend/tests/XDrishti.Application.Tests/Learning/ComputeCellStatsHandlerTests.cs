@@ -81,6 +81,34 @@ public sealed class ComputeCellStatsHandlerTests
     }
 
     [Fact]
+    public async Task A_cell_whose_trades_exit_inside_a_released_block_carries_its_label_and_a_cell_outside_carries_none()
+    {
+        Run(KeyA, Trade(Side.Buy, AsOf.AddDays(-5), 1), Trade(Side.Buy, AsOf.AddDays(-40), -1), Trade(Side.Sell, AsOf.AddDays(-60), 2), Trade(Side.Sell, AsOf.AddDays(-50), -1));
+        var released = new List<(DateOnly Start, DateOnly End)> { (AsOf.AddDays(-10), AsOf) };
+
+        var result = await Handler().HandleAsync(Command(new CellSource(KeyA, "intraday", "FIXED_RR")) with { ReleasedBlocks = released }, Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        var labelled = _written!.SeenHoldOut.ShouldNotBeNull();
+        labelled.Keys.ShouldBe(["ORB|15m|BUY|intraday|FIXED_RR|*"]);
+        labelled["ORB|15m|BUY|intraday|FIXED_RR|*"].ShouldBe("seen_holdout:" + AsOf.AddDays(-10).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task A_label_is_not_part_of_the_snapshot_key()
+    {
+        Run(KeyA, Trade(Side.Buy, AsOf, 1));
+        var plain = await Handler().HandleAsync(Command(new CellSource(KeyA, "intraday", "FIXED_RR")), Ct);
+        var keyPlain = plain.Value.SnapshotKey;
+        Run(KeyA, Trade(Side.Buy, AsOf, 1));
+
+        var labelled = await Handler().HandleAsync(Command(new CellSource(KeyA, "intraday", "FIXED_RR")) with { ReleasedBlocks = [(AsOf.AddDays(-3), AsOf)] }, Ct);
+
+        _written!.SeenHoldOut.ShouldNotBeNull();
+        labelled.Value.SnapshotKey.ShouldBe(keyPlain, "a label is not part of the snapshot key");
+    }
+
+    [Fact]
     public async Task The_same_inputs_give_the_same_key_and_a_stored_snapshot_is_reported_as_already_stored()
     {
         Run(KeyA, Trade(Side.Buy, AsOf, 1));

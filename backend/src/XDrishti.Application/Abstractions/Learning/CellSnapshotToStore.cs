@@ -10,4 +10,5 @@ namespace XDrishti.Application.Abstractions.Learning;
 /// <param name="Rows">One row per cell and window.</param>
 /// <param name="CreatedBy">Who made it.</param>
 /// <param name="CreatedAt">When.</param>
-public sealed record CellSnapshotToStore(string SnapshotKey, DateOnly AsOf, CellStatsOptions Options, string Sources, IReadOnlyList<CellStatsRow> Rows, string CreatedBy, DateTimeOffset CreatedAt);
+/// <param name="SeenHoldOut">The <c>seen_holdout:&lt;start&gt;</c> labels (comma separated) by cell key, for the rows whose trades exit inside a released hold-out block (HO-01b); null when none.</param>
+public sealed record CellSnapshotToStore(string SnapshotKey, DateOnly AsOf, CellStatsOptions Options, string Sources, IReadOnlyList<CellStatsRow> Rows, string CreatedBy, DateTimeOffset CreatedAt, IReadOnlyDictionary<string, string>? SeenHoldOut = null);

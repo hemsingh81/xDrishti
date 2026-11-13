@@ -18,6 +18,9 @@ public interface ILabRunStore
     /// <summary>Runs newest first, optionally of one strategy and one state, at most <paramref name="limit"/>.</summary>
     ValueTask<IReadOnlyList<LabRun>> ListAsync(string? strategyId, LabRunState? state, int limit, CancellationToken cancellationToken);
 
+    /// <summary>Every succeeded full or robust run, newest first, with no cap (HO-01b: a cap would let a version with an old passing run go unseen, and the hold-out slot read as having no subject). One query; the stored verdicts are read separately.</summary>
+    ValueTask<IReadOnlyList<LabRun>> ListSucceededFullTestsAsync(CancellationToken cancellationToken);
+
     /// <summary>Takes the oldest queued run for <paramref name="host"/> and makes it running (stage <c>validate</c>), or null. Two hosts never get the same run.</summary>
     ValueTask<LabRun?> ClaimNextAsync(string host, DateTimeOffset now, CancellationToken cancellationToken);
 

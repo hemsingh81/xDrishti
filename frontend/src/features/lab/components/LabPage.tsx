@@ -6,6 +6,7 @@ import { PageHeader } from '@/shared/ui';
 import { useToast } from '@/shared/ui/toastContext';
 import { versionQuery } from '../api/labQueries';
 import { EditorCard, type Draft } from './EditorCard';
+import { HoldOutBlocksCard } from './HoldOutBlocksCard';
 import { LedgerCard } from './LedgerCard';
 import { LibraryCard } from './LibraryCard';
 import { RegistrationCard } from './RegistrationCard';
@@ -70,6 +71,9 @@ export function LabPage() {
             <RegistrationCard key={`${origin.id}:${origin.version}`} strategyId={origin.id} version={origin.version} />
           </Grid>
         )}
+        <Grid size={12}>
+          <HoldOutBlocksCard />
+        </Grid>
         <Grid size={12}>
           <RunsCard familyId={familyId} target={origin} runId={runId} onSelectRun={setRunId} />
         </Grid>

@@ -79,12 +79,12 @@ internal sealed class HoldOutReleaseRecordConfiguration : IEntityTypeConfigurati
     }
 }
 
-/// <summary><c>lab.holdout_unlocks</c> (CF-06, ADR 0207): one look at the hold-out per version and kind, irreversible. Insert-only for the runtime role.</summary>
+/// <summary><c>lab.holdout_unlocks</c> (CF-06, ADR 0207): one look at the hold-out per version, kind and block, irreversible; a block gives one fresh look per kind (HO-01). Insert-only for the runtime role.</summary>
 internal sealed class HoldOutUnlockRecordConfiguration : IEntityTypeConfiguration<HoldOutUnlockRecord>
 {
     public void Configure(EntityTypeBuilder<HoldOutUnlockRecord> builder)
     {
-        builder.ToTable("holdout_unlocks", Schemas.Lab, t => t.HasCheckConstraint("ck_holdout_unlocks_shape", "version >= 1 AND kind IN ('strategy','model') AND mode IN ('owner','auto') AND setting_hash ~ '^[0-9a-f]{64}$'"));
+        builder.ToTable("holdout_unlocks", Schemas.Lab, t => t.HasCheckConstraint("ck_holdout_unlocks_shape", "version >= 1 AND kind IN ('strategy','model','system') AND mode IN ('owner','auto') AND setting_hash ~ '^[0-9a-f]{64}$'"));
         builder.HasKey(x => x.Id).HasName("pk_holdout_unlocks");
         builder.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         builder.Property(x => x.StrategyId).HasColumnType("text").IsRequired();
@@ -98,9 +98,11 @@ internal sealed class HoldOutUnlockRecordConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.BlockStart).HasColumnType("date").IsRequired();
         builder.Property(x => x.LabRunId).IsRequired();
         builder.Property(x => x.Result).HasColumnType("jsonb").IsRequired();
-        builder.HasIndex(x => new { x.StrategyId, x.Version, x.Kind }).IsUnique().HasDatabaseName("uq_holdout_unlocks_version");
+        builder.Property(x => x.Reason).HasColumnType("text");
+        // HO-01b (ADR 0283): a version looks once per block and kind
+        builder.HasIndex(x => new { x.StrategyId, x.Version, x.Kind, x.BlockStart }).IsUnique().HasDatabaseName("uq_holdout_unlocks_version");
         builder.HasIndex(x => x.BlockStart, "ix_holdout_unlocks_block").HasDatabaseName("ix_holdout_unlocks_block");   // a named index: without the name it is the same index as the unique one below and the later call wins
-        // at most one fresh look at a block, decided by the database and not by a read before the insert (two looks at once cannot both be fresh)
-        builder.HasIndex(x => x.BlockStart).IsUnique().HasFilter("NOT reused_window").HasDatabaseName("uq_holdout_unlocks_fresh");
+        // at most one fresh look per kind at a block (HO-01b), decided by the database and not by a read before the insert (two looks of a kind at once cannot both be fresh)
+        builder.HasIndex(x => new { x.BlockStart, x.Kind }).IsUnique().HasFilter("NOT reused_window").HasDatabaseName("uq_holdout_unlocks_fresh");
     }
 }

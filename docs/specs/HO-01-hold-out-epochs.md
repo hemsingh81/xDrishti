@@ -64,7 +64,7 @@ New sessions reach learning on a fixed, announced schedule. A hold-out never mov
   - **The horizon.** A look is fresh only when its subject was frozen before the block's horizon:
     - for k ≥ 2 the horizon is `S_k` (India date): the version's first plan freeze (`lab.plan_freezes.created_at`), the model's registration (`research.model_versions`), or the SR-03 registration, must be before it;
     - for block 1 (today's rule, kept), the horizon is the first stored look of any kind at block 1; with no look yet, any subject qualifies. A `system` look is never fresh at block 1: the system's configuration was built while block 1 was being traded and reported.
-  - Otherwise the look is stored `reused_window` with the reason `not_predated` and cannot pass.
+  - Otherwise a strategy look is stored `reused_window` with the reason `not_predated` and cannot pass. A **model** look that is not pre-dated is refused (`learning.holdout_unavailable`) and not stored, because its key is the family and the block and a stored row would fill the family's one row at the block.
   - *Why one per kind, not one per block:* each kind tests a different claim (a strategy keeps its edge; the model beats no-ML; the whole system beats its baseline). With the horizon rule no subject can have been tuned on the block, so a look of one kind cannot contaminate another. One per kind still bounds the number of tests on a block to three, and each look is a row in the trial ledger.
   - *Why not one per strategy family:* three families would give three strategy tests on one block, and the best of them would be a selection. The `system` look is the honest aggregate of the families.
   - *Alternative:* keep one shared slot. Rejected: a model or system look would then burn the strategies' block, which is why CF-10e part 3 and SR-03 were waiting.
@@ -80,7 +80,7 @@ New sessions reach learning on a fixed, announced schedule. A hold-out never mov
   - Deferred to a later, separate spec, shown beside the research basis and never pooled with it.
 - **D10. The seal step.** (Due diligence change 4.) A new service `holdout-epochs`, `After eod`, `NotBeforeSessionEnd`, recovery class `LatestOnly`, **enabled at first start** (it acts only through the auto settings, each of which fails closed). Each evening it:
   1. marks a block sealed when its last session has closed;
-  2. **strategy auto look:** with `Confidence:HoldOut:AutoUnlock` ON (default ON by ADR 0282) and the strategy slot free, claims the look for the newest pre-dated version with a stored default-options full or robust Lab run whose development rows all pass (`HoldOutAutoGate`), ties broken by the earliest first freeze; the look is queued as the existing `holdout` Lab job, `auto`. **Never for block 1** (coordinator, 2026-11-13): block 1 has no pre-dating horizon and its look is irreversible, so its strategy look stays the owner's act (a manual unlock, or a release with the forfeit); the post-Lab-run auto look (`LabRunner.cs:116`) also skips block 1;
+  2. **strategy auto look:** with `Confidence:HoldOut:AutoUnlock` ON (default ON by ADR 0282) and the strategy slot free, claims the look for the newest pre-dated version with a stored default-options full or robust Lab run whose development rows all pass (`HoldOutAutoGate`), ties broken by the earliest first freeze; the look is queued as the existing `holdout` Lab job, `auto`. **Never for block 1** (coordinator, 2026-11-13): block 1 has no pre-dating horizon and its look is irreversible, so its strategy look stays the owner's act (a manual unlock, or a release with the forfeit); the post-Lab-run auto look (`LabRunner.cs:116`) is removed in HO-01b (coordinator, 2026-11-13): the automatic strategy look is taken only by this step;
   3. leaves room for the model step (CF-10e part 3) and the system step (SR-03), added by those slices;
   4. checks the auto release (D4).
 
@@ -146,7 +146,7 @@ Block 2 seals when the session of 2027-05-04 closes. Looks at block 2:
    - ON: an unlooked block, or any `unavailable` read, is never released.
    - OFF: nothing is released by itself.
    - After 20 sealed sessions without release: one notice naming the reason.
-8. **Strategy auto look at the seal.** With AutoUnlock ON, on the evening block 2 seals, the look is claimed for ORB v3 (newest pre-dated version with a development pass), not v4; with AutoUnlock OFF nothing is claimed. On the evening block 1 is in force and sealed, with AutoUnlock ON and a passing version, nothing is claimed either (block 1 is the owner's), and a Lab run that passes does not claim block 1.
+8. **Strategy auto look at the seal.** With AutoUnlock ON, on the evening block 2 seals, the look is claimed for ORB v3 (newest pre-dated version with a development pass), not v4; with AutoUnlock OFF nothing is claimed. On the evening block 1 is in force and sealed, with AutoUnlock ON and a passing version, nothing is claimed either (block 1 is the owner's), and a Lab run that passes claims nothing at any block (the post-run auto look is removed).
 9. **Scorecard row 12 and the ML gate.** A pass on block 1 followed by a fail on block 2 reads fail, for a version (row 12) and for a model family (the gate). After block 2 is released, the model's block-2 figures are still read.
 10. **Labels.** `seen_holdout:<start>` appears on Lab run labels, replay sessions and the run message of the LC-01 refresh (HO-01a). The per-row label on the LC-01 cell rows (the cell tables have no label column) moves to HO-01b.
 11. **Fences.** Pinned by architecture tests:
@@ -202,3 +202,11 @@ Block 2 seals when the session of 2027-05-04 closes. Looks at block 2:
 6. Row 12 reads the newest fresh look, and a later fail beats an earlier pass? **Yes**, and the ML gate reads its model the same way (D8).
 7. Keep block 1 exactly as stored, never re-cut? **Yes.**
 8. The forward-basis cell series (D9) as a later, separate spec? **Yes, defer.**
+
+## As built, HO-01b (2026-11-13)
+Built on branch feature/ho-01b (on top of feature/ho-01a). See [ADR 0283](../adr/0283-the-hold-out-is-a-chain-of-fixed-blocks-released-by-an-owner-act-or-the-auto-option-and-every-cut-follows-the-block-in-force.md), *Amendment, HO-01b*.
+- AC 6, 8, 9: the horizon (`HoldOutHorizon`), the per-kind index and per-block version key, the model reading across blocks, the seal strategy look and row 12 are tested with fakes (`HoldOutSealTests`, `ModelHoldOutLooksTests`, `ScorecardReaderTests`) and against the database (`WidenHoldOutLooksMigrationTests`).
+- AC 7: the auto release is tested through the real strategy slot; the model and system "free slot with an eligible subject" cases are for CF-10e part 3 and SR-03.
+- AC 10: the per-row label is stored on `research.cell_stats.seen_holdout`; serving it in the cell views is not done.
+- `GET /api/lab/holdout` takes no parameter; the query object has an internal `Slots` flag so that the scorecard skips the candidate scan.
+- Service order of the list (`GET /api/services`): `holdout-epochs` follows `ml-monitor`.

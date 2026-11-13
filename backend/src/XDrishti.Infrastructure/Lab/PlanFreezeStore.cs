@@ -32,4 +32,12 @@ internal sealed class PlanFreezeStore(NpgsqlDataSource dataSource) : IPlanFreeze
         command.Parameters.AddWithValue("v", NpgsqlDbType.Integer, version);
         return await command.ExecuteScalarAsync(cancellationToken) as string;
     }
+
+    public async ValueTask<DateTimeOffset?> FirstFrozenAtAsync(string strategyId, int version, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT min(created_at) FROM lab.plan_freezes WHERE strategy_id = @id AND version = @v");
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
+        command.Parameters.AddWithValue("v", NpgsqlDbType.Integer, version);
+        return await command.ExecuteScalarAsync(cancellationToken) is DateTime at ? new DateTimeOffset(DateTime.SpecifyKind(at, DateTimeKind.Utc)) : null;
+    }
 }

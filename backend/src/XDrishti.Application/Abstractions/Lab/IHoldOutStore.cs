@@ -25,8 +25,8 @@ public enum ReleaseOutcome
     ChainConflict,
 }
 
-/// <summary>One look at the hold-out, as stored in <c>lab.holdout_unlocks</c> (spec CF-06, D5).</summary>
-public sealed record StoredUnlock(string StrategyId, int Version, string Kind, string Mode, string Actor, DateTimeOffset UnlockedAt, string SettingHash, bool ReusedWindow, DateOnly BlockStart, Guid RunId, HoldOutResultView Result);
+/// <summary>One look at the hold-out, as stored in <c>lab.holdout_unlocks</c> (spec CF-06, D5). <c>Reason</c> is <c>not_predated</c> when the subject was not frozen before the block's horizon (HO-01 D5), else null.</summary>
+public sealed record StoredUnlock(string StrategyId, int Version, string Kind, string Mode, string Actor, DateTimeOffset UnlockedAt, string SettingHash, bool ReusedWindow, DateOnly BlockStart, Guid RunId, HoldOutResultView Result, string? Reason = null);
 
 /// <summary>
 /// The hold-out blocks, their releases and the looks taken (<c>lab.holdout_unlocks</c>) behind a port (spec CF-06, HO-01). All are insert-only for the runtime role. This port reads the stored records of the hold-out, not market data: the sessions inside the hold-out are read only by the unlock
@@ -49,15 +49,27 @@ public interface IHoldOutStore
     /// <summary>Stores the block; false when a block with this start exists.</summary>
     ValueTask<bool> InsertBlockAsync(HoldOutBlock block, CancellationToken cancellationToken);
 
-    /// <summary>The unlock of the version of this kind (<c>strategy</c>; CF-10 uses <c>model</c>), or null.</summary>
-    ValueTask<StoredUnlock?> GetUnlockAsync(string strategyId, int version, string kind, CancellationToken cancellationToken);
+    /// <summary>The look of the version of this kind at the block that starts on this date (a version looks once per block and kind; CF-10 uses <c>model</c>, SR-03 <c>system</c>), or null.</summary>
+    ValueTask<StoredUnlock?> GetUnlockAsync(string strategyId, int version, string kind, DateOnly blockStart, CancellationToken cancellationToken);
 
-    /// <summary>Whether any look at the block that starts on this date was taken.</summary>
-    ValueTask<bool> AnyUnlockAsync(DateOnly blockStart, CancellationToken cancellationToken);
+    /// <summary>The version's newest look of this kind across blocks, a fresh one before a re-used one (HO-01 D7), or null.</summary>
+    ValueTask<StoredUnlock?> NewestUnlockAsync(string strategyId, int version, string kind, CancellationToken cancellationToken);
+
+    /// <summary>Whether a fresh (not re-used) look of this kind was taken at the block that starts on this date.</summary>
+    ValueTask<bool> HasFreshLookAsync(DateOnly blockStart, string kind, CancellationToken cancellationToken);
+
+    /// <summary>The fresh looks at the block, at most one per kind (HO-01 D5).</summary>
+    ValueTask<IReadOnlyList<StoredUnlock>> ListFreshLooksAsync(DateOnly blockStart, CancellationToken cancellationToken);
+
+    /// <summary>When the first look of any kind at the block was stored, or null when none was (the horizon of block 1, HO-01 D5).</summary>
+    ValueTask<DateTimeOffset?> FirstLookAtAsync(DateOnly blockStart, CancellationToken cancellationToken);
+
+    /// <summary>The looks of this kind whose subject id starts with <paramref name="idPrefix"/>, newest block first (a model family's looks across blocks, HO-01 D8).</summary>
+    ValueTask<IReadOnlyList<StoredUnlock>> ListUnlocksByIdPrefixAsync(string kind, string idPrefix, CancellationToken cancellationToken);
 
     /// <summary>The unlocks, newest first, at most <paramref name="limit"/>.</summary>
     ValueTask<IReadOnlyList<StoredUnlock>> ListUnlocksAsync(int limit, CancellationToken cancellationToken);
 
-    /// <summary>Stores the unlock; false (nothing written) when the version already has one of this kind, when the look is fresh and another fresh look at the block exists, or when the block is released already (the database decides; this closes the race between a look and a release).</summary>
+    /// <summary>Stores the unlock; false (nothing written) when the version already has one of this kind at the block, when the look is fresh and another fresh look of the kind at the block exists, or when the block is released already (the database decides; this closes the race between a look and a release).</summary>
     ValueTask<bool> InsertUnlockAsync(StoredUnlock unlock, CancellationToken cancellationToken);
 }

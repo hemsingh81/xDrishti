@@ -411,6 +411,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, ShadowDigestService>(); // copies the newest chain digest to a log outside the database every week (CF-08 review fix 4, ADR 0232); starts enabled (ADR 0282), nothing exported while paper.shadow.enabled is OFF
         services.AddSingleton<IScheduledService, DecayMonitorService>(); // the daily kill-rule evaluation of each strategy's forward series, after the shadow grading (CF-12 part 12b); starts enabled (ADR 0282), automatic demotion pauses only while confidence.kill.auto is ON (ON by default, owner password to change), no order
         services.AddSingleton<IScheduledService, MlMonitorService>(); // the daily rollback evaluation of each champion, after the decay monitor (CF-10 part 10d-1); starts enabled (ADR 0282), automatic acts only with the owner's settings ON (default OFF), no order
+        services.AddSingleton<IScheduledService, HoldOutEpochsService>(); // the evening seal steps of the hold-out chain (HO-01b, ADR 0283); enabled at first start, acts only through the auto settings, no order
         services.AddSingleton<IScheduledService, CellsRefreshService>(); // the scheduled cell-statistics refresh (LC-01); starts paused, resuming needs the owner's password, fails closed
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
         services.AddSingleton<IScheduledService, BriefingService>(); // the daily briefing text after the suggestions (P9-06); starts paused, the model is used only under both switches
@@ -774,6 +775,10 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetRegistrationQuery, Result<RegistrationView>>, GetRegistrationHandler>(); // reads only the registration store; here, not in AddLabRunner, because the readiness gate (CF-11) of the lifecycle recorder reads it in every host that records a cell move
         services.AddScoped<HoldOutEpochs>(); // the chain of hold-out blocks and their derived states (HO-01, ADR 0283); here, with the hold-out read that uses it
         services.AddScoped<IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>, GetHoldOutHandler>(); // reads the hold-out store and the guard; here for the same reason
+        services.AddScoped<HoldOutReleaser>(); // the one release of the block in force: the owner act and the auto option (HO-01)
+        services.AddScoped<HoldOutStrategyCandidates>(); // the versions that can still take a block's fresh strategy look (HO-01b)
+        services.AddScoped<IHoldOutLookSlot, StrategyLookSlot>(); // the strategy kind's slot; CF-10e part 3 and SR-03 add the model and system slots with one line each
+        services.AddScoped<IBellNoticeSource, HoldOutStalledNotices>(); // a sealed block unreleased after 20 sessions, naming what holds it (HO-01 D4), derived on read
         services.TryAddSingleton(LabSettings.Default); // the host replaces it with its configuration
         services.TryAddSingleton(new ShrinkageOptions()); // shrinkage of expectancy toward the parent (CF-02, ADR 0204): ReportOnly; the host replaces it with its configuration (section Confidence:Shrinkage)
         services.TryAddSingleton(new DeflationOptions()); // the deflated Sharpe ratio of a Lab verdict (CF-03, ADR 0205): ReportOnly; the host replaces it with its configuration (section Confidence:Deflation)
@@ -820,7 +825,9 @@ public static class DependencyInjection
         services.AddScoped<HoldOutUnlocker>(); // the one look at the hold-out, by the owner or by the auto option (CF-06)
         services.AddScoped<ICommandHandler<RegisterStrategyCommand, RegistrationView>, RegisterStrategyHandler>();
         services.AddScoped<ICommandHandler<UnlockHoldOutCommand, LabRunView>, UnlockHoldOutHandler>();
-        services.AddScoped<HoldOutReleaser>(); // the one release of the block in force: the owner act and the auto option (HO-01); the seal step of HO-01b registers its IHoldOutLookSlot kinds
+        services.AddScoped<IHoldOutSealStep, StrategyAutoLookStep>(); // seal step 20: the auto strategy look, never block 1 (HO-01 D10)
+        services.AddScoped<IHoldOutSealStep, HoldOutAutoReleaseStep>(); // seal step 90: the auto release (HO-01 D4)
+        services.AddScoped<ICommandHandler<RunHoldOutEpochsCommand, HoldOutEpochsOutcome>, RunHoldOutEpochsHandler>(); // the evening run of the seal steps (HO-01 D10)
         services.AddScoped<ICommandHandler<ReleaseHoldOutCommand, HoldOutBlockView>, ReleaseHoldOutHandler>();
         services.AddScoped<LabPlateau>(); // the plateau gate beside the nulls, read from the stored sweep (CF-07 part C, ADR 0210)
         services.AddScoped<LabNulls>(); // the random-entry null beside the outcome and its ledger row (CF-07, ADR 0208)

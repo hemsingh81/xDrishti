@@ -62,6 +62,18 @@ export const handlers = [
   http.get('/api/assistant/briefings/:kind', () =>
     problemResponse({ title: 'No briefing is stored.', code: 'assistant.briefing_not_found' }, 404),
   ),
+  // Hold-out blocks (HO-01b): none fixed; the hold-out tests bring their own.
+  http.get('/api/lab/holdout', () =>
+    HttpResponse.json({
+      enforce: true,
+      autoUnlock: true,
+      block: null,
+      proposed: null,
+      unlocks: [],
+      blocks: [],
+      autoRelease: true,
+    }),
+  ),
   // Lab pre-registration (CF-06): none written by default; the tests of the registration bring their own.
   http.get('/api/lab/strategies/:id/versions/:version/registration', () =>
     problemResponse({ title: 'No registration.', code: 'lab.not_found' }, 404),

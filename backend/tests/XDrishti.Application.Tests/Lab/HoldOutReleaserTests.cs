@@ -52,7 +52,7 @@ public sealed class HoldOutReleaserTests
     private HoldOutEpochs Epochs() => new(_store, new FixedCalendar(), _time);
 
     private void Look(DateOnly block, bool reused = false) =>
-        _store.Unlocks.Add(new StoredUnlock("ORB", _store.Unlocks.Count + 1, "strategy", "owner", "owner:x", _time.GetUtcNow(), Hash, reused, block, Guid.NewGuid(), null!));
+        _store.Unlocks.Add(new StoredUnlock("ORB", _store.Unlocks.Count + 1, "strategy", "owner", "owner:x", _time.GetUtcNow(), Hash, reused, block, Guid.NewGuid(), new HoldOutResultView("ORB", 1, "strategy", "owner", reused ? "reused" : "used", _time.GetUtcNow(), block, block, reused, false, true, "pass", "ok", null, null, null, 0, null, Hash, "owner:x", [])));
 
     private static FakeSlot Slot(string kind, LookAvailability state) => new(kind, state);
 

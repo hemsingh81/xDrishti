@@ -855,7 +855,7 @@ public sealed class LabRunnerTests
         var s = settings ?? LabSettings.Default;
         var guard = holdOut is null ? null : new XDrishti.Application.Lab.LabHoldOutGuard(store!, bars!, holdOut, _time);
         return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, s, new ConfidenceOptions(), registration), new LabRobustness(_simulation, s), _ledger, _results, _progress, s, _time, NullLogger<LabRunner>.Instance,
-            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, null, holdOut, guard, unlocker);
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, null, holdOut, guard);
     }
 
     [Fact]
@@ -981,6 +981,7 @@ public sealed class LabRunnerTests
         bars.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new XDrishti.Application.Abstractions.Market.Bars.BarTotals(2, 1000, first, new DateTimeOffset(2026, 10, 30, 15, 29, 0, TimeSpan.FromHours(5.5)), 0, 0));
         var freezes = Substitute.For<IPlanFreezeStore>();
         freezes.FirstAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new string('f', 64));
+        freezes.FirstFrozenAtAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new DateTimeOffset(2026, 9, 1, 5, 0, 0, TimeSpan.Zero)); // pre-dated: frozen before block 2 begins (HO-01b)
         var store = new MemoryHoldOutStore();
         if (blockOneReleased)
         {
@@ -1014,14 +1015,11 @@ public sealed class LabRunnerTests
     }
 
     [Fact]
-    public async Task With_the_auto_option_on_and_every_development_row_a_pass_a_succeeded_run_stores_exactly_one_auto_unlock()
+    public async Task With_the_auto_option_on_and_every_development_row_a_pass_a_succeeded_run_stores_no_unlock_the_seal_step_takes_the_look()
     {
         var store = await RunWithAutoUnlockAsync(autoOn: true);
 
-        var unlock = store.Unlocks.ShouldHaveSingleItem();
-        unlock.Mode.ShouldBe("auto");
-        unlock.Actor.ShouldBe("system:auto-unlock");
-        unlock.StrategyId.ShouldBe("LAB_TEST");
+        store.Unlocks.ShouldBeEmpty("HO-01b: the automatic strategy look is taken only by the seal step, never after a Lab run");
     }
 
     [Fact]

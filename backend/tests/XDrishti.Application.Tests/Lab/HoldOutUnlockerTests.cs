@@ -188,18 +188,16 @@ public sealed class HoldOutUnlockerTests
     [InlineData("robust", "nulls=off")]
     [InlineData("robust", "draws=300")]
     [InlineData("full", "stress=on")]
-    public async Task A_what_if_run_cannot_take_the_hold_out_by_hand_or_by_the_auto_option(string method, string options)
+    public async Task A_what_if_run_cannot_take_the_hold_out(string method, string options)
     {
         _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
         var run = Run(method: method);
         _runs.GetAsync(run.Id, Arg.Any<CancellationToken>()).Returns(run with { RunOptions = options });
 
         var manual = await Unlocker().UnlockAsync(run.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
-        var auto = await Unlocker(new HoldOutOptions(AutoUnlock: true)).TryAutoAsync(run.Id, Verdict(), Ct);
 
         manual.Error.Code.ShouldBe(LabErrors.HoldOutUnavailableCode);
         manual.Error.Message.ShouldContain("what-if");
-        auto.ShouldBeNull();
         _store.Unlocks.ShouldBeEmpty("the single look is not spent");
         _pass.Calls.ShouldBe(0);
     }
@@ -214,26 +212,6 @@ public sealed class HoldOutUnlockerTests
         (await Unlocker().UnlockAsync(run.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct)).IsSuccess.ShouldBeTrue();
     }
 
-    [Fact]
-    public async Task The_auto_option_off_never_runs_and_on_it_runs_once_recorded_as_auto_when_every_development_row_passes()
-    {
-        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
-        var run = Run();
-        ReleaseBlock1(); // automatic looks start at block 2 (HO-01)
-
-        (await Unlocker(new HoldOutOptions(AutoUnlock: false)).TryAutoAsync(run.Id, Verdict(), Ct)).ShouldBeNull();
-        _store.Unlocks.ShouldBeEmpty();
-        var done = await Unlocker(new HoldOutOptions(AutoUnlock: true)).TryAutoAsync(run.Id, Verdict(), Ct);
-        var second = await Unlocker(new HoldOutOptions(AutoUnlock: true)).TryAutoAsync(run.Id, Verdict(), Ct);
-
-        done.ShouldNotBeNull().Mode.ShouldBe("auto");
-        done.Actor.ShouldBe("system:auto-unlock");
-        done.SettingHash.ShouldBe(new HoldOutOptions(AutoUnlock: true).SnapshotHash(), "the snapshot with the setting ON is recorded");
-        second.ShouldBeNull("it ran once");
-        _events.Received(1).Record(Arg.Is<AccountEvent>(e => e.Event == AccountEventType.LabHoldOutUnlocked && e.Actor == "system:auto-unlock" && e.Detail!.Contains("mode=auto", StringComparison.Ordinal)));
-        _store.Unlocks.Single().Mode.ShouldBe("auto");
-    }
-
     private void ReleaseBlock1()
     {
         var one = new HoldOutBlock(new DateOnly(2026, 5, 1), new DateOnly(2024, 10, 1), new DateOnly(2026, 10, 30), 6, Hash, _time.GetUtcNow());
@@ -244,7 +222,7 @@ public sealed class HoldOutUnlockerTests
     }
 
     [Fact]
-    public async Task A_filling_block_is_refused_for_a_manual_look_and_the_auto_option_does_not_run()
+    public async Task A_filling_block_is_refused_for_a_manual_look()
     {
         _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
         var run = Run();
@@ -254,44 +232,27 @@ public sealed class HoldOutUnlockerTests
         _store.Blocks.Add(filling);
 
         var manual = await Unlocker().UnlockAsync(run.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
-        var auto = await Unlocker(new HoldOutOptions(AutoUnlock: true)).TryAutoAsync(run.Id, Verdict(), Ct);
 
         manual.Error.Code.ShouldBe(LabErrors.HoldOutFillingCode);
-        auto.ShouldBeNull();
         _store.Unlocks.ShouldBeEmpty();
         _pass.Calls.ShouldBe(0);
-    }
-
-    [Fact]
-    public async Task The_auto_option_never_claims_block_1_even_when_every_development_row_passes()
-    {
-        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
-        var run = Run();
-
-        var auto = await Unlocker(new HoldOutOptions(AutoUnlock: true)).TryAutoAsync(run.Id, Verdict(), Ct);
-
-        auto.ShouldBeNull();
-        _store.Unlocks.ShouldBeEmpty();
-        _pass.Calls.ShouldBe(0);
-        (await Unlocker().UnlockAsync(run.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct)).IsSuccess.ShouldBeTrue("the owner's own look at block 1 is unchanged");
     }
 
     [Fact]
     public async Task The_auto_option_does_not_run_while_any_development_row_is_not_a_pass_or_is_unavailable()
     {
         _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
-        var run = Run();
-        var on = Unlocker(new HoldOutOptions(AutoUnlock: true));
+        var before = new DateOnly(2026, 4, 30);
+        var start = new DateOnly(2026, 5, 1);
 
-        (await on.TryAutoAsync(run.Id, Verdict(outcome: "MARGINAL"), Ct)).ShouldBeNull();
-        (await on.TryAutoAsync(run.Id, Verdict(gatesPass: false), Ct)).ShouldBeNull();
-        (await on.TryAutoAsync(run.Id, Verdict(enough: null), Ct)).ShouldBeNull("effective n unavailable");
-        (await on.TryAutoAsync(run.Id, Verdict(tradable: "unavailable"), Ct)).ShouldBeNull("cost stress unavailable");
-        (await on.TryAutoAsync(run.Id, Verdict(tradable: null), Ct)).ShouldBeNull("no cost stress block");
-        (await on.TryAutoAsync(run.Id, Verdict(dsr: null), Ct)).ShouldBeNull("no deflated Sharpe");
-        (await on.TryAutoAsync(run.Id, Verdict(dsr: 0.5), Ct)).ShouldBeNull();
-        _store.Unlocks.ShouldBeEmpty();
-        _pass.Calls.ShouldBe(0);
+        HoldOutAutoGate.AllPass(Verdict(), before, start).ShouldBeTrue();
+        HoldOutAutoGate.AllPass(Verdict(outcome: "MARGINAL"), before, start).ShouldBeFalse();
+        HoldOutAutoGate.AllPass(Verdict(gatesPass: false), before, start).ShouldBeFalse();
+        HoldOutAutoGate.AllPass(Verdict(enough: null), before, start).ShouldBeFalse("effective n unavailable");
+        HoldOutAutoGate.AllPass(Verdict(tradable: "unavailable"), before, start).ShouldBeFalse("cost stress unavailable");
+        HoldOutAutoGate.AllPass(Verdict(tradable: null), before, start).ShouldBeFalse("no cost stress block");
+        HoldOutAutoGate.AllPass(Verdict(dsr: null), before, start).ShouldBeFalse("no deflated Sharpe");
+        HoldOutAutoGate.AllPass(Verdict(dsr: 0.5), before, start).ShouldBeFalse();
     }
 
     [Fact]
@@ -311,24 +272,6 @@ public sealed class HoldOutUnlockerTests
     }
 
     [Fact]
-    public async Task The_auto_option_does_not_unlock_a_run_whose_explicit_window_reached_the_block_and_keeps_the_fresh_look_for_a_later_version()
-    {
-        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
-        var reaching = Run(version: 1, to: new DateOnly(2026, 6, 30));
-        var on = Unlocker(new HoldOutOptions(AutoUnlock: true));
-
-        (await on.TryAutoAsync(reaching.Id, Verdict(), Ct)).ShouldBeNull();
-
-        _store.Unlocks.ShouldBeEmpty();
-        _pass.Calls.ShouldBe(0);
-        var later = await Unlocker().UnlockAsync(Run(version: 2).Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
-        later.Value.ReusedWindow.ShouldBeFalse("the fresh slot was not burned");
-        // the owner path is unchanged: a reaching run may still be unlocked by the owner, and is stored but cannot count
-        var owner = await Unlocker().UnlockAsync(reaching.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
-        owner.IsSuccess.ShouldBeTrue();
-    }
-
-    [Fact]
     public async Task The_owner_handler_refuses_an_empty_actor_and_otherwise_queues_one_holdout_job_without_running_the_pass()
     {
         var run = Run();
@@ -343,7 +286,7 @@ public sealed class HoldOutUnlockerTests
         queued.IsSuccess.ShouldBeTrue(queued.IsFailure ? queued.Error.Message : string.Empty);
         (queued.Value.Method, queued.Value.State).ShouldBe(("holdout", "queued"));
         posted.ShouldNotBeNull();
-        posted.Key.ShouldBe(HoldOutJob.KeyOf(run.Id));
+        posted.Key.ShouldBe(HoldOutJob.KeyOf(run.Id, new DateOnly(2026, 5, 1)));
         (posted.StrategyId, posted.Version, posted.StrategyHash, posted.From, posted.To).ShouldBe((run.StrategyId, run.Version, run.StrategyHash, run.From, run.To));
         HoldOutJob.Parse(Queued(posted)).ShouldBe((run.Id, "owner:x"));
         _pass.Calls.ShouldBe(0, "the pass runs on the dispatcher, not in the request");
@@ -489,23 +432,23 @@ public sealed class HoldOutUnlockerTests
         HoldOutJob.Parse(JobOf(run) with { Labels = [] }).ShouldBeNull();
     }
 
-    private HoldOutJobRunner Job(ILabProgress? progress = null) => new(_runs, Unlocker(), progress ?? Substitute.For<ILabProgress>(), _time, NullLogger<HoldOutJobRunner>.Instance);
+    private HoldOutJobRunner Job(ILabProgress? progress = null) => new(_runs, Unlocker(), progress ?? Substitute.For<ILabProgress>(), new HoldOutOptions(), _time, NullLogger<HoldOutJobRunner>.Instance);
 
     private static LabRun Queued(NewLabRun n) => new(n.Id, n.Key, n.StrategyId, n.Version, n.StrategyHash, n.Universe, n.From, n.To, n.Method, n.ConfigHash, n.EngineVersion, LabRunState.Queued, null, 0, 0, [], null, [], [], n.Labels, null, false, n.CreatedAt, null, null);
 
-    private LabRun JobOf(LabRun source) => Queued(new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(source.Id), source.StrategyId, source.Version, source.StrategyHash, source.Universe, source.From, source.To, HoldOutJob.Method, HoldOutJob.ConfigHash, source.EngineVersion, [HoldOutJob.Label(source.Id, "owner:x")], _time.GetUtcNow()));
+    private LabRun JobOf(LabRun source) => Queued(new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(source.Id, new DateOnly(2026, 5, 1)), source.StrategyId, source.Version, source.StrategyHash, source.Universe, source.From, source.To, HoldOutJob.Method, HoldOutJob.ConfigHash, source.EngineVersion, [HoldOutJob.Label(source.Id, "owner:x")], _time.GetUtcNow()));
 
     [Fact]
     public async Task The_hold_out_view_shows_the_proposal_before_a_block_exists_and_numbers_only_in_a_look_that_was_taken()
     {
-        var handler = new GetHoldOutHandler(_store, new LabHoldOutGuard(_store, _bars, new HoldOutOptions(), _time), new HoldOutOptions(), new HoldOutEpochs(_store, new FixedCalendar(), _time));
+        var handler = new GetHoldOutHandler(_store, new LabHoldOutGuard(_store, _bars, new HoldOutOptions(), _time), new HoldOutOptions(), new HoldOutEpochs(_store, new FixedCalendar(), _time), new HoldOutReleaser(new HoldOutEpochs(_store, new FixedCalendar(), _time), _store, [], new HoldOutOptions(), _time, _events, _unitOfWork, NullLogger<HoldOutReleaser>.Instance));
 
         var before = (await handler.HandleAsync(new GetHoldOutQuery(), Ct)).Value;
 
         before.Block.ShouldBeNull();
         before.Proposed.ShouldNotBeNull().Start.ShouldBe(new DateOnly(2026, 5, 1));
         before.Unlocks.ShouldBeEmpty();
-        before.Enforce.ShouldBeFalse();
+        before.Enforce.ShouldBeTrue("HO-01b: the default is ON (ADR 0282)");
         _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
         await Unlocker().UnlockAsync(Run().Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
 
@@ -539,7 +482,7 @@ public sealed class HoldOutUnlockerTests
     }
 }
 
-/// <summary>An in-memory hold-out store with the same uniqueness as the tables.</summary>
+/// <summary>An in-memory hold-out store with the same uniqueness as the tables: one look per (id, version, kind, block) and one fresh look per block and kind.</summary>
 internal sealed class MemoryHoldOutStore : IHoldOutStore
 {
     public List<HoldOutBlock> Blocks { get; } = [];
@@ -587,21 +530,34 @@ internal sealed class MemoryHoldOutStore : IHoldOutStore
         return ValueTask.FromResult(true);
     }
 
-    public ValueTask<StoredUnlock?> GetUnlockAsync(string strategyId, int version, string kind, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(Unlocks.FirstOrDefault(u => u.StrategyId == strategyId && u.Version == version && u.Kind == kind));
+    public ValueTask<StoredUnlock?> GetUnlockAsync(string strategyId, int version, string kind, DateOnly blockStart, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Unlocks.FirstOrDefault(u => u.StrategyId == strategyId && u.Version == version && u.Kind == kind && u.BlockStart == blockStart));
+
+    public ValueTask<StoredUnlock?> NewestUnlockAsync(string strategyId, int version, string kind, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Unlocks.Where(u => u.StrategyId == strategyId && u.Version == version && u.Kind == kind).OrderBy(u => u.ReusedWindow).ThenByDescending(u => u.UnlockedAt).FirstOrDefault());
 
     /// <summary>Set to make the read before the insert miss a look that lands at the same moment (the race the partial unique index closes).</summary>
     public bool HideLooksFromAny { get; set; }
 
-    public ValueTask<bool> AnyUnlockAsync(DateOnly blockStart, CancellationToken cancellationToken) => ValueTask.FromResult(!HideLooksFromAny && Unlocks.Any(u => u.BlockStart == blockStart));
+    public ValueTask<bool> HasFreshLookAsync(DateOnly blockStart, string kind, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(!HideLooksFromAny && Unlocks.Any(u => u.BlockStart == blockStart && u.Kind == kind && !u.ReusedWindow));
+
+    public ValueTask<IReadOnlyList<StoredUnlock>> ListFreshLooksAsync(DateOnly blockStart, CancellationToken cancellationToken) =>
+        Failing ? throw new InvalidOperationException("unavailable") : ValueTask.FromResult<IReadOnlyList<StoredUnlock>>([.. Unlocks.Where(u => u.BlockStart == blockStart && !u.ReusedWindow)]);
+
+    public ValueTask<DateTimeOffset?> FirstLookAtAsync(DateOnly blockStart, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Unlocks.Where(u => u.BlockStart == blockStart).Select(u => (DateTimeOffset?)u.UnlockedAt).Min());
+
+    public ValueTask<IReadOnlyList<StoredUnlock>> ListUnlocksByIdPrefixAsync(string kind, string idPrefix, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<StoredUnlock>>([.. Unlocks.Where(u => u.Kind == kind && u.StrategyId.StartsWith(idPrefix, StringComparison.Ordinal)).OrderByDescending(u => u.BlockStart)]);
 
     public ValueTask<IReadOnlyList<StoredUnlock>> ListUnlocksAsync(int limit, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<StoredUnlock>>([.. Unlocks.AsEnumerable().Reverse().Take(limit)]);
 
     public ValueTask<bool> InsertUnlockAsync(StoredUnlock unlock, CancellationToken cancellationToken)
     {
-        if (Unlocks.Any(u => u.StrategyId == unlock.StrategyId && u.Version == unlock.Version && u.Kind == unlock.Kind)
-            || (!unlock.ReusedWindow && Unlocks.Any(u => u.BlockStart == unlock.BlockStart && !u.ReusedWindow)))
+        if (Unlocks.Any(u => u.StrategyId == unlock.StrategyId && u.Version == unlock.Version && u.Kind == unlock.Kind && u.BlockStart == unlock.BlockStart)
+            || (!unlock.ReusedWindow && Unlocks.Any(u => u.BlockStart == unlock.BlockStart && u.Kind == unlock.Kind && !u.ReusedWindow)))
         {
             return ValueTask.FromResult(false);
         }

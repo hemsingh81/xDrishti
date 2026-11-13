@@ -103,7 +103,7 @@ public sealed class HoldOutChainTests
     {
         var defaults = new HoldOutOptions();
 
-        (defaults.AutoUnlock, defaults.AutoRelease, defaults.BlockMonths, defaults.Enforce).ShouldBe((true, true, 6, false));
+        (defaults.AutoUnlock, defaults.AutoRelease, defaults.BlockMonths, defaults.Enforce).ShouldBe((true, true, 6, true)); // Enforce defaults ON since HO-01b (ADR 0282)
         defaults.KeyText().ShouldContain("auto_release=on");
         defaults.KeyText().ShouldContain("block_months=6");
         defaults.SnapshotHash().ShouldNotBe((defaults with { AutoRelease = false }).SnapshotHash());

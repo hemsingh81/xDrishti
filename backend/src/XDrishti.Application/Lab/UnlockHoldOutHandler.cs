@@ -28,14 +28,14 @@ internal sealed class UnlockHoldOutHandler(HoldOutUnlocker unlocker, ILabRunStor
         var run = plan.Value.Run;
         var labels = new[] { HoldOutJob.Label(run.Id, command.Actor), "Hold-out look: the frozen plan of this run's version, run once over the locked block; the result is stored beside the report." };
         var queued = await runs.InsertOrGetAsync(
-            new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(run.Id), run.StrategyId, run.Version, run.StrategyHash, run.Universe, run.From, run.To, HoldOutJob.Method, HoldOutJob.ConfigHash, run.EngineVersion, labels, time.GetUtcNow()),
+            new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(run.Id, plan.Value.Block.Start), run.StrategyId, run.Version, run.StrategyHash, run.Universe, run.From, run.To, HoldOutJob.Method, HoldOutJob.ConfigHash, run.EngineVersion, labels, time.GetUtcNow()),
             cancellationToken);
         return Result.Success(LabRunView.Of(queued.Run));
     }
 }
 
 /// <summary>Reads the hold-out: the block (or the proposal) and the looks taken. Numbers only in a look that was taken.</summary>
-internal sealed class GetHoldOutHandler(IHoldOutStore store, LabHoldOutGuard guard, HoldOutOptions options, HoldOutEpochs epochs) : IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>
+internal sealed class GetHoldOutHandler(IHoldOutStore store, LabHoldOutGuard guard, HoldOutOptions options, HoldOutEpochs epochs, HoldOutReleaser releaser) : IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>
 {
     public async ValueTask<Result<HoldOutView>> HandleAsync(GetHoldOutQuery query, CancellationToken cancellationToken)
     {
@@ -49,14 +49,21 @@ internal sealed class GetHoldOutHandler(IHoldOutStore store, LabHoldOutGuard gua
             proposed = new HoldOutPlanView(p.HistoryMonths, p.LengthMonths, p.DevelopmentMonths, p.Folds, p.Start, p.Status);
         }
 
+        IReadOnlyDictionary<string, XDrishti.Domain.Lab.LookAvailability>? kinds = null;
+        string? blockedBy = null;
+        if (inForce is not null && query.Slots)
+        {
+            (blockedBy, kinds) = await releaser.WhatHoldsAsync(inForce, cancellationToken);
+        }
+
         var unlocks = await store.ListUnlocksAsync(200, cancellationToken);
         return Result.Success(new HoldOutView(
             options.Enforce,
             options.AutoUnlock,
-            inForce is null ? null : BlockViews.Of(inForce),
+            inForce is null ? null : BlockViews.Of(inForce, kinds, blockedBy),
             proposed,
             [.. unlocks.Select(u => u.Result)],
-            [.. chain.Select(BlockViews.Of)],
+            [.. chain.Select(b => b == inForce ? BlockViews.Of(b, kinds, blockedBy) : BlockViews.Of(b))],
             options.AutoRelease));
     }
 }

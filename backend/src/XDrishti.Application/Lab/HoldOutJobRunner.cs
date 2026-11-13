@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Lab;
 
 namespace XDrishti.Application.Lab;
@@ -8,7 +9,7 @@ namespace XDrishti.Application.Lab;
 /// Carries out a claimed <c>holdout</c> job (spec CF-06, part C, D5): the one look at the hold-out that the owner asked for, run on the Lab dispatcher with a stage log and progress events. The password never reaches here. A failure to look ends the job
 /// <c>failed</c> with the code of the refusal; a cancel seen before the pass starts ends it <c>cancelled</c>; a stop of the host leaves it <c>running</c> for the next start to mark <c>interrupted</c>, and asking again is safe.
 /// </summary>
-internal sealed class HoldOutJobRunner(ILabRunStore runs, HoldOutUnlocker unlocker, ILabProgress progress, TimeProvider time, ILogger<HoldOutJobRunner> logger) : ILabRunExecutor
+internal sealed class HoldOutJobRunner(ILabRunStore runs, HoldOutUnlocker unlocker, ILabProgress progress, HoldOutOptions options, TimeProvider time, ILogger<HoldOutJobRunner> logger) : ILabRunExecutor
 {
     public async Task ExecuteAsync(LabRun run, CancellationToken hostStop)
     {
@@ -30,9 +31,21 @@ internal sealed class HoldOutJobRunner(ILabRunStore runs, HoldOutUnlocker unlock
             {
                 state = LabRunState.Cancelled;
             }
+            else if (string.Equals(HoldOutJob.ModeOf(job.Actor), HoldOutUnlocker.AutoMode, StringComparison.Ordinal) && !options.AutoUnlock)
+            {
+                // an automatic look queued while the setting was ON is not taken after it was turned OFF
+                state = LabRunState.Cancelled;
+                problems.Add(new LabProblem(HoldOutJob.Stage, "holdout", "lab.holdout_auto_off", "The automatic look was queued while the setting was ON and is not taken now that it is OFF.", "info", null, null));
+            }
+            else if (string.Equals(HoldOutJob.ModeOf(job.Actor), HoldOutUnlocker.AutoMode, StringComparison.Ordinal) && await unlocker.AutoLookRefusalAsync(job.RunId, hostStop) is { } refusal)
+            {
+                // the slot was taken, or the version is not pre-dated, while the job waited: nothing is stored, so the version's look at the block is not burned as a re-used one
+                state = LabRunState.Cancelled;
+                problems.Add(new LabProblem(HoldOutJob.Stage, "holdout", "lab.holdout_auto_refused", "The automatic look was not taken: " + refusal + ".", "info", null, null));
+            }
             else
             {
-                var looked = await unlocker.UnlockAsync(job.RunId, HoldOutUnlocker.OwnerMode, job.Actor, hostStop);
+                var looked = await unlocker.UnlockAsync(job.RunId, HoldOutJob.ModeOf(job.Actor), job.Actor, hostStop);
                 state = looked.IsSuccess ? LabRunState.Succeeded : LabRunState.Failed;
                 if (looked.IsSuccess)
                 {

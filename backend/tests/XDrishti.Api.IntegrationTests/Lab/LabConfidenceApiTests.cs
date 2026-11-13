@@ -86,6 +86,8 @@ public sealed class LabConfidenceApiTests(ApiFactory factory) : DataTestBase(fac
         await using (var connection = await OpenAsync())
         {
             await ExecuteAsync(connection, "UPDATE lab.lab_runs SET state = 'succeeded', finished_at = now() WHERE id = @id", ("id", created.Run.Id));
+            // HO-01b: a version looks once per block, so the block must exist for the second look to be refused as used
+            await ExecuteAsync(connection, "DELETE FROM lab.holdout_releases; DELETE FROM lab.holdout_blocks; INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2026-05-01', '2024-10-01', '2026-10-30', 6, repeat('a', 64), now())");
         }
 
         var verdict = new LabVerdictView("PASS", 1, 1, new EvidenceView(100, 0.2, 1.5, 6, 5, 3, 0, "walk_forward"), [], [], [], [], []);

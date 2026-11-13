@@ -16,4 +16,8 @@ public sealed record UnlockHoldOutCommand(Guid RunId, string Actor) : ICommand;
 public sealed record ReleaseHoldOutCommand(DateOnly Start, bool ForfeitLook, string Actor) : ICommand;
 
 /// <summary>The locked hold-out: block, proposal and the looks taken.</summary>
-public sealed record GetHoldOutQuery : IQuery<Result<HoldOutView>>;
+public sealed record GetHoldOutQuery : IQuery<Result<HoldOutView>>
+{
+    /// <summary>Whether the block in force reads what each kind of look can still do and what blocks its auto release (default true); a reader that needs only the looks taken (scorecard row 12) sets it false and skips the candidate scan.</summary>
+    public bool Slots { get; init; } = true;
+}

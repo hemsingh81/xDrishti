@@ -91,7 +91,8 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
         var rows = CellStatsCalculator.Compute(ordered, command.AsOf, command.Options, regime?.Cells, confidence, shrinkage, universe?.Cells);
         var sources = string.Join(',', command.Sources.OrderBy(s => s.RunKey, StringComparer.Ordinal).Select(s => $"{s.RunKey}:{s.Style}:{s.Exit}"));
         var key64 = KeyOf(command.AsOf, command.Options, sources, regimeText, confidence, shrinkage, universeText);
-        var snapshot = new CellSnapshotToStore(key64, command.AsOf, command.Options, sources, rows, command.Actor, time.GetUtcNow());
+        var seen = SeenLabels(command.ReleasedBlocks, ordered, regime?.Cells, universe?.Cells);
+        var snapshot = new CellSnapshotToStore(key64, command.AsOf, command.Options, sources, rows, command.Actor, time.GetUtcNow(), seen);
         bool written;
         try
         {
@@ -121,6 +122,27 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
         }
 
         return Result.Success(outcome);
+    }
+
+    /// <summary>HO-01b: for each cell (all-shares, regime and tier cells alike) whose trades exit inside a released block, the labels of those blocks. A window row shares its cell's label, which is the safe side (a 60-day row of a labelled cell may not hold such a trade).</summary>
+    private static Dictionary<string, string>? SeenLabels(IReadOnlyList<(DateOnly Start, DateOnly End)>? released, params IReadOnlyList<CellInput>?[] groups)
+    {
+        if (released is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        var labels = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var cell in groups.Where(g => g is not null).SelectMany(g => g!))
+        {
+            var hit = released.Where(b => cell.Trades.Any(t => t.ExitDate >= b.Start && t.ExitDate <= b.End)).ToList();
+            if (hit.Count > 0)
+            {
+                labels[cell.Cell.Key] = string.Join(',', hit.OrderBy(b => b.Start).Select(b => XDrishti.Domain.Lab.SeenHoldOut.Label(b.Start)));
+            }
+        }
+
+        return labels.Count == 0 ? null : labels;
     }
 
     internal static string KeyOf(DateOnly asOf, CellStatsOptions o, string sources, string? regimeLabels = null, ConfidenceOptions? confidence = null, ShrinkageOptions? shrinkage = null, string? universeTiers = null)
