@@ -5,7 +5,7 @@ Designed now so v1 leaves room for them; built after v1 is proven.
 | Module | Phase | Container / project |
 |--------|-------|---------------------|
 | A. Automated order placement | P12 | `xd-exec` / `XDrishti.Execution` |
-| B. Tick & order-book data | Recorder from P7, features P13 | `xd-feed` / `XDrishti.Feed` |
+| B. Tick & order-book data (dropped, ADR 0288) | none | `xd-feed` / `XDrishti.Feed` |
 | C. Options & statistical arbitrage | P14 | Engine modules |
 | D. Fundamentals & events | P15 | Worker jobs + assistant extraction |
 | HFT / latency arbitrage | **Not pursued** | — |
@@ -48,15 +48,8 @@ stateDiagram-v2
 
 ## B. Tick & order-book data
 
-- Dhan live feed + **20-level depth** (up to 50 instruments/connection) and **200-level depth** (NSE equity
-  & derivatives) over WebSocket (binary). No historical depth from brokers ⇒ record our own.
-  **Built in P7-16 ([ADR 0135](../adr/0135-the-depth-recorder-stores-the-20-level-book-of-up-to-50-shares-about-once-a-second-behind-three-gates-a-disk-guard-and-no-reader.md)):** the 20-level book of up to 50 shares, about once a second, in `market.depth_snapshots`; off by default behind three gates; nothing reads it until P13.
-  **Built in P7-16b ([ADR 0173](../adr/0173-the-trade-tick-recorder-stores-last-trade-updates-of-the-depth-set-when-cumulative-volume-rises-on-a-second-quote-socket-behind-three-gates-its-own-cap-and-no-reader.md)):** the last-trade updates (receive time, raw exchange time, price in paise, last quantity, cumulative volume) of the same set in `market.trade_ticks`, a row only when the cumulative volume rises, from a second Quote-mode socket to the allowed live-feed host; the source of P13's aggressive volume delta (classified against the recorded book, not stored); its own 12 GB cap, the shared 20 GB free floor; off by default behind three gates; nothing reads it until P13.
-- Extends the v1 `xd-feed` (which already streams the active set): adds 20-level depth subscriptions for a
-  configured recording list; writes to Timescale hypertables (compressed); ~50–100 GB/year.
-- **Start recording in P7** so ≥ 6 months exist by P13.
-- Uses: order-book imbalance, depth pressure near trigger, aggressive volume delta, spread → meta-model
-  features and realistic slippage. Kept only if OOS improves.
+**Dropped 2026-11-13 ([ADR 0288](../adr/0288-p13-tick-and-depth-features-are-dropped-the-depth-and-tick-recorders-are-removed-and-the-feature-set-comparison-stays.md)).** Dhan sells live depth only; NSE historical tick and depth data is institutional, and recording for about eleven months was declined. The depth and tick recorders (P7-16, P7-16b) are removed and P13 does not run.
+
 - **One comparison core (P13-05, [ADR 0183](../adr/0183-the-feature-set-comparison-fits-one-recipe-twice-on-identical-rows-widens-its-margins-for-the-ledger-count-and-reads-the-hold-out-once.md)):** the depth and tick features (`md-1`) are judged by the same code as the filings features of §D — model A (`tf-1`) against model B (`tf-1` plus the group) on identical rows, monthly folds here, a paired block bootstrap, margins widened for the ledger count.
 - **HFT/latency arbitrage not pursued:** home latency vs co-located firms, order-rate limits and costs leave
   no retail edge.

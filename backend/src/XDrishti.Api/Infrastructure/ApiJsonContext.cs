@@ -24,7 +24,6 @@ using XDrishti.Application.Autonomy;
 using XDrishti.Application.Capabilities;
 using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Confidence;
-using XDrishti.Application.Depth;
 using XDrishti.Application.Execution;
 using XDrishti.Application.Filings;
 using XDrishti.Application.Lab;
@@ -71,7 +70,6 @@ using XDrishti.Application.Selection;
 using XDrishti.Application.Shadow;
 using XDrishti.Application.SimAll;
 using XDrishti.Application.Sizing;
-using XDrishti.Application.Ticks;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Portfolio;
 
@@ -129,12 +127,6 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(JourneyView))]
 [JsonSerializable(typeof(LessonView))]
 [JsonSerializable(typeof(IReadOnlyList<LessonView>))]
-[JsonSerializable(typeof(DepthRecorderView))]
-[JsonSerializable(typeof(DepthRecorderSwitched))]
-[JsonSerializable(typeof(DepthSwitchRequest))]
-[JsonSerializable(typeof(TickRecorderView))]
-[JsonSerializable(typeof(TickRecorderSwitched))]
-[JsonSerializable(typeof(TickSwitchRequest))]
 [JsonSerializable(typeof(OpeningBarsRecorderView))]
 [JsonSerializable(typeof(OpeningBarsSwitched))]
 [JsonSerializable(typeof(OpeningBarsSwitchRequest))]
@@ -352,7 +344,6 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(XDrishti.Application.AutoSwitch.AutoView))]
 [JsonSerializable(typeof(XDrishti.Api.Endpoints.TurnAutoOnRequest))]
 [JsonSerializable(typeof(XDrishti.Api.Endpoints.ResumeServiceRequest))]
-[JsonSerializable(typeof(TicketChartView))]
 [JsonSerializable(typeof(IReadOnlyList<PlanView>))]
 [JsonSerializable(typeof(PlanRunView))]
 [JsonSerializable(typeof(PlanPhaseCheckView))]

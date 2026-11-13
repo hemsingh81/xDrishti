@@ -169,7 +169,7 @@ internal sealed class FakeChainSession : IChainSession
 {
     private TaskCompletionSource<ChainSessionResult>? _current;
 
-    public string State { get; set; } = XDrishti.Application.Depth.DepthStates.Recording;
+    public string State { get; set; } = XDrishti.Application.Recording.RecorderStates.Recording;
 
     public ChainRunStats Stats { get; set; } = new(0, 0, 0, 0, 0);
 

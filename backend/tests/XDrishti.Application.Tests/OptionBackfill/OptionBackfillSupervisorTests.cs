@@ -1,7 +1,7 @@
 using XDrishti.Application.Abstractions.OptionBackfill;
-using XDrishti.Application.Depth;
 using XDrishti.Application.Live;
 using XDrishti.Application.OptionBackfill;
+using XDrishti.Application.Recording;
 using XDrishti.Domain.Platform.Services;
 using static XDrishti.Application.Tests.OptionBackfill.BackfillSamples;
 using static XDrishti.Application.Tests.OptionBackfill.OptionBackfillSupervisorWorld;
@@ -27,7 +27,7 @@ public sealed class OptionBackfillSupervisorTests
         world.Targets.Loads.ShouldBe(0);
         world.Session.Starts.ShouldBe(0);
         world.Runs.ShouldBeEmpty();
-        world.LastState.ShouldBe(DepthStates.Disabled);
+        world.LastState.ShouldBe(RecorderStates.Disabled);
         world.Heartbeats.Reports[^1].Details.DeploymentEnabled.ShouldBeFalse();
     }
 
@@ -40,7 +40,7 @@ public sealed class OptionBackfillSupervisorTests
 
         world.Credentials.Reads.ShouldBe(0);
         world.Session.Starts.ShouldBe(0);
-        world.LastState.ShouldBe(DepthStates.SwitchOff);
+        world.LastState.ShouldBe(RecorderStates.SwitchOff);
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class OptionBackfillSupervisorTests
 
         world.Credentials.Reads.ShouldBe(0);
         world.Session.Starts.ShouldBe(0);
-        world.LastState.ShouldBe(DepthStates.Paused);
+        world.LastState.ShouldBe(RecorderStates.Paused);
     }
 
     [Fact]
@@ -117,7 +117,7 @@ public sealed class OptionBackfillSupervisorTests
         await world.TickAsync();
 
         world.Session.Starts.ShouldBe(1);
-        world.LastState.ShouldBe(DepthStates.Paused);
+        world.LastState.ShouldBe(RecorderStates.Paused);
         world.Runs.ShouldHaveSingleItem().Status.ShouldBe(ServiceRunStatus.Succeeded);
     }
 
@@ -131,7 +131,7 @@ public sealed class OptionBackfillSupervisorTests
 
         world.Credentials.Reads.ShouldBe(0);
         world.Session.Starts.ShouldBe(0);
-        world.LastState.ShouldBe(DepthStates.Paused);
+        world.LastState.ShouldBe(RecorderStates.Paused);
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public sealed class OptionBackfillSupervisorTests
         await world.TickAsync();
 
         world.Runs.ShouldHaveSingleItem().Status.ShouldBe(ServiceRunStatus.Succeeded);
-        world.LastState.ShouldBe(DepthStates.SwitchOff);
+        world.LastState.ShouldBe(RecorderStates.SwitchOff);
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public sealed class OptionBackfillSupervisorTests
 
         world.Credentials.Reads.ShouldBe(0);
         world.Runs.ShouldHaveSingleItem().Status.ShouldBe(ServiceRunStatus.Skipped);
-        world.LastState.ShouldBe(DepthStates.NoInstruments);
+        world.LastState.ShouldBe(RecorderStates.NoInstruments);
     }
 
     [Fact]
@@ -203,7 +203,7 @@ public sealed class OptionBackfillSupervisorTests
 
         world.Session.Starts.ShouldBe(0);
         world.Runs.ShouldHaveSingleItem().Message.ShouldBe(OptionBackfillSupervisor.NoTokenMessage);
-        world.LastState.ShouldBe(DepthStates.NoToken);
+        world.LastState.ShouldBe(RecorderStates.NoToken);
     }
 
     // ---- ends ----
@@ -240,7 +240,7 @@ public sealed class OptionBackfillSupervisorTests
         world.SetClock(At(12, 20, 3));
         await world.TickAsync();
         world.Session.Starts.ShouldBe(1);
-        world.LastState.ShouldBe(DepthStates.TokenRefused);
+        world.LastState.ShouldBe(RecorderStates.TokenRefused);
 
         world.Credentials.Token = "a-new-token";
         world.SetClock(At(12, 20, 5));
@@ -265,7 +265,7 @@ public sealed class OptionBackfillSupervisorTests
 
         world.Runs.ShouldHaveSingleItem().Message.ShouldBe(OptionBackfillSupervisor.NotSubscribedMessage);
         world.Session.Starts.ShouldBe(1, "the day is over for the backfill, whatever the token");
-        world.LastState.ShouldBe(DepthStates.NotSubscribed);
+        world.LastState.ShouldBe(RecorderStates.NotSubscribed);
     }
 
     [Fact]
@@ -302,7 +302,7 @@ public sealed class OptionBackfillSupervisorTests
         world.Session.Starts.ShouldBe(0, "it stays stopped until the owner resumes");
         world.Credentials.Reads.ShouldBe(0);
         world.Runs.ShouldHaveSingleItem().Status.ShouldBe(ServiceRunStatus.Skipped);
-        world.LastState.ShouldBe(DepthStates.DiskBudget);
+        world.LastState.ShouldBe(RecorderStates.DiskBudget);
 
         world.Switch.Set(false); // the owner pauses, then resumes: the guard agrees now
         world.SetClock(At(12, 20, 2));
@@ -323,7 +323,7 @@ public sealed class OptionBackfillSupervisorTests
 
         world.Session.Starts.ShouldBe(0);
         world.Credentials.Reads.ShouldBe(0);
-        world.LastState.ShouldBe(DepthStates.DiskFree);
+        world.LastState.ShouldBe(RecorderStates.DiskFree);
     }
 
     [Fact]
@@ -341,7 +341,7 @@ public sealed class OptionBackfillSupervisorTests
 
         world.Runs.ShouldHaveSingleItem().Message.ShouldBe(OptionBackfillSupervisor.DiskBudgetMessage);
         world.Session.Starts.ShouldBe(1);
-        world.LastState.ShouldBe(DepthStates.DiskBudget);
+        world.LastState.ShouldBe(RecorderStates.DiskBudget);
     }
 
     [Fact]

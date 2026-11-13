@@ -137,7 +137,7 @@ public sealed class HistoryBackfillArchitectureTests
     private static readonly string[] NotCut =
     [
         "BarStore.cs", "BarAggregates.cs", "BarComparer.cs", "BarDayCounts.cs", "BarCoverageSql.cs", "BarRecords.cs", "BarConfigurations.cs", "QualityData.cs", "ObservedDays.cs",
-        "EodStore.cs", "DepthUniverse.cs", "OptionUnderlyingSetting.cs", "PaperLedgerData.cs", "PortfolioPrices.cs", "LiveExecutionMarket.cs", "FixtureSeeder.cs", "BackfillStore.cs",
+        "EodStore.cs", "OptionUnderlyingSetting.cs", "PaperLedgerData.cs", "PortfolioPrices.cs", "LiveExecutionMarket.cs", "FixtureSeeder.cs", "BackfillStore.cs",
     ];
 
     [Fact]

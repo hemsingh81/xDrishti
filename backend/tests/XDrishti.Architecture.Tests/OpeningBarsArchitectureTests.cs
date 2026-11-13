@@ -28,10 +28,6 @@ public sealed class OpeningBarsArchitectureTests
             "XDrishti.Application.Live.LiveFeedSupervisor",
             "XDrishti.Application.Live.IActiveSetProvider",
             "XDrishti.Application.Live.ActiveSetLoader",
-            "XDrishti.Application.Ticks",
-            "XDrishti.Application.Abstractions.Ticks",
-            "XDrishti.Application.Depth",
-            "XDrishti.Application.Abstractions.Depth",
             "XDrishti.Application.Planning",
             "XDrishti.Application.Abstractions.Planning",
             "XDrishti.Application.Execution",
@@ -55,8 +51,6 @@ public sealed class OpeningBarsArchitectureTests
     [InlineData("XDrishti.Application.Research")]
     [InlineData("XDrishti.Application.Execution")]
     [InlineData("XDrishti.Application.Paper")]
-    [InlineData("XDrishti.Application.Depth")]
-    [InlineData("XDrishti.Application.Ticks")]
     public void The_decision_live_and_recorder_code_references_no_opening_bars_type(string area)
     {
         var result = Types.InAssembly(Application).That().ResideInNamespaceStartingWith(area).ShouldNot().HaveDependencyOnAny(OpeningNamespaces).GetResult();

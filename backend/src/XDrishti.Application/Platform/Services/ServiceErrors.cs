@@ -23,7 +23,7 @@ public static class ServiceErrors
 
     public const string RunNowUnavailableCode = "services.run_now_unavailable";
 
-    /// <summary>The depth recorder (P7-16) and the trade-tick recorder (P7-16b) follow their three gates and their window; "Run now" cannot start them.</summary>
+    /// <summary>The option-chain and backfill recorders (P14-02, P14-03) follow their three gates and their window; "Run now" cannot start them.</summary>
     public static readonly Error RunNowUnavailable = Error.Conflict(RunNowUnavailableCode, "This service cannot be started by hand. It runs only when the deployment flag, your switch and this service are all on, inside its window.");
 
     public static readonly Error ReadOnly = Error.Conflict(ReadOnlyCode, "This service is set elsewhere (under Accounts) and cannot be changed here.");

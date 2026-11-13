@@ -1,9 +1,9 @@
-namespace XDrishti.Application.Depth;
+namespace XDrishti.Application.Recording;
 
-/// <summary>The state words of the depth recorder's heartbeat (column <c>state</c>, at most 32 characters).</summary>
-public static class DepthStates
+/// <summary>The state words of a recorder's heartbeat (column <c>state</c>, at most 32 characters).</summary>
+public static class RecorderStates
 {
-    /// <summary>The deployment flag <c>Depth:Enabled</c> is false: nothing is read or opened.</summary>
+    /// <summary>The recorder deployment flag is false: nothing is read or opened.</summary>
     public const string Disabled = "disabled";
 
     /// <summary>The owner's stored switch is OFF.</summary>

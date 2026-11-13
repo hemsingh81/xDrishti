@@ -1,25 +1,21 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, unwrap, type Schemas } from '@/shared/api';
 
-export type RecorderView = Schemas['DepthRecorderView'];
-export type RecorderChange = Schemas['DepthSwitchRequest'];
+export type RecorderView = Schemas['OptionChainRecorderView'];
+export type RecorderChange = Schemas['OptionChainSwitchRequest'];
 
-// The card reads both recorders through one shape: this fails to compile if the two generated shapes drift apart.
+// The card reads all recorders through one shape: this fails to compile if the generated shapes drift apart.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
 export const recorderShapesMatch: [
-  Same<RecorderView, Schemas['TickRecorderView']>,
-  Same<RecorderChange, Schemas['TickSwitchRequest']>,
-  Same<RecorderChange, Schemas['OptionChainSwitchRequest']>,
   Same<RecorderChange, Schemas['OptionBackfillSwitchRequest']>,
-  Same<RecorderView, Schemas['OptionChainRecorderView']>,
   Same<RecorderView, Schemas['OpeningBarsRecorderView']>,
   Same<RecorderChange, Schemas['OpeningBarsSwitchRequest']>,
-] = [true, true, true, true, true, true, true];
+] = [true, true, true];
 
-export type RecorderKind = 'depth' | 'ticks' | 'chain' | 'backfill' | 'opening';
+export type RecorderKind = 'chain' | 'backfill' | 'opening';
 
 /** What any recorder card reads: the common switch shape, plus the progress and probe acceptance for the backfill. */
-export type AnyRecorderView = RecorderView | Schemas['OptionChainRecorderView'] | Schemas['OptionBackfillView'];
+export type AnyRecorderView = RecorderView | Schemas['OptionBackfillView'];
 
 export const recorderKeys = {
   all: ['services', 'recorders'] as const,
@@ -32,10 +28,6 @@ export const recorderQuery = (kind: RecorderKind) =>
     queryKey: recorderKeys.one(kind),
     queryFn: async ({ signal }): Promise<AnyRecorderView> => {
       switch (kind) {
-        case 'depth':
-          return unwrap(await api.GET('/api/depth/recorder', { signal }));
-        case 'ticks':
-          return unwrap(await api.GET('/api/ticks/recorder', { signal }));
         case 'chain':
           return unwrap(await api.GET('/api/options/chain-recorder', { signal }));
         case 'backfill':
@@ -55,10 +47,6 @@ export function useChangeRecorder(kind: RecorderKind) {
     gcTime: 0,
     mutationFn: async (body: RecorderChange) => {
       switch (kind) {
-        case 'depth':
-          return unwrap(await api.PUT('/api/depth/recorder', { body }));
-        case 'ticks':
-          return unwrap(await api.PUT('/api/ticks/recorder', { body }));
         case 'chain':
           return unwrap(await api.PUT('/api/options/chain-recorder', { body }));
         case 'backfill':

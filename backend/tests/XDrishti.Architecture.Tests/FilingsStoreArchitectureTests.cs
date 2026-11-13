@@ -34,8 +34,6 @@ public sealed partial class FilingsStoreArchitectureTests
     [InlineData("XDrishti.Application.Live")]
     [InlineData("XDrishti.Application.Lab")]
     [InlineData("XDrishti.Application.Paper")]
-    [InlineData("XDrishti.Application.Depth")]
-    [InlineData("XDrishti.Application.Ticks")]
     [InlineData("XDrishti.Application.OptionChain")]
     [InlineData("XDrishti.Application.OptionBackfill")]
     [InlineData("XDrishti.Application.OptionQuality")]

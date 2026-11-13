@@ -112,7 +112,7 @@ public static class SettingsRegistry
         .. new[]
         {
             "Live", "Live:Buckets", "Live:Estimates", "Live:Capacity", "Live:Report", "Live:Ramp", "Live:Capture", "Live:Match", "Live:Protect",
-            "Ticks", "OpeningBars", "Depth", "Options", "Options:Liquidity", "Options:Costs", "Options:PhaseCheck", "Options:Remark", "Options:Quality",
+            "OpeningBars", "Options", "Options:Liquidity", "Options:Costs", "Options:PhaseCheck", "Options:Remark", "Options:Quality",
             "Pairs", "Models", "Filings", "StrategyLab", "Experiments", "Recovery", "Shadow", "Heartbeat", "Exports", "Mcp", "Eval",
             "Learned", "Learning:CellsRefresh", "Simulate", "Training", "Replay", "Planning:TicketAlerts", "Reports:PlanVsActual", "Reports:Benchmark", "Reports:BasketProfile", "Reports:Training", "Market:RelativeStrength",
             "Portfolio:Heal", "Portfolio:BrokerHistory", "Portfolio:AutoRefresh", "Instruments:AutoRefresh", "Data", "Data:History", "Baskets:System:Fetch", "Baskets:System:Lists", "Baskets:System:Derived", "Selection:ListFilters",

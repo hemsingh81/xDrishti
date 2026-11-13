@@ -4,7 +4,6 @@ using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Capabilities;
 using XDrishti.Application.Abstractions.Confidence;
-using XDrishti.Application.Abstractions.Depth;
 using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
@@ -21,7 +20,6 @@ using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Abstractions.Selection;
-using XDrishti.Application.Abstractions.Ticks;
 using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
@@ -37,7 +35,6 @@ using XDrishti.Application.Autonomy;
 using XDrishti.Application.Capabilities;
 using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Confidence;
-using XDrishti.Application.Depth;
 using XDrishti.Application.Execution;
 using XDrishti.Application.Filings;
 using XDrishti.Application.Lab;
@@ -98,7 +95,6 @@ using XDrishti.Application.Research.CostSheets;
 using XDrishti.Application.Selection;
 using XDrishti.Application.Shadow;
 using XDrishti.Application.SimAll;
-using XDrishti.Application.Ticks;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
@@ -124,8 +120,6 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetSystemStatusQuery, SystemStatusResponse>, GetSystemStatusHandler>();
         services.AddScoped<ICommandHandler<RecordHeartbeatCommand>, RecordHeartbeatHandler>();
         services.AddScoped<IFeedHeartbeats, FeedHeartbeats>();
-        services.AddScoped<IDepthHeartbeats, DepthHeartbeats>(); // the depth recorder's own row xd-depth (P7-16)
-        services.AddScoped<ITickHeartbeats, TickHeartbeats>(); // the trade-tick recorder's own row xd-ticks (P7-16b)
         services.AddScoped<IOptionChainHeartbeats, OptionChainHeartbeats>(); // the option-chain recorder's own row xd-options (P14-02)
         services.AddScoped<IOptionBackfillHeartbeats, OptionBackfillHeartbeats>(); // the expired-options backfill's own row xd-backfill (P14-03)
         services.AddScoped<IQueryHandler<GetExecutionAlarmsQuery, Result<IReadOnlyList<ExecutionAlarmView>>>, GetExecutionAlarmsHandler>(); // the execution alarms (P12-04): read only
@@ -160,8 +154,6 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetExecutionActivityQuery, Result<IReadOnlyList<ActivityRow>>>, GetExecutionActivityHandler>(); // the action log with alarms, halts, drills and changes (P12-10): read only
         services.AddScoped<IQueryHandler<GetExecutionNoticesQuery, ExecutionNotices>, GetExecutionNoticesHandler>(); // the bell's execution items, derived on read (P12-10): read only
         services.AddScoped<IQueryHandler<GetExecutionStatusQuery, ExecutionStatusView>, GetExecutionStatusHandler>(); // the execution service's status (P12-01b): read only
-        services.AddScoped<IQueryHandler<GetDepthRecorderQuery, DepthRecorderView>, GetDepthRecorderHandler>(); // the owner's depth switch (P7-16): read
-        services.AddScoped<IQueryHandler<GetTickRecorderQuery, TickRecorderView>, GetTickRecorderHandler>(); // the owner's tick switch (P7-16b): read
         services.AddScoped<IQueryHandler<GetOptionChainRecorderQuery, OptionChainRecorderView>, GetOptionChainRecorderHandler>(); // the owner's option-chain switch (P14-02): read
         services.AddScoped<IQueryHandler<GetOptionBackfillQuery, OptionBackfillView>, GetOptionBackfillHandler>(); // the owner's backfill switch, acceptance and progress (P14-03): read
         services.AddScoped<IQueryHandler<GetOptionCoverageQuery, Result<OptionCoverageView>>, GetOptionCoverageHandler>(); // the stored quality verdicts of the option archive, aggregates only (P14-04): read
@@ -260,8 +252,6 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ExecutionGapQuery, Result<ExecutionGapView>>, GetExecutionGapHandler>(); // plan R to actual R by strategy or month: computed on read, read only
         services.AddSingleton<IScheduledService, LiveEstimatesService>(); // the weekly estimates (P11-02); starts paused, reads stored rows, places no order
         services.AddScoped<ICommandHandler<RecordComplianceCommand, ComplianceRecordView>, RecordComplianceHandler>(); // and write, insert-only, behind a fresh password and the live-writes gate in the endpoint
-        services.AddScoped<ICommandHandler<ChangeDepthRecorderCommand, DepthRecorderSwitched>, ChangeDepthRecorderHandler>(); // and change, insert-only, behind a fresh password in the endpoint
-        services.AddScoped<ICommandHandler<ChangeTickRecorderCommand, TickRecorderSwitched>, ChangeTickRecorderHandler>(); // the tick switch (P7-16b): change, insert-only, behind a fresh password in the endpoint
         services.AddScoped<ICommandHandler<ChangeOptionChainRecorderCommand, OptionChainRecorderSwitched>, ChangeOptionChainRecorderHandler>(); // the option-chain switch (P14-02): change, insert-only, behind a fresh password in the endpoint
         services.AddScoped<ICommandHandler<ChangeOptionBackfillCommand, OptionBackfillSwitched>, ChangeOptionBackfillHandler>(); // the backfill switch (P14-03): change, insert-only, behind a fresh password in the endpoint
         services.AddScoped<ICommandHandler<AcceptBackfillProbeCommand, BackfillProbeAccepted>, AcceptBackfillProbeHandler>(); // the owner's acceptance of the probe result (P14-03): insert-only, behind a fresh password in the endpoint
@@ -316,17 +306,6 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// The depth recorder (P7-16) - only for the <c>xd-feed</c> host: the supervisor that owns the three gates, the window, the run record and the heartbeat, and the session that records. The host provides <see cref="DepthSettings"/> (from its
-    /// checked <c>Depth:*</c> options) and, through <c>AddDepthRecording</c>, the ports they use. Registered paused and off: the supervisor opens nothing until the deployment flag, the owner's switch and the service are all on.
-    /// </summary>
-    public static IServiceCollection AddDepthRecorder(this IServiceCollection services)
-    {
-        services.AddSingleton<IDepthSession, DepthRecorder>();
-        services.AddSingleton<IDepthSupervisor, DepthRecorderSupervisor>();
-        return services;
-    }
-
-    /// <summary>
     /// The opening-minute recorder (BK-03b) - only for the <c>xd-feed</c> host: its own supervisor (three gates, window, run record) and its own session (a second Quote-mode socket to the allowed live-feed host). The host provides
     /// <c>OpeningBarsSettings</c> and, through <c>AddOpeningBarsRecording</c>, the ports. Registered paused and off.
     /// </summary>
@@ -334,17 +313,6 @@ public static class DependencyInjection
     {
         services.AddSingleton<XDrishti.Application.OpeningBars.OpeningBarsRecorder>();
         services.AddSingleton<XDrishti.Application.Abstractions.OpeningBars.IOpeningBarsSupervisor, XDrishti.Application.OpeningBars.OpeningBarsSupervisor>();
-        return services;
-    }
-
-    /// <summary>
-    /// The trade-tick recorder (P7-16b) - only for the <c>xd-feed</c> host: its own supervisor (three gates, window, run record, heartbeat <c>xd-ticks</c>) and its own session (a second Quote-mode socket to the allowed live-feed host). The host provides
-    /// <see cref="TickSettings"/> and <see cref="DepthSettings"/> (the set inputs and the shared free floor) and, through <c>AddTickRecording</c>, the ports. Registered paused and off.
-    /// </summary>
-    public static IServiceCollection AddTickRecorder(this IServiceCollection services)
-    {
-        services.AddSingleton<ITickSession, TickRecorder>();
-        services.AddSingleton<ITickSupervisor, TickRecorderSupervisor>();
         return services;
     }
 
@@ -420,8 +388,6 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, LearnedSettings.LearnedSettingsService>(); // learned setting changes after the digest (AU-10); starts enabled (ADR 0282), applies a tightening only with Auto ON, a loosening never
         services.AddSingleton<IScheduledService, PaperReviewService>(); // the weekly paper review (P10-03); starts enabled (ADR 0282), builds and stores one text per week and epoch, applies nothing
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
-        services.AddSingleton<IScheduledService, DepthRecorderService>(); // the depth recorder (P7-16): shown and edited here, run by xd-feed; starts paused, Run now is refused
-        services.AddSingleton<IScheduledService, TickRecorderService>(); // the trade-tick recorder (P7-16b): as the depth recorder
         services.AddSingleton<IScheduledService, OptionChainRecorderService>(); // the option-chain recorder (P14-02): as the tick recorder; starts paused, "Run now" refused
         services.AddSingleton<IScheduledService, OptionBackfillService>(); // the expired-options backfill (P14-03): as the recorders; starts paused, "Run now" refused
         services.AddSingleton<IScheduledService, OptionArchiveQualityService>(); // the option-archive quality checks (P14-04): daily 16:15, on by default, reads the archive and writes only its own result rows

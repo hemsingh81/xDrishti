@@ -113,8 +113,6 @@ public sealed class OptionChainHostTests
         scope.ServiceProvider.GetRequiredService<IChainTargets>().ShouldNotBeNull();
         var loops = host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name).ToList();
         loops.ShouldContain("FeedService");
-        loops.ShouldContain("DepthService");
-        loops.ShouldContain("TickService");
         loops.ShouldContain("OptionChainService");
     }
 
@@ -128,7 +126,5 @@ public sealed class OptionChainHostTests
         host.Services.GetRequiredService<ServiceRegistry>().UsesLiveFeedMarker("option-chain-recorder").ShouldBeFalse();
         host.Services.GetServices<IScheduledService>().Single(s => s.Definition.Id == "option-chain-recorder").Definition.Defaults.Enabled.ShouldBeFalse();
         IOptionChainHeartbeats.ServiceName.ShouldBe("xd-options");
-        IOptionChainHeartbeats.ServiceName.ShouldNotBe("xd-ticks");
-        IOptionChainHeartbeats.ServiceName.ShouldNotBe("xd-depth");
     }
 }
