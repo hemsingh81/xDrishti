@@ -19,6 +19,14 @@ public sealed class PaperGovernanceDatabaseTests(ApiFactory factory) : DataTestB
 {
     private static readonly DateOnly Session = new(2099, 1, 5);
 
+    /// <summary>The configuration reading includes the basis of the stored cell snapshots, which reads their source runs and fails closed on one it cannot read: start from none, whatever a class that ran earlier left.</summary>
+    public override async ValueTask InitializeAsync()
+    {
+        await base.InitializeAsync();
+        await using var connection = await OpenAsync();
+        await ExecuteAsync(connection, "DELETE FROM research.cell_stats");
+    }
+
     private async Task<TResult> WithAsync<TResult>(Func<IServiceProvider, Task<TResult>> work)
     {
         using var scope = Factory.Services.CreateScope();
