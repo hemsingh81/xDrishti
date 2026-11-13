@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import type { Schemas } from '@/shared/api';
@@ -80,7 +80,7 @@ describe('the Governance tab', () => {
           counted: 0,
           straddle: 1,
           riskDownChanges: 0,
-          cellsRefreshed: 0,
+          cellsRefreshed: 7,
           unexplainedChanges: 1,
           reason: 'x',
         },
@@ -118,6 +118,8 @@ describe('the Governance tab', () => {
     expect(await screen.findByText('would restart the count')).toBeInTheDocument();
     expect(await screen.findByText('detected_change')).toBeInTheDocument();
     expect(screen.getByText('in force')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Cell refreshes' })).toBeInTheDocument();
+    expect(within(screen.getByText('detected_change').closest('tr') as HTMLElement).getByText('7')).toBeInTheDocument();
     expect(await screen.findByText('H9')).toBeInTheDocument();
   });
 

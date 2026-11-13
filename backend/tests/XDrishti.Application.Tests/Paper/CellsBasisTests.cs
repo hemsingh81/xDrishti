@@ -31,14 +31,14 @@ public sealed class CellsBasisTests
     private static string Sheet(decimal capital = 1_000_000m, string profile = "standard") =>
         $$"""{"sheet_id":"default","rates_sha256":"x","sheet_json":"{}","checked":null,"capital":{{capital}},"profile":{"name":"{{profile}}","risk_per_trade_pct":0.5,"max_capital_per_trade_pct":25},"max_cost_r":0.1}""";
 
-    private static async Task<ConfigReading> ReadAsync(StoredCellStats stats, string? record = null, bool runMissing = false, bool recordMissing = false)
+    private static async Task<ConfigReading> ReadAsync(StoredCellStats stats, string? record = null, bool runMissing = false, bool recordMissing = false, string? label = null)
     {
         var cellStats = Substitute.For<ICellStatsStore>();
         cellStats.ListLatestCashAsync(null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<StoredCellStats>>([stats]));
         var changelog = Substitute.For<ILearningChangelog>();
         changelog.ListAsync("cell", null, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<ChangelogEntry>>([]));
         var runs = Substitute.For<IRunStore>();
-        runs.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<StoredRunHeader?>(runMissing ? null : JobFixtures.Header()));
+        runs.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<StoredRunHeader?>(runMissing ? null : JobFixtures.Header() with { UniverseLabel = label ?? "x" }));
         runs.ReadRecordTextAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<string?>(recordMissing ? null : record ?? JobFixtures.Record()));
         var source = new ConfigSnapshotSource(
             Substitute.For<IPlanningSettingsReader>(), Substitute.For<IAutonomySettingsStore>(), Substitute.For<IAccountStore>(), Substitute.For<IRiskProfileStore>(), changelog, Substitute.For<IStrategyStore>(), cellStats, runs,
@@ -46,9 +46,9 @@ public sealed class CellsBasisTests
         return await source.ReadAsync(Ct);
     }
 
-    private static async Task<Dictionary<string, string>> CellsAsync(StoredCellStats stats, string? record = null)
+    private static async Task<Dictionary<string, string>> CellsAsync(StoredCellStats stats, string? record = null, string? label = null)
     {
-        var reading = await ReadAsync(stats, record);
+        var reading = await ReadAsync(stats, record, label: label);
         return reading.Components.Where(c => c.Key.StartsWith("cells.", StringComparison.Ordinal)).ToDictionary(c => c.Key, c => c.Value, StringComparer.Ordinal);
     }
 
@@ -67,21 +67,27 @@ public sealed class CellsBasisTests
     public async Task A_recompute_with_another_rule_input_changes_the_basis_and_starts_a_new_epoch()
     {
         var before = await CellsAsync(Stats("snapA"), JobFixtures.Record(costs: Sheet()));
-        var changed = new Dictionary<string, (StoredCellStats Stats, string Record)>
+        var basket = Guid.NewGuid().ToString("D");
+        var changed = new Dictionary<string, (StoredCellStats Stats, string Record, string? Label)>
         {
-            ["strategy"] = (Stats("s1"), JobFixtures.Record(costs: Sheet(), sha: new string('e', 64))),
-            ["options"] = (Stats("s2", options: new CellStatsOptions(MinTrades: 10)), JobFixtures.Record(costs: Sheet())),
-            ["exit label"] = (Stats("s3", "run1:intraday:TRAIL"), JobFixtures.Record(costs: Sheet())),
-            ["timeframe"] = (Stats("s4"), JobFixtures.Record(costs: Sheet(), timeframe: "5m")),
-            ["capital"] = (Stats("s5"), JobFixtures.Record(costs: Sheet(capital: 500_000m))),
-            ["profile"] = (Stats("s6"), JobFixtures.Record(costs: Sheet(profile: "conservative"))),
-            ["gross costs"] = (Stats("s7"), JobFixtures.Record()),
-            ["run data options"] = (Stats("s8"), JobFixtures.Record(costs: Sheet()).Replace("\"min_session_completeness\":0.9", "\"min_session_completeness\":0.8", StringComparison.Ordinal)),
+            ["strategy"] = (Stats("s1"), JobFixtures.Record(costs: Sheet(), sha: new string('e', 64)), null),
+            ["options"] = (Stats("s2", options: new CellStatsOptions(MinTrades: 10)), JobFixtures.Record(costs: Sheet()), null),
+            ["exit label"] = (Stats("s3", "run1:intraday:TRAIL"), JobFixtures.Record(costs: Sheet()), null),
+            ["timeframe"] = (Stats("s4"), JobFixtures.Record(costs: Sheet(), timeframe: "5m"), null),
+            ["capital"] = (Stats("s5"), JobFixtures.Record(costs: Sheet(capital: 500_000m)), null),
+            ["profile"] = (Stats("s6"), JobFixtures.Record(costs: Sheet(profile: "conservative")), null),
+            ["gross costs"] = (Stats("s7"), JobFixtures.Record(), null),
+            ["risk per trade"] = (Stats("s9"), JobFixtures.Record(costs: Sheet().Replace("\"risk_per_trade_pct\":0.5", "\"risk_per_trade_pct\":0.25", StringComparison.Ordinal)), null),
+            ["start date"] = (Stats("s10"), JobFixtures.Record(costs: Sheet()).Replace("2024-04-01", "2024-05-01", StringComparison.Ordinal), null),
+            ["instrument list member"] = (Stats("s11"), JobFixtures.Record(costs: Sheet()).Replace("00000000-0000-0000-0000-00000000000b", "00000000-0000-0000-0000-00000000000c", StringComparison.Ordinal), null),
+            ["basket"] = (Stats("s12"), JobFixtures.Record(costs: Sheet(), universeKind: "basket", basket: basket), null),
+            ["universe label (dated basket)"] = (Stats("s13"), JobFixtures.Record(costs: Sheet(), universeKind: "basket", basket: basket), "dated"),
+            ["run data options"] = (Stats("s8"), JobFixtures.Record(costs: Sheet()).Replace("\"min_session_completeness\":0.9", "\"min_session_completeness\":0.8", StringComparison.Ordinal), null),
         };
 
-        foreach (var (name, (stats, record)) in changed)
+        foreach (var (name, (stats, record, label)) in changed)
         {
-            var after = await CellsAsync(stats, record);
+            var after = await CellsAsync(stats, record, label);
 
             after["cells.basis"].ShouldNotBe(before["cells.basis"], name);
             PaperConfigKeys.Classify("cells.basis", before["cells.basis"], after["cells.basis"]).ShouldBe(ConfigClass.Frozen, name);

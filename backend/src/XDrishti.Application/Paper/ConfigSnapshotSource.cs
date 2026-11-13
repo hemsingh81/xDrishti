@@ -221,6 +221,16 @@ internal sealed class ConfigSnapshotSource(
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n--\n", parts))));
     }
 
+    /// <summary>The sizing numbers of the stored profile (risk per trade and the capital cap), as written in the record: the profile name alone does not prove them. Throws when missing (fail closed).</summary>
+    private static string ProfileNumbers(string record)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(record);
+        var profile = doc.RootElement.GetProperty("costs").GetProperty("profile");
+        return profile.GetProperty("risk_per_trade_pct").GetRawText() + "/" + profile.GetProperty("max_capital_per_trade_pct").GetRawText();
+    }
+
+    // shortcut: a record-schema bump (RecordSchemaVersion != CurrentSchemaVersion) makes the reader refuse the record, so the cells group is unreadable and the paper capture is blind until the sources are simulated again; the upgrade path is to read the identity fields schema-tolerantly.
+    // shortcut: a dated (members-as-of) source is re-simulated by the refresh as a "members now" run because the baseline drops MembersBasis; the label in the basis shows that honestly as a frozen change. Follow-up: refuse dated sources in the refresh or carry MembersBasis.
     private async Task<string> SourceIdentityAsync(string runKey, CancellationToken cancellationToken)
     {
         var header = await runs.FindAsync(runKey, cancellationToken) ?? throw new InvalidOperationException("A source run is not stored.");
@@ -234,12 +244,14 @@ internal sealed class ConfigSnapshotSource(
         var b = read.Value;
         var inv = CultureInfo.InvariantCulture;
         var costs = b.Costs is XDrishti.Application.Research.CostChoice.SheetChoice sheet
-            ? string.Create(inv, $"sheet:{sheet.SheetId}:{sheet.Capital}:{sheet.Profile}:{sheet.MaxCostR}:{header.CostsRatesSha256}")
+            ? string.Create(inv, $"sheet:{sheet.SheetId}:{sheet.Capital}:{sheet.Profile}:{sheet.MaxCostR}:{header.CostsRatesSha256}:{ProfileNumbers(record)}")
             : "gross";
         var exit = b.Exit?.Id ?? "none";
         var timeStop = b.TimeStop is { } t ? string.Create(inv, $"{t.MinProgressRr:R}/{t.IntradayBars}/{t.SwingSessions}") : "none";
         var parameters = string.Join(',', b.Parameters.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => string.Create(inv, $"{p.Key}={p.Value:R}")));
-        var universe = b.BasketId is { } basket ? "basket:" + basket.ToString("N") : "list:" + header.UniverseLabel;
+        var universe = b.BasketId is { } basket
+            ? "basket:" + basket.ToString("N") + ":" + header.UniverseLabel
+            : "list:" + string.Join(',', b.InstrumentIds.Select(i => i.ToString("N")).Order(StringComparer.Ordinal)); // the ids of a list are the request itself, stable across refreshes
         return string.Join('|', b.DefinitionSha256, parameters, b.Timeframe, string.Create(inv, $"{b.Options.MinSessionCompleteness:R}/{b.Options.DiscontinuityThreshold:R}"), b.AcknowledgeCsvAdjusted ? "adj" : "raw", b.Fills.ToCanonicalJson(), costs, exit, timeStop, universe, b.From.ToString("yyyy-MM-dd", inv));
     }
 
