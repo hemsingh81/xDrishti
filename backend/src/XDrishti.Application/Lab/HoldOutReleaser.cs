@@ -129,6 +129,12 @@ internal sealed class HoldOutReleaser(HoldOutEpochs epochs, IHoldOutStore store,
     public async ValueTask<(string? Reason, IReadOnlyDictionary<string, LookAvailability> Kinds)> WhatHoldsAsync(BlockStatus current, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(current);
+        // a filling or released block is answered without reading any slot (the card and the bell read this often)
+        if (current.State is HoldOutBlockState.Filling or HoldOutBlockState.Released)
+        {
+            return (HoldOutChain.Word(current.State), new Dictionary<string, LookAvailability>(StringComparer.Ordinal));
+        }
+
         var kinds = await ReadSlotsAsync(current.Block.Start, cancellationToken);
         if (!slots.Any(s => string.Equals(s.Kind, "strategy", StringComparison.Ordinal)))
         {

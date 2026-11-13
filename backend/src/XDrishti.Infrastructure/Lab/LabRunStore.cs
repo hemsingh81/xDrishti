@@ -94,6 +94,19 @@ internal sealed class LabRunStore(NpgsqlDataSource dataSource) : ILabRunStore
         return list;
     }
 
+    public async ValueTask<IReadOnlyList<LabRun>> ListSucceededFullTestsAsync(CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand($"SELECT {Columns} FROM lab.lab_runs WHERE state = 'succeeded' AND method IN ('full', 'robust') ORDER BY created_at DESC, id DESC");
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var list = new List<LabRun>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            list.Add(Read(reader));
+        }
+
+        return list;
+    }
+
     public async ValueTask<LabRun?> ClaimNextAsync(string host, DateTimeOffset now, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand($"""

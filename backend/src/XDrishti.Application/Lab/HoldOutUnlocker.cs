@@ -204,6 +204,13 @@ internal sealed class HoldOutUnlocker(
             return null; // a filling block is never looked at, by hand or by the auto option (D6)
         }
 
+        // HO-01b: the same two conditions as the seal step's candidates: the version's plan was frozen before the block's horizon and the block's strategy slot is free; otherwise the look would only be stored re-used and burn the version's look at this block
+        var frozenAt = block is null ? null : await freezes.FirstFrozenAtAsync(run.StrategyId, run.Version, cancellationToken);
+        if (block is null || !HoldOutHorizon.IsPredated(StrategyKind, block.PrevStart is null, block.Start, frozenAt, null) || await store.HasFreshLookAsync(block.Start, StrategyKind, cancellationToken))
+        {
+            return null;
+        }
+
         var result = await UnlockAsync(runId, AutoMode, "system:auto-unlock", cancellationToken);
         return result.IsSuccess ? result.Value : null;
     }

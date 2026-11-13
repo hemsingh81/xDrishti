@@ -129,7 +129,7 @@ public sealed class ModelHoldOutLooksTests
     }
 
     [Fact]
-    public async Task At_block_one_a_model_registered_after_the_first_look_is_stored_not_predated_and_cannot_count()
+    public async Task At_block_one_a_model_registered_after_the_first_look_is_refused_and_nothing_is_stored()
     {
         var (looks, store) = Make(Block());
         store.Unlocks.Add(new StoredUnlock("ORB", 1, "strategy", "owner", "owner", DateTimeOffset.UnixEpoch.AddDays(1), Hash, false, BlockStart, Guid.NewGuid(), null!));
@@ -138,14 +138,13 @@ public sealed class ModelHoldOutLooksTests
         var claim = await looks.ClaimAsync(model, "owner", "owner", Hash, Ct);
         var reading = await looks.ReadAsync(model, Ct);
 
-        claim.Value.ReusedWindow.ShouldBeTrue();
-        claim.Value.Reason.ShouldBe("not_predated");
-        claim.Value.Result.ReusedReason.ShouldBe("not_predated");
-        reading.State.ShouldBe("reused");
+        claim.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutUnavailableCode);
+        store.Unlocks.Count.ShouldBe(1, "a refused look stores no row, so it cannot fill its family's row at the block");
+        reading.State.ShouldBe("kept");
     }
 
     [Fact]
-    public async Task At_a_later_block_a_model_registered_on_or_after_its_start_is_not_predated_and_one_registered_before_is_fresh()
+    public async Task At_a_later_block_a_model_registered_on_or_after_its_start_is_refused_without_a_row_and_one_registered_before_is_fresh()
     {
         var later = new DateOnly(2026, 11, 1);
         var (looks, store) = Make(Block(later) with { PrevStart = BlockStart });
@@ -155,9 +154,9 @@ public sealed class ModelHoldOutLooksTests
         var lateClaim = await looks.ClaimAsync(late, "owner", "owner", Hash, Ct);
         var earlyClaim = await looks.ClaimAsync(early, "owner", "owner", Hash, Ct);
 
-        (lateClaim.Value.ReusedWindow, lateClaim.Value.Reason).ShouldBe((true, "not_predated"));
-        (earlyClaim.Value.ReusedWindow, earlyClaim.Value.Reason).ShouldBe((false, null), "a not-predated look burns no slot");
-        store.Unlocks.Count.ShouldBe(2);
+        lateClaim.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutUnavailableCode);
+        (earlyClaim.Value.ReusedWindow, earlyClaim.Value.Reason).ShouldBe((false, null), "a refused look burns no slot and fills no row");
+        store.Unlocks.Count.ShouldBe(1);
     }
 
     [Fact]

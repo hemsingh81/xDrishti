@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Lab;
@@ -8,7 +9,7 @@ namespace XDrishti.Application.Lab;
 /// The strategy auto look of the seal service (HO-01 D10): with <c>Confidence:HoldOut:AutoUnlock</c> on and the block in force sealed with its strategy slot free, queues the existing <c>holdout</c> Lab job, recorded as <c>auto</c>, for the best candidate
 /// (<see cref="HoldOutStrategyCandidates"/>). Never at block 1 (its look stays the owner's act) and never at a filling block. The job runs the look as the Lab dispatcher does for the owner's; this step only claims it.
 /// </summary>
-internal sealed class StrategyAutoLookStep(HoldOutEpochs epochs, HoldOutStrategyCandidates candidates, HoldOutUnlocker unlocker, IHoldOutStore store, ILabRunStore runs, HoldOutOptions options, TimeProvider time) : IHoldOutSealStep
+internal sealed class StrategyAutoLookStep(HoldOutEpochs epochs, HoldOutStrategyCandidates candidates, HoldOutUnlocker unlocker, IHoldOutStore store, ILabRunStore runs, HoldOutOptions options, TimeProvider time, ILogger<StrategyAutoLookStep> logger) : IHoldOutSealStep
 {
     public const string Actor = "system:auto-unlock";
 
@@ -54,9 +55,16 @@ internal sealed class StrategyAutoLookStep(HoldOutEpochs epochs, HoldOutStrategy
 
             var run = plan.Value.Run;
             var labels = new[] { HoldOutJob.Label(run.Id, Actor), "Hold-out look (auto): the frozen plan of this run's version, run once over the block in force; recorded as auto." };
-            await runs.InsertOrGetAsync(
-                new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(run.Id), run.StrategyId, run.Version, run.StrategyHash, run.Universe, run.From, run.To, HoldOutJob.Method, HoldOutJob.ConfigHash, run.EngineVersion, labels, time.GetUtcNow()),
+            var queued = await runs.InsertOrGetAsync(
+                new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(run.Id, plan.Value.Block.Start), run.StrategyId, run.Version, run.StrategyHash, run.Universe, run.From, run.To, HoldOutJob.Method, HoldOutJob.ConfigHash, run.EngineVersion, labels, time.GetUtcNow()),
                 cancellationToken);
+            if (!queued.Created)
+            {
+                // a look of this run at this block is queued, running or done already: this evening claims nothing new for it, and the next candidate may still be claimed
+                LabRunLog.HoldOutLookAlreadyQueued(logger, run.Id);
+                continue;
+            }
+
             return $"look queued for {run.StrategyId} v{run.Version}";
         }
 

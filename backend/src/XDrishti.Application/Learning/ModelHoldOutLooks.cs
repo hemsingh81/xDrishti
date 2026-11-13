@@ -118,11 +118,16 @@ internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time)
             return Result.Failure<StoredUnlock>(MlInfluenceErrors.HoldOutReused(key));
         }
 
-        // HO-01 D5: fresh only when the model was registered before the block's horizon and the model slot of the block is free
+        // HO-01 D5: a model registered on or after the block's horizon is refused and nothing is stored: a stored not-predated row would fill the family's one row at this block (the key is the family and the block) and block a later, pre-dated model of the family
         var firstBlock = block.PrevStart is null;
         var firstLookAt = firstBlock ? await store.FirstLookAtAsync(block.Start, cancellationToken) : null;
-        var predated = HoldOutHorizon.IsPredated(ModelKind, firstBlock, block.Start, model.Model.CreatedAt, firstLookAt);
-        var reused = !predated || await store.HasFreshLookAsync(block.Start, ModelKind, cancellationToken);
+        if (!HoldOutHorizon.IsPredated(ModelKind, firstBlock, block.Start, model.Model.CreatedAt, firstLookAt))
+        {
+            return Result.Failure<StoredUnlock>(MlInfluenceErrors.HoldOutUnavailable("The model was registered on or after the horizon of the block (the block's start, or its first look at block 1), so it cannot take a fresh look at it."));
+        }
+
+        var predated = true;
+        var reused = await store.HasFreshLookAsync(block.Start, ModelKind, cancellationToken);
         var look = Build(model, block, key, mode, actor, settingHash, reused, predated);
         var stored = await store.InsertUnlockAsync(look, cancellationToken);
         if (!stored && !reused && await store.GetUnlockAsync(key, FamilyVersion, ModelKind, block.Start, cancellationToken) is null)

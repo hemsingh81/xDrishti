@@ -58,6 +58,9 @@ internal static partial class LabRunLog
     [LoggerMessage(EventId = 7095, Level = LogLevel.Warning, Message = "lab.holdout.seal_step_failed {Step} {Failure}; the step left the block as it was")]
     public static partial void HoldOutSealStepFailed(ILogger logger, string step, string failure);
 
+    [LoggerMessage(EventId = 7097, Level = LogLevel.Information, Message = "lab.holdout.look_already_queued run {RunId}; the seal step claims nothing new for it")]
+    public static partial void HoldOutLookAlreadyQueued(ILogger logger, Guid runId);
+
     [LoggerMessage(EventId = 7096, Level = LogLevel.Warning, Message = "lab.tiers.bars_unread instrument {InstrumentId} trades {Trades}; its trades count as tier and capacity unavailable")]
     public static partial void TiersBarsUnread(ILogger logger, Guid instrumentId, int trades, Exception exception);
 

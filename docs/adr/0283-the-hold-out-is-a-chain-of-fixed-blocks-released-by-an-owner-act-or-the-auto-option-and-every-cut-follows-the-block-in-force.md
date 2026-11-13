@@ -37,4 +37,6 @@ The hold-out was one block, fixed at the first Lab post and never advanced. Sess
 15. **Labels.** A snapshot of cell statistics labels each cell row whose trades exit inside a released block (`seen_holdout:<start>`, comma separated); a label is not part of the snapshot key. The label is stored; the cell views do not serve it yet.
 16. **`Confidence:HoldOut:Enforce` defaults ON** (code default and settings section). Tests that pinned OFF were changed to ON, none deleted.
 
+Row 12 and the model reading (D8) look at fresh looks only: the fail of a later look stored `reused_window` (including `not_predated`) is ignored by design, as spec D7 says, because such a look cannot count either way. A model registered on or after the horizon is refused before any block figure is read and nothing is stored, so it cannot fill its family's row at the block. A queued look is keyed by the run and the block, so a run that looked at block 2 can be queued again at block 3.
+
 *Shortcut:* the strategy auto look queues a job and the same evening's auto release reads the slot as still available, so a block is released the evening after its look is stored, not the same evening.

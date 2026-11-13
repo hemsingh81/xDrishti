@@ -226,4 +226,25 @@ public sealed class LabRunStoreTests(ApiFactory factory, ResearchGrantsTests.Ded
         (await WithStoreAsync(host, s => s.GetAsync(running, Ct).AsTask()))!.State.ShouldBe(LabRunState.Interrupted);
         (await WithStoreAsync(host, s => s.GetAsync(other, Ct).AsTask()))!.State.ShouldBe(LabRunState.Running);
     }
+
+    [Fact]
+    public async Task The_succeeded_full_and_robust_runs_are_listed_newest_first_with_no_cap_and_quick_and_failed_runs_are_left_out()
+    {
+        await ResetAsync();
+        using var host = Host();
+        var full = New(Key('1')) with { Method = "full" };
+        var robust = New(Key('2')) with { Method = "robust" };
+        var quick = New(Key('3'));
+        var failed = New(Key('4')) with { Method = "full" };
+        foreach (var run in new[] { full, robust, quick, failed })
+        {
+            await WithStoreAsync(host, s => s.InsertOrGetAsync(run, Ct).AsTask());
+        }
+
+        await StoreKit.ExecuteAsync(server.Owner, $"UPDATE lab.lab_runs SET state = 'succeeded' WHERE id IN ('{full.Id}', '{robust.Id}', '{quick.Id}'); UPDATE lab.lab_runs SET state = 'failed' WHERE id = '{failed.Id}'", Ct);
+
+        var listed = await WithStoreAsync(host, s => s.ListSucceededFullTestsAsync(Ct).AsTask());
+
+        listed.Select(r => r.Id).Order().ShouldBe(new[] { full.Id, robust.Id }.Order());
+    }
 }

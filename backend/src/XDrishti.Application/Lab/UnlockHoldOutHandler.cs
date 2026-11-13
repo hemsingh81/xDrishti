@@ -28,7 +28,7 @@ internal sealed class UnlockHoldOutHandler(HoldOutUnlocker unlocker, ILabRunStor
         var run = plan.Value.Run;
         var labels = new[] { HoldOutJob.Label(run.Id, command.Actor), "Hold-out look: the frozen plan of this run's version, run once over the locked block; the result is stored beside the report." };
         var queued = await runs.InsertOrGetAsync(
-            new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(run.Id), run.StrategyId, run.Version, run.StrategyHash, run.Universe, run.From, run.To, HoldOutJob.Method, HoldOutJob.ConfigHash, run.EngineVersion, labels, time.GetUtcNow()),
+            new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(run.Id, plan.Value.Block.Start), run.StrategyId, run.Version, run.StrategyHash, run.Universe, run.From, run.To, HoldOutJob.Method, HoldOutJob.ConfigHash, run.EngineVersion, labels, time.GetUtcNow()),
             cancellationToken);
         return Result.Success(LabRunView.Of(queued.Run));
     }

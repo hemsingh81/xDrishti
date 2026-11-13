@@ -70,10 +70,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
             migrationBuilder.Sql("""
                 DO $$
                 BEGIN
-                    IF EXISTS (SELECT 1 FROM lab.holdout_unlocks WHERE kind = 'system')
+                    IF EXISTS (SELECT 1 FROM lab.holdout_unlocks WHERE kind = 'system' OR reason IS NOT NULL)
                        OR EXISTS (SELECT 1 FROM lab.holdout_unlocks GROUP BY strategy_id, version, kind HAVING count(*) > 1)
                        OR EXISTS (SELECT 1 FROM lab.holdout_unlocks WHERE NOT reused_window GROUP BY block_start HAVING count(*) > 1) THEN
-                        RAISE EXCEPTION 'Looks of kind system, a second look of a version, or two fresh looks at a block exist and are permanent; WidenHoldOutLooks cannot be reverted.';
+                        RAISE EXCEPTION 'Looks of kind system, a not_predated reason, a second look of a version, or two fresh looks at a block exist and are permanent; WidenHoldOutLooks cannot be reverted.';
                     END IF;
                 END $$;
                 """);

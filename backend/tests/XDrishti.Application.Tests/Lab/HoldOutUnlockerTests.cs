@@ -220,6 +220,7 @@ public sealed class HoldOutUnlockerTests
         _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
         var run = Run();
         ReleaseBlock1(); // automatic looks start at block 2 (HO-01)
+        _freezes.FirstFrozenAtAsync(run.StrategyId, run.Version, Arg.Any<CancellationToken>()).Returns(new DateTimeOffset(2026, 9, 1, 5, 0, 0, TimeSpan.Zero)); // pre-dated: frozen before block 2 begins
 
         (await Unlocker(new HoldOutOptions(AutoUnlock: false)).TryAutoAsync(run.Id, Verdict(), Ct)).ShouldBeNull();
         _store.Unlocks.ShouldBeEmpty();
@@ -343,7 +344,7 @@ public sealed class HoldOutUnlockerTests
         queued.IsSuccess.ShouldBeTrue(queued.IsFailure ? queued.Error.Message : string.Empty);
         (queued.Value.Method, queued.Value.State).ShouldBe(("holdout", "queued"));
         posted.ShouldNotBeNull();
-        posted.Key.ShouldBe(HoldOutJob.KeyOf(run.Id));
+        posted.Key.ShouldBe(HoldOutJob.KeyOf(run.Id, new DateOnly(2026, 5, 1)));
         (posted.StrategyId, posted.Version, posted.StrategyHash, posted.From, posted.To).ShouldBe((run.StrategyId, run.Version, run.StrategyHash, run.From, run.To));
         HoldOutJob.Parse(Queued(posted)).ShouldBe((run.Id, "owner:x"));
         _pass.Calls.ShouldBe(0, "the pass runs on the dispatcher, not in the request");
@@ -489,11 +490,11 @@ public sealed class HoldOutUnlockerTests
         HoldOutJob.Parse(JobOf(run) with { Labels = [] }).ShouldBeNull();
     }
 
-    private HoldOutJobRunner Job(ILabProgress? progress = null) => new(_runs, Unlocker(), progress ?? Substitute.For<ILabProgress>(), _time, NullLogger<HoldOutJobRunner>.Instance);
+    private HoldOutJobRunner Job(ILabProgress? progress = null) => new(_runs, Unlocker(), progress ?? Substitute.For<ILabProgress>(), new HoldOutOptions(), _time, NullLogger<HoldOutJobRunner>.Instance);
 
     private static LabRun Queued(NewLabRun n) => new(n.Id, n.Key, n.StrategyId, n.Version, n.StrategyHash, n.Universe, n.From, n.To, n.Method, n.ConfigHash, n.EngineVersion, LabRunState.Queued, null, 0, 0, [], null, [], [], n.Labels, null, false, n.CreatedAt, null, null);
 
-    private LabRun JobOf(LabRun source) => Queued(new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(source.Id), source.StrategyId, source.Version, source.StrategyHash, source.Universe, source.From, source.To, HoldOutJob.Method, HoldOutJob.ConfigHash, source.EngineVersion, [HoldOutJob.Label(source.Id, "owner:x")], _time.GetUtcNow()));
+    private LabRun JobOf(LabRun source) => Queued(new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(source.Id, new DateOnly(2026, 5, 1)), source.StrategyId, source.Version, source.StrategyHash, source.Universe, source.From, source.To, HoldOutJob.Method, HoldOutJob.ConfigHash, source.EngineVersion, [HoldOutJob.Label(source.Id, "owner:x")], _time.GetUtcNow()));
 
     [Fact]
     public async Task The_hold_out_view_shows_the_proposal_before_a_block_exists_and_numbers_only_in_a_look_that_was_taken()

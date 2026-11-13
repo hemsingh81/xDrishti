@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Lab;
 
 namespace XDrishti.Application.Lab;
@@ -8,7 +9,7 @@ namespace XDrishti.Application.Lab;
 /// Carries out a claimed <c>holdout</c> job (spec CF-06, part C, D5): the one look at the hold-out that the owner asked for, run on the Lab dispatcher with a stage log and progress events. The password never reaches here. A failure to look ends the job
 /// <c>failed</c> with the code of the refusal; a cancel seen before the pass starts ends it <c>cancelled</c>; a stop of the host leaves it <c>running</c> for the next start to mark <c>interrupted</c>, and asking again is safe.
 /// </summary>
-internal sealed class HoldOutJobRunner(ILabRunStore runs, HoldOutUnlocker unlocker, ILabProgress progress, TimeProvider time, ILogger<HoldOutJobRunner> logger) : ILabRunExecutor
+internal sealed class HoldOutJobRunner(ILabRunStore runs, HoldOutUnlocker unlocker, ILabProgress progress, HoldOutOptions options, TimeProvider time, ILogger<HoldOutJobRunner> logger) : ILabRunExecutor
 {
     public async Task ExecuteAsync(LabRun run, CancellationToken hostStop)
     {
@@ -29,6 +30,11 @@ internal sealed class HoldOutJobRunner(ILabRunStore runs, HoldOutUnlocker unlock
             else if (await runs.IsCancelRequestedAsync(run.Id, hostStop))
             {
                 state = LabRunState.Cancelled;
+            }
+            else if (string.Equals(HoldOutJob.ModeOf(job.Actor), HoldOutUnlocker.AutoMode, StringComparison.Ordinal) && !options.AutoUnlock)
+            {
+                // an automatic look queued while the setting was ON is not taken after it was turned OFF
+                (state, error) = (LabRunState.Cancelled, null);
             }
             else
             {

@@ -149,4 +149,16 @@ describe('HoldOutBlocksCard (HO-01b)', () => {
     expect(await within(dialog).findByText(/The password was not accepted/)).toBeInTheDocument();
     expect(within(dialog).getByLabelText(/Your password for this act/)).toHaveValue('');
   });
+
+  it('warns in the dialog that releasing forfeits a look that is still available', async () => {
+    serve([block({ looks: { strategy: fresh, model: open, system: none }, blockedBy: 'look_available' })]);
+    const user = userEvent.setup();
+    renderWithProviders(<HoldOutBlocksCard />);
+
+    await user.click(await screen.findByRole('button', { name: 'Release this block' }));
+    const dialog = await screen.findByRole('dialog');
+
+    expect(within(dialog).getByText(/Releasing it now forfeits that look for good/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('checkbox')).toBeNull();
+  });
 });

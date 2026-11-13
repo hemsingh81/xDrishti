@@ -981,6 +981,7 @@ public sealed class LabRunnerTests
         bars.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new XDrishti.Application.Abstractions.Market.Bars.BarTotals(2, 1000, first, new DateTimeOffset(2026, 10, 30, 15, 29, 0, TimeSpan.FromHours(5.5)), 0, 0));
         var freezes = Substitute.For<IPlanFreezeStore>();
         freezes.FirstAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new string('f', 64));
+        freezes.FirstFrozenAtAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new DateTimeOffset(2026, 9, 1, 5, 0, 0, TimeSpan.Zero)); // pre-dated: frozen before block 2 begins (HO-01b)
         var store = new MemoryHoldOutStore();
         if (blockOneReleased)
         {

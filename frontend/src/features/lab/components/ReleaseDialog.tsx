@@ -57,6 +57,12 @@ export function ReleaseDialog({ block, onClose }: { block: HoldOutBlock; onClose
             The block becomes development data, labelled seen_holdout, and every development cut moves forward. This
             cannot be undone.
           </Typography>
+          {!unlooked && block.blockedBy === 'look_available' && (
+            <Alert severity="warning">
+              A look is still available for this block (a strategy version, a model or a system run can take it).
+              Releasing it now forfeits that look for good.
+            </Alert>
+          )}
           {unlooked && (
             <Alert severity="warning">
               <Typography variant="body2" sx={{ mb: 1 }}>

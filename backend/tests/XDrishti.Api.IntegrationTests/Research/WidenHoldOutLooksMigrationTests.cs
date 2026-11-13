@@ -88,4 +88,20 @@ public sealed class WidenHoldOutLooksMigrationTests(ApiFactory factory)
         refused.MessageText.ShouldContain("cannot be reverted");
         (await ListAsync(connection, "SELECT kind FROM lab.holdout_unlocks")).ShouldBe(["system"]);
     }
+
+    [Fact]
+    public async Task Down_is_refused_while_a_not_predated_reason_is_stored()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_widen_holdout_reason_probe", Ct);
+        using var scope = scratch.Host.Services.CreateScope();
+        var migrator = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>().GetService<IMigrator>();
+        await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+        await connection.OpenAsync(Ct);
+        await migrator.MigrateAsync(null, Ct);
+        await ExecuteAsync(connection, Unlock("ORB", 4, "strategy", true, "2026-11-05", "not_predated"));
+
+        var refused = await Should.ThrowAsync<PostgresException>(async () => await migrator.MigrateAsync(Before, Ct));
+
+        refused.MessageText.ShouldContain("cannot be reverted");
+    }
 }

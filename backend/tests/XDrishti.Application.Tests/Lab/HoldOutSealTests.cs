@@ -32,6 +32,7 @@ public sealed class HoldOutSealTests
     private readonly FixedPass _pass = new();
     private readonly MemoryHoldOutStore _store = new();
     private readonly List<LabRun> _listed = [];
+    private readonly Dictionary<string, LabRun> _jobs = [];
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2027, 5, 5, 6, 0, 0, TimeSpan.Zero));
 
     public HoldOutSealTests()
@@ -42,8 +43,18 @@ public sealed class HoldOutSealTests
         _store.Releases.Add(new StoredRelease(One, DateTimeOffset.UnixEpoch, "owner", "owner:x", Hash, true, Two));
         _bars.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new BarTotals(2, 1000, new DateTimeOffset(2024, 10, 1, 9, 15, 0, TimeSpan.FromHours(5.5)), new DateTimeOffset(2027, 4, 30, 15, 29, 0, TimeSpan.FromHours(5.5)), 0, 0));
         _freezes.FirstAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new string('f', 64));
-        _runs.ListAsync(null, LabRunState.Succeeded, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(_ => (IReadOnlyList<LabRun>)[.. _listed]);
-        _runs.InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>()).Returns(c => new InsertedLabRun(Queued(c.Arg<NewLabRun>()), true));
+        _runs.ListSucceededFullTestsAsync(Arg.Any<CancellationToken>()).Returns(_ => (IReadOnlyList<LabRun>)[.. _listed]);
+        // real key semantics, as the table has them: a second post with the same key gets the first one back and creates nothing
+        _runs.InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>()).Returns(c =>
+        {
+            var n = c.Arg<NewLabRun>();
+            if (_jobs.TryGetValue(n.Key, out var existing))
+            {
+                return new InsertedLabRun(existing, false);
+            }
+
+            return new InsertedLabRun(_jobs[n.Key] = Queued(n), true);
+        });
     }
 
     private sealed class FixedPass : IHoldOutPass
@@ -68,7 +79,7 @@ public sealed class HoldOutSealTests
     private StrategyAutoLookStep Step(HoldOutOptions? options = null, FakeTimeProvider? time = null)
     {
         var o = options ?? new HoldOutOptions();
-        return new StrategyAutoLookStep(Epochs(time), Candidates(), Unlocker(o), _store, _runs, o, _time);
+        return new StrategyAutoLookStep(Epochs(time), Candidates(), Unlocker(o), _store, _runs, o, _time, NullLogger<StrategyAutoLookStep>.Instance);
     }
 
     private static LabRun Queued(NewLabRun n) => new(n.Id, n.Key, n.StrategyId, n.Version, n.StrategyHash, n.Universe, n.From, n.To, n.Method, n.ConfigHash, n.EngineVersion, LabRunState.Queued, null, 0, 0, [], null, [], [], n.Labels, null, false, n.CreatedAt, null, null);
@@ -204,6 +215,94 @@ public sealed class HoldOutSealTests
         Run("ORB", 3, new DateOnly(2026, 10, 1), to: new DateOnly(2026, 11, 15));
 
         (await Step().RunAsync(Ct)).ShouldBe("no candidate");
+    }
+
+    [Fact]
+    public async Task A_run_that_looked_at_block_two_is_queued_again_at_block_three_and_the_same_block_is_queued_once()
+    {
+        var v3 = Run("ORB", 3, new DateOnly(2026, 10, 1));
+        (await Step().RunAsync(Ct)).ShouldBe("look queued for ORB v3");
+        (await Step().RunAsync(Ct)).ShouldBe("no candidate"); // the same run at the same block gets its queued job back: nothing new is claimed
+        _store.Unlocks.Add(new StoredUnlock("ORB", 3, "strategy", "auto", "system:auto-unlock", DateTimeOffset.UnixEpoch.AddDays(1), Hash, false, Two, v3.Id, View(Two)));
+        _store.Releases.Add(new StoredRelease(Two, DateTimeOffset.UnixEpoch.AddDays(2), "auto", "system:auto-release", Hash, true, new DateOnly(2027, 5, 1)));
+        _store.Blocks.Add(new HoldOutBlock(new DateOnly(2027, 5, 1), new DateOnly(2024, 10, 1), new DateOnly(2027, 10, 31), 6, Hash, DateTimeOffset.UnixEpoch, Two));
+        _time.SetUtcNow(new DateTimeOffset(2027, 11, 5, 6, 0, 0, TimeSpan.Zero));
+        _bars.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new BarTotals(2, 1000, new DateTimeOffset(2024, 10, 1, 9, 15, 0, TimeSpan.FromHours(5.5)), new DateTimeOffset(2027, 10, 29, 15, 29, 0, TimeSpan.FromHours(5.5)), 0, 0));
+
+        var said = await Step().RunAsync(Ct);
+
+        said.ShouldBe("look queued for ORB v3");
+        _jobs.Count.ShouldBe(2, "one job per run and block");
+        _jobs.Keys.ShouldContain(HoldOutJob.KeyOf(v3.Id, Two));
+        _jobs.Keys.ShouldContain(HoldOutJob.KeyOf(v3.Id, new DateOnly(2027, 5, 1)));
+    }
+
+    [Fact]
+    public async Task The_newest_run_of_a_version_decides_so_an_older_passing_run_never_outweighs_a_newer_failing_one()
+    {
+        Run("ORB", 3, new DateOnly(2026, 10, 1), passes: false); // newest
+        Run("ORB", 3, new DateOnly(2026, 10, 1), passes: true);
+
+        (await Step().RunAsync(Ct)).ShouldBe("no candidate");
+        (await new StrategyLookSlot(_store, Candidates()).ReadAsync(Two, Ct)).ShouldBe(LookAvailability.NoSubject);
+    }
+
+    [Fact]
+    public async Task A_newer_run_that_reaches_the_block_does_not_decide_and_the_older_clear_one_does()
+    {
+        Run("ORB", 3, new DateOnly(2026, 10, 1), passes: false, to: new DateOnly(2026, 11, 20)); // newest, window reaches the block
+        Run("ORB", 3, new DateOnly(2026, 10, 1), passes: true);
+
+        (await Step().RunAsync(Ct)).ShouldBe("look queued for ORB v3");
+    }
+
+    [Fact]
+    public async Task A_version_beyond_a_few_hundred_other_runs_is_still_found_there_is_no_cap()
+    {
+        for (var i = 0; i < 600; i++)
+        {
+            Run("OTHER", i + 10, new DateOnly(2026, 10, 1), passes: false);
+        }
+
+        Run("ORB", 3, new DateOnly(2026, 10, 1));
+
+        (await new StrategyLookSlot(_store, Candidates()).ReadAsync(Two, Ct)).ShouldBe(LookAvailability.Available);
+    }
+
+    // ---- the post-run auto look and the queued auto job
+
+    [Fact]
+    public async Task The_post_run_auto_look_takes_a_pre_dated_version_and_skips_a_later_one_and_a_used_slot()
+    {
+        var late = Run("ORB", 4, new DateOnly(2026, 12, 15));
+        var early = Run("ORB", 3, new DateOnly(2026, 10, 1));
+        var verdict = HoldOutUnlockerTests.Verdict();
+
+        (await Unlocker().TryAutoAsync(late.Id, verdict, Ct)).ShouldBeNull("not pre-dated: the look would only burn the version's look at the block");
+        _store.Unlocks.ShouldBeEmpty();
+        FreshStrategyLook(Two);
+        (await Unlocker().TryAutoAsync(early.Id, verdict, Ct)).ShouldBeNull("the block's strategy slot is taken");
+        _store.Unlocks.Count.ShouldBe(1);
+        _store.Unlocks.Clear();
+
+        var taken = await Unlocker().TryAutoAsync(early.Id, verdict, Ct);
+
+        taken.ShouldNotBeNull().ReusedWindow.ShouldBeFalse();
+        taken.Mode.ShouldBe("auto");
+    }
+
+    [Fact]
+    public async Task A_queued_auto_job_is_cancelled_when_the_auto_look_was_turned_off_before_it_ran()
+    {
+        var run = Run("ORB", 3, new DateOnly(2026, 10, 1));
+        var job = Queued(new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(run.Id, Two), run.StrategyId, run.Version, run.StrategyHash, run.Universe, run.From, run.To, HoldOutJob.Method, HoldOutJob.ConfigHash, run.EngineVersion, [HoldOutJob.Label(run.Id, "system:auto-unlock")], _time.GetUtcNow()));
+        var off = new HoldOutOptions(AutoUnlock: false);
+        var runner = new HoldOutJobRunner(_runs, Unlocker(off), Substitute.For<ILabProgress>(), off, _time, NullLogger<HoldOutJobRunner>.Instance);
+
+        await runner.ExecuteAsync(job, Ct);
+
+        _store.Unlocks.ShouldBeEmpty();
+        await _runs.Received(1).FinishAsync(Arg.Is<LabFinish>(f => f.Id == job.Id && f.State == LabRunState.Cancelled), Arg.Any<CancellationToken>());
     }
 
     // ---- the slot and the auto release
