@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
@@ -12,6 +13,7 @@ using XDrishti.Application.Paper;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Research;
 using XDrishti.Application.Tests.Research;
+using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Paper;
@@ -54,6 +56,8 @@ public sealed class CapturePaperFillsHandlerTests
 
     private readonly ITradingCalendar _calendar = Substitute.For<ITradingCalendar>();
 
+    private readonly IAccountStore _accounts = Substitute.For<IAccountStore>();
+
     private readonly IQueryHandler<RunSimulationQuery, Result<SimulationRun>> _simulation = Substitute.For<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>();
 
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 4, 12, 0, 0, TimeSpan.Zero));
@@ -71,6 +75,8 @@ public sealed class CapturePaperFillsHandlerTests
         _baskets.MembersAsync(basket, null, null, Ct).Returns(new BasketMembers(basket, "B", null, null, 1, [member]));
         _calendar.GetAsync(Ct).Returns(new TradingCalendar());
         var epoch = new EpochRow(1, new DateOnly(2026, 11, 2), DateTimeOffset.UnixEpoch, "first", "default", "system");
+        _paper.CurrentEpochAsync(Ct).Returns(epoch);
+        _accounts.ListActiveAsync(Ct).Returns([]);
         _gate.ResolveAsync(Arg.Any<IReadOnlyList<DateOnly>>(), Ct).Returns(call => new EpochResolution(epoch, call.Arg<IReadOnlyList<DateOnly>>().Distinct().ToDictionary(s => s, _ => "measured")));
         _paper.PairsAsync(Arg.Any<IReadOnlyList<long>>(), Ct).Returns(new Dictionary<(long, Guid), StoredPair>());
         _paper.CoverageAsync(Ct).Returns(new SessionCoverage(new HashSet<DateOnly>(), new HashSet<DateOnly>()));
@@ -94,13 +100,62 @@ public sealed class CapturePaperFillsHandlerTests
         new(id, 1, new NewPlanItem((int)id, group, "NSE:AAA", "BUY", "ORB", Hash, "t", "s", "g", "v", group == TicketGroup.Primary ? [] : ["why"], new PlanEvidence(Cell, 30, "r", "b", null, null, [], null), [new NewAllocation(Account, "paper", qty)]), state);
 
     private CapturePaperFillsHandler Handler() =>
-        new(_plans, _paper, _gate, _settings, _sheets, _calendar, new TicketReplayer(_strategies, _baskets, _simulation), _time, NullLogger<CapturePaperFillsHandler>.Instance);
+        new(_plans, _paper, _gate, _settings, _sheets, _calendar, _accounts, new TicketReplayer(_strategies, _baskets, _simulation), _time, NullLogger<CapturePaperFillsHandler>.Instance);
 
     private void Replay(IReadOnlyList<SimTrade> trades, IReadOnlyList<SimTrade>? open = null, bool costed = false) =>
         _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Ct).Returns(Result.Success(FabricatedRun.Assemble(
             FabricatedRun.List((Instrument, "NSE:AAA")), [FabricatedRun.Ran(Instrument, "NSE:AAA", F.AddDays(-30), F)], trades, open, from: F, to: F, costs: costed ? new CostRecord(PaperFixture.SheetId, new string('a', 64), "{}", null, 100_000m, SizingProfile.Standard, 1m) : null)));
 
     private static string ModificationText(int qty) => TicketModification.Serialize([new QuantityChange(Account, qty)]);
+
+    [Fact]
+    public async Task With_no_epoch_and_no_paper_account_nothing_is_captured_and_no_epoch_is_opened()
+    {
+        _paper.CurrentEpochAsync(Ct).Returns((EpochRow?)null);
+
+        var result = await Handler().HandleAsync(new CapturePaperFillsCommand(null, false), Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        (result.Value.Sessions, result.Value.EntriesWritten, result.Value.FailedSessions).ShouldBe((0, 0, 0));
+        await _gate.DidNotReceiveWithAnyArgs().ResolveAsync(default!, Ct);
+        await _paper.DidNotReceiveWithAnyArgs().WriteSessionAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task A_live_mode_account_or_a_disabled_paper_account_is_not_a_paper_account_and_the_capture_stays_a_no_op()
+    {
+        _paper.CurrentEpochAsync(Ct).Returns((EpochRow?)null);
+        _accounts.ListActiveAsync(Ct).Returns([PaperLedgerFixture.Make("1000000022", 100_000m, TradingMode.ManualLive), PaperLedgerFixture.Make("1000000023", 100_000m, TradingMode.Paper, tradingRole: false)]);
+
+        var result = await Handler().HandleAsync(new CapturePaperFillsCommand(null, false), Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Sessions.ShouldBe(0);
+        await _gate.DidNotReceiveWithAnyArgs().ResolveAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task A_failing_account_read_is_not_swallowed_so_no_epoch_is_opened_on_a_guess()
+    {
+        _paper.CurrentEpochAsync(Ct).Returns((EpochRow?)null);
+        _accounts.ListActiveAsync(Ct).Returns<IReadOnlyList<BrokerAccount>>(_ => throw new InvalidOperationException("away"));
+
+        await Should.ThrowAsync<InvalidOperationException>(async () => await Handler().HandleAsync(new CapturePaperFillsCommand(null, false), Ct));
+
+        await _gate.DidNotReceiveWithAnyArgs().ResolveAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task With_no_epoch_but_a_paper_account_the_first_capture_goes_on_and_opens_the_epoch_through_the_gate()
+    {
+        _paper.CurrentEpochAsync(Ct).Returns((EpochRow?)null);
+        _accounts.ListActiveAsync(Ct).Returns([PaperLedgerFixture.Make("1000000021", 100_000m)]);
+
+        var result = await Handler().HandleAsync(new CapturePaperFillsCommand(null, false), Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        await _gate.ReceivedWithAnyArgs().ResolveAsync(default!, Ct);
+    }
 
     [Fact]
     public async Task A_session_of_an_earlier_epoch_that_still_has_work_is_revisited_and_written_under_its_own_epoch()

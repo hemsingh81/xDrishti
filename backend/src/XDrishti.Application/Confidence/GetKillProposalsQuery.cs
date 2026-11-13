@@ -47,12 +47,13 @@ public sealed record KillProposalView(
     string? DismissReason = null);
 
 /// <summary>The automatic setting and the thresholds as they stand.</summary>
-/// <param name="Auto">Whether an automatic demotion is allowed now (default OFF).</param>
+/// <param name="Auto">Whether an automatic demotion is allowed now (ON by default since ADR 0282 through the system default row; OFF when no row exists).</param>
 /// <param name="SettingId">The row of the switch in force, or null when none was ever stored.</param>
 /// <param name="StressMultiplier">The cost multiplier of rule (a).</param>
 /// <param name="DrawdownFactor">The factor of rule (b).</param>
 /// <param name="SettingsHash">The SHA-256 of the thresholds.</param>
-public sealed record KillSettingsView(bool Auto, long? SettingId, double StressMultiplier, double DrawdownFactor, string SettingsHash);
+/// <param name="Actor">Who wrote the switch row in force: <c>system:default</c> for the ADR 0282 seed (ON by default), <c>owner:...</c> for the owner's own act; null when none was ever stored.</param>
+public sealed record KillSettingsView(bool Auto, long? SettingId, double StressMultiplier, double DrawdownFactor, string SettingsHash, string? Actor = null);
 
 /// <summary>The proposals and the settings beside them.</summary>
 /// <param name="Items">The proposals, newest first.</param>

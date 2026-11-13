@@ -29,9 +29,9 @@ internal sealed class GetKillProposalsHandler(IKillProposalReader reader, IKillS
         var current = await settings.CurrentAsync(cancellationToken);
         return Result.Success(new KillProposalsView(
             [.. rows.Select(r => new KillProposalView(r.Id, r.Proposal.Strategy, r.Proposal.Rule, r.Proposal.ProposalOnly, r.Proposal.Value, r.Proposal.Limit, r.Proposal.Trades, r.Proposal.Text, r.Proposal.Cells, r.Proposal.SettingsHash, r.ProposedOn, r.ProposedAt, r.State, r.Actor, r.DecidedAt, r.AutoSettingId, r.DismissReason))],
-            new KillSettingsView(current.Auto, current.Id, kill.StressMultiplier, kill.DrawdownFactor, kill.SnapshotHash()),
+            new KillSettingsView(current.Auto, current.Id, kill.StressMultiplier, kill.DrawdownFactor, kill.SnapshotHash(), current.Actor),
             [
-                "A proposal changes nothing by itself. Applying it pauses the cells it names (Paper or Active to Paused); the owner applies it, or the automatic setting does when it is ON (default OFF), except for the CF-09 failure boundary, which only the owner applies.",
+                "A proposal changes nothing by itself. Applying it pauses the cells it names (Paper or Active to Paused); the owner applies it, or the automatic setting does when it is ON (ON by default since ADR 0282; the owner can switch it off with a fresh password), except for the CF-09 failure boundary, which only the owner applies.",
                 "Re-enabling a paused cell is always the owner's act with a fresh password and needs the failing condition to have cleared. No order is placed by any of this.",
             ]));
     }

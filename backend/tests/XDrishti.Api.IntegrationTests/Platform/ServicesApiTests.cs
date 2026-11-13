@@ -484,14 +484,14 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
         var timeline = await response.ReadAsync<ServicesTimeline>(Ct);
 
         (timeline.TradingDay, timeline.MarketOpen, timeline.MarketClose, timeline.ReviewCutoff).ShouldBe((true, "09:15", "15:30", "09:05"));
-        timeline.Entries.Select(e => e.ServiceId).ShouldBe(["holdings-quotes", "live-feed", "options-quality", FakeJobService.Id]); // options-quality is on by default (P14-04); eod, the instrument master and the trades and ledger read are seeded paused
+        timeline.Entries.Select(e => e.ServiceId).ShouldBe(["holdings-quotes", "paper-capture", "decay-monitor", "ml-monitor", "live-feed", "options-quality", "readiness-snapshot", FakeJobService.Id]); // options-quality is on by default (P14-04) and the evidence services since AM-01a (ADR 0282); eod, the instrument master and the trades and ledger read are seeded paused
         var quotes = timeline.Entries[0];
         (quotes.Kind, quotes.Band, quotes.EveryMinutes).ShouldBe(("band", new TimelineBand("09:15", "15:30"), 5));
-        var feed = timeline.Entries[1];
+        var feed = timeline.Entries[4];
         (feed.Kind, feed.Band).ShouldBe(("band", new TimelineBand("09:00", "15:35")));
-        var quality = timeline.Entries[2];
+        var quality = timeline.Entries[5];
         (quality.ServiceId, quality.Kind, quality.Marks.Single().Time).ShouldBe(("options-quality", "mark", "16:15"));
-        var entry = timeline.Entries[3];
+        var entry = timeline.Entries[7];
         (entry.ServiceId, entry.Kind, entry.Marks.Single().Time).ShouldBe((FakeJobService.Id, "mark", "10:00"));
         using var saturday = await _client.GetAsync("/api/services/timeline?date=2026-10-10", Ct);
         (await saturday.ReadAsync<ServicesTimeline>(Ct)).TradingDay.ShouldBeFalse();

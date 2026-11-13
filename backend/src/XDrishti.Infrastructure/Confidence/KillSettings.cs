@@ -12,9 +12,9 @@ internal sealed class KillSettings(NpgsqlDataSource dataSource) : IKillSettings,
 {
     public async ValueTask<KillSwitch> CurrentAsync(CancellationToken cancellationToken)
     {
-        await using var select = dataSource.CreateCommand("SELECT id, auto FROM confidence.kill_settings ORDER BY id DESC LIMIT 1");
+        await using var select = dataSource.CreateCommand("SELECT id, auto, actor FROM confidence.kill_settings ORDER BY id DESC LIMIT 1");
         await using var reader = await select.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? new KillSwitch(reader.GetInt64(0), reader.GetBoolean(1)) : new KillSwitch(null, false);
+        return await reader.ReadAsync(cancellationToken) ? new KillSwitch(reader.GetInt64(0), reader.GetBoolean(1), reader.GetString(2)) : new KillSwitch(null, false);
     }
 
     public async ValueTask<long> AppendAsync(bool auto, string actor, string reason, CancellationToken cancellationToken)

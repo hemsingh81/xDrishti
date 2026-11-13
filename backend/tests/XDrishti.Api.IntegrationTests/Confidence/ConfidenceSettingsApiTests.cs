@@ -47,7 +47,8 @@ public sealed class ConfidenceSettingsApiTests(ApiFactory factory)
 
         host.Services.GetRequiredService<KillOptions>().ShouldBe(new KillOptions(StressMultiplier: 2, DrawdownFactor: 1.5));
         using var scope = host.Services.CreateScope();
-        (await scope.ServiceProvider.GetRequiredService<XDrishti.Application.Abstractions.Confidence.IKillSettings>().CurrentAsync(TestContext.Current.CancellationToken)).Auto.ShouldBeFalse();
+        var current = await scope.ServiceProvider.GetRequiredService<XDrishti.Application.Abstractions.Confidence.IKillSettings>().CurrentAsync(TestContext.Current.CancellationToken);
+        (current.Id is null || current.Actor is "system:default").ShouldBeTrue("the switch is only ever a stored row (OFF with none; since ADR 0282 the one system default seed row on a fresh database), never the configuration key");
     }
 
     [Theory]

@@ -405,20 +405,20 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, DerivedBasketsService>(); // BK-03: the derived baskets' versions after the end-of-day run; starts paused, Baskets:System:Derived:Enabled OFF, reads and writes nothing while off
         services.AddSingleton<IScheduledService, XDrishti.Application.OpeningBars.OpeningBarsService>(); // BK-03b: the opening-minute recorder, shown and edited here, run by xd-feed; starts paused, "Run now" refused
         services.AddSingleton<IScheduledService, PlanExpiryService>(); // expires the day's armed tickets after the close (P7-11); starts paused
-        services.AddSingleton<IScheduledService, PaperCaptureService>(); // paper fills of armed tickets after the end-of-day run (P10-01); starts paused, no order
+        services.AddSingleton<IScheduledService, PaperCaptureService>(); // paper fills of armed tickets after the end-of-day run (P10-01); starts enabled (ADR 0282) but opens no epoch before a paper account exists, no order
         services.AddSingleton<IScheduledService, ShadowWriteService>(); // the shadow record of every nightly candidate, written before the open (CF-08); starts paused, setting paper.shadow.enabled OFF, no order
         services.AddSingleton<IScheduledService, ShadowGradeService>(); // grades the shadow record after the close with the same replay as paper (CF-08 part B); starts paused, setting paper.shadow.enabled OFF, no order
         services.AddSingleton<IScheduledService, ShadowDigestService>(); // copies the newest chain digest to a log outside the database every week (CF-08 review fix 4, ADR 0232); starts paused, nothing exported while paper.shadow.enabled is OFF
-        services.AddSingleton<IScheduledService, DecayMonitorService>(); // the daily kill-rule evaluation of each strategy's forward series, after the shadow grading (CF-12 part 12b); starts paused, automatic demotion only with the owner's setting ON (default OFF), no order
-        services.AddSingleton<IScheduledService, MlMonitorService>(); // the daily rollback evaluation of each champion, after the decay monitor (CF-10 part 10d-1); starts paused, automatic acts only with the owner's settings ON (default OFF), no order
+        services.AddSingleton<IScheduledService, DecayMonitorService>(); // the daily kill-rule evaluation of each strategy's forward series, after the shadow grading (CF-12 part 12b); starts enabled (ADR 0282), automatic demotion pauses only while confidence.kill.auto is ON (ON by default, owner password to change), no order
+        services.AddSingleton<IScheduledService, MlMonitorService>(); // the daily rollback evaluation of each champion, after the decay monitor (CF-10 part 10d-1); starts enabled (ADR 0282), automatic acts only with the owner's settings ON (default OFF), no order
         services.AddSingleton<IScheduledService, HoldOutEpochsService>(); // the evening seal steps of the hold-out chain (HO-01b, ADR 0283); enabled at first start, acts only through the auto settings, no order
         services.AddSingleton<IScheduledService, CellsRefreshService>(); // the scheduled cell-statistics refresh (LC-01); starts paused, resuming needs the owner's password, fails closed
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
         services.AddSingleton<IScheduledService, BriefingService>(); // the daily briefing text after the suggestions (P9-06); starts paused, the model is used only under both switches
         services.AddSingleton<IScheduledService, WeeklyReviewService>(); // the weekly review text after the digest (P9-06); starts paused, applies nothing
         services.AddSingleton<IScheduledService, ProposalService>(); // hypothesis and basket proposals after the digest (P9-08); starts paused, off unless Assistant:Proposals:Enabled and the master switch are on
-        services.AddSingleton<IScheduledService, LearnedSettings.LearnedSettingsService>(); // learned setting changes after the digest (AU-10); starts paused, applies a tightening only with Auto ON, a loosening never
-        services.AddSingleton<IScheduledService, PaperReviewService>(); // the weekly paper review (P10-03); starts paused, builds and stores one text per week and epoch, applies nothing
+        services.AddSingleton<IScheduledService, LearnedSettings.LearnedSettingsService>(); // learned setting changes after the digest (AU-10); starts enabled (ADR 0282), applies a tightening only with Auto ON, a loosening never
+        services.AddSingleton<IScheduledService, PaperReviewService>(); // the weekly paper review (P10-03); starts enabled (ADR 0282), builds and stores one text per week and epoch, applies nothing
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<IScheduledService, DepthRecorderService>(); // the depth recorder (P7-16): shown and edited here, run by xd-feed; starts paused, Run now is refused
         services.AddSingleton<IScheduledService, TickRecorderService>(); // the trade-tick recorder (P7-16b): as the depth recorder
@@ -1254,6 +1254,6 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ChangeReadinessSwitchCommand, ReadinessSwitched>, ChangeReadinessSwitchHandler>(); // the owner's switch confidence.readiness.enforce (default OFF)
         services.AddScoped<ICommandHandler<SnapshotScorecardsCommand, SnapshotRunOutcome>, SnapshotScorecardsHandler>(); // the daily insert-only snapshots
         services.TryAddSingleton(new ReadinessOptions()); // the thresholds of the checklist and the label cut-offs (CF-11, ADR 0221): the spec's proposals, tighten-only; the host replaces it with its configuration (section Confidence:Readiness)
-        services.AddSingleton<IScheduledService, ReadinessSnapshotService>(); // the daily scorecard snapshots after the decay monitor (CF-11); starts paused, stores a derived score and moves nothing
+        services.AddSingleton<IScheduledService, ReadinessSnapshotService>(); // the daily scorecard snapshots after the decay monitor (CF-11); starts enabled (ADR 0282), stores a derived score and moves nothing
     }
 }

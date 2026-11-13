@@ -7,7 +7,7 @@ namespace XDrishti.Application.Confidence;
 
 /// <summary>
 /// The daily readiness snapshots as a service (<see cref="Id"/>, spec CF-11 D7, ADR 0221): every trading day at 18:30, after the decay monitor of 18:00, it carries out <see cref="SnapshotScorecardsCommand"/>: one insert-only snapshot per Lab strategy and one for the system, with the
-/// settings hash, once a day. It starts <b>paused</b>. A strategy that fails records nothing for the day and the run reports the failure. It reads and stores a derived score: it moves no cell, raises no size, calls no broker and places no order.
+/// settings hash, once a day. It starts <b>enabled</b> (ADR 0282). A strategy that fails records nothing for the day and the run reports the failure. It reads and stores a derived score: it moves no cell, raises no size, calls no broker and places no order.
 /// </summary>
 public sealed class ReadinessSnapshotService(IServiceScopeFactory scopes) : IScheduledService
 {
@@ -20,7 +20,7 @@ public sealed class ReadinessSnapshotService(IServiceScopeFactory scopes) : ISch
         "At 18:30, after the decay monitor, stores one snapshot of the readiness score of each strategy and one of the system, with the hash of the settings used, once a day, so that a trend can be drawn and a gate decision can cite what was true. It reads stored results and writes only its own snapshot rows: it moves no cell, raises no size and places no order. A strategy whose scorecard cannot be built is counted and repeated the next day.",
         "xd-api",
         [ScheduleType.Daily],
-        new ServiceSettings(false, Schedule.Daily(new TimeOnly(18, 30)), 0, 15, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
+        new ServiceSettings(true, Schedule.Daily(new TimeOnly(18, 30)), 0, 15, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
         new ServiceConstraints
         {
