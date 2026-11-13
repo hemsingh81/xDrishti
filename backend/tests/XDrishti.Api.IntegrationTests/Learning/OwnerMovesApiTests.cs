@@ -38,7 +38,7 @@ public sealed class OwnerMovesApiTests(ApiFactory factory) : DataTestBase(factor
     {
         await base.InitializeAsync();
         await using var connection = await OpenAsync();
-        foreach (var table in new[] { "research.lessons", "research.hypotheses", "research.experiments", "research.learning_changelog" })
+        foreach (var table in new[] { "research.lessons", "research.hypotheses", "research.experiment_jobs", "research.experiments", "research.learning_changelog" })
         {
             await ExecuteAsync(connection, "DELETE FROM " + table);
         }

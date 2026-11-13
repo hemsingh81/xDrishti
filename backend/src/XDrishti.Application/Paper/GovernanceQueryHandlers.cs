@@ -18,7 +18,7 @@ internal static class GovernanceWording
 
     public static IReadOnlyList<EpochView> Views(IReadOnlyList<EpochSummary> newestFirst) =>
         [.. newestFirst.Select((s, i) => new EpochView(
-            s.Epoch.Id, s.Epoch.Kind, s.Epoch.StartedOn, i == 0 ? null : newestFirst[i - 1].Epoch.StartedOn, s.Hash is null ? null : Short(s.Hash), s.Counted, s.Straddle, s.RiskDownChanges, s.UnexplainedChanges, s.Epoch.Reason))];
+            s.Epoch.Id, s.Epoch.Kind, s.Epoch.StartedOn, i == 0 ? null : newestFirst[i - 1].Epoch.StartedOn, s.Hash is null ? null : Short(s.Hash), s.Counted, s.Straddle, s.RiskDownChanges, s.UnexplainedChanges, s.Epoch.Reason, s.CellsRefreshed))];
 }
 
 /// <summary>The epochs with their counts (spec P10-05). Read only.</summary>

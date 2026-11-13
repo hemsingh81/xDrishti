@@ -219,7 +219,7 @@ describe('Auto page', () => {
     expect(await within(list).findByText(/Shadow record switch: OFF/)).toBeInTheDocument();
     const resumed = screen.getByRole('list', { name: 'Resumed by Auto' });
     expect(within(resumed).getByText(/Cells refresh: running/)).toBeInTheDocument();
-    expect(within(resumed).getByText(/restarts the paper count/)).toBeInTheDocument();
+    expect(within(resumed).getByText(/is noted in the paper epoch/)).toBeInTheDocument();
     expect(within(list).queryByText(/Cells refresh/)).not.toBeInTheDocument();
     expect(screen.getByText(/Auto does not resume these/)).toBeInTheDocument();
     expect(within(list).queryByRole('button')).not.toBeInTheDocument();

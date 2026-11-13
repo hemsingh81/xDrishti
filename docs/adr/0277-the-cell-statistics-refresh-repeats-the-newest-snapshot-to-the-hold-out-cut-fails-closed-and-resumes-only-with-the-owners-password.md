@@ -1,5 +1,6 @@
 # 0277 — The cell-statistics refresh repeats the newest snapshot to the hold-out cut, fails closed, and resumes only with the owner's password
 
+- **Amended by [0286](0286-the-paper-epoch-freezes-the-strategy-versions-and-the-rules-but-not-the-cell-statistics-snapshot.md) (owner, 2026-11-13):** sections 7 and 11: `cells-refresh` is no paper blocker and a refresh does not restart the paper count.
 - **Status:** Accepted (coordinator's recommendation under the owner's standing instruction of 2026-11-11; every decision of spec LC-01 as recommended).
 - **Date:** 2026-11-12.
 - **Relation to other ADRs:** Amends [0252](0252-the-auto-switch-resumes-five-chain-services-follows-the-stored-switch-for-the-builder-and-restores-only-what-it-resumed.md) §1 (the chain becomes six services). Uses the recovery classes of [0240](0240-missed-days-are-recovered-by-one-dependency-ordered-pass-and-each-service-declares-how-it-can-be-recovered.md), the evidence fence and training embargo of [0243](0243-simulate-everything-is-training-data-fenced-from-the-hold-out-and-from-scorecard-evidence.md), CF-08 D6 (cell statistics do not ingest shadow grades) and the paper rule of ADR 0119 (P10-05), which this decision does **not** change.

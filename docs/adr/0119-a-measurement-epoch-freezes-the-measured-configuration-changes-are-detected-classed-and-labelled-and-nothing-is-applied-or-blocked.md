@@ -1,5 +1,6 @@
 # 0119 — A measurement epoch freezes the measured configuration: changes are detected, classed and labelled, and nothing is applied or blocked
 
+- **Amended by [0286](0286-the-paper-epoch-freezes-the-strategy-versions-and-the-rules-but-not-the-cell-statistics-snapshot.md) (owner, 2026-11-13):** the cell-statistics snapshot is no longer frozen; a refresh is a noted change, the rules stay frozen through `cells.basis`.
 - **Status:** Proposed (spec [P10-05](../specs/P10-05-config-change-governance-via-the-hypothesis-loop.md), built 2026-10-26; the spec is still Draft). Becomes Accepted when the owner has read it.
 - **Date:** 2026-10-26.
 - **Relation to other ADRs:** [0076](0076-the-hypothesis-loop-one-knob-checked-on-stored-runs-a-state-table-and-nothing-applied.md) (accepting applies nothing), [0073](0073-the-learning-changelog-and-the-cell-lifecycle-the-log-is-the-state.md) (the changelog), [0116](0116-paper-fills-are-the-grading-replay-captured-per-armed-allocation.md) (`IEpochGate`, epochs, `measured`/`straddle`), [0091](0091-autonomy-settings-and-auto-approval-are-owner-acts-recorded-in-an-insert-only-table.md) (autonomy), [0002](0002-configuration-lives-in-the-app.md) (configuration in the app).
