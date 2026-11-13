@@ -25,7 +25,7 @@ public sealed class ListFilterCompositionTests(ApiFactory factory)
         sp.GetRequiredService<IListDayStore>().ShouldNotBeNull();
         sp.GetRequiredService<ICommandHandler<ListsProbeCommand, ListsProbeReport>>().ShouldNotBeNull();
         sp.GetRequiredService<ICommandHandler<ListsBackfillCommand, ListsBackfillSummary>>().ShouldNotBeNull();
-        sp.GetRequiredService<IListFilterSettings>().Enabled.ShouldBeFalse();
+        sp.GetRequiredService<IListFilterSettings>().Enabled.ShouldBeTrue();
         sp.GetRequiredService<IListHistorySettings>().Enabled.ShouldBeFalse();
     }
 }

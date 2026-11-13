@@ -104,7 +104,7 @@ public sealed class LearnedNoticesAndServiceTests
         var d = LearnedSettingsService.Definition;
 
         d.Id.ShouldBe("learned-settings");
-        d.Defaults.Enabled.ShouldBeFalse();
+        d.Defaults.Enabled.ShouldBeTrue();
         d.Defaults.Schedule.ShouldBe(Schedule.AfterService("weekly"));
         d.Constraints.MustFollow.ShouldBe(["weekly"]);
         new LearnedSettingsService(Substitute.For<IServiceScopeFactory>()).FirstStartSettings().ShouldBeNull();

@@ -8,7 +8,7 @@ namespace XDrishti.Application.LearnedSettings;
 
 /// <summary>
 /// The learned-settings service (<see cref="Id"/>, AU-10, ADR 0242): after the weekly digest it lets learning propose bounded changes to a small allow-list of settings. A tightening is applied by itself only when the Auto switch is ON (off by default) and
-/// the weekly cap allows; a loosening is only ever a proposal for the owner's password. It starts <b>paused</b>, and with no evidence it changes nothing. It places no order.
+/// the weekly cap allows; a loosening is only ever a proposal for the owner's password. It starts <b>enabled</b> (ADR 0282), and with no evidence it changes nothing. It places no order.
 /// </summary>
 public sealed class LearnedSettingsService(IServiceScopeFactory scopes) : IScheduledService
 {
@@ -22,7 +22,7 @@ public sealed class LearnedSettingsService(IServiceScopeFactory scopes) : ISched
         "After the weekly digest, proposes bounded changes to a small allow-list of settings from what was learned. A change toward the safer side is applied by itself only when Auto is on; anything else waits for your password. With no evidence nothing changes.",
         "xd-api",
         [ScheduleType.After, ScheduleType.Weekly],
-        new ServiceSettings(false, Schedule.AfterService(WeeklyService.Id), 0, 30, false, true, new Dictionary<string, System.Text.Json.JsonElement>()),
+        new ServiceSettings(true, Schedule.AfterService(WeeklyService.Id), 0, 30, false, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
         new ServiceConstraints
         {

@@ -1,5 +1,6 @@
 using System.Globalization;
 using XDrishti.Api.Simulate;
+using XDrishti.Application.Abstractions.Confidence;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Confidence;
 using XDrishti.Domain.Common;
@@ -215,7 +216,7 @@ internal static class LearnDecayCommand
         }
 
         var p = open.Value;
-        yield return "automatic demotion (confidence.kill.auto): " + (p.Settings.Auto ? "ON (the owner switched it on)" : "OFF (a proposal waits for the owner)");
+        yield return "automatic demotion (confidence.kill.auto): " + (p.Settings.Auto ? (p.Settings.Actor == KillSwitch.SystemDefaultActor ? "ON (system default, ADR 0282)" : "ON (owner)") : "OFF (a proposal waits for the owner)");
         if (p.Items.Count == 0)
         {
             yield return "open kill proposals: none";

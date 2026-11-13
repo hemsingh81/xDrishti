@@ -226,12 +226,12 @@ public sealed class ReadinessHandlersTests
     // ---- the service ----
 
     [Fact]
-    public void The_service_starts_paused_runs_daily_at_18_30_after_the_decay_monitor_and_raises_no_schedule_issue()
+    public void The_service_starts_enabled_runs_daily_at_18_30_after_the_decay_monitor_and_raises_no_schedule_issue()
     {
         var d = ReadinessSnapshotService.Definition;
 
         d.Id.ShouldBe("readiness-snapshot");
-        d.Defaults.Enabled.ShouldBeFalse("starts paused");
+        d.Defaults.Enabled.ShouldBeTrue("starts enabled (ADR 0282)");
         d.Defaults.Schedule.ShouldBe(Schedule.Daily(new TimeOnly(18, 30)));
         d.Constraints.MustFollow.ShouldBe([DecayMonitorService.Id]);
         d.Description.ShouldContain("moves no cell");

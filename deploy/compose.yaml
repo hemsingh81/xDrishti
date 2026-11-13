@@ -147,9 +147,9 @@ services:
       Baskets__System__Fetch__Enabled: ${XD_BASKETS_FETCH_ENABLED:-false}
       Baskets__System__Fetch__UserAgent: ${XD_BASKETS_FETCH_USER_AGENT:-}
       Baskets__System__Lists__FetchEnabled: ${XD_BASKETS_LISTS_FETCH_ENABLED:-false}
-      # DATA-01: the dated ban/surveillance list history and the filters that read it (settings land with that story; both OFF).
+      # DATA-01: the dated ban/surveillance list history and the filters that read it (the fetch is OFF; the filters are ON by default, ADR 0282).
       Data__History__Lists__Enabled: ${XD_HISTORY_LISTS_ENABLED:-false}
-      Selection__ListFilters__Enabled: ${XD_SELECTION_LIST_FILTERS_ENABLED:-false}
+      Selection__ListFilters__Enabled: ${XD_SELECTION_LIST_FILTERS_ENABLED:-true}
       Filings__LagMinutes: ${XD_FILINGS_LAG_MINUTES:-5}
       Filings__MaxFilesGb: ${XD_FILINGS_MAX_FILES_GB:-5}
       Filings__MinFreeGb: ${XD_FILINGS_MIN_FREE_GB:-20}

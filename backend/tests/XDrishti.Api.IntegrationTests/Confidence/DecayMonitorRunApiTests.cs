@@ -142,4 +142,27 @@ public sealed class DecayMonitorRunApiTests(ApiFactory factory) : DataTestBase(f
         var items = (await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/plans/notices", UriKind.Relative), Ct)).GetProperty("items").EnumerateArray().Where(i => i.GetProperty("text").GetString()!.Contains(_strategy, StringComparison.Ordinal)).ToList();
         items.Select(i => i.GetProperty("kind").GetString()).Order(StringComparer.Ordinal).ToList().ShouldBe(["kill_applied_auto"], "the automatic pause is visible on the bell as a resolved notice");
     }
+
+    [Fact]
+    public async Task With_only_the_system_default_seed_row_the_daily_run_pauses_as_auto_with_the_seed_id_and_the_settings_show_the_system_actor()
+    {
+        await SeedSeriesAsync();
+        await WalkAsync(Cell("BUY"), CellState.Candidate, CellState.Paper);
+        await WalkAsync(Cell("SELL"), CellState.Candidate, CellState.Paper, CellState.Active);
+        await using (var connection = await OpenAsync())
+        {
+            await ExecuteAsync(connection, "DELETE FROM confidence.kill_settings");
+            await ExecuteAsync(connection, "INSERT INTO confidence.kill_settings (auto, actor, reason) VALUES (true, 'system:default', 'ADR 0282')");
+        }
+
+        var seedId = await ScalarAsync<long>("SELECT id FROM confidence.kill_settings");
+        var outcome = await RunAsync();
+
+        outcome.ShouldBe(new DecayRunOutcome(1, 1, 0, 1, 1, 0));
+        (await ScalarAsync<string>("SELECT string_agg(rule || ':' || state || ':' || COALESCE(actor, '-') || ':' || COALESCE(auto_setting_id::text, '-'), ',' ORDER BY rule) FROM confidence.kill_proposals WHERE strategy = @s", ("s", _strategy)))
+            .ShouldBe($"cost_stress:applied:auto:{seedId}");
+        (await ScalarAsync<long>("SELECT count(*) FROM research.learning_changelog WHERE subject LIKE @p AND actor LIKE 'owner:%' AND to_state = 'paused'", ("p", _strategy + "|%"))).ShouldBe(0, "an automatic pause is never an owner approval");
+        var settings = (await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/confidence/kill-proposals", UriKind.Relative), Ct)).GetProperty("settings");
+        (settings.GetProperty("auto").GetBoolean(), settings.GetProperty("actor").GetString()).ShouldBe((true, "system:default"));
+    }
 }

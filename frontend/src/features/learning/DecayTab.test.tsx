@@ -110,6 +110,21 @@ describe('Decay tab', () => {
     expect(await screen.findByText(/records the decision as "auto", never as an owner approval/)).toBeInTheDocument();
   });
 
+  it.each([
+    ['system:default', /\(system default, ADR 0282\)/],
+    ['owner:me@x.test', /\(owner\)\. ON:/],
+  ])('says who put the automatic setting in force (%s)', async (actor, text) => {
+    twoStrategies();
+    mountConfidence({
+      proposals: buildProposals({
+        settings: { auto: true, settingId: 3, stressMultiplier: 2, drawdownFactor: 2, settingsHash: 'h', actor },
+      }),
+    });
+    renderLearning('?tab=decay');
+
+    expect(await screen.findByText(text)).toBeInTheDocument();
+  });
+
   it('says there is no proposal when none was written', async () => {
     twoStrategies();
     mountConfidence();

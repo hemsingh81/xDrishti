@@ -43,10 +43,10 @@ public sealed class NseListArchiveSourceTests : HttpMessageHandler, IHttpClientF
     private NseListArchiveSource Source() => new(this, new FakeTimeProvider(), NullLogger<NseListArchiveSource>.Instance);
 
     [Fact]
-    public void Both_switches_default_to_off()
+    public void The_history_switch_defaults_off_and_the_filter_switch_on()
     {
         new ListHistorySettings(Options.Create(new HistoryOptions())).Enabled.ShouldBeFalse();
-        new ListFilterSettings(Options.Create(new ListFilterOptions())).Enabled.ShouldBeFalse();
+        new ListFilterSettings(Options.Create(new ListFilterOptions())).Enabled.ShouldBeTrue();
     }
 
     [Fact]

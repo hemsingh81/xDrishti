@@ -129,7 +129,13 @@ public static class PaperConfigKeys
         [EventFilterEnabled] = ConfigDirection.OnIsProtective,
         [EventFilterResultsWithinDays] = ConfigDirection.HigherStricter,
         [EventFilterApproval] = ConfigDirection.Any,
+
+        // The dated ban and surveillance list filters of the plan (DATA-01, ADR 0274; ON by default since ADR 0282): configuration, so a later switch OFF is a loosening and a record, not a silent env flip.
+        [ListFiltersEnabled] = ConfigDirection.OnIsProtective,
     };
+
+    /// <summary>The field of the list-filter switch (<c>smart_rules.list_filters.enabled</c>, <c>Selection:ListFilters:Enabled</c>). OFF to ON is risk_down, ON to OFF frozen. A first appearance (an older snapshot has no such key) is risk_down when ON and free when OFF: the filter was OFF before it was recorded, so OFF changes nothing and does not restart an open epoch.</summary>
+    public const string ListFiltersEnabled = "list_filters.enabled";
 
     /// <summary>The field (after <see cref="SmartRulesPrefix"/>) of the event-risk switch (<c>smart_rules.event_filter.enabled</c>), so the configuration identity of a paper account changes when the owner turns it on or off.</summary>
     public const string EventFilterEnabled = "event_filter.enabled";
@@ -212,6 +218,12 @@ public static class PaperConfigKeys
         if (key.StartsWith(AutonomyPrefix, StringComparison.Ordinal))
         {
             return ByField(key[AutonomyPrefix.Length..], AutonomyFields, before, after);
+        }
+
+        // shortcut: an ON set by env before AM-01a and flipped OFF before the first snapshot is not seen as a loosening; upgrade if the env value is ever recorded earlier.
+        if (key == SmartRulesPrefix + ListFiltersEnabled && before is null && after is not null)
+        {
+            return IsOn(after) ? ConfigClass.RiskDown : ConfigClass.Free;
         }
 
         if (key.StartsWith(SmartRulesPrefix, StringComparison.Ordinal))

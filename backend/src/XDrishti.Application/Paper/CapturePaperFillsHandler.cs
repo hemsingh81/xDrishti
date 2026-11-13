@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Paper;
@@ -6,6 +7,7 @@ using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Planning;
+using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Calendar;
@@ -27,6 +29,7 @@ internal sealed class CapturePaperFillsHandler(
     IGradeSettings settings,
     ICostSheetStore costSheets,
     ITradingCalendar calendars,
+    IAccountStore accounts,
     TicketReplayer replayer,
     TimeProvider time,
     ILogger<CapturePaperFillsHandler> logger) : ICommandHandler<CapturePaperFillsCommand, PaperCaptureOutcome>
@@ -46,6 +49,13 @@ internal sealed class CapturePaperFillsHandler(
         if (command.Date is { } d && (d > lastClosed || !calendar.IsTradingDay(d)))
         {
             return Result.Failure<PaperCaptureOutcome>(PaperErrors.Invalid("date", "A session can be captured only after it has closed, and only a trading session."));
+        }
+
+        // AM-01a (ADR 0282): the service starts enabled, but the first epoch is not opened before a paper account exists (the P10-00 pre-flight and Auto come first); once one does, the first capture opens epoch 1 as before.
+        if (await paper.CurrentEpochAsync(cancellationToken) is null && !(await accounts.ListActiveAsync(cancellationToken)).Any(a => a.Trading.Enabled && a.Trading.Mode == TradingMode.Paper))
+        {
+            PaperLog.NoPaperAccount(logger);
+            return Result.Success(new PaperCaptureOutcome(0, 0, 0, 0, 0, 0, 0, 0));
         }
 
         var costs = await ReplayCosts.ResolveAsync(settings, costSheets, cancellationToken);

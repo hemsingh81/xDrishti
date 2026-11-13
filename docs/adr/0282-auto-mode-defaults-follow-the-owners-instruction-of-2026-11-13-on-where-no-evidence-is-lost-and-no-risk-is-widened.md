@@ -31,3 +31,9 @@ The standing rule of 2026-10-23 says: anything that needs a manual approval also
 - `Selection:ListFilters:Enabled` ON changes the live plan wherever a dated ban or surveillance row exists (a tightening). If a paper epoch is open, the change is classed as P10-05 says.
 - Tests that pinned the old defaults (`EvidenceComposeRulesTests`, the settings descriptor tests, the service definition tests) are updated to the new defaults, never deleted.
 - docs/design/17 and deploy/CLAUDE.md list the new defaults at build time.
+
+## Amendment 2026-11-13 (AM-01a build and review)
+- **Services need no row.** The six services return no first-start row, so a service with no row runs on its enabled definition; a row the owner saved always wins. No migration touches `service_schedules`, and there is no audit row for them (decision 4 is read that way).
+- **The seed row is sealed.** The stamp trigger of `confidence.kill_settings` refuses actor `system:default` from the runtime role and into a non-empty table, and the shape check allows only the exact row (ON, reason `ADR 0282`). Only the migration, as the owner role, into an empty table, can write it.
+- **No first epoch without a paper account.** With `paper-capture` enabled, the capture handler opens no first paper epoch while no enabled paper-mode account exists (it returns a no-op); the P10-00 pre-flight and Auto come first. Once an account exists, the first capture opens epoch 1 as before.
+- **The list filter is in the P10 fingerprint** as `smart_rules.list_filters.enabled` (OFF to ON risk_down, ON to OFF frozen). A first appearance is risk_down when ON and free when OFF, so recording it never starts a new epoch.

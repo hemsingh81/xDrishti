@@ -86,15 +86,19 @@ internal sealed class PaperLedgerFixture
 
     private static DateTimeOffset At(DateOnly day, int hour, int minute) => new(day.ToDateTime(new TimeOnly(hour, minute)), TimeSpan.FromMinutes(330));
 
-    public static BrokerAccount Make(string client, decimal? capital)
+    public static BrokerAccount Make(string client, decimal? capital, TradingMode mode = TradingMode.Paper, bool tradingRole = true)
     {
         var limits = new RiskLimits(0.5m, 25m, 3, 5, 3.0m, 2, 0.70m, 2, 2, 2m, 1.5m, 5m, WeeklyLossAction.HalveSize);
         var t0 = new DateTimeOffset(2026, 10, 10, 9, 0, 0, TimeSpan.Zero);
         var profile = RiskProfile.Create("Std", limits, t0).Value;
         var account = BrokerAccount.Create("Acct " + client, client, null, null, null, new DateOnly(2026, 10, 10), t0).Value;
         var source = capital is null ? CapitalSource.BrokerFunds : CapitalSource.Fixed;
-        account.ConfigureTrading(new TradingSpec(TradingMode.Paper, profile.Id, source, capital, true, false, Instruments.EquityIntraday, Instruments.None, Instruments.None, TradingOverrides.None), t0).IsSuccess.ShouldBeTrue();
-        account.ChangeRoles(new RolesChange(null, true, null), null, null, t0).IsSuccess.ShouldBeTrue();
+        account.ConfigureTrading(new TradingSpec(mode, profile.Id, source, capital, true, false, Instruments.EquityIntraday, Instruments.None, Instruments.None, TradingOverrides.None), t0).IsSuccess.ShouldBeTrue();
+        if (tradingRole)
+        {
+            account.ChangeRoles(new RolesChange(null, true, null), null, null, t0).IsSuccess.ShouldBeTrue();
+        }
+
         return account;
     }
 }

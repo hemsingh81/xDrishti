@@ -7,8 +7,7 @@ using XDrishti.Domain.Platform.Services;
 namespace XDrishti.Application.Paper;
 
 /// <summary>
-/// The weekly paper review as a service (<see cref="Id"/>, spec P10-03, ADR 0121, ADR 0018): Saturday 10:30 India time, after the weekly digest, it builds the review of the current week and stores it once per week and epoch. It starts <b>paused</b>; switching it
-/// on is the owner's act. It reads stored records and writes only that text: no setting, ticket, approval or order is touched.
+/// The weekly paper review as a service (<see cref="Id"/>, spec P10-03, ADR 0121, ADR 0018): Saturday 10:30 India time, after the weekly digest, it builds the review of the current week and stores it once per week and epoch. It starts <b>enabled</b> (ADR 0282); the owner can pause it. It reads stored records and writes only that text: no setting, ticket, approval or order is touched.
 /// </summary>
 public sealed class PaperReviewService(IServiceScopeFactory scopes) : IScheduledService
 {
@@ -24,7 +23,7 @@ public sealed class PaperReviewService(IServiceScopeFactory scopes) : IScheduled
         "Saturday 10:30, after the weekly digest, builds the week's paper review (where the epoch stands, what happened, what you skipped, added or resized, execution gap, configuration changes) from stored records and stores it once per ISO week and epoch. It applies nothing, approves nothing and places no order.",
         "xd-api",
         [ScheduleType.Weekly, ScheduleType.After],
-        new ServiceSettings(false, Schedule.Weekly(DayOfWeek.Saturday, new TimeOnly(10, 30)), 0, 30, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
+        new ServiceSettings(true, Schedule.Weekly(DayOfWeek.Saturday, new TimeOnly(10, 30)), 0, 30, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
         new ServiceConstraints
         {

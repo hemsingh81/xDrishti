@@ -46,6 +46,10 @@ public sealed class PaperCaptureDatabaseTests(ApiFactory factory) : DataTestBase
             ON CONFLICT (id) DO NOTHING
             """,
             ("id", AccountId));
+
+        // AM-01a: the capture opens no first epoch before a paper account exists (a unit test pins that), so these database tests start from the epoch the first capture of a paper account would open.
+        using var scope = Factory.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IPaperStore>().EnsureFirstEpochAsync(Session, AfterClose, Ct);
     }
 
     private async Task<TResult> WithAsync<TResult>(Func<IServiceProvider, Task<TResult>> work)

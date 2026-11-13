@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Learning;
+using XDrishti.Application.Abstractions.Market.Lists;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Research;
@@ -40,6 +41,7 @@ internal sealed class ConfigSnapshotSource(
     IGradeSettings grading,
     ICostSheetStore costSheets,
     IEventFilterDecisions? eventFilter = null,
+    IListFilterSettings? listFilters = null,
     ILogger<ConfigSnapshotSource>? logger = null) : IConfigSnapshotSource
 {
     private static readonly CellState[] Eligible = [CellState.Candidate, CellState.Paper, CellState.Active];
@@ -60,6 +62,11 @@ internal sealed class ConfigSnapshotSource(
         {
             // P15-06: the event-risk switch is a stored setting (its newest decision row); an unreadable history makes the snapshot partial, it is not read as OFF.
             await Group("event_filter", () => EventFilterAsync(eventFilter, cancellationToken), components, unreadable);
+        }
+
+        if (listFilters is not null)
+        {
+            components.Add(new(PaperConfigKeys.SmartRulesPrefix + PaperConfigKeys.ListFiltersEnabled, Bool(listFilters.Enabled))); // AM-01a: Selection:ListFilters:Enabled
         }
 
         return new ConfigReading(components, unreadable);

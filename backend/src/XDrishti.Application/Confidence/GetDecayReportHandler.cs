@@ -251,7 +251,7 @@ internal sealed class GetDecayReportHandler(
         reference.View.State == "available"
             ? "The reference is the strategy's backtest trades before the epoch started, including in-sample trades (the Lab result's out-of-sample and hold-out trades are not available per strategy yet), which typically makes an alert earlier, not later."
             : "No reference: nothing is judged. unavailable is never read as fine.",
-        "Report only: reading this proposes, pauses and changes nothing, and places no order. The kill rules are evaluations with their numbers; proposals are written by the daily decay-monitor service, and a pause is the owner's act (or the automatic setting's, default OFF, and never for the CF-09 boundary). Their thresholds are proposals of the spec.",
+        "Report only: reading this proposes, pauses and changes nothing, and places no order. The kill rules are evaluations with their numbers; proposals are written by the daily decay-monitor service, and a pause is the owner's act (or the automatic setting's, ON by default through the system default row of ADR 0282, and never for the CF-09 boundary). Their thresholds are proposals of the spec.",
     ];
 
     private static string Line(DecayReportView v)

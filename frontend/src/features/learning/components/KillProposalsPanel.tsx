@@ -8,7 +8,7 @@ import { DataTable, formatAsOf, formatCount, formatRatio } from '@/shared/analyt
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { Facts } from '@/shared/ui/Facts';
 import { killProposalsQuery, type KillProposal } from '../api/confidenceQueries';
-import { autoMeaning, proposalStateLabel, ruleLabel } from '../lib/confidenceText';
+import { autoMeaning, autoSource, proposalStateLabel, ruleLabel } from '../lib/confidenceText';
 import { figure, formatFine, formatFineSigned } from '../lib/figure';
 import type { KillTarget } from '../lib/killActText';
 import { KillActDialog } from './KillActDialog';
@@ -60,7 +60,9 @@ export function KillProposalsPanel({ strategy }: { strategy: string }) {
                 label: 'Automatic setting',
                 value: (
                   <>
-                    <strong>{query.data.settings.auto ? 'ON' : 'OFF'}</strong>. {autoMeaning(query.data.settings.auto)}
+                    <strong>{query.data.settings.auto ? 'ON' : 'OFF'}</strong>
+                    {query.data.settings.auto ? autoSource(query.data.settings.actor) : ''}.{' '}
+                    {autoMeaning(query.data.settings.auto)}
                   </>
                 ),
               },
