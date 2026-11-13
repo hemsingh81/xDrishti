@@ -27,6 +27,7 @@ public sealed class RegimeCellsApiTests(ApiFactory factory) : DataTestBase(facto
         await base.InitializeAsync();
         await using var connection = await OpenAsync();
         await ExecuteAsync(connection, "DELETE FROM research.cell_stats");
+        await ExecuteAsync(connection, "DELETE FROM market.context_vix_csv");
         await ExecuteAsync(connection, "DELETE FROM market.context_daily");
     }
 

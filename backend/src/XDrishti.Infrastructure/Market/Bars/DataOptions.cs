@@ -141,6 +141,12 @@ internal sealed class ContextDataOptions
     /// <summary>Whether the data job writes the context.</summary>
     public bool Enabled { get; set; } = true;
 
+    /// <summary>Whether the data job loads the NSE CSVs the owner dropped into <see cref="InboxPath"/> (P3-01d fallback D, ADR 0290). It only reads local files.</summary>
+    public bool InboxEnabled { get; set; } = true;
+
+    /// <summary>The folder the owner drops NIFTY 50 and INDIA VIX history CSVs into; handled files move to <c>done/</c> or <c>failed/</c> inside it (in the container <c>/data/inbox/context</c>).</summary>
+    public string InboxPath { get; set; } = "data/inbox/context";
+
     /// <summary>Canonical symbols of the regime index, in order; empty means <c>NSE:NIFTY</c>.</summary>
     public string[] IndexSymbols { get; set; } = [];
 

@@ -11,7 +11,8 @@ internal sealed class ContextUpkeep(
     ICommandHandler<ComputeBreadthCommand, BreadthComputed> breadth,
     ILogger<ContextUpkeep> logger,
     ICommandHandler<ComputeBasketContextCommand, BasketContextComputed>? basketContext = null,
-    ICommandHandler<ComputeRelativeStrengthCommand, RelativeStrengthComputed>? strength = null) : IContextUpkeep
+    ICommandHandler<ComputeRelativeStrengthCommand, RelativeStrengthComputed>? strength = null,
+    ICommandHandler<LoadContextInboxCommand, ContextInboxLoaded>? inboxLoad = null) : IContextUpkeep
 {
     private const string Crashed = "The market context could not be updated. See the API log.";
 
@@ -24,6 +25,12 @@ internal sealed class ContextUpkeep(
             if (result.IsFailure)
             {
                 await reporter.WarnAsync("Market context: " + result.Error.Message, cancellationToken);
+            }
+
+            // The owner-dropped NSE CSVs (P3-01d fallback D): after the derivation, so a day the bars gave is never taken from a CSV; a failure is a warning of its own.
+            if (inboxLoad is not null && await inboxLoad.HandleAsync(new LoadContextInboxCommand(), cancellationToken) is { IsFailure: true } loaded)
+            {
+                await reporter.WarnAsync("Context inbox: " + loaded.Error.Message, cancellationToken);
             }
 
             // The breadth of the days just written (and of any day still without one); a failure here is a warning of its own, the index figures are already stored.

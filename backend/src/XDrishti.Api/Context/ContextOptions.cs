@@ -6,6 +6,9 @@ internal enum ContextAction
     /// <summary><c>refresh</c>: write the days that became final.</summary>
     Refresh,
 
+    /// <summary><c>import</c>: load the NSE CSVs of NIFTY 50 and INDIA VIX from the context inbox folder.</summary>
+    Import,
+
     /// <summary><c>coverage</c>: print what is stored and what is missing.</summary>
     Coverage,
 
@@ -19,6 +22,7 @@ internal sealed record ContextOptions(ContextAction Action, DateOnly? From = nul
     public const string Usage =
         "usage:\n"
         + "  context refresh    write the market context days that became final (idempotent; the data job does the same after every update)\n"
+        + "  context import     load the NIFTY 50 and INDIA VIX history CSVs the owner dropped into the context inbox (data/inbox/context); idempotent, never overwrites a stored day (the data job does the same after every update)\n"
         + "  context coverage   print the stored days, what is readable from when, the skipped days and any missing prerequisite (writes nothing)\n"
         + "  context rebuild-breadth --from <yyyy-mm-dd> --to <yyyy-mm-dd> [--write]\n"
         + "                     recompute the breadth of the owner's tracked shares for stored days (at most 400 sessions); a dry run that prints the old and new figure of each changed day unless --write\n";
@@ -45,6 +49,7 @@ internal sealed record ContextOptions(ContextAction Action, DateOnly? From = nul
         return args[0] switch
         {
             "refresh" => (new ContextOptions(ContextAction.Refresh), []),
+            "import" => (new ContextOptions(ContextAction.Import), []),
             "coverage" => (new ContextOptions(ContextAction.Coverage), []),
             _ => (null, ["unknown action: use refresh, coverage or rebuild-breadth"]),
         };

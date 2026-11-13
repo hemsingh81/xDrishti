@@ -61,6 +61,11 @@ if [ ! -d ../data/history-probe ]; then
   (umask 077; mkdir -p ../data/history-probe)
 fi
 
+# 1d2) The context inbox (P3-01d fallback D, ADR 0290): where the owner drops NIFTY 50 and INDIA VIX history CSVs from NSE; 0700, mounted into xd-api (Data__Context__InboxPath).
+if [ ! -d ../data/inbox/context ]; then
+  (umask 077; mkdir -p ../data/inbox/context)
+fi
+
 # 1e) The shadow digest log folder (CF-08, ADR 0232), 0700; mounted into xd-api (Shadow__DigestFolder).
 if [ ! -d "${XD_SHADOW_DIGEST_DIR:-../data/shadow-digest}" ]; then
   (umask 077; mkdir -p "${XD_SHADOW_DIGEST_DIR:-../data/shadow-digest}")

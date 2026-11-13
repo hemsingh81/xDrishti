@@ -50,6 +50,7 @@ internal sealed class GetContextCoverageHandler(
             }
         }
 
+        var csv = await store.CsvCountsAsync(cancellationToken);
         var breadth = Breadth(await store.ListBreadthAsync(cancellationToken));
         return new ContextCoverageView(
             settings.Enabled,
@@ -74,7 +75,8 @@ internal sealed class GetContextCoverageHandler(
             skipped.Count,
             [.. skipped.Take(MaxSkippedListed).Select(s => new ContextSkippedView(s.Date, s.Reason.ToCode(), s.Bars))],
             SourceNote,
-            breadth);
+            breadth,
+            new ContextCsvView(csv.IndexDays, csv.VixDays, csv.First, csv.Last));
     }
 
     private static ContextBreadthView Breadth(IReadOnlyList<StoredBreadth> rows)

@@ -137,6 +137,8 @@ services:
       Filings__FilesPath: /data/filings/files
       # The NSE daily-history probe's raw files (CF-04, ADR 0195): a mounted 0700 folder (xd-api's /app is read-only). The fetch itself stays OFF (Data:History:Nse:Enabled) until the owner acts.
       Data__History__ProbeFolder: /data/history-probe
+      # The NSE CSV drop folder for NIFTY 50 and INDIA VIX daily history (P3-01d fallback D, ADR 0290): read, and handled files are moved to done/ or failed/ inside it. Local files only.
+      Data__Context__InboxPath: /data/inbox/context
       # The evidence fetch switches (OPS-01, ADR 0278): ALL OFF / empty by default; a variable is configuration, not an owner act, and gates fetches, never decisions. Nothing here places an order. The services themselves stay paused until the owner resumes them.
       # NSE daily-history fetch, its deepening backfill, and the verified pre-seam admission to replay (CF-04, ADR 0195, 0270, 0273); the user agent is a descriptive name plus the owner's contact (empty = the client's own).
       Data__History__Nse__Enabled: ${XD_HISTORY_NSE_ENABLED:-false}
@@ -177,6 +179,8 @@ services:
       - ../data/filings/files:/data/filings/files
       # The history probe folder (CF-04, ADR 0195), read-write. deploy/xd-up.sh creates it 0700 when missing.
       - ../data/history-probe:/data/history-probe
+      # The context inbox (P3-01d fallback D), read-write: handled CSVs move to done/ or failed/. deploy/xd-up.sh creates it 0700 when missing.
+      - ../data/inbox/context:/data/inbox/context
       - ../eval:/data/eval-files:ro
       # The shadow digest log (ADR 0232), read-write; XD_SHADOW_DIGEST_DIR can point it at another disk (the owner should, so that the database role cannot write it). deploy/xd-up.sh creates the default 0700 when missing.
       - ${XD_SHADOW_DIGEST_DIR:-../data/shadow-digest}:/data/shadow-digest

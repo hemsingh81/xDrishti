@@ -543,6 +543,7 @@ public static class DependencyInjection
 
         // The market context (P3-01d, ADR 0033): written by the data job after the aggregates, read through IContextFigures, coverage at /api/data/context.
         services.AddScoped<ICommandHandler<RefreshContextCommand, ContextRefreshed>, RefreshContextHandler>();
+        services.AddScoped<ICommandHandler<LoadContextInboxCommand, ContextInboxLoaded>, LoadContextInboxHandler>(); // the owner-dropped NSE CSVs of NIFTY 50 and INDIA VIX, insert-only fallback (P3-01d D, ADR 0290)
         services.AddScoped<ICommandHandler<ComputeBreadthCommand, BreadthComputed>, ComputeBreadthHandler>(); // the breadth of the owner's tracked shares, set once per context day (P3-01e)
         services.AddScoped<ICommandHandler<RebuildBreadthCommand, BreadthRebuilt>, RebuildBreadthHandler>();
         services.AddScoped<IContextUpkeep, ContextUpkeep>();

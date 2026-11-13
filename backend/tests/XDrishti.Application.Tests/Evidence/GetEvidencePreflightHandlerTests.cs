@@ -368,7 +368,7 @@ public sealed class GetEvidencePreflightHandlerTests
     private static ChargeSheetStatusView Sheet(string state) => new(true, state, "text", null, null, null, "meaning", []);
 
     private static ContextCoverageView Context() => new(
-        true, null, null, "NIFTY 50", "INDIA VIX", 100, new DateOnly(2026, 1, 1), Today, 0, false, new DateOnly(2026, 2, 1), new DateOnly(2026, 3, 1), new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 1), 90, 0, 10, false, 0, 0, [], "src", null!);
+        true, null, null, "NIFTY 50", "INDIA VIX", 100, new DateOnly(2026, 1, 1), Today, 0, false, new DateOnly(2026, 2, 1), new DateOnly(2026, 3, 1), new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 1), 90, 0, 10, false, 0, 0, [], "src", null!, new ContextCsvView(0, 0, null, null));
 
     private static ShadowSummaryView Shadow(bool enabled) => new(enabled, false, null, "s", "c", null!, null!, [], null!, null!, null!);
 

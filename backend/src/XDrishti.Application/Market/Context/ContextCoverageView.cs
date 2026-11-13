@@ -20,6 +20,9 @@ public sealed record ContextBreadthView(
     IReadOnlyList<DateOnly> InsufficientDates,
     string Label);
 
+/// <summary>Days that came from owner-dropped NSE CSVs (fallback D, source <c>nse_csv</c>): index days, VIX closes held in the side table, and the first and last index day.</summary>
+public sealed record ContextCsvView(int IndexDays, int VixDays, DateOnly? FirstDate, DateOnly? LastDate);
+
 /// <summary>
 /// What the stored market context makes readable (<c>GET /api/data/context</c>, criterion 7). <c>Missing</c> names an unmet prerequisite (<c>index_not_tracked</c>, <c>vix_not_tracked</c>, <c>disabled</c>) with its <c>Fix</c>. <c>AgeSessions</c> is the number of
 /// trading sessions the newest day is behind the last closed one; <c>Stale</c> is more than one.
@@ -47,4 +50,5 @@ public sealed record ContextCoverageView(
     int SkippedTotal,
     IReadOnlyList<ContextSkippedView> Skipped,
     string Source,
-    ContextBreadthView Breadth);
+    ContextBreadthView Breadth,
+    ContextCsvView Csv);

@@ -502,6 +502,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.tracked_instruments;
                 DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%' OR event LIKE 'Calendar%' OR event LIKE 'CorporateAction%' OR event LIKE 'Service%' OR event = 'PortfolioBenchmarkChanged' OR event LIKE 'Action%' OR event LIKE 'PriceAlert%';
                 DELETE FROM market.live_quotes;
+                DELETE FROM market.context_vix_csv;
                 DELETE FROM market.context_daily;
                 DELETE FROM market.instrument_broker_ids;
                 TRUNCATE filings.extractions, filings.calendar, filings.announcements, filings.shareholding, filings.result_facts, filings.result_parses, filings.filings;

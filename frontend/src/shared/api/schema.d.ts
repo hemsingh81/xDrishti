@@ -10187,6 +10187,18 @@ export interface components {
       skipped: components['schemas']['ContextSkippedView'][];
       source: string;
       breadth: components['schemas']['ContextBreadthView'];
+      csv: components['schemas']['ContextCsvView'];
+    };
+    /** @description Days that came from owner-dropped NSE CSVs (fallback D, source `nse_csv`): index days, VIX closes held in the side table, and the first and last index day. */
+    ContextCsvView: {
+      /** Format: int32 */
+      indexDays: number;
+      /** Format: int32 */
+      vixDays: number;
+      /** Format: date */
+      firstDate: null | string;
+      /** Format: date */
+      lastDate: null | string;
     };
     /** @description One day (or VIX leg) the derivation did not use, with the reason code and the bars it had. */
     ContextSkippedView: {

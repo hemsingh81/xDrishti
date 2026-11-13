@@ -40,6 +40,7 @@ public sealed class ContextVerbTests
 
     [Theory]
     [InlineData("refresh", "Refresh")]
+    [InlineData("import", "Import")]
     [InlineData("coverage", "Coverage")]
     public void The_two_actions_parse(string action, string expected)
     {
@@ -87,7 +88,8 @@ public sealed class ContextVerbTests
     private static ContextCoverageView View(string? missing = null) => new(
         true, missing, missing is null ? null : "Track NIFTY 50 on the Instruments screen and run Update data.", "NSE:NIFTY", "NSE:INDIAVIX", 3, new DateOnly(2026, 10, 7), new DateOnly(2026, 10, 9), 0, false,
         null, null, null, null, 3, 0, null, false, 0, 1, [new ContextSkippedView(new DateOnly(2026, 10, 6), "index_thin", 300)], "derived from 1-minute bars; the official daily close can differ slightly",
-        new ContextBreadthView(null, null, null, null, null, null, 0, 3, 0, [], "breadth of your tracked shares (members as of today), not of the market"));
+        new ContextBreadthView(null, null, null, null, null, null, 0, 3, 0, [], "breadth of your tracked shares (members as of today), not of the market"),
+        new ContextCsvView(0, 0, null, null));
 
     private static async Task<(int Exit, string Out, string Error)> RunAsync(string[] args, ContextRefreshed? refreshed = null, ContextCoverageView? coverage = null, FixedRebuild? rebuild = null)
     {
