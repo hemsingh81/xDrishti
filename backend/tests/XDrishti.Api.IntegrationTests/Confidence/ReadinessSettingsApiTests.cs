@@ -21,6 +21,7 @@ public sealed class ReadinessSettingsApiTests(ApiFactory factory)
     [Fact]
     public async Task The_section_is_bound_and_a_key_left_out_keeps_its_default_and_the_enforce_switch_is_not_a_configuration_value()
     {
+        await factory.ResetAccountsAsync(); // the database is shared: an earlier test may have stored an ON row, and this one asserts the seeded default
         using var host = factory.WithWebHostBuilder(b =>
         {
             b.UseSetting("Confidence:Readiness:MinNEff", "400");

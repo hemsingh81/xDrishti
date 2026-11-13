@@ -21,6 +21,12 @@ namespace XDrishti.Api.IntegrationTests.Confidence;
 [Collection(ApiTestSuite.Name)]
 public sealed class ReadinessApiTests(ApiFactory factory) : DataTestBase(factory)
 {
+    public override async ValueTask DisposeAsync()
+    {
+        await Factory.ResetAccountsAsync(); // leave no stored enforce-ON row (or snapshot) behind for the classes that share the database
+        await base.DisposeAsync();
+    }
+
     private static readonly Uri Scorecards = new("/api/confidence/scorecards", UriKind.Relative);
 
     private static readonly Uri Settings = new("/api/confidence/readiness-settings", UriKind.Relative);
