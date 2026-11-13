@@ -86,7 +86,8 @@ function History({ card }: { card: Scorecard }) {
           card.history.length === 0
             ? {
                 kind: 'empty',
-                reason: 'No daily snapshot is stored yet. The readiness-snapshot service starts paused.',
+                reason:
+                  'No daily snapshot is stored yet. The readiness-snapshot service runs daily after the evening runs (enabled by default); a snapshot appears after its first run.',
               }
             : undefined
         }

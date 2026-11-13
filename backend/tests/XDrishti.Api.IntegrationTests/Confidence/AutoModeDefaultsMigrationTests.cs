@@ -9,7 +9,7 @@ using XDrishti.Infrastructure.Persistence;
 
 namespace XDrishti.Api.IntegrationTests.Confidence;
 
-/// <summary>AM-01a (ADR 0282): the migration <c>ApplyAutoModeDefaults</c> seeds <c>confidence.kill.auto</c> ON as <c>system:default</c> only into an empty table, refuses any other system row, and enables a service only where the owner never changed it.</summary>
+/// <summary>AM-01a (ADR 0282): the migration <c>ApplyAutoModeDefaults</c> seeds <c>confidence.kill.auto</c> ON as <c>system:default</c> only into an empty table and refuses any other system row, including a second seed row.</summary>
 [Collection(ApiTestSuite.Name)]
 public sealed class AutoModeDefaultsMigrationTests(ApiFactory factory)
 {
@@ -29,9 +29,6 @@ public sealed class AutoModeDefaultsMigrationTests(ApiFactory factory)
         await command.ExecuteNonQueryAsync(Ct);
     }
 
-    private static string Service(string id, bool enabled, string by) =>
-        $"INSERT INTO platform.service_schedules (service_id, enabled, schedule, retries, timeout_minutes, catch_up, notify_on_failure, parameters, updated_by, updated_at) VALUES ('{id}', {enabled}, '{{\"type\":\"daily\",\"time\":\"18:00\"}}', 0, 15, true, true, '{{}}', '{by}', now())";
-
     [Fact]
     public async Task A_fresh_database_reads_the_kill_switch_ON_from_one_system_row_and_empty_reads_OFF()
     {
@@ -45,13 +42,15 @@ public sealed class AutoModeDefaultsMigrationTests(ApiFactory factory)
         // Only the one exact system row is allowed: not OFF, not another reason, not another system actor.
         await Should.ThrowAsync<PostgresException>(() => RunAsync(connection, "INSERT INTO confidence.kill_settings (auto, actor, reason) VALUES (false, 'system:default', 'ADR 0282')"));
         await Should.ThrowAsync<PostgresException>(() => RunAsync(connection, "INSERT INTO confidence.kill_settings (auto, actor, reason) VALUES (true, 'system:other', 'ADR 0282')"));
+        var second = await Should.ThrowAsync<PostgresException>(() => RunAsync(connection, "INSERT INTO confidence.kill_settings (auto, actor, reason) VALUES (true, 'system:default', 'ADR 0282')"));
+        second.SqlState.ShouldBe("23514", "a second system row into a non-empty table is refused by the trigger");
 
         await RunAsync(connection, "DELETE FROM confidence.kill_settings");
         (await CountAsync(connection, "SELECT count(*) FROM confidence.kill_settings")).ShouldBe(0);
     }
 
     [Fact]
-    public async Task The_migration_keeps_an_owner_row_and_enables_only_services_the_owner_never_changed()
+    public async Task The_migration_keeps_an_owner_row_and_seeds_nothing_when_the_table_is_not_empty()
     {
         await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_am01a_owner_probe", Ct);
         using var scope = scratch.Host.Services.CreateScope();
@@ -61,16 +60,10 @@ public sealed class AutoModeDefaultsMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(Before, Ct);
         await RunAsync(connection, "INSERT INTO confidence.kill_settings (auto, actor, reason) VALUES (false, 'owner:me@x.test', 'off')");
-        await RunAsync(connection, Service("ml-monitor", false, "owner:me@x.test"));
-        await RunAsync(connection, Service("paper-capture", false, "system:first-start"));
-        await RunAsync(connection, Service("eod", false, "system:first-start"));
 
         await migrator.MigrateAsync(null, Ct);
 
         (await CountAsync(connection, "SELECT count(*) FROM confidence.kill_settings WHERE actor = 'system:default'")).ShouldBe(0, "the owner's OFF row stays the newest and only row");
-        (await CountAsync(connection, "SELECT count(*) FROM platform.service_schedules WHERE service_id = 'ml-monitor' AND NOT enabled AND updated_by = 'owner:me@x.test'")).ShouldBe(1, "a service the owner paused stays paused");
-        (await CountAsync(connection, "SELECT count(*) FROM platform.service_schedules WHERE service_id = 'paper-capture' AND enabled AND updated_by = 'system:default'")).ShouldBe(1);
-        (await CountAsync(connection, "SELECT count(*) FROM platform.service_schedules WHERE service_id = 'eod' AND NOT enabled")).ShouldBe(1, "a service outside the six is never touched");
         scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>().Database.HasPendingModelChanges().ShouldBeFalse("data only: the snapshot does not change");
     }
 }

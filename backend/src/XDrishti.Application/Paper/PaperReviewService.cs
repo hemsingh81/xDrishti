@@ -7,8 +7,7 @@ using XDrishti.Domain.Platform.Services;
 namespace XDrishti.Application.Paper;
 
 /// <summary>
-/// The weekly paper review as a service (<see cref="Id"/>, spec P10-03, ADR 0121, ADR 0018): Saturday 10:30 India time, after the weekly digest, it builds the review of the current week and stores it once per week and epoch. It starts <b>enabled</b> (ADR 0282); switching it
-/// on is the owner's act. It reads stored records and writes only that text: no setting, ticket, approval or order is touched.
+/// The weekly paper review as a service (<see cref="Id"/>, spec P10-03, ADR 0121, ADR 0018): Saturday 10:30 India time, after the weekly digest, it builds the review of the current week and stores it once per week and epoch. It starts <b>enabled</b> (ADR 0282); the owner can pause it. It reads stored records and writes only that text: no setting, ticket, approval or order is touched.
 /// </summary>
 public sealed class PaperReviewService(IServiceScopeFactory scopes) : IScheduledService
 {

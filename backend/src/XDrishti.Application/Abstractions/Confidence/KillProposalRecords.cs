@@ -68,7 +68,12 @@ public enum KillDecideResult
 /// <summary>The setting <c>confidence.kill.auto</c> as stored: the newest row of <c>confidence.kill_settings</c>, OFF when there is none.</summary>
 /// <param name="Id">The row, or null when none exists.</param>
 /// <param name="Auto">Whether an automatic demotion is allowed.</param>
-public sealed record KillSwitch(long? Id, bool Auto);
+/// <param name="Actor">Who wrote the row: <c>owner:&lt;email&gt;</c>, or <see cref="SystemDefaultActor"/> for the seed row of ADR 0282; null when none exists.</param>
+public sealed record KillSwitch(long? Id, bool Auto, string? Actor = null)
+{
+    /// <summary>The actor of the seed row (ADR 0282): ON by default, never an owner act.</summary>
+    public const string SystemDefaultActor = "system:default";
+}
 
 /// <summary>Reads the owner's switch <c>confidence.kill.auto</c>.</summary>
 public interface IKillSettings

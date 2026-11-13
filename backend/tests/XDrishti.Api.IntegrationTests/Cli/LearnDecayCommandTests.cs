@@ -62,8 +62,10 @@ public sealed class LearnDecayCommandTests
     private static KillProposalView Proposal(long id) =>
         new(id, "ORB", "decay_twice", false, -0.2, -0.091, 130, "Decay twice in a row: two windows below their alert level.", ["ORB|a|swing", "ORB|b|intraday"], new string('b', 64), Day, DateTimeOffset.UnixEpoch, "proposed", null, null, null);
 
-    private static Result<KillProposalsView> Proposals(bool auto, params KillProposalView[] items) =>
-        Result.Success(new KillProposalsView(items, new KillSettingsView(auto, null, 1.5, 2, new string('c', 64)), ["A proposal changes nothing by itself."]));
+    private static Result<KillProposalsView> Proposals(bool auto, params KillProposalView[] items) => Proposals(auto, "owner:me@x.test", items);
+
+    private static Result<KillProposalsView> Proposals(bool auto, string? actor, params KillProposalView[] items) =>
+        Result.Success(new KillProposalsView(items, new KillSettingsView(auto, null, 1.5, 2, new string('c', 64), actor), ["A proposal changes nothing by itself."]));
 
     // the text is wrapped to a terminal width, so a sentence is compared with its line breaks and indents folded to one space
     private static async Task<(int Code, string Out, string Error)> RunAsync(FakeDecay decay, FakeProposals proposals, params string[] args)
@@ -142,6 +144,16 @@ public sealed class LearnDecayCommandTests
     }
 
     [Fact]
+    public async Task The_automatic_setting_is_printed_as_a_system_default_when_the_seed_row_put_it_on()
+    {
+        var (code, output, _) = await RunAsync(new FakeDecay(_ => Result.Success(Report(available: false))), new FakeProposals(Proposals(true, "system:default")), "--strategy", "ORB");
+
+        code.ShouldBe(0);
+        output.ShouldContain("automatic demotion (confidence.kill.auto): ON (system default, ADR 0282)");
+        output.ShouldNotContain("ON (owner)");
+    }
+
+    [Fact]
     public async Task An_unavailable_reference_says_so_and_why_and_is_never_a_pass()
     {
         var (code, output, _) = await RunAsync(new FakeDecay(_ => Result.Success(Report(available: false))), new FakeProposals(Proposals(true)), "--strategy", "ORB");
@@ -153,7 +165,7 @@ public sealed class LearnDecayCommandTests
         output.ShouldContain("note: unavailable: no backtest trade of this strategy before the epoch's start");
         output.ShouldContain("no window is judged; this is not a pass");
         output.ShouldContain("decay_twice: NOT EVALUATED (not a pass)");
-        output.ShouldContain("automatic demotion (confidence.kill.auto): ON (the owner switched it on)");
+        output.ShouldContain("automatic demotion (confidence.kill.auto): ON (owner)");
         output.ShouldContain("open kill proposals: none");
         output.ShouldNotContain("(alert)");
     }

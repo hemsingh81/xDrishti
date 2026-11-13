@@ -4403,7 +4403,7 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** Switch confidence.kill.auto (OFF by default; no row means OFF) ON or OFF as the owner; appends an audited row with the owner as actor. ON lets the daily decay-monitor pause the cells of a strategy when a kill rule fires, recorded as actor auto with the setting row, never as an owner approval; the CF-09 failure boundary is never executed automatically. Needs a session, the CSRF token and the password in the body, checked on EVERY change. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.reason_invalid, 429 auth.rate_limited */
+    /** Switch confidence.kill.auto (ON by default through the system default row of ADR 0282; no row means OFF) ON or OFF as the owner; appends an audited row with the owner as actor. ON lets the daily decay-monitor pause the cells of a strategy when a kill rule fires, recorded as actor auto with the setting row, never as an owner approval; the CF-09 failure boundary is never executed automatically. Needs a session, the CSRF token and the password in the body, checked on EVERY change. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.reason_invalid, 429 auth.rate_limited */
     put: operations['ChangeKillSettings'];
     post?: never;
     delete?: never;
@@ -15364,7 +15364,7 @@ export interface components {
     };
     /** @description The automatic setting and the thresholds as they stand. */
     KillSettingsView: {
-      /** @description Whether an automatic demotion is allowed now (default OFF). */
+      /** @description Whether an automatic demotion is allowed now (ON by default since ADR 0282 through the system default row; OFF when no row exists). */
       auto: boolean;
       /**
        * Format: int64
@@ -15383,6 +15383,8 @@ export interface components {
       drawdownFactor: number;
       /** @description The SHA-256 of the thresholds. */
       settingsHash: string;
+      /** @description Who wrote the switch row in force: `system:default` for the ADR 0282 seed (ON by default), `owner:...` for the owner's own act; null when none was ever stored. */
+      actor?: null | string;
     };
     /** @description The body of the automatic kill switch. The owner is never part of it: the actor comes from the signed-in session. */
     KillSwitchRequest: {

@@ -85,6 +85,10 @@ export const slopeVerdictLabel = (verdict: string | null): string =>
     verdict,
   );
 
+/** Who put the automatic kill setting in force: the ADR 0282 seed row (a default, never an owner act) or the owner. */
+export const autoSource = (actor: string | null | undefined): string =>
+  actor === 'system:default' ? ' (system default, ADR 0282)' : actor ? ' (owner)' : '';
+
 /** What the automatic kill setting means in each position. */
 export const autoMeaning = (on: boolean): string =>
   on

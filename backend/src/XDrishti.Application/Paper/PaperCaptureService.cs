@@ -8,7 +8,7 @@ namespace XDrishti.Application.Paper;
 
 /// <summary>
 /// The paper capture as a service (<see cref="Id"/>, spec P10-01, ADR 0116): every trading day at 17:00, after the end-of-day data run and before the nightly plan, it carries out <see cref="CapturePaperFillsCommand"/>: every armed ticket of a closed
-/// session becomes a timed, priced paper trade per account, replayed on the stored official bars. It starts <b>enabled</b> (ADR 0282); switching it on is the owner's act. It places no order, calls no broker and moves no ticket.
+/// session becomes a timed, priced paper trade per account, replayed on the stored official bars. It starts <b>enabled</b> (ADR 0282), but it opens no epoch while no paper account exists (the P10-00 pre-flight and Auto come first). It places no order, calls no broker and moves no ticket.
 /// </summary>
 public sealed class PaperCaptureService(IServiceScopeFactory scopes) : IScheduledService
 {

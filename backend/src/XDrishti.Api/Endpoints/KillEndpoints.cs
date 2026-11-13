@@ -37,7 +37,7 @@ internal sealed class KillEndpoints : IEndpointModule
         group.MapPut("/kill-settings", SwitchAsync)
             .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy) // a password is checked here, so the sign-in limit applies
             .WithName("ChangeKillSettings")
-            .WithSummary("Switch confidence.kill.auto (OFF by default; no row means OFF) ON or OFF as the owner; appends an audited row with the owner as actor. ON lets the daily decay-monitor pause the cells of a strategy when a kill rule fires, recorded as actor auto with the setting row, never as an owner approval; the CF-09 failure boundary is never executed automatically. Needs a session, the CSRF token and the password in the body, checked on EVERY change. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.reason_invalid, 429 auth.rate_limited")
+            .WithSummary("Switch confidence.kill.auto (ON by default through the system default row of ADR 0282; no row means OFF) ON or OFF as the owner; appends an audited row with the owner as actor. ON lets the daily decay-monitor pause the cells of a strategy when a kill rule fires, recorded as actor auto with the setting row, never as an owner approval; the CF-09 failure boundary is never executed automatically. Needs a session, the CSRF token and the password in the body, checked on EVERY change. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.reason_invalid, 429 auth.rate_limited")
             .ProducesRejections(conflict: false, notFound: false);
 
         var cells = api.MapGroup("/learning/cells").WithTags("Learning");

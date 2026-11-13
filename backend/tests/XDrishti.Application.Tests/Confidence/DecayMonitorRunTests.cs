@@ -174,6 +174,18 @@ public sealed class DecayMonitorRunTests
         badLimit.IsFailure.ShouldBeTrue();
     }
 
+    [Fact]
+    public async Task The_settings_view_carries_the_actor_of_the_switch_row_so_a_system_default_is_not_shown_as_the_owner()
+    {
+        var f = new KillFixture();
+        f.Switch = new KillSwitch(9, true, KillSwitch.SystemDefaultActor);
+        var handler = new GetKillProposalsHandler(f.Store, f.Settings, new KillOptions());
+
+        var view = (await handler.HandleAsync(new GetKillProposalsQuery(null, null), Ct)).Value;
+
+        (view.Settings.Auto, view.Settings.SettingId, view.Settings.Actor).ShouldBe((true, 9L, "system:default"));
+    }
+
     [Theory]
     [InlineData(1.5, 2, true)]
     [InlineData(3, 1, true)]
