@@ -54,6 +54,7 @@ internal sealed class MlSafetyEndpoints : IEndpointModule
         HttpContext http,
         ICommandHandler<StepUpCommand, StepUpResult> passwordCheck,
         ICommandHandler<ScoreModelHoldOutCommand, MlHoldOutScoreView> handler,
+        IHostApplicationLifetime lifetime,
         CancellationToken cancellationToken)
     {
         http.Response.Headers.CacheControl = "no-store";
@@ -63,7 +64,8 @@ internal sealed class MlSafetyEndpoints : IEndpointModule
             return ProblemResults.From(owner.Error, http);
         }
 
-        var result = await handler.HandleAsync(new ScoreModelHoldOutCommand(id, owner.Value), cancellationToken);
+        // the look is irreversible once claimed: a dropped connection must not cut the pass off half way, only the host stopping does (the same model finishes its own claimed look on the next call, ADR 0285)
+        var result = await handler.HandleAsync(new ScoreModelHoldOutCommand(id, owner.Value), lifetime.ApplicationStopping);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 

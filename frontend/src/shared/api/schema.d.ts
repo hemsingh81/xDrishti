@@ -17619,6 +17619,11 @@ export interface components {
       gainHigh?: null | number;
       /** @description `owner` or `auto` (how the look was taken), or null. */
       mode?: null | string;
+      /**
+       * @description Whether the owner could take (or finish) the model's look now: the block in force is sealed, the model kept a hold-out before it, and its family has no finished look there. A hint for the button; the act decides.
+       * @default false
+       */
+      canScore: boolean;
     };
     /** @description `GET /api/learning/models/{id}/influence`: whether the model may influence a decision, term by term (CF-10 part 10c-2, ADR 0217). */
     MlInfluenceView: {

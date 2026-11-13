@@ -41,8 +41,6 @@ internal sealed class TrainFromSimulationHandler(
     ILogger<TrainFromSimulationHandler> logger) : ICommandHandler<TrainFromSimulationCommand, SimTrainingView>
 {
     internal const string Actor = "system:sim-training";
-    private const string Style = "swing"; // join keys of the point-in-time cells only; they carry no meaning here
-    private const string ExitLabel = "simulated";
 
     public async ValueTask<Result<SimTrainingView>> HandleAsync(TrainFromSimulationCommand command, CancellationToken cancellationToken)
     {
@@ -204,7 +202,7 @@ internal sealed class TrainFromSimulationHandler(
                     continue;
                 }
 
-                if (sampleEvery == 1 || Bucket(t.Key) % sampleEvery == 0)
+                if (sampleEvery == 1 || SimTrainingCells.Bucket(t.Key) % sampleEvery == 0)
                 {
                     kept.Add(t);
                 }
@@ -227,28 +225,19 @@ internal sealed class TrainFromSimulationHandler(
         }
 
         var options = new CellStatsOptions();
-        var inputs = new Dictionary<string, (CellId Cell, bool Costed, List<CellTrade> Trades)>(StringComparer.Ordinal);
+        var inputsBuilt = SimTrainingCells.BuildInputs(trades);
+        if (inputsBuilt.IsFailure)
+        {
+            return Result.Failure<Loaded>(inputsBuilt.Error);
+        }
+
         var cellOf = new Dictionary<string, (string CellKey, DateOnly Date)>(StringComparer.Ordinal);
         foreach (var t in trades)
         {
-            var id = new CellId(t.StrategyId, t.TriggerTimeframe.ToCode(), t.Side.ToString().ToUpperInvariant(), Style, ExitLabel, Expression: Expression.Cash);
-            var costed = t.Costs == CostBasis.Charged && t.Costing is not null;
-            if (!inputs.TryGetValue(id.Key, out var cell))
-            {
-                cell = (id, costed, []);
-                inputs[id.Key] = cell;
-            }
-
-            if (cell.Costed != costed)
-            {
-                return Result.Failure<Loaded>(LearningErrors.MixedBasis(id.Key));
-            }
-
-            cell.Trades.Add(new CellTrade(SessionClock.DateOf(t.ExitEpochSeconds), costed ? t.Costing!.RNet : t.RFilled, t.MaeR, t.MfeR, t.TradeDate));
-            cellOf[t.Key] = (id.Key, SessionClock.DateOf(t.DecisionEpochSeconds - 60));
+            cellOf[t.Key] = (SimTrainingCells.CellOf(t).Key, SessionClock.DateOf(t.DecisionEpochSeconds - 60));
         }
 
-        var cellInputs = inputs.Values.OrderBy(c => c.Cell.Key, StringComparer.Ordinal).Select(c => new CellInput(c.Cell, c.Costed, c.Trades)).ToList();
+        var cellInputs = inputsBuilt.Value;
         var stats = cellInputs.Count == 0 ? [] : CellStatsCalculator.Compute(cellInputs, job.WindowTo, options);
         if (trades.Count == 0)
         {
@@ -292,8 +281,6 @@ internal sealed class TrainFromSimulationHandler(
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     }
 
-    /// <summary>A stable bucket of a trade key, so thinning keeps the same trades on every run.</summary>
-    private static uint Bucket(string key) => BitConverter.ToUInt32(SHA256.HashData(Encoding.UTF8.GetBytes(key)), 0);
 
     private Result<SimTrainingView> Refuse(Error error)
     {

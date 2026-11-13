@@ -14,6 +14,7 @@ public sealed class MlHoldOutScoresGrantsTests(ResearchGrantsTests.DedicatedServ
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private static readonly string Hash = new('a', 64);
+    private const string LookId = "11111111-1111-1111-1111-111111111111";
 
     private const string TrainingSet = """
         INSERT INTO research.training_sets (set_id, label_set_id, rule_version, feature_version, basis, sources, required_features, half_life_days, prior_strength, min_trades, credible_level, from_date, to_date, labelled, row_count,
@@ -30,7 +31,10 @@ public sealed class MlHoldOutScoresGrantsTests(ResearchGrantsTests.DedicatedServ
         """;
 
     private static string Score(long model, string block, string mode = "owner", string actor = "owner:me@x.test") =>
-        string.Create(CultureInfo.InvariantCulture, $"INSERT INTO research.ml_holdout_scores (model_id, block_start, look_key, row_count, day_count, logloss_model, logloss_baseline, baseline_name, p_better, low, high, policy_effect_r, input_hash, setting_hash, mode, actor) VALUES ({model}, '{block}', 'model-family:tf-1@{block}', 140, 30, 0.652, 0.671, 'cell_rate', 0.97, 0.001, 0.03, 0.04, '{Hash}', '{Hash}', '{mode}', '{actor}')");
+        string.Create(CultureInfo.InvariantCulture, $"INSERT INTO research.ml_holdout_scores (model_id, block_start, look_key, row_count, day_count, logloss_model, logloss_baseline, baseline_name, p_better, low, high, policy_effect_r, input_hash, setting_hash, mode, actor, dropped, block_end, look_id) VALUES ({model}, '{block}', 'model-family:tf-1@{block}', 140, 30, 0.652, 0.671, 'cell_rate', 0.97, 0.001, 0.03, 0.04, '{Hash}', '{Hash}', '{mode}', '{actor}', 2, '2027-04-30', '{LookId}')");
+
+    private static string Unlock(string block, bool reused = false) =>
+        $"INSERT INTO lab.holdout_unlocks (strategy_id, version, kind, unlocked_at, mode, actor, setting_hash, reused_window, block_start, lab_run_id, result) VALUES ('model-family:tf-1@{block}', 1, 'model', now(), 'owner', 'owner:me@x.test', '{Hash}', {reused.ToString().ToLowerInvariant()}, '{block}', '{LookId}', '{{}}'::jsonb)";
 
     private static async Task<string?> SqlStateAsync(string connectionString, string sql)
     {
@@ -81,9 +85,12 @@ public sealed class MlHoldOutScoresGrantsTests(ResearchGrantsTests.DedicatedServ
         await StoreKit.ExecuteAsync(server.Owner, TrainingSet, Ct);
         var model = await ScalarAsync(server.Owner, Model);
 
+        (await SqlStateAsync(server.App, Score(model, "2026-10-31"))).ShouldBe(PostgresErrorCodes.CheckViolation, "a score needs the fresh model look it belongs to");
+        await StoreKit.ExecuteAsync(server.Owner, Unlock("2026-10-31"), Ct);
+        await StoreKit.ExecuteAsync(server.Owner, Unlock("2027-05-01"), Ct);
         (await SqlStateAsync(server.App, Score(model, "2026-10-31"))).ShouldBeNull();
         (await SqlStateAsync(server.App, Score(model, "2026-10-31"))).ShouldBe(PostgresErrorCodes.UniqueViolation, "one row per model and block");
-        (await SqlStateAsync(server.App, Score(model + 9999, "2026-11-01"))).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
+        (await SqlStateAsync(server.App, Score(model + 9999, "2027-05-01"))).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
         (await SqlStateAsync(server.App, Score(model, "2027-05-01", "owner", "auto"))).ShouldBe(PostgresErrorCodes.CheckViolation, "an owner row names an owner");
         foreach (var statement in new[] { "UPDATE research.ml_holdout_scores SET row_count = 1", "DELETE FROM research.ml_holdout_scores", "TRUNCATE research.ml_holdout_scores" })
         {

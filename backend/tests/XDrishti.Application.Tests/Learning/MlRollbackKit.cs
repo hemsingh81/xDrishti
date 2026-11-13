@@ -158,7 +158,7 @@ internal sealed class MlRollbackFixture
 
     public MlInfluenceOptions Options { get; } = new();
 
-    public MlInfluenceEvaluator Evaluator => new(Registry, new ModelHoldOutLooks(HoldOuts, Time), Predicate, Influence, Options);
+    public MlInfluenceEvaluator Evaluator => new(Registry, new ModelHoldOutLooks(HoldOuts, Time, new MlInfluenceKit.NoScores()), Predicate, Influence, Options);
 
     public DesignateModelHandler Designate => new(Registry, Time, NullLogger<DesignateModelHandler>.Instance);
 
@@ -183,7 +183,7 @@ internal sealed class MlRollbackFixture
     /// <summary>Gives a model the evidence the predicate needs (without the switch) and its one look at the hold-out, so that the predicate holds for it except for the owner's switch.</summary>
     public async Task MakePredicateHoldAsync(StoredModel model)
     {
-        (await new ModelHoldOutLooks(HoldOuts, Time).ClaimAsync(model, "owner", "owner", new string('d', 64), TestContext.Current.CancellationToken)).IsSuccess.ShouldBeTrue();
+        (await new ModelHoldOutLooks(HoldOuts, Time, new MlInfluenceKit.NoScores()).ClaimAsync(model, "owner", "owner", new string('d', 64), TestContext.Current.CancellationToken)).IsSuccess.ShouldBeTrue();
         PredicateEvidence = new MlInfluenceEvidence(new MlHoldOutFigures(150, 0.97, 0.05), new MlForwardFacts(40, 6, 0.1, 3), false);
     }
 

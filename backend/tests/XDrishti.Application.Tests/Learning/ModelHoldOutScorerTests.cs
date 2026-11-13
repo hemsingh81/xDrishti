@@ -49,19 +49,40 @@ public sealed class ModelHoldOutScorerTests
 
     private ModelHoldOutLooks Looks() => new(_store, _time, _scores);
 
-    private ModelHoldOutScorer Scorer() => new(_registry, _store, Looks(), _pass, _scores, _switches, new MlInfluenceOptions(), _time, NullLogger<ModelHoldOutScorer>.Instance);
+    private HoldOutEpochs Epochs(FakeTimeProvider? time = null) => new(_store, new FixedCalendar(), time ?? _time);
 
-    private ModelAutoLookStep Step() => new(new HoldOutEpochs(_store, new FixedCalendar(), _time), new ModelHoldOutCandidates(_registry, _store), Scorer(), _switches);
+    private ModelHoldOutScorer Scorer(FakeTimeProvider? time = null) => new(_registry, _store, Epochs(time), Looks(), _pass, _scores, _switches, new MlInfluenceOptions(), _time, NullLogger<ModelHoldOutScorer>.Instance);
+
+    private ModelAutoLookStep Step() => new(new HoldOutEpochs(_store, new FixedCalendar(), _time), new ModelHoldOutCandidates(_registry, _store, _scores), Scorer(), _switches);
 
     private sealed class FakePass : IModelHoldOutPass
     {
+        public int Prepares { get; private set; }
+
         public int Calls { get; private set; }
+
+        public Result<PreparedModelHoldOut>? Prepared { get; set; }
 
         public Result<ModelHoldOutRows>? Answer { get; set; }
 
-        public ValueTask<Result<ModelHoldOutRows>> RunAsync(StoredModel model, HoldOutBlock block, CancellationToken cancellationToken)
+        /// <summary>Throws this on the next run only (a transient failure after the claim), then clears itself.</summary>
+        public Exception? FailOnce { get; set; }
+
+        public ValueTask<Result<PreparedModelHoldOut>> PrepareAsync(StoredModel model, DateOnly blockStart, CancellationToken cancellationToken)
+        {
+            Prepares++;
+            return ValueTask.FromResult(Prepared ?? Result.Success(new PreparedModelHoldOut(model, null!, new Dictionary<string, XDrishti.Domain.Learning.CellStatsRow>(), 0.5, [])));
+        }
+
+        public ValueTask<Result<ModelHoldOutRows>> RunAsync(PreparedModelHoldOut prepared, HoldOutBlock block, CancellationToken cancellationToken)
         {
             Calls++;
+            if (FailOnce is { } failure)
+            {
+                FailOnce = null;
+                throw failure;
+            }
+
             if (Answer is { } fixedAnswer)
             {
                 return ValueTask.FromResult(fixedAnswer);
@@ -176,15 +197,74 @@ public sealed class ModelHoldOutScorerTests
     }
 
     [Fact]
-    public async Task A_pass_that_cannot_read_its_inputs_stores_no_figures_and_the_look_stays_burned()
+    public async Task An_input_that_is_missing_refuses_before_the_claim_and_nothing_is_written()
     {
-        _pass.Answer = Result.Failure<ModelHoldOutRows>(MlInfluenceErrors.HoldOutUnavailable("no cell statistics"));
+        _pass.Prepared = Result.Failure<PreparedModelHoldOut>(MlInfluenceErrors.HoldOutUnavailable("no cell statistics before the block"));
 
         var result = await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
 
-        result.IsFailure.ShouldBeTrue();
-        _store.Unlocks.Count.ShouldBe(1);
+        result.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutUnavailableCode);
+        _store.Unlocks.ShouldBeEmpty("the look is not burned by a missing input");
         _scores.Rows.ShouldBeEmpty();
+        _pass.Calls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_filling_block_is_refused_before_anything_is_read_or_written()
+    {
+        var filling = new FakeTimeProvider(new DateTimeOffset(2026, 12, 1, 6, 0, 0, TimeSpan.Zero));
+
+        var result = await Scorer(filling).ScoreAsync(7, "owner", "owner:hem", Ct);
+
+        result.Error.Code.ShouldBe(LabErrors.HoldOutFillingCode);
+        _store.Unlocks.ShouldBeEmpty();
+        _pass.Prepares.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_transient_failure_after_the_claim_answers_interrupted_and_the_same_model_finishes_its_own_look()
+    {
+        _pass.FailOnce = new InvalidOperationException("retries exhausted", new TimeoutException("db"));
+
+        var first = await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
+        var second = await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
+        var third = await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
+
+        first.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutInterruptedCode);
+        _store.Unlocks.Count.ShouldBe(1, "one look, claimed once");
+        second.IsSuccess.ShouldBeTrue("a failed pass stored no figure, so finishing it is not a second look");
+        _scores.Rows.Count.ShouldBe(1);
+        third.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutReusedCode, "a finished look is never redone");
+    }
+
+    [Fact]
+    public async Task A_failure_that_is_not_transient_still_throws_and_a_look_of_another_model_is_never_resumed()
+    {
+        _pass.FailOnce = new InvalidOperationException("a bug");
+        await Should.ThrowAsync<InvalidOperationException>(async () => await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct));
+        var other = Model(8, hash: 'b');
+        _registry.FindAsync(8, Arg.Any<CancellationToken>()).Returns(other);
+
+        var refused = await Scorer().ScoreAsync(8, "owner", "owner:hem", Ct);
+
+        refused.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutReusedCode);
+        _store.Unlocks.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Turning_the_auto_setting_off_during_the_pass_does_not_throw_and_the_owner_can_finish_the_look()
+    {
+        var calls = 0;
+        _switches.CurrentAsync(Arg.Any<CancellationToken>()).Returns(_ => new MlSwitches(new MlSwitchState(null, false), new MlSwitchState(null, false), new MlSwitchState(null, false), new MlSwitchState(3, ++calls <= 1)));
+
+        var auto = await Scorer().ScoreAsync(7, "auto", ModelHoldOutScorer.AutoActor, Ct);
+        var owner = await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
+
+        auto.IsFailure.ShouldBeTrue();
+        auto.Error.Code.ShouldBe(LearningErrors.InvalidCode);
+        _store.Unlocks.Count.ShouldBe(1);
+        owner.IsSuccess.ShouldBeTrue();
+        _scores.Rows.Single().Mode.ShouldBe("owner");
     }
 
     [Fact]
@@ -243,7 +323,7 @@ public sealed class ModelHoldOutScorerTests
     {
         var one = new MemoryHoldOutStore();
         one.Blocks.Add(new HoldOutBlock(One, new DateOnly(2024, 10, 1), OneEnd, 6, Hash, DateTimeOffset.UnixEpoch));
-        var step = new ModelAutoLookStep(new HoldOutEpochs(one, new FixedCalendar(), _time), new ModelHoldOutCandidates(_registry, one), Scorer(), _switches);
+        var step = new ModelAutoLookStep(new HoldOutEpochs(one, new FixedCalendar(), _time), new ModelHoldOutCandidates(_registry, one, _scores), Scorer(), _switches);
         (await step.RunAsync(Ct)).ShouldBe("block 1 is the owner's");
 
         var filling = new FakeTimeProvider(new DateTimeOffset(2026, 12, 1, 6, 0, 0, TimeSpan.Zero));
@@ -251,7 +331,7 @@ public sealed class ModelHoldOutScorerTests
         fill.Blocks.Add(new HoldOutBlock(One, new DateOnly(2024, 10, 1), OneEnd, 6, Hash, DateTimeOffset.UnixEpoch));
         fill.Blocks.Add(new HoldOutBlock(Two, new DateOnly(2024, 10, 1), TwoEnd, 6, Hash, DateTimeOffset.UnixEpoch, One));
         fill.Releases.Add(new StoredRelease(One, DateTimeOffset.UnixEpoch, "owner", "owner:x", Hash, true, Two));
-        var fillStep = new ModelAutoLookStep(new HoldOutEpochs(fill, new FixedCalendar(), filling), new ModelHoldOutCandidates(_registry, fill), Scorer(), _switches);
+        var fillStep = new ModelAutoLookStep(new HoldOutEpochs(fill, new FixedCalendar(), filling), new ModelHoldOutCandidates(_registry, fill, _scores), Scorer(), _switches);
         (await fillStep.RunAsync(Ct)).ShouldBe("block filling");
 
         _pass.Calls.ShouldBe(0);
@@ -261,7 +341,7 @@ public sealed class ModelHoldOutScorerTests
     public async Task Only_an_eligible_pre_dated_champion_is_a_candidate()
     {
         var block = _store.Blocks[1];
-        var candidates = new ModelHoldOutCandidates(_registry, _store);
+        var candidates = new ModelHoldOutCandidates(_registry, _store, _scores);
         _registry.ListAsync(ModelRole.Champion, Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns([Model(7, registeredAt: new DateTimeOffset(2026, 12, 1, 0, 0, 0, TimeSpan.Zero))]);
         (await candidates.FindAsync(block, Ct)).ShouldBeEmpty("registered after the block started");
@@ -277,19 +357,23 @@ public sealed class ModelHoldOutScorerTests
     [Fact]
     public async Task The_model_slot_is_available_with_an_eligible_champion_used_after_the_look_and_unavailable_on_a_read_error()
     {
-        var slot = new ModelLookSlot(_store, new ModelHoldOutCandidates(_registry, _store));
+        var slot = new ModelLookSlot(_store, new ModelHoldOutCandidates(_registry, _store, _scores));
 
         (await slot.ReadAsync(Two, Ct)).ShouldBe(LookAvailability.Available);
         await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
         (await slot.ReadAsync(Two, Ct)).ShouldBe(LookAvailability.Used);
 
+        // a claimed look that has no figures yet is still the model's to finish: the block is kept (never NoSubject)
+        _scores.Rows.Clear();
+        (await slot.ReadAsync(Two, Ct)).ShouldBe(LookAvailability.Available);
+
         _registry.ListAsync(ModelRole.Champion, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromException<IReadOnlyList<StoredModel>>(new InvalidOperationException("down")));
         var fresh = new MemoryHoldOutStore();
         fresh.Blocks.AddRange(_store.Blocks);
         fresh.Releases.AddRange(_store.Releases);
-        await Should.ThrowAsync<InvalidOperationException>(async () => await new ModelLookSlot(fresh, new ModelHoldOutCandidates(_registry, fresh)).ReadAsync(Two, Ct));
+        await Should.ThrowAsync<InvalidOperationException>(async () => await new ModelLookSlot(fresh, new ModelHoldOutCandidates(_registry, fresh, _scores)).ReadAsync(Two, Ct));
         var none = Substitute.For<IModelRegistry>();
         none.ListAsync(ModelRole.Champion, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([]);
-        (await new ModelLookSlot(fresh, new ModelHoldOutCandidates(none, fresh)).ReadAsync(Two, Ct)).ShouldBe(LookAvailability.NoSubject);
+        (await new ModelLookSlot(fresh, new ModelHoldOutCandidates(none, fresh, _scores)).ReadAsync(Two, Ct)).ShouldBe(LookAvailability.NoSubject);
     }
 }

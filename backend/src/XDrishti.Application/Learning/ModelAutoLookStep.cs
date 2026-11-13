@@ -45,6 +45,12 @@ internal sealed class ModelAutoLookStep(HoldOutEpochs epochs, ModelHoldOutCandid
         // one model per block: the champion is the only model of the rule, and the slot holds one fresh look
         var model = found[0];
         var scored = await scorer.ScoreAsync(model.Id, ModelHoldOutScorer.Auto, ModelHoldOutScorer.AutoActor, cancellationToken);
-        return scored.IsSuccess ? $"scored model {model.Id}" : $"model {model.Id} not scored ({scored.Error.Code})";
+        if (scored.IsSuccess)
+        {
+            return $"scored model {model.Id}";
+        }
+
+        // an input that is missing refuses before the claim: nothing is burned and the next evening tries again
+        return scored.Error.Code == MlInfluenceErrors.HoldOutUnavailableCode ? $"model {model.Id} inputs unavailable ({scored.Error.Code})" : $"model {model.Id} not scored ({scored.Error.Code})";
     }
 }

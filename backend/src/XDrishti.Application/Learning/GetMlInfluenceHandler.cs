@@ -1,4 +1,5 @@
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Lab;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
@@ -6,7 +7,7 @@ using XDrishti.Domain.Learning;
 namespace XDrishti.Application.Learning;
 
 /// <summary>The influence predicate for one registered model, term by term (spec CF-10 part 10c-2, ADR 0217). Read only; the gate is what records checks.</summary>
-internal sealed class GetMlInfluenceHandler(MlInfluenceEvaluator evaluator, MlInfluenceOptions options) : IQueryHandler<GetMlInfluenceQuery, Result<MlInfluenceView>>
+internal sealed class GetMlInfluenceHandler(MlInfluenceEvaluator evaluator, ModelHoldOutLooks looks, HoldOutEpochs epochs, MlInfluenceOptions options) : IQueryHandler<GetMlInfluenceQuery, Result<MlInfluenceView>>
 {
     internal static readonly string[] FixedNotes =
     [
@@ -31,7 +32,7 @@ internal sealed class GetMlInfluenceHandler(MlInfluenceEvaluator evaluator, MlIn
             e.MayInfluence,
             [.. e.Terms.Select(t => new MlTermView(t.Name, t.State.ToString().ToLowerInvariant(), [.. t.Reasons.Select(Reason)]))],
             [.. e.Reasons.Select(Reason)],
-            new MlHoldOutView(e.HoldOut.State, ModelHoldOutLooks.FamilyId(e.Model.Model), e.HoldOut.BlockStart, facts?.Rows, facts?.ProbabilityBeatsNoMl, facts?.PolicyEffectR, score?.LogLossModel, score?.LogLossBaseline, score?.BaselineName, score?.GainLow, score?.GainHigh, score?.Mode),
+            new MlHoldOutView(e.HoldOut.State, ModelHoldOutLooks.FamilyId(e.Model.Model), e.HoldOut.BlockStart, facts?.Rows, facts?.ProbabilityBeatsNoMl, facts?.PolicyEffectR, score?.LogLossModel, score?.LogLossBaseline, score?.BaselineName, score?.GainLow, score?.GainHigh, score?.Mode, await looks.CanScoreAsync(e.Model, await epochs.InForceAsync(cancellationToken), cancellationToken)),
             e.Facts.SwitchOn,
             e.SettingHash,
             options.KeyText(),

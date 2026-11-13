@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { buildModel, buildModelDetail, mountRecords } from '@/test/learningFixtures';
-import { buildHoldingInfluence, buildRollback, buildSettings } from '@/test/mlFixtures';
+import { buildHoldingInfluence, buildInfluence, buildRollback, buildSettings } from '@/test/mlFixtures';
 import { pinClock } from '@/test/pinClock';
 import { server } from '@/test/server';
 import { renderLearning } from './testing';
@@ -390,6 +390,18 @@ describe('Models tab, ML switches and rollback', () => {
 
     expect(await dialog.findByRole('alert')).toHaveTextContent(/learning\.holdout_reused/);
     expect(dialog.getByLabelText(/^Your password for this act/)).toHaveValue('');
+  });
+
+  it('offers no score button while the block fills or the family has looked (the server says canScore false)', async () => {
+    mountRecords({
+      ...models(),
+      ml: { influence: buildInfluence({ holdOut: { ...buildInfluence().holdOut, canScore: false } }) },
+    });
+    renderLearning('?tab=models&model=2');
+    const drawer = within(await screen.findByRole('dialog', { name: 'Model #2' }));
+
+    expect(await drawer.findByText(/Kept: not looked at yet/)).toBeInTheDocument();
+    expect(drawer.queryByRole('button', { name: 'Score on hold-out' })).toBeNull();
   });
 
   it('shows the stored hold-out figures and the interval of a scored model, and no score button', async () => {

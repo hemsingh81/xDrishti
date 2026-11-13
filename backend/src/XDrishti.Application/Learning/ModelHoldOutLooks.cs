@@ -16,7 +16,7 @@ namespace XDrishti.Application.Learning;
 /// <c>holdout_reused</c> and can never make <c>HoldOutBeatsNoMl</c> true. A model counts only if the hold-out it kept excludes the locked block (its kept start is not after the block's start). The row is insert-only, so a look that fails or is abandoned stays burned.
 /// This type claims and reads the look and the stored figures of it; scoring the hold-out rows is <see cref="ModelHoldOutScorer"/>, and no session of the hold-out is read here.
 /// </summary>
-internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time, IMlHoldOutScores? scores = null)
+internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time, IMlHoldOutScores scores)
 {
     /// <summary>The kind of the unlock row.</summary>
     public const string ModelKind = "model";
@@ -71,7 +71,7 @@ internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time, 
         if (own is not null)
         {
             // the figures are those stored for exactly this look (CF-10e part 3): a look that was claimed and not scored has none, which is unavailable and never a pass
-            var score = scores is null ? null : await scores.FindAsync(model.Id, own.BlockStart, cancellationToken);
+            var score = await scores.FindAsync(model.Id, own.BlockStart, cancellationToken);
             var facts = score is null ? new MlHoldOutFacts(true, false, null, null, null) : new MlHoldOutFacts(true, false, score.Rows, score.ProbabilityBetter, score.PolicyEffectR);
             return new HoldOutReading(HoldOutReading.Used, facts, own.BlockStart, own, score);
         }
@@ -79,6 +79,21 @@ internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time, 
         return atBlock is null
             ? new HoldOutReading("kept", null, null)
             : new HoldOutReading("reused", new MlHoldOutFacts(true, true, null, null, null), atBlock.BlockStart);
+    }
+
+    /// <summary>
+    /// Whether the owner could score this model now, for the button of the screen (a hint, the act itself decides): the block in force is sealed, the model kept a hold-out that ends before it, and the family has no look at it, or this model's own look has no figures yet (it may finish it).
+    /// </summary>
+    public async ValueTask<bool> CanScoreAsync(StoredModel model, BlockStatus? current, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        if (current is null || current.State is HoldOutBlockState.Filling or HoldOutBlockState.Released || model.Model.HoldOutStart is not { } kept || kept > current.Block.Start)
+        {
+            return false;
+        }
+
+        var atBlock = (await store.ListUnlocksByIdPrefixAsync(ModelKind, FamilyId(model.Model) + "@", cancellationToken)).FirstOrDefault(l => l.BlockStart == current.Block.Start);
+        return atBlock is null || (atBlock.RunId == LookId(model.Model) && !atBlock.ReusedWindow && await scores.FindAsync(model.Id, current.Block.Start, cancellationToken) is null);
     }
 
     /// <summary>

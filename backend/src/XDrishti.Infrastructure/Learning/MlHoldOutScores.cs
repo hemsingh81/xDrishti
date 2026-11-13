@@ -11,7 +11,7 @@ internal sealed class MlHoldOutScores(NpgsqlDataSource dataSource) : IMlHoldOutS
     public async ValueTask<StoredMlHoldOutScore?> FindAsync(long modelId, DateOnly blockStart, CancellationToken cancellationToken)
     {
         await using var select = dataSource.CreateCommand("""
-            SELECT look_key, row_count, day_count, logloss_model, logloss_baseline, baseline_name, p_better, low, high, policy_effect_r, input_hash, setting_hash, mode, actor, scored_at
+            SELECT look_key, row_count, day_count, logloss_model, logloss_baseline, baseline_name, p_better, low, high, policy_effect_r, input_hash, setting_hash, mode, actor, scored_at, dropped, block_end, look_id, setting_id
             FROM research.ml_holdout_scores WHERE model_id = @model AND block_start = @block
             """);
         select.Parameters.AddWithValue("model", NpgsqlDbType.Bigint, modelId);
@@ -39,15 +39,19 @@ internal sealed class MlHoldOutScores(NpgsqlDataSource dataSource) : IMlHoldOutS
             reader.GetString(11),
             reader.GetString(12),
             reader.GetString(13),
-            reader.GetFieldValue<DateTimeOffset>(14));
+            reader.GetFieldValue<DateTimeOffset>(14),
+            reader.GetInt32(15),
+            DateOnly.FromDateTime(reader.GetDateTime(16)),
+            reader.GetGuid(17),
+            reader.IsDBNull(18) ? null : reader.GetInt64(18));
     }
 
     public async ValueTask<bool> InsertAsync(StoredMlHoldOutScore score, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(score);
         await using var insert = dataSource.CreateCommand("""
-            INSERT INTO research.ml_holdout_scores (model_id, block_start, look_key, row_count, day_count, logloss_model, logloss_baseline, baseline_name, p_better, low, high, policy_effect_r, input_hash, setting_hash, mode, actor)
-            VALUES (@model, @block, @look, @rows, @days, @lm, @lb, @baseline, @p, @low, @high, @effect, @input, @setting, @mode, @actor)
+            INSERT INTO research.ml_holdout_scores (model_id, block_start, look_key, row_count, day_count, logloss_model, logloss_baseline, baseline_name, p_better, low, high, policy_effect_r, input_hash, setting_hash, mode, actor, dropped, block_end, look_id, setting_id)
+            VALUES (@model, @block, @look, @rows, @days, @lm, @lb, @baseline, @p, @low, @high, @effect, @input, @setting, @mode, @actor, @dropped, @end, @lookid, @settingid)
             ON CONFLICT (model_id, block_start) DO NOTHING
             """);
         var p = insert.Parameters;
@@ -67,6 +71,10 @@ internal sealed class MlHoldOutScores(NpgsqlDataSource dataSource) : IMlHoldOutS
         p.AddWithValue("setting", NpgsqlDbType.Char, score.SettingHash);
         p.AddWithValue("mode", NpgsqlDbType.Varchar, score.Mode);
         p.AddWithValue("actor", NpgsqlDbType.Varchar, score.Actor);
+        p.AddWithValue("dropped", NpgsqlDbType.Integer, score.Dropped);
+        p.AddWithValue("end", NpgsqlDbType.Date, score.BlockEnd);
+        p.AddWithValue("lookid", NpgsqlDbType.Uuid, score.LookId);
+        p.AddWithValue("settingid", NpgsqlDbType.Bigint, (object?)score.SettingId ?? DBNull.Value);
         return await insert.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 

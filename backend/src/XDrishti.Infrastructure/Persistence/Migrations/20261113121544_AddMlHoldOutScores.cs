@@ -59,9 +59,14 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     mode varchar(5) NOT NULL,
                     actor varchar(100) NOT NULL,
                     scored_at timestamptz NOT NULL DEFAULT now(),
+                    dropped integer NOT NULL,
+                    block_end date NOT NULL,
+                    look_id uuid NOT NULL,
+                    setting_id bigint NULL,
                     CONSTRAINT pk_ml_holdout_scores PRIMARY KEY (model_id, block_start),
                     CONSTRAINT fk_ml_holdout_scores_model_versions_model_id FOREIGN KEY (model_id) REFERENCES research.model_versions (id) ON DELETE RESTRICT,
-                    CONSTRAINT ck_ml_holdout_scores_shape CHECK (row_count > 0 AND day_count > 0 AND baseline_name IN ('base_rate', 'cell_rate') AND input_hash ~ '^[0-9a-f]{64}$' AND setting_hash ~ '^[0-9a-f]{64}$'
+                    CONSTRAINT fk_ml_holdout_scores_ml_switch_settings_setting_id FOREIGN KEY (setting_id) REFERENCES research.ml_switch_settings (id) ON DELETE RESTRICT,
+                    CONSTRAINT ck_ml_holdout_scores_shape CHECK (dropped >= 0 AND block_end >= block_start AND row_count > 0 AND day_count > 0 AND baseline_name IN ('base_rate', 'cell_rate') AND input_hash ~ '^[0-9a-f]{64}$' AND setting_hash ~ '^[0-9a-f]{64}$'
                         AND (p_better IS NULL OR p_better BETWEEN 0 AND 1) AND mode IN ('owner', 'auto')
                         AND ((mode = 'owner' AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6) OR (mode = 'auto' AND actor LIKE 'system:%')))
                 )
@@ -72,6 +77,11 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     IF NEW.mode = 'auto' AND NOT COALESCE((SELECT enabled FROM research.ml_switch_settings WHERE name = 'ml.holdout.auto_score' ORDER BY id DESC LIMIT 1), false) THEN
                         RAISE EXCEPTION 'An automatic hold-out score needs the newest ml.holdout.auto_score row to be ON' USING ERRCODE = '23514';
                     END IF;
+                    -- the figures belong to a fresh look of the model kind at this block, with this look key and this look id: a score cannot be written for a look that was never claimed, a re-used one, or another model's
+                    IF NOT EXISTS (SELECT 1 FROM lab.holdout_unlocks u WHERE u.strategy_id = NEW.look_key AND u.version = 1 AND u.kind = 'model' AND u.block_start = NEW.block_start AND NOT u.reused_window AND u.lab_run_id = NEW.look_id) THEN
+                        RAISE EXCEPTION 'A hold-out score needs the fresh model look of this block that it belongs to' USING ERRCODE = '23514';
+                    END IF;
+
                     NEW.scored_at := now();
                     RETURN NEW;
                 END
@@ -87,8 +97,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
             migrationBuilder.Sql("DROP TABLE IF EXISTS research.ml_holdout_scores");
             migrationBuilder.Sql("DROP FUNCTION IF EXISTS research.guard_ml_holdout_score()");
 
-            // Fails closed once an automatic act references nothing here; the seed row is deleted only while it is the name's only row kind.
-            migrationBuilder.Sql("DELETE FROM research.ml_switch_settings WHERE name = 'ml.holdout.auto_score'");
+            // Only the seed row goes. An owner's own row of the name stays, so the old shape check cannot be put back and this Down stops there: nothing is half undone (the whole migration is one transaction).
+            migrationBuilder.Sql("DELETE FROM research.ml_switch_settings WHERE name = 'ml.holdout.auto_score' AND actor = 'system:default' AND reason = 'ADR 0282'");
             migrationBuilder.Sql("""
                 CREATE OR REPLACE FUNCTION research.stamp_ml_switch_setting() RETURNS trigger LANGUAGE plpgsql AS $fn$
                 BEGIN

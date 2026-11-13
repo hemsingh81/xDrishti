@@ -15,6 +15,14 @@ internal static class MlInfluenceKit
             string.Empty, "report", "params", [0, 1], [0.4, 0.6], [0.5, 0.5, 0.5], 1, 3, registeredAt ?? DateTimeOffset.UnixEpoch, "t"),
         1);
 
+    /// <summary>A score store with no figures (the models of these tests never scored a hold-out).</summary>
+    public sealed class NoScores : IMlHoldOutScores
+    {
+        public ValueTask<StoredMlHoldOutScore?> FindAsync(long modelId, DateOnly blockStart, CancellationToken cancellationToken) => ValueTask.FromResult<StoredMlHoldOutScore?>(null);
+
+        public ValueTask<bool> InsertAsync(StoredMlHoldOutScore score, CancellationToken cancellationToken) => ValueTask.FromResult(false);
+    }
+
     public static HoldOutBlock Block(DateOnly? start = null) => new(start ?? BlockStart, new DateOnly(2024, 1, 1), new DateOnly(2026, 10, 31), 6, new string('c', 64), DateTimeOffset.UnixEpoch);
 
     /// <summary>A hold-out store in memory that keeps the two uniqueness rules of the database: one look per (id, version, kind, block), and one fresh look per block and kind.</summary>

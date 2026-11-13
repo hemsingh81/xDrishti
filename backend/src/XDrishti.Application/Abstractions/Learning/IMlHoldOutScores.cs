@@ -18,6 +18,10 @@ namespace XDrishti.Application.Abstractions.Learning;
 /// <param name="Mode"><c>owner</c> or <c>auto</c>.</param>
 /// <param name="Actor">The owner, or <c>system:auto-score</c>.</param>
 /// <param name="ScoredAt">When (the database stamps it on insert).</param>
+/// <param name="Dropped">Candidates of the block that could not be scored (no features or cell statistics).</param>
+/// <param name="BlockEnd">The last day of the block.</param>
+/// <param name="LookId">The id of the look (the model's stable look id, kept in the unlock row).</param>
+/// <param name="SettingId">The row of <c>ml.holdout.auto_score</c> in force when the look was scored, or null when none.</param>
 public sealed record StoredMlHoldOutScore(
     long ModelId,
     DateOnly BlockStart,
@@ -35,7 +39,11 @@ public sealed record StoredMlHoldOutScore(
     string SettingHash,
     string Mode,
     string Actor,
-    DateTimeOffset ScoredAt);
+    DateTimeOffset ScoredAt,
+    int Dropped,
+    DateOnly BlockEnd,
+    Guid LookId,
+    long? SettingId);
 
 /// <summary>Where the figures of the model hold-out looks are kept. Insert-only; one row per model and block.</summary>
 public interface IMlHoldOutScores

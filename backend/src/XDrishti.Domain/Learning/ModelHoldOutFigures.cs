@@ -4,8 +4,8 @@ namespace XDrishti.Domain.Learning;
 
 /// <summary>
 /// The pure figures of a model's one look at the hold-out (CF-10e part 3, ADR 0285, spec D5). The model's log loss is compared with the better of two no-ML baselines read before the block (the base rate of the stored cell statistics, and each row's own cell rate), the better being the one with
-/// the lower pooled log loss on the rows, so the baseline is never chosen in the model's favour; the gain of each row is the baseline's loss minus the model's, and <see cref="PairedDayBootstrap"/> gives the probability that the mean gain is above zero. The take rule is fixed before any row is seen: take a candidate
-/// when the model's probability is at least the probability of the baseline that was used for that row; its effect is the mean R per candidate of what it takes (a skipped candidate counts zero) minus the mean R of taking all. Pure; the seed is the key text.
+/// the lower pooled log loss on the rows, so the baseline is never chosen in the model's favour; the gain of each row is the baseline's loss minus the model's, and <see cref="PairedDayBootstrap"/> gives the probability that the mean gain is above zero. The take rule is fixed before any row is seen and never chosen from the hold-out's labels: take a candidate
+/// when the model's probability is at least its cell's own rate, read before the block; its effect is the mean R per candidate of what it takes (a skipped candidate counts zero) minus the mean R of taking all. Pure; the seed is the key text.
 /// </summary>
 public static class ModelHoldOutFigures
 {
@@ -52,9 +52,8 @@ public static class ModelHoldOutFigures
         var all = 0.0;
         foreach (var r in ordered)
         {
-            var threshold = useCell ? r.CellRate : baseRate;
             all += r.R;
-            if (r.PWin >= threshold)
+            if (r.PWin >= r.CellRate)
             {
                 kept += r.R;
             }

@@ -111,7 +111,7 @@ function Body({ id, view }: { id: number; view: MlInfluence }) {
           {note}
         </Typography>
       ))}
-      {holdOut.state === 'kept' && (
+      {holdOut.canScore && (
         <Box>
           <Button
             variant="outlined"
