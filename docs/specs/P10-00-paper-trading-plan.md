@@ -110,3 +110,5 @@ None that an agent can answer. Owner acts only (defaults above): approve these s
 ## Review fixes 2026-10-25 (2)
 - Sizes: P10-03 3 -> 5 d, P10-04 2.5 -> 4 d; slice total about 16.5 -> 20 agent-days.
 - The label 'P10-07 or P8-06b' replaced everywhere by 'the unwritten slice that writes the charge-sheet confirmation'.
+
+**Amendment (owner, 2026-11-13, roadmap open decision 9, option (a); slice DEC9, not built).** The cell-statistics snapshot is no longer frozen in an epoch: `cells.snapshot` becomes a `free` (noted) change, a new `frozen` component `cells.basis` holds the snapshot's options and sources without their window ends, and `cells-refresh` is no longer a learning-writer blocker. The strategy versions, the rules and the champion stay frozen. See [LC-01](LC-01-scheduled-cell-statistics-refresh.md) *Decision 9*.

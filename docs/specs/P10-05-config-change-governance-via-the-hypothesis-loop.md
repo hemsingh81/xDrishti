@@ -80,3 +80,5 @@ None. Owner acts, with defaults: choose to apply a queued hypothesis (default: h
 
 ## Built 2026-10-26
 - Built from this Draft under the owner's standing instruction; ADR 0119. Resolved ambiguities are listed in the ADR consequences (smart-rule and selection code defaults are fingerprinted; autonomy threshold direction by strictness; a note naming a hypothesis takes it out of the queue; the Governance tab is the stand-alone route `/paper/governance` until P10-02's paper screen hosts it). Log ids 5240 to 5245.
+
+**Amendment (owner, 2026-11-13, roadmap open decision 9, option (a); slice DEC9, not built).** The cell-statistics snapshot is no longer frozen in an epoch: `cells.snapshot` becomes a `free` (noted) change, a new `frozen` component `cells.basis` holds the snapshot's options and sources without their window ends, and `cells-refresh` is no longer a learning-writer blocker. The strategy versions, the rules and the champion stay frozen. See [LC-01](LC-01-scheduled-cell-statistics-refresh.md) *Decision 9*.
