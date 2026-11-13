@@ -4,7 +4,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.OpeningBars;
-using XDrishti.Application.Abstractions.OptionChain;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Platform.Services;
 
@@ -33,7 +32,7 @@ public sealed class OpeningBarsHostTests
     }
 
     [Fact]
-    public void The_deployment_flag_is_off_by_default_with_the_spec_defaults_and_the_free_floor_of_the_options_recorders()
+    public void The_deployment_flag_is_off_by_default_with_the_spec_defaults_and_the_own_free_floor_of_20_gib()
     {
         using var host = Builder().Build();
 
@@ -45,7 +44,7 @@ public sealed class OpeningBarsHostTests
         settings.Grace.ShouldBe(TimeSpan.FromSeconds(5));
         settings.FormBy.ShouldBe(TimeSpan.FromMinutes(2));
         settings.KeepDays.ShouldBe(60);
-        settings.MinFreeBytes.ShouldBe(host.Services.GetRequiredService<OptionChainSettings>().MinFreeBytes);
+        settings.MinFreeBytes.ShouldBe(20L * 1024 * 1024 * 1024);
     }
 
     [Fact]

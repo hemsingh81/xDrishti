@@ -374,7 +374,7 @@ The labels, the banner and the readme carry the roadmap's "what a P3 number mean
 
 | Schema | Key tables |
 |--------|-----------|
-| `market` | `instruments`, `instrument_broker_ids`, `master_refreshes`, `bars_1m` (hypertable, source csv/dhan), `bars_1m_live`, `bars_1d`, continuous aggregates `bars_5m…bars_1h`, `context_daily`, `calendar`, `corporate_actions`, `depth_snapshots` (hypertable, 20-level book, P7-16, [ADR 0135](../adr/0135-the-depth-recorder-stores-the-20-level-book-of-up-to-50-shares-about-once-a-second-behind-three-gates-a-disk-guard-and-no-reader.md)), `depth_session_instruments`, `depth_sessions`, `depth_recorder_switch` (all insert-only), (later) `ticks` |
+| `market` | `instruments`, `instrument_broker_ids`, `master_refreshes`, `bars_1m` (hypertable, source csv/dhan), `bars_1m_live`, `bars_1d`, continuous aggregates `bars_5m…bars_1h`, `context_daily`, `calendar`, `corporate_actions`, (depth/tick tables dropped 2026-11-13, [ADR 0288](../adr/0288-p13-tick-and-depth-features-are-dropped-the-depth-and-tick-recorders-are-removed-and-the-feature-set-comparison-stays.md))|
 | `catalog` | `tracked_instruments`, `baskets`, `basket_members` (valid_from/to), `index_membership` |
 | `data` | `import_profiles`, `import_jobs`, `import_issues` |
 | `portfolio` | `transactions`, `lots`, `lot_closures`, `positions`, `buckets`, `cash_flows`, `valuations_daily`, `corporate_action_adjustments` |

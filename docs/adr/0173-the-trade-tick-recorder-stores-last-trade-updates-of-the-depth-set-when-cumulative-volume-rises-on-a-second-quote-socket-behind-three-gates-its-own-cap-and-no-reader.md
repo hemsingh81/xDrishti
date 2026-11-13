@@ -44,3 +44,7 @@ P13's aggressive-volume feature (`vol_delta_5m`) needs a trade stream aligned wi
 - The architecture tests' list of areas that must not use tick types omits `Application.Execution`, `Application.Accounts` and `Application.Platform`, and exempts the whole `Infrastructure.Brokers` namespace; narrow both later.
 - The Services page shows the tick recorder's switch together with the depth recorder's (same two files as in the amendment to ADR 0135); the tick recorder has no other screen.
 
+
+
+## Amendment (2026-11-13): removed
+The trade-tick recorder is removed with P13, and its tables are dropped by migration `DropDepthAndTickRecording` ([ADR 0288](0288-p13-tick-and-depth-features-are-dropped-the-depth-and-tick-recorders-are-removed-and-the-feature-set-comparison-stays.md)). This ADR stays as the record of what was built.

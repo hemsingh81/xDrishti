@@ -35,12 +35,12 @@ internal static class FeedHost
             .ValidateOnStart();
         builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<LiveOptions>>().Value.ToSettings());
 
-        // The opening-minute recorder (BK-03b): off by default (OpeningBars:Enabled false), registered paused, behind the owner's stored switch baskets.opening_bars; its own connection; the free floor is the options recorders' (Options:MinFreeGb, shared).
+        // The opening-minute recorder (BK-03b): off by default (OpeningBars:Enabled false), registered paused, behind the owner's stored switch baskets.opening_bars; its own connection; its own free floor (OpeningBars:MinFreeGb).
         builder.Services.AddOptions<OpeningBarsOptions>()
             .Bind(builder.Configuration.GetSection(OpeningBarsOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
-        builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<OpeningBarsOptions>>().Value.ToSettings(sp.GetRequiredService<IOptions<OptionsOptions>>().Value.MinFreeGb));
+        builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<OpeningBarsOptions>>().Value.ToSettings());
 
         // The option-chain recorder (P14-02): off by default (Options:Chain:Enabled false), registered paused, behind its own stored switch; REST requests to the two allowed option-chain endpoints, one per 3 seconds at most.
         builder.Services.AddOptions<OptionsOptions>()

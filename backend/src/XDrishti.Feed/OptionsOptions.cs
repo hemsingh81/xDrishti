@@ -13,7 +13,7 @@ internal sealed class OptionsOptions
 {
     public const string SectionName = "Options";
 
-    /// <summary>The free disk space under which an options recorder stops (GiB; the same value as <c>Depth:MinFreeGb</c> by default).</summary>
+    /// <summary>The free disk space under which an options recorder stops (GiB).</summary>
     [Range(5, 500)]
     public int MinFreeGb { get; set; } = 20;
 

@@ -5,7 +5,7 @@ namespace XDrishti.Feed;
 
 /// <summary>
 /// The numbers of the opening-minute recorder (<c>OpeningBars:*</c>, BK-03b, documented in doc 16), bounds-checked at start. <see cref="Enabled"/> is the deployment gate and is <b>false</b> by default: with it false the recorder never reads credentials, opens a
-/// socket or writes a row (it takes a restart to change). The owner's stored switch <c>baskets.opening_bars</c> and the paused service are the other two gates. The free-space floor is the options recorders' (<c>Options:MinFreeGb</c>, shared).
+/// socket or writes a row (it takes a restart to change). The owner's stored switch <c>baskets.opening_bars</c> and the paused service are the other two gates. 
 /// </summary>
 internal sealed class OpeningBarsOptions : IValidatableObject
 {
@@ -40,6 +40,10 @@ internal sealed class OpeningBarsOptions : IValidatableObject
     [Range(5, 300)]
     public int SilenceSeconds { get; set; } = 30;
 
+    /// <summary>The free disk space under which the recorder stops (GiB).</summary>
+    [Range(5, 500)]
+    public int MinFreeGb { get; set; } = 20;
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (RecordUntil < EarliestRecordUntil)
@@ -48,7 +52,7 @@ internal sealed class OpeningBarsOptions : IValidatableObject
         }
     }
 
-    /// <summary>The settings the recorder works with; the free floor is the shared <c>Options:MinFreeGb</c>.</summary>
-    public OpeningBarsSettings ToSettings(int minFreeGb) =>
-        new(Enabled, MaxInstruments, RecordUntil, TimeSpan.FromSeconds(GraceSeconds), TimeSpan.FromSeconds(FormBySeconds), KeepDays, TimeSpan.FromSeconds(SilenceSeconds), minFreeGb * 1024L * 1024 * 1024);
+    /// <summary>The settings the recorder works with; the free floor is its own <c>OpeningBars:MinFreeGb</c>.</summary>
+    public OpeningBarsSettings ToSettings() =>
+        new(Enabled, MaxInstruments, RecordUntil, TimeSpan.FromSeconds(GraceSeconds), TimeSpan.FromSeconds(FormBySeconds), KeepDays, TimeSpan.FromSeconds(SilenceSeconds), MinFreeGb * 1024L * 1024 * 1024);
 }

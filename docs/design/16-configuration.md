@@ -419,7 +419,7 @@ Live:
   ManualRunMinutes: 30           # 1–240: how long Run now keeps the connection open outside the window
 ```
 
-The depth recorder (`Depth:*`) and the trade-tick recorder (`Ticks:*`) were removed with P13 ([ADR 0288](../adr/0288-p13-tick-and-depth-features-are-dropped-the-depth-and-tick-recorders-are-removed-and-the-feature-set-comparison-stays.md)); the opening-minute and option recorders take their free-space floor from `Options:MinFreeGb`.
+The depth recorder (`Depth:*`) and the trade-tick recorder (`Ticks:*`) were removed with P13 ([ADR 0288](../adr/0288-p13-tick-and-depth-features-are-dropped-the-depth-and-tick-recorders-are-removed-and-the-feature-set-comparison-stays.md)); the opening-minute recorder has its own free-space floor, `OpeningBars:MinFreeGb` (5–500 GiB, default 20), and the option recorders keep `Options:MinFreeGb`.
 
 ### Option-chain recorder (`Options:*`, [ADR 0176](../adr/0176-the-option-chain-recorder-stores-five-minute-index-chains-and-a-daily-stock-pass-from-two-new-allow-listed-data-api-endpoints-behind-three-gates-its-own-cap-and-no-reader.md), P14-02)
 
