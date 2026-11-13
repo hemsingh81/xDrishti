@@ -273,7 +273,7 @@ internal sealed class ReadinessFixture
     public static List<ShadowResultRow> Series(int count) =>
     [
         .. Enumerable.Range(0, count).Select(i => new ShadowResultRow(
-            new DateOnly(2025, 1, 1).AddDays(i), $"{Strategy}|S{i}|BUY|{i}", "g", true, "graded", i % 2 == 0 ? 0.5 : -0.1, "net", "sheet-1", i % 2 == 0 ? 0.6 : 0.0, 1)),
+            new DateOnly(2025, 1, 1).AddDays(i), $"{Strategy}|S{i}|BUY|{i}", "g", true, "graded", i % 2 == 0 ? 0.5 : -0.1, "net", "sheet-1", i % 2 == 0 ? 0.6 : 0.0, 1, InSet: true)),
     ];
 
     private IReadOnlyList<LabRunView> RunList() => Verdict is null ? [] : [RunView(null)];

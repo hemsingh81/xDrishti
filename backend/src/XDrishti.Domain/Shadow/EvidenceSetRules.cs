@@ -20,6 +20,12 @@ public static partial class EvidenceSetRules
     /// <summary>The set was named by the owner before the epoch's first shadow write.</summary>
     public const string ModeOwner = "owner";
 
+    /// <summary>The set the migration of AM-01b wrote for an epoch that already held shadow rows: every version written before evidence sets existed. It was NOT pre-registered (the versions were not chosen before their results); only the label says so.</summary>
+    public const string ModeBackfill = "backfill";
+
+    /// <summary>The actor of a backfill set.</summary>
+    public const string BackfillActor = "system:migration";
+
     /// <summary>The actor of an automatic set.</summary>
     public const string AutoActor = "system:default";
 
@@ -52,17 +58,17 @@ public static partial class EvidenceSetRules
     }
 
     /// <summary>
-    /// The default set: the strategy version of every <c>cells.eligible/...</c> component of the snapshot (the keys of the paper fingerprint, <c>ConfigSnapshotSource</c>). A component whose version could not be resolved (<c>unknown</c>) is left out, so an unreadable
-    /// input never joins the set. Null when the snapshot is missing or unreadable, or when no version is left: the shadow record then writes nothing (fail closed).
+    /// The default set: the strategy version of every <c>cells.eligible/...</c> component of a fresh configuration reading (the keys of the paper fingerprint, <c>ConfigSnapshotSource</c>). A component whose version could not be resolved (<c>unknown</c>) is left out, so an unreadable
+    /// input never joins the set. Null when no version is left: the shadow record then writes nothing (fail closed).
     /// </summary>
-    public static IReadOnlyList<string>? Default(string? snapshotComponentsJson)
+    public static IReadOnlyList<string>? Default(IEnumerable<ConfigComponent>? components)
     {
-        if (snapshotComponentsJson is null || ConfigFingerprint.FromJson(snapshotComponentsJson) is not { } fingerprint)
+        if (components is null)
         {
             return null;
         }
 
-        return Canonical(fingerprint.Values.Where(p => p.Key.StartsWith(PaperConfigKeys.CellsEligible, StringComparison.Ordinal)).Select(p => p.Value).Where(IsVersionHash));
+        return Canonical(components.Where(c => c.Key.StartsWith(PaperConfigKeys.CellsEligible, StringComparison.Ordinal)).Select(c => c.Value).Where(IsVersionHash));
     }
 
     [GeneratedRegex("^[0-9a-f]{64}$")]

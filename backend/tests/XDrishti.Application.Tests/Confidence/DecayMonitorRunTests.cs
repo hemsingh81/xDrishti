@@ -21,7 +21,7 @@ public sealed class DecayMonitorRunTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private static ShadowResultRow Row(string key, long? epoch = 1, bool counts = true) => new(new DateOnly(2026, 11, 3), key, "primary", counts, "graded", 0.5, "net", null, 0.6, epoch);
+    private static ShadowResultRow Row(string key, long? epoch = 1, bool counts = true) => new(new DateOnly(2026, 11, 3), key, "primary", counts, "graded", 0.5, "net", null, 0.6, epoch, InSet: true);
 
     private static (EvaluateDecayHandler Handler, ICommandHandler<ProposeKillCommand, ProposeKillOutcome> Propose) Arrange(params ShadowResultRow[] rows)
     {

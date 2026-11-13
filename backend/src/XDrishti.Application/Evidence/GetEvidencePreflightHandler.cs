@@ -35,6 +35,7 @@ internal sealed class GetEvidencePreflightHandler(
     ITradingCalendar calendar,
     IModelRegistry models,
     IQueryHandler<GetShadowSummaryQuery, ShadowSummaryView> shadow,
+    IQueryHandler<GetEvidenceSetQuery, EvidenceSetView> evidenceSet,
     IServiceScheduleReader schedules,
     IQueryHandler<GetAutoQuery, AutoView> auto,
     IQueryHandler<ShowHistoryQuery, IReadOnlyList<HistoryRow>> history,
@@ -172,6 +173,12 @@ internal sealed class GetEvidencePreflightHandler(
     private async ValueTask<(bool? Met, string Reason)> ShadowAsync(CancellationToken ct)
     {
         var s = await shadow.HandleAsync(new GetShadowSummaryQuery(), ct);
+        if (s.Enabled && await evidenceSet.HandleAsync(new GetEvidenceSetQuery(), ct) is { State: "pending", Versions.Count: 0 })
+        {
+            // ON by default does not mean writing: with no set stored and none nameable the writer writes nothing (spec AM-01 GAP-09)
+            return (false, "paper.shadow.enabled is ON, writing nothing: no evidence set is stored or can be named (no eligible cell)");
+        }
+
         return (s.Enabled, s.Enabled ? "paper.shadow.enabled is ON" : "paper.shadow.enabled is OFF (the owner switched it off; the default is ON, ADR 0282)");
     }
 

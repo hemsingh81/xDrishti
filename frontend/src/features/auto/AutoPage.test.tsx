@@ -225,6 +225,23 @@ describe('Auto page', () => {
     expect(within(list).queryByRole('button')).not.toBeInTheDocument();
   });
 
+  it('says the shadow record is ON but writing nothing while no evidence set is stored or nameable', async () => {
+    server.use(
+      http.get('/api/services', () =>
+        HttpResponse.json({ items: [buildServiceView({ id: 'shadow-write', enabled: true })] }),
+      ),
+      http.get('/api/paper/shadow/summary', () => HttpResponse.json({ enabled: true })),
+      http.get('/api/paper/shadow/evidence-set', () =>
+        HttpResponse.json({ edgeEpoch: null, state: 'pending', versions: [], shadowEnabled: true, note: '' }),
+      ),
+    );
+    renderWithProviders(<AutoPage />);
+    const list = await screen.findByRole('list', { name: 'Evidence services' });
+    expect(
+      await within(list).findByText(/Shadow record switch: ON, writing nothing: no evidence set/),
+    ).toBeInTheDocument();
+  });
+
   it('shows an error, never running, when the services cannot be read', async () => {
     server.use(http.get('/api/services', () => problemResponse({ title: 'Down.', code: 'x.down' }, 500)));
     renderWithProviders(<AutoPage />);

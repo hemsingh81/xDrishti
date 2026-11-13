@@ -17,7 +17,7 @@ public sealed class ShadowDigestService(IServiceScopeFactory scopes) : ISchedule
     public static readonly ServiceDefinition Definition = new(
         Id,
         "Shadow digest copy",
-        "Saturday 11:00, appends the newest session and chain digest of the shadow record to a log file outside the database (setting Shadow:DigestFolder), after verifying that the chain recomputes; a broken chain is not copied and the run fails. Nothing is exported while the setting paper.shadow.enabled is OFF (the default). It writes no database row and places no order.",
+        "Saturday 11:00, appends the newest session and chain digest of the shadow record to a log file outside the database (setting Shadow:DigestFolder), after verifying that the chain recomputes; a broken chain is not copied and the run fails. Nothing is exported while the setting paper.shadow.enabled is OFF (it is ON by default, ADR 0282; with it ON the first run also probes the digest folder, so a folder that cannot be written shows as a failed run). It writes no database row and places no order.",
         "xd-api",
         [ScheduleType.Weekly],
         new ServiceSettings(true, Schedule.Weekly(DayOfWeek.Saturday, new TimeOnly(11, 0)), 0, 30, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),

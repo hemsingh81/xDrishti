@@ -28,6 +28,7 @@ internal sealed class WriteShadowHandler(
     IEvidenceSetStore evidenceSets,
     IPaperStore paper,
     IGovernanceStore governance,
+    IConfigSnapshotSource configuration,
     ITradingCalendar calendars,
     ShadowScorer scorer,
     ShadowOptions options,
@@ -172,8 +173,8 @@ internal sealed class WriteShadowHandler(
             return new Context(epoch?.Id, snapshot?.Hash, true, null); // the epoch has a set (an owner's, or the automatic one of an earlier session)
         }
 
-        // No set yet: the default rule, fixed from the stored snapshot before any forward result of the epoch exists. Nothing nameable means no write.
-        var versions = EvidenceSetRules.Default(snapshot?.ComponentsJson);
+        // No set yet: the default rule, from a fresh configuration reading (no stored snapshot is needed), fixed before any forward result of the epoch exists. Nothing nameable, or a partial reading, means no write.
+        var versions = await EvidenceSetDefault.ReadAsync(configuration, cancellationToken);
         return versions is null
             ? new Context(epoch?.Id, snapshot?.Hash, false, null)
             : new Context(epoch?.Id, snapshot?.Hash, true, new NewEvidenceSet(key, versions, EvidenceSetRules.SetHash(versions), EvidenceSetRules.ModeAuto, EvidenceSetRules.AutoActor, null));

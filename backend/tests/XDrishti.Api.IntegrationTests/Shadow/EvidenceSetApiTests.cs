@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using XDrishti.Api.IntegrationTests.Data;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 
@@ -40,6 +41,16 @@ public sealed class EvidenceSetApiTests(ApiFactory factory) : DataTestBase(facto
         using var response = await Client.PutAsJsonAsync(Route, new { versions = versions ?? [_hash], reason, password, actor = "owner:evil@example.test" }, Ct);
         var text = await response.Content.ReadAsStringAsync(Ct);
         return (response.StatusCode, text.Length == 0 ? default : JsonDocument.Parse(text).RootElement.Clone());
+    }
+
+    [Fact]
+    public async Task Table_B_ML_switches_read_OFF_with_nothing_stored()
+    {
+        using var scope = Factory.Services.CreateScope();
+
+        var switches = await scope.ServiceProvider.GetRequiredService<XDrishti.Application.Abstractions.Learning.IMlSwitchSettings>().CurrentAsync(Ct);
+
+        switches.ShouldBe(XDrishti.Application.Abstractions.Learning.MlSwitches.AllOff);
     }
 
     [Fact]

@@ -6068,8 +6068,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Mode")
                         .IsRequired()
-                        .HasMaxLength(5)
-                        .HasColumnType("character varying(5)")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
                         .HasColumnName("mode");
 
                     b.Property<string>("Reason")
@@ -6095,7 +6095,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("evidence_sets", "paper", t =>
                         {
-                            t.HasCheckConstraint("ck_evidence_sets_shape", "edge_epoch >= 0 AND jsonb_typeof(versions) = 'array' AND jsonb_array_length(versions) BETWEEN 1 AND 500 AND set_hash ~ '^[0-9a-f]{64}$' AND ((mode = 'auto' AND actor = 'system:default' AND reason IS NULL) OR (mode = 'owner' AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND reason IS NOT NULL AND length(btrim(reason)) > 0))");
+                            t.HasCheckConstraint("ck_evidence_sets_shape", "edge_epoch >= 0 AND jsonb_typeof(versions) = 'array' AND jsonb_array_length(versions) BETWEEN 1 AND 500 AND set_hash ~ '^[0-9a-f]{64}$' AND ((mode = 'auto' AND actor = 'system:default' AND reason IS NULL) OR (mode = 'owner' AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND reason IS NOT NULL AND length(btrim(reason)) > 0) OR (mode = 'backfill' AND actor = 'system:migration' AND reason = 'AM-01b backfill: every version written before evidence sets existed; not pre-registered'))");
                         });
                 });
 

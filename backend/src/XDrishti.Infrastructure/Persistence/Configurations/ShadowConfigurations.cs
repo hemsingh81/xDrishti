@@ -104,12 +104,12 @@ internal sealed class EvidenceSetRecordConfiguration : IEntityTypeConfiguration<
     {
         builder.ToTable("evidence_sets", Schemas.Paper, t => t.HasCheckConstraint(
             "ck_evidence_sets_shape",
-            "edge_epoch >= 0 AND jsonb_typeof(versions) = 'array' AND jsonb_array_length(versions) BETWEEN 1 AND 500 AND set_hash ~ '^[0-9a-f]{64}$' AND ((mode = 'auto' AND actor = 'system:default' AND reason IS NULL) OR (mode = 'owner' AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND reason IS NOT NULL AND length(btrim(reason)) > 0))"));
+            "edge_epoch >= 0 AND jsonb_typeof(versions) = 'array' AND jsonb_array_length(versions) BETWEEN 1 AND 500 AND set_hash ~ '^[0-9a-f]{64}$' AND ((mode = 'auto' AND actor = 'system:default' AND reason IS NULL) OR (mode = 'owner' AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND reason IS NOT NULL AND length(btrim(reason)) > 0) OR (mode = 'backfill' AND actor = 'system:migration' AND reason = 'AM-01b backfill: every version written before evidence sets existed; not pre-registered'))"));
         builder.HasKey(x => x.Id).HasName("pk_evidence_sets");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
         builder.Property(x => x.Versions).HasColumnType("jsonb").IsRequired();
         builder.Property(x => x.SetHash).HasColumnType("char(64)").IsRequired();
-        builder.Property(x => x.Mode).HasMaxLength(5).IsRequired();
+        builder.Property(x => x.Mode).HasMaxLength(8).IsRequired();
         builder.Property(x => x.Actor).HasMaxLength(100).IsRequired();
         builder.Property(x => x.Reason).HasMaxLength(500);
         builder.Property(x => x.CreatedAt).HasDefaultValueSql("now()");

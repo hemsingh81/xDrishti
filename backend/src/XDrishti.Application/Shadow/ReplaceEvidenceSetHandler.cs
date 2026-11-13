@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Paper;
-using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Abstractions.Shadow;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
@@ -18,7 +17,6 @@ namespace XDrishti.Application.Shadow;
 internal sealed class ReplaceEvidenceSetHandler(
     IEvidenceSetStore store,
     IPaperStore paper,
-    IStrategyStore strategies,
     IAccountEventLog events,
     IAccountUnitOfWork unitOfWork,
     TimeProvider clock,
@@ -55,12 +53,9 @@ internal sealed class ReplaceEvidenceSetHandler(
             return Result.Failure<EvidenceSetReplaced>(Error.Validation(VersionsInvalidCode, $"A set holds 1 to {EvidenceSetRules.MaxVersions} distinct strategy version hashes (64 lower-case hex characters each)."));
         }
 
-        foreach (var hash in versions)
+        if ((await store.UnknownVersionsAsync(versions, cancellationToken)).Count > 0)
         {
-            if (await strategies.GetByHashAsync(hash, cancellationToken) is null)
-            {
-                return Result.Failure<EvidenceSetReplaced>(Error.Validation(UnknownVersionCode, "A version of the set is not a stored strategy version."));
-            }
+            return Result.Failure<EvidenceSetReplaced>(Error.Validation(UnknownVersionCode, "A version of the set is not a stored strategy version."));
         }
 
         var epoch = (await paper.CurrentEpochAsync(cancellationToken))?.Id;

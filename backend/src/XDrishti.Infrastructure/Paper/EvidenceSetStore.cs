@@ -31,6 +31,21 @@ internal sealed class EvidenceSetStore(NpgsqlDataSource dataSource) : IEvidenceS
             reader.GetFieldValue<DateTimeOffset>(7), reader.IsDBNull(8) ? null : reader.GetFieldValue<DateTimeOffset>(8), reader.GetBoolean(9));
     }
 
+    public async ValueTask<IReadOnlyList<string>> UnknownVersionsAsync(IReadOnlyList<string> versions, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(versions);
+        await using var select = dataSource.CreateCommand("SELECT h FROM unnest(@hashes) AS h WHERE NOT EXISTS (SELECT 1 FROM lab.strategy_versions v WHERE v.hash::text = h) ORDER BY h");
+        select.Parameters.AddWithValue("hashes", NpgsqlDbType.Array | NpgsqlDbType.Text, versions.ToArray());
+        var unknown = new List<string>();
+        await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            unknown.Add(reader.GetString(0));
+        }
+
+        return unknown;
+    }
+
     public async ValueTask<bool> ReplaceAsync(NewEvidenceSet set, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(set);
@@ -76,13 +91,14 @@ internal sealed class EvidenceSetStore(NpgsqlDataSource dataSource) : IEvidenceS
         // The ledger rows: a registration, not a look (the variant counts leave the kind out). The version's family and number come from the stored version; a hash that is not stored is skipped (the handler refuses an unknown one for the owner, and the default reads stored hashes).
         await using var ledger = new NpgsqlCommand("""
             INSERT INTO lab.test_ledger (strategy_id, version, strategy_hash, parent_hash, lab_run_id, run_key, universe_label, window_from, window_to, method, created_at, trial_kind, extra_trials)
-            SELECT v.strategy_id, v.version, v.hash, v.parent_hash, md5(@hash || v.hash::text)::uuid, encode(sha256(convert_to(@hash || v.hash::text, 'UTF8')), 'hex'),
+            SELECT v.strategy_id, v.version, v.hash, v.parent_hash, md5(@key::text || ':' || @hash || v.hash::text)::uuid, encode(sha256(convert_to(@key::text || ':' || @hash || v.hash::text, 'UTF8')), 'hex'),
                    'evidence_set', d.day, d.day, 'evidence_set', now(), 'evidence_set', 0
             FROM lab.strategy_versions v CROSS JOIN (SELECT (now() AT TIME ZONE 'Asia/Kolkata')::date AS day) d
             WHERE v.hash::text = ANY(@hashes)
             ON CONFLICT (lab_run_id) DO NOTHING
             """, connection, transaction);
         ledger.Parameters.AddWithValue("hash", NpgsqlDbType.Text, set.SetHash);
+        ledger.Parameters.AddWithValue("key", NpgsqlDbType.Bigint, set.EdgeKey);
         ledger.Parameters.AddWithValue("hashes", NpgsqlDbType.Array | NpgsqlDbType.Text, set.Versions.ToArray());
         await ledger.ExecuteNonQueryAsync(cancellationToken);
         return true;

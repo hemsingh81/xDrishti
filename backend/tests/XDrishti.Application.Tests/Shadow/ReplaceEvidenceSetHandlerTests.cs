@@ -3,7 +3,6 @@ using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Paper;
-using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Abstractions.Shadow;
 using XDrishti.Application.Shadow;
 using XDrishti.Domain.Accounts;
@@ -21,8 +20,6 @@ public sealed class ReplaceEvidenceSetHandlerTests
 
     private readonly IPaperStore _paper = Substitute.For<IPaperStore>();
 
-    private readonly IStrategyStore _strategies = Substitute.For<IStrategyStore>();
-
     private readonly IAccountEventLog _events = Substitute.For<IAccountEventLog>();
 
     private readonly IAccountUnitOfWork _unitOfWork = Substitute.For<IAccountUnitOfWork>();
@@ -32,10 +29,10 @@ public sealed class ReplaceEvidenceSetHandlerTests
     public ReplaceEvidenceSetHandlerTests()
     {
         _store.ReplaceAsync(Arg.Any<NewEvidenceSet>(), Ct).Returns(true);
-        _strategies.GetByHashAsync(A, Ct).Returns(new StoredVersion("s", 1, 1, A, "t", "{}", null, null, DateTimeOffset.UnixEpoch));
+        _store.UnknownVersionsAsync(Arg.Any<IReadOnlyList<string>>(), Ct).Returns(ci => ci.Arg<IReadOnlyList<string>>().Where(v => v != A).ToList());
     }
 
-    private ReplaceEvidenceSetHandler Handler() => new(_store, _paper, _strategies, _events, _unitOfWork, new FakeTimeProvider(), NullLogger<ReplaceEvidenceSetHandler>.Instance);
+    private ReplaceEvidenceSetHandler Handler() => new(_store, _paper, _events, _unitOfWork, new FakeTimeProvider(), NullLogger<ReplaceEvidenceSetHandler>.Instance);
 
     private async Task<Result<EvidenceSetReplaced>> RunAsync(string actor = "owner:me@x.test", string reason = "the versions I would trade", string? version = null) =>
         await Handler().HandleAsync(new ReplaceEvidenceSetCommand(actor, [version ?? A], reason), Ct);

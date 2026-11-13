@@ -405,7 +405,7 @@ public static class FixtureSeeder
         // AM-01b (GAP-09): only rows inside the epoch's evidence set count for edge, so the fixture names the version of its candidates as the set (no paper epoch: key 0), as the owner would.
         await Exec(
             c, t, "INSERT INTO paper.evidence_sets (edge_epoch, versions, set_hash, mode, actor, reason) VALUES (0, to_jsonb(ARRAY[@version::text]), @set, 'owner', 'owner:eval-fixture@example.test', 'eval fixture database')", ct,
-            ("version", NpgsqlDbType.Text, Sha("eval-definition|VWAP_PULLBACK")), ("set", NpgsqlDbType.Char, Sha("eval-fixture-evidence-set")));
+            ("version", NpgsqlDbType.Text, Sha("eval-definition|VWAP_PULLBACK")), ("set", NpgsqlDbType.Char, XDrishti.Domain.Shadow.EvidenceSetRules.SetHash([Sha("eval-definition|VWAP_PULLBACK")])));
         var planId = (long)(await Scalar(
             c, t,
             """

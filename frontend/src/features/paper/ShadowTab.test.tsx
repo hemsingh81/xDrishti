@@ -221,6 +221,22 @@ describe('Evidence set card (AM-01b)', () => {
     expect(screen.getByLabelText(/your password/i)).toHaveValue('');
   });
 
+  it('shows a migration backfill as not pre-registered', async () => {
+    mountShadow(
+      buildShadowSummary(),
+      buildEvidenceSet({
+        mode: 'backfill',
+        actor: 'system:migration',
+        reason: 'AM-01b backfill: not pre-registered',
+        firstWriteAt: null,
+      }),
+    );
+    open('shadow');
+    expect(await screen.findByText(/Migration backfill/)).toBeInTheDocument();
+    expect(screen.getByText(/NOT pre-registered/)).toBeInTheDocument();
+    expect(screen.queryByText(/System default/)).not.toBeInTheDocument();
+  });
+
   it('shows a pending set with the versions the default would register', async () => {
     mountShadow(
       buildShadowSummary(),

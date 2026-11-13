@@ -5,7 +5,7 @@ namespace XDrishti.Application.Abstractions.Shadow;
 /// <param name="EdgeKey">The paper epoch id the set belongs to, or 0 while no paper epoch exists.</param>
 /// <param name="Versions">The strategy version hashes, canonical order.</param>
 /// <param name="SetHash">The identity of the set.</param>
-/// <param name="Mode"><c>auto</c> (the rule, at the epoch's first shadow write) or <c>owner</c> (named before it).</param>
+/// <param name="Mode"><c>auto</c> (the rule, at the epoch's first shadow write), <c>owner</c> (named before it) or <c>backfill</c> (written by the AM-01b migration for rows that already existed: not a pre-registration).</param>
 /// <param name="Actor"><c>system:default</c> or <c>owner:...</c>.</param>
 /// <param name="Reason">The owner's reason, or null for the automatic set.</param>
 /// <param name="CreatedAt">When stored (the database clock).</param>
@@ -30,6 +30,9 @@ public interface IEvidenceSetStore
 {
     /// <summary>The newest set of the epoch, or null when none is stored.</summary>
     ValueTask<StoredEvidenceSet?> CurrentAsync(long edgeKey, CancellationToken cancellationToken);
+
+    /// <summary>The given versions that are not stored strategy versions, in one read; empty when all are stored.</summary>
+    ValueTask<IReadOnlyList<string>> UnknownVersionsAsync(IReadOnlyList<string> versions, CancellationToken cancellationToken);
 
     /// <summary>Stores an owner set (and registers its versions in the trial ledger) in one transaction; false and nothing stored when the epoch already has a shadow row.</summary>
     ValueTask<bool> ReplaceAsync(NewEvidenceSet set, CancellationToken cancellationToken);

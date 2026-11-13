@@ -13,6 +13,8 @@ const stateText: Record<string, string> = {
 /** Who or what fixed the set, in words: the default rule (system:default) is never shown as an owner decision. */
 function setOrigin(set: EvidenceSet): string {
   if (set.mode === 'auto') return 'System default (the versions of the eligible cells, registered automatically)';
+  if (set.mode === 'backfill')
+    return 'Migration backfill (the versions of rows already stored; NOT pre-registered, not chosen before their results)';
   if (set.mode === 'owner') return `Owner (${set.actor ?? 'unknown'})`;
   return 'Not fixed yet: the first shadow write of the epoch registers the default';
 }

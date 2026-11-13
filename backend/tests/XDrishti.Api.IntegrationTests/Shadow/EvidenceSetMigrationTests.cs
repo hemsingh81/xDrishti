@@ -87,7 +87,9 @@ public sealed class EvidenceSetMigrationTests(ApiFactory factory)
         await migrator.MigrateAsync(null, Ct);
 
         (await CountAsync(connection, "SELECT count(*) FROM paper.shadow_settings WHERE actor = 'system:default'")).ShouldBe(0, "the owner's OFF row stays the only row");
-        (await CountAsync(connection, "SELECT count(*) FROM paper.evidence_sets WHERE edge_epoch = 0 AND mode = 'auto' AND versions = to_jsonb(ARRAY[repeat('f', 64)]) AND first_write_at IS NOT NULL")).ShouldBe(1, "the epoch that holds rows keeps counting them");
+        (await CountAsync(connection, "SELECT count(*) FROM paper.evidence_sets WHERE edge_epoch = 0 AND mode = 'backfill' AND actor = 'system:migration' AND reason LIKE '%not pre-registered' AND versions = to_jsonb(ARRAY[repeat('f', 64)]) AND first_write_at IS NULL")).ShouldBe(1, "the epoch that holds rows keeps counting them, labelled a backfill and not a pre-registration");
+        var refused = await Should.ThrowAsync<PostgresException>(() => RunAsync(connection, "INSERT INTO paper.evidence_sets (edge_epoch, versions, set_hash, mode, actor, reason) VALUES (5, to_jsonb(ARRAY[repeat('f', 64)]), repeat('d', 64), 'backfill', 'system:migration', 'AM-01b backfill: every version written before evidence sets existed; not pre-registered')"));
+        refused.SqlState.ShouldBe("23514", "a backfill set is written by the migration only");
         scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>().Database.HasPendingModelChanges().ShouldBeFalse();
     }
 }

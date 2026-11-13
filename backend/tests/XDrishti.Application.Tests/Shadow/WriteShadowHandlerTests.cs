@@ -8,6 +8,7 @@ using XDrishti.Application.Abstractions.Shadow;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Shadow;
 using XDrishti.Domain.Market.Calendar;
+using XDrishti.Domain.Paper;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Shadow;
 using static XDrishti.Application.Tests.Shadow.ShadowFixture;
@@ -33,7 +34,9 @@ public sealed class WriteShadowHandlerTests
 
     private readonly IEvidenceSetStore _sets = Substitute.For<IEvidenceSetStore>();
 
-    private static readonly string Eligible = "{\"cells.eligible/" + Intraday + "\":\"" + Hash + "\"}";
+    private readonly IConfigSnapshotSource _config = Substitute.For<IConfigSnapshotSource>();
+
+    private static ConfigReading Eligible => new([new ConfigComponent("cells.eligible/" + Intraday, Hash)], []);
 
     private static StoredSnapshot Snapshot(string components) => new(1, DateTimeOffset.UnixEpoch, Monday, new string('f', 64), components, false);
 
@@ -50,14 +53,15 @@ public sealed class WriteShadowHandlerTests
         _settings.IsEnabledAsync(Ct).Returns(true);
         _calendar.GetAsync(Ct).Returns(new TradingCalendar());
         _paper.CurrentEpochAsync(Ct).Returns(new EpochRow(3, new DateOnly(2026, 10, 1), DateTimeOffset.UnixEpoch, "first", "default", "system"));
-        _governance.LatestSnapshotAsync(true, Ct).Returns(Snapshot(Eligible));
+        _governance.LatestSnapshotAsync(true, Ct).Returns(Snapshot("{}"));
+        _config.ReadAsync(Ct).Returns(Eligible);
         _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns([Plan(10, Tuesday)]);
         _plans.ListAsync(Tuesday, null, Arg.Any<int>(), Ct).Returns([Plan(10, Tuesday)]);
     }
 
     private ShadowScorer _scorer = ShadowScorerFake.Empty();
 
-    private WriteShadowHandler Handler() => new(_settings, _plans, _store, _sets, _paper, _governance, _calendar, _scorer, new ShadowOptions(), _time, NullLogger<WriteShadowHandler>.Instance);
+    private WriteShadowHandler Handler() => new(_settings, _plans, _store, _sets, _paper, _governance, _config, _calendar, _scorer, new ShadowOptions(), _time, NullLogger<WriteShadowHandler>.Instance);
 
     private void Items(long planId, params NewPlanItem[] items) =>
         _plans.ItemsAsync(planId, Ct).Returns([.. items.Select((item, i) => Row(100 + i, planId, item))]);
@@ -389,13 +393,44 @@ public sealed class WriteShadowHandlerTests
         _store.Sessions.Single().EvidenceSet.ShouldBeNull();
     }
 
-    [Theory]
-    [InlineData("{}")] // no eligible cell
-    [InlineData("{\"cells.eligible/ORB|15m|BUY|intraday|FIXED_RR{rr=2}|*\":\"unknown\"}")] // an unresolved version never joins the set
-    [InlineData("not json")]
-    public async Task With_no_set_stored_and_none_nameable_nothing_is_written_and_it_is_said(string components)
+    [Fact]
+    public async Task With_no_stored_snapshot_at_all_the_set_is_still_registered_from_the_fresh_reading()
     {
-        _governance.LatestSnapshotAsync(true, Ct).Returns(Snapshot(components));
+        _governance.LatestSnapshotAsync(true, Ct).Returns((StoredSnapshot?)null); // no paper account has ever captured, so no full snapshot exists
+        TheNightlyPlan();
+
+        var outcome = await RunAsync();
+
+        outcome.EvidenceSetMissing.ShouldBeFalse();
+        _store.Sessions.Single().EvidenceSet.ShouldNotBeNull().Versions.ShouldBe([Hash]);
+    }
+
+    [Fact]
+    public async Task Two_unopened_sessions_store_the_set_only_with_the_first()
+    {
+        _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns([Plan(10, Tuesday), Plan(11, Tuesday.AddDays(1))]);
+        _plans.ListAsync(Tuesday.AddDays(1), null, Arg.Any<int>(), Ct).Returns([Plan(11, Tuesday.AddDays(1))]);
+        TheNightlyPlan();
+        Items(11, Item(1, TicketGroup.Primary, "NSE:W1"));
+
+        var outcome = await RunAsync();
+
+        outcome.Sessions.ShouldBe(2);
+        _store.Sessions.Select(s => s.EvidenceSet is not null).ShouldBe([true, false]);
+    }
+
+    public static TheoryData<IReadOnlyList<ConfigComponent>, IReadOnlyList<string>> NothingNameable => new()
+    {
+        { [], [] }, // no eligible cell
+        { [new ConfigComponent("cells.eligible/" + Intraday, "unknown")], [] }, // an unresolved version never joins the set
+        { [new ConfigComponent("cells.eligible/" + Intraday, Hash)], ["cells"] }, // a partial reading is never trusted
+    };
+
+    [Theory]
+    [MemberData(nameof(NothingNameable))]
+    public async Task With_no_set_stored_and_none_nameable_nothing_is_written_and_it_is_said(IReadOnlyList<ConfigComponent> components, IReadOnlyList<string> unreadable)
+    {
+        _config.ReadAsync(Ct).Returns(new ConfigReading(components, unreadable));
         TheNightlyPlan();
 
         var outcome = await RunAsync();
@@ -407,17 +442,6 @@ public sealed class WriteShadowHandlerTests
         _store.WriteCalls.ShouldBe(0);
     }
 
-    [Fact]
-    public async Task With_no_snapshot_and_no_set_nothing_is_written()
-    {
-        _governance.LatestSnapshotAsync(true, Ct).Returns((StoredSnapshot?)null);
-        TheNightlyPlan();
-
-        var outcome = await RunAsync();
-
-        outcome.EvidenceSetMissing.ShouldBeTrue();
-        _store.WriteCalls.ShouldBe(0);
-    }
 
     [Fact]
     public async Task With_the_switch_off_nothing_is_read_or_written()
@@ -496,7 +520,8 @@ public sealed class WriteShadowHandlerTests
         _settings.IsEnabledAsync(Arg.Any<CancellationToken>()).Returns(true);
         _calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new TradingCalendar());
         _paper.CurrentEpochAsync(Arg.Any<CancellationToken>()).Returns(new EpochRow(3, new DateOnly(2026, 10, 1), DateTimeOffset.UnixEpoch, "first", "default", "system"));
-        _governance.LatestSnapshotAsync(true, Arg.Any<CancellationToken>()).Returns(Snapshot(Eligible));
+        _governance.LatestSnapshotAsync(true, Arg.Any<CancellationToken>()).Returns(Snapshot("{}"));
+        _config.ReadAsync(Arg.Any<CancellationToken>()).Returns(Eligible);
         _plans.ListAsync(null, null, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([Plan(10, Tuesday)]);
         _plans.ListAsync(Tuesday, null, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([Plan(10, Tuesday)]);
         _plans.ItemsAsync(10, Arg.Any<CancellationToken>()).Returns([.. new[] { Item(1, TicketGroup.Primary, "NSE:P1") }.Select((item, i) => Row(100 + i, 10, item))]);
