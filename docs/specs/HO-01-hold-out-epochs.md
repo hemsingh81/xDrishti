@@ -202,3 +202,11 @@ Block 2 seals when the session of 2027-05-04 closes. Looks at block 2:
 6. Row 12 reads the newest fresh look, and a later fail beats an earlier pass? **Yes**, and the ML gate reads its model the same way (D8).
 7. Keep block 1 exactly as stored, never re-cut? **Yes.**
 8. The forward-basis cell series (D9) as a later, separate spec? **Yes, defer.**
+
+## As built, HO-01b (2026-11-13)
+Built on branch feature/ho-01b (on top of feature/ho-01a). See [ADR 0283](../adr/0283-the-hold-out-is-a-chain-of-fixed-blocks-released-by-an-owner-act-or-the-auto-option-and-every-cut-follows-the-block-in-force.md), *Amendment, HO-01b*.
+- AC 6, 8, 9: the horizon (`HoldOutHorizon`), the per-kind index and per-block version key, the model reading across blocks, the seal strategy look and row 12 are tested with fakes (`HoldOutSealTests`, `ModelHoldOutLooksTests`, `ScorecardReaderTests`) and against the database (`WidenHoldOutLooksMigrationTests`).
+- AC 7: the auto release is tested through the real strategy slot; the model and system "free slot with an eligible subject" cases are for CF-10e part 3 and SR-03.
+- AC 10: the per-row label is stored on `research.cell_stats.seen_holdout`; serving it in the cell views is not done.
+- `GET /api/lab/holdout` takes no parameter; the query object has an internal `Slots` flag so that the scorecard skips the candidate scan.
+- Service order of the list (`GET /api/services`): `holdout-epochs` follows `ml-monitor`.

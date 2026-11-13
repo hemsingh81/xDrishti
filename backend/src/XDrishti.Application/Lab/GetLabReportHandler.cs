@@ -55,7 +55,7 @@ internal sealed class GetLabReportHandler(
             ? new ReportRegistrationView("not_registered", enforceRegistration, null, "No pre-registration was written for this version: the row reads fail" + (enforceRegistration ? "." : " and nothing is refused until the owner turns enforcement on."))
             : new ReportRegistrationView("registered", enforceRegistration, RegisterStrategyHandler.ViewOf(stored), "Registered before the data was searched; the text is frozen.");
         var block = await holdOuts.CurrentAsync(cancellationToken);
-        var unlock = await holdOuts.GetUnlockAsync(run.StrategyId, run.Version, HoldOutUnlocker.StrategyKind, cancellationToken);
+        var unlock = await holdOuts.NewestUnlockAsync(run.StrategyId, run.Version, HoldOutUnlocker.StrategyKind, cancellationToken);
         var reaches = block is not null && run.To >= block.Start;
         var enforceHoldOut = holdOutOptions?.Enforce ?? false;
         var holdOut = unlock is not null

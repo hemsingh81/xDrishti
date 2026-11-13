@@ -5,7 +5,7 @@ namespace XDrishti.Domain.Confidence;
 /// <summary>
 /// The <c>Confidence:HoldOut</c> settings of CF-06 (ADR 0207); every number is a proposal of the spec (D4, D5), a setting and not a constant.
 /// </summary>
-/// <param name="Enforce">The owner's switch (default false). The block is fixed at the first Lab post and a default window always ends before it. Off, an explicit window may reach the hold-out and a missing hold-out caps nothing; on, such a window is refused, and a full or robust PASS without a kept hold-out is capped at MARGINAL.</param>
+/// <param name="Enforce">The owner's switch (default true since HO-01b, ADR 0282 and 0283). The block is fixed at the first Lab post and a default window always ends before it. Off, an explicit window may reach the hold-out and a missing hold-out caps nothing; on, such a window is refused, and a full or robust PASS without a kept hold-out is capped at MARGINAL.</param>
 /// <param name="AutoUnlock">The auto option (default true, ADR 0282): on, the unlock runs once by itself when every development row is a pass; recorded as auto, never as an owner approval. It never claims block 1 of the chain (HO-01): that look stays the owner's act.</param>
 /// <param name="MinMonths">Shortest hold-out in months (default 6; 1..60).</param>
 /// <param name="SharePercent">Share of the stored history kept (default 20; 5..50).</param>
@@ -14,7 +14,7 @@ namespace XDrishti.Domain.Confidence;
 /// <param name="TrainingEmbargoDays">Calendar days left empty between the end of a training window and the hold-out start (default 30; 28..180; ADR 0243, AU-11): a trade held across the cut, or a feature built on a trailing window, must not carry hold-out information into training. The longest holding period a strategy may declare is 20 sessions (about 28 calendar days), and the embargo of purged cross-validation is at least the label horizon, so 30 days is the shortest safe default. Not part of <see cref="KeyText"/>: it does not size the hold-out.</param>
 /// <param name="BlockMonths">Length in months of every block after the first, read when that block is stored (default 6; 3..12; HO-01, ADR 0283). A stored block never changes.</param>
 /// <param name="AutoRelease">The auto release (default true, ADR 0282): a sealed block that has a fresh look and no look still available is released by itself, recorded as auto with the setting snapshot. An unlooked block is never released automatically.</param>
-public sealed record HoldOutOptions(bool Enforce = false, bool AutoUnlock = true, int MinMonths = 6, double SharePercent = 20, int MinTrades = 30, double Retention = 0.5, int TrainingEmbargoDays = 30, int BlockMonths = 6, bool AutoRelease = true)
+public sealed record HoldOutOptions(bool Enforce = true, bool AutoUnlock = true, int MinMonths = 6, double SharePercent = 20, int MinTrades = 30, double Retention = 0.5, int TrainingEmbargoDays = 30, int BlockMonths = 6, bool AutoRelease = true)
 {
     /// <summary>The last date a training window (or a refreshed run) may reach: the day before the hold-out start less the embargo. The one formula of the training store, the training window and the cell-statistics refresh.</summary>
     public static DateOnly TrainingCut(DateOnly blockStart, int embargoDays) => blockStart.AddDays(-1 - embargoDays);

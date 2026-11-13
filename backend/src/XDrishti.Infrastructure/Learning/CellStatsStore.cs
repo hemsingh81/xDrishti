@@ -57,11 +57,11 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
                 INSERT INTO research.cell_stats (snapshot_key, as_of, cell_key, strategy, timeframe, side, style, exit_policy, regime, window_code, costed, n, wins, effective_n, win_rate_raw, prior_rate, win_rate_posterior,
                     win_rate_lower, win_rate_upper, avg_win_r, avg_loss_r, expectancy_r, profit_factor, max_drawdown_r, mae_p50, mae_p90, mfe_p50, mfe_p90, enough, half_life_days, prior_strength, min_trades, credible_level,
                     sources, created_at, created_by, n_eff, design_effect, n_eff_method, needed_trades, min_detectable_edge_r, min_trl, enough_by_n_eff, span_years, n_eff_mode, n_eff_note, target_edge_r,
-                    parent_level, parent_mean_r, tau_squared, blend, shrunk_mean_r, shrunk_lower_r, estimated_strength, shrunk_win_rate, tau_source, strength_source, shrink_n, shrink_mode, shrink_note, universe_verdict, universe_first_n, universe_second_n)
+                    parent_level, parent_mean_r, tau_squared, blend, shrunk_mean_r, shrunk_lower_r, estimated_strength, shrunk_win_rate, tau_source, strength_source, shrink_n, shrink_mode, shrink_note, universe_verdict, universe_first_n, universe_second_n, seen_holdout)
                 VALUES (@snapshot_key, @as_of, @cell_key, @strategy, @timeframe, @side, @style, @exit, @regime, @window, @costed, @n, @wins, @effective_n, @raw, @prior, @posterior,
                     @lower, @upper, @avg_win, @avg_loss, @expectancy, @pf, @dd, @mae50, @mae90, @mfe50, @mfe90, @enough, @half_life, @strength, @min_trades, @level,
                     @sources, @created_at, @created_by, @n_eff, @design_effect, @n_eff_method, @needed_trades, @min_detectable_edge_r, @min_trl, @enough_by_n_eff, @span_years, @n_eff_mode, @n_eff_note, @target_edge_r,
-                    @parent_level, @parent_mean_r, @tau_squared, @blend, @shrunk_mean_r, @shrunk_lower_r, @estimated_strength, @shrunk_win_rate, @tau_source, @strength_source, @shrink_n, @shrink_mode, @shrink_note, @universe_verdict, @universe_first_n, @universe_second_n)
+                    @parent_level, @parent_mean_r, @tau_squared, @blend, @shrunk_mean_r, @shrunk_lower_r, @estimated_strength, @shrunk_win_rate, @tau_source, @strength_source, @shrink_n, @shrink_mode, @shrink_note, @universe_verdict, @universe_first_n, @universe_second_n, @seen_holdout)
                 ON CONFLICT (snapshot_key, cell_key, window_code) DO NOTHING
                 """, connection, transaction);
             var p = insert.Parameters;
@@ -131,6 +131,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
             Text(p, "universe_verdict", uh?.Verdict);
             p.AddWithValue("universe_first_n", NpgsqlDbType.Integer, uh is null ? DBNull.Value : (object)uh.FirstN);
             p.AddWithValue("universe_second_n", NpgsqlDbType.Integer, uh is null ? DBNull.Value : (object)uh.SecondN);
+            Text(p, "seen_holdout",snapshot.SeenHoldOut is { } seen && seen.TryGetValue(row.Cell.Key, out var label) ? label : null);
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 

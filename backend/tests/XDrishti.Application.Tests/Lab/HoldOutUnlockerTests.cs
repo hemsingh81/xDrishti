@@ -498,14 +498,14 @@ public sealed class HoldOutUnlockerTests
     [Fact]
     public async Task The_hold_out_view_shows_the_proposal_before_a_block_exists_and_numbers_only_in_a_look_that_was_taken()
     {
-        var handler = new GetHoldOutHandler(_store, new LabHoldOutGuard(_store, _bars, new HoldOutOptions(), _time), new HoldOutOptions(), new HoldOutEpochs(_store, new FixedCalendar(), _time));
+        var handler = new GetHoldOutHandler(_store, new LabHoldOutGuard(_store, _bars, new HoldOutOptions(), _time), new HoldOutOptions(), new HoldOutEpochs(_store, new FixedCalendar(), _time), new HoldOutReleaser(new HoldOutEpochs(_store, new FixedCalendar(), _time), _store, [], new HoldOutOptions(), _time, _events, _unitOfWork, NullLogger<HoldOutReleaser>.Instance));
 
         var before = (await handler.HandleAsync(new GetHoldOutQuery(), Ct)).Value;
 
         before.Block.ShouldBeNull();
         before.Proposed.ShouldNotBeNull().Start.ShouldBe(new DateOnly(2026, 5, 1));
         before.Unlocks.ShouldBeEmpty();
-        before.Enforce.ShouldBeFalse();
+        before.Enforce.ShouldBeTrue("HO-01b: the default is ON (ADR 0282)");
         _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
         await Unlocker().UnlockAsync(Run().Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
 
@@ -539,7 +539,7 @@ public sealed class HoldOutUnlockerTests
     }
 }
 
-/// <summary>An in-memory hold-out store with the same uniqueness as the tables.</summary>
+/// <summary>An in-memory hold-out store with the same uniqueness as the tables: one look per (id, version, kind, block) and one fresh look per block and kind.</summary>
 internal sealed class MemoryHoldOutStore : IHoldOutStore
 {
     public List<HoldOutBlock> Blocks { get; } = [];
@@ -587,21 +587,34 @@ internal sealed class MemoryHoldOutStore : IHoldOutStore
         return ValueTask.FromResult(true);
     }
 
-    public ValueTask<StoredUnlock?> GetUnlockAsync(string strategyId, int version, string kind, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(Unlocks.FirstOrDefault(u => u.StrategyId == strategyId && u.Version == version && u.Kind == kind));
+    public ValueTask<StoredUnlock?> GetUnlockAsync(string strategyId, int version, string kind, DateOnly blockStart, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Unlocks.FirstOrDefault(u => u.StrategyId == strategyId && u.Version == version && u.Kind == kind && u.BlockStart == blockStart));
+
+    public ValueTask<StoredUnlock?> NewestUnlockAsync(string strategyId, int version, string kind, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Unlocks.Where(u => u.StrategyId == strategyId && u.Version == version && u.Kind == kind).OrderBy(u => u.ReusedWindow).ThenByDescending(u => u.UnlockedAt).FirstOrDefault());
 
     /// <summary>Set to make the read before the insert miss a look that lands at the same moment (the race the partial unique index closes).</summary>
     public bool HideLooksFromAny { get; set; }
 
-    public ValueTask<bool> AnyUnlockAsync(DateOnly blockStart, CancellationToken cancellationToken) => ValueTask.FromResult(!HideLooksFromAny && Unlocks.Any(u => u.BlockStart == blockStart));
+    public ValueTask<bool> HasFreshLookAsync(DateOnly blockStart, string kind, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(!HideLooksFromAny && Unlocks.Any(u => u.BlockStart == blockStart && u.Kind == kind && !u.ReusedWindow));
+
+    public ValueTask<IReadOnlyList<StoredUnlock>> ListFreshLooksAsync(DateOnly blockStart, CancellationToken cancellationToken) =>
+        Failing ? throw new InvalidOperationException("unavailable") : ValueTask.FromResult<IReadOnlyList<StoredUnlock>>([.. Unlocks.Where(u => u.BlockStart == blockStart && !u.ReusedWindow)]);
+
+    public ValueTask<DateTimeOffset?> FirstLookAtAsync(DateOnly blockStart, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Unlocks.Where(u => u.BlockStart == blockStart).Select(u => (DateTimeOffset?)u.UnlockedAt).Min());
+
+    public ValueTask<IReadOnlyList<StoredUnlock>> ListUnlocksByIdPrefixAsync(string kind, string idPrefix, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<StoredUnlock>>([.. Unlocks.Where(u => u.Kind == kind && u.StrategyId.StartsWith(idPrefix, StringComparison.Ordinal)).OrderByDescending(u => u.BlockStart)]);
 
     public ValueTask<IReadOnlyList<StoredUnlock>> ListUnlocksAsync(int limit, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<StoredUnlock>>([.. Unlocks.AsEnumerable().Reverse().Take(limit)]);
 
     public ValueTask<bool> InsertUnlockAsync(StoredUnlock unlock, CancellationToken cancellationToken)
     {
-        if (Unlocks.Any(u => u.StrategyId == unlock.StrategyId && u.Version == unlock.Version && u.Kind == unlock.Kind)
-            || (!unlock.ReusedWindow && Unlocks.Any(u => u.BlockStart == unlock.BlockStart && !u.ReusedWindow)))
+        if (Unlocks.Any(u => u.StrategyId == unlock.StrategyId && u.Version == unlock.Version && u.Kind == unlock.Kind && u.BlockStart == unlock.BlockStart)
+            || (!unlock.ReusedWindow && Unlocks.Any(u => u.BlockStart == unlock.BlockStart && u.Kind == unlock.Kind && !u.ReusedWindow)))
         {
             return ValueTask.FromResult(false);
         }

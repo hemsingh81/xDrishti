@@ -580,6 +580,24 @@ public sealed class ScorecardReaderTests
     }
 
     [Fact]
+    public async Task Row_twelve_reads_the_newest_fresh_look_so_a_later_fail_beats_an_earlier_pass_and_a_newer_re_used_look_hides_nothing()
+    {
+        var f = new ReadinessFixture();
+        var pass = f.HoldOutResults[0] with { UnlockedAt = DateTimeOffset.UnixEpoch.AddDays(1) };
+        var laterFail = pass with { UnlockedAt = DateTimeOffset.UnixEpoch.AddDays(200), Passed = false, Status = "fail", Reason = "block 2 failed" };
+        var newerReused = pass with { UnlockedAt = DateTimeOffset.UnixEpoch.AddDays(300), Passed = false, ReusedWindow = true, ReusedReason = "not_predated" };
+
+        f.HoldOutResults = [pass, laterFail];
+        var failCard = await CardAsync(f);
+        f.HoldOutResults = [pass, newerReused];
+        var passCard = await CardAsync(f);
+
+        Status(failCard, 12).ShouldBe("fail");
+        failCard.Rows.Single(r => r.Number == 12).Value.ShouldContain("block 2 failed");
+        Status(passCard, 12).ShouldBe("pass");
+    }
+
+    [Fact]
     public async Task A_producer_that_judged_fail_is_taken_at_its_word()
     {
         var f = new ReadinessFixture();

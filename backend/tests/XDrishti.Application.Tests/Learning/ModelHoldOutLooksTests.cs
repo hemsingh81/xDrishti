@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Time.Testing;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Domain.Common;
@@ -114,7 +115,7 @@ public sealed class ModelHoldOutLooksTests
     }
 
     [Fact]
-    public async Task A_strategys_fresh_look_at_the_block_makes_a_models_first_look_a_reused_window()
+    public async Task A_strategys_fresh_look_at_the_block_does_not_burn_the_models_slot_when_the_model_was_registered_before_it()
     {
         var (looks, store) = Make(Block());
         store.Unlocks.Add(new StoredUnlock("ORB", 1, "strategy", "owner", "owner", _time.GetUtcNow(), Hash, false, BlockStart, Guid.NewGuid(), null!));
@@ -122,8 +123,41 @@ public sealed class ModelHoldOutLooksTests
 
         var claim = await looks.ClaimAsync(model, "owner", "owner", Hash, Ct);
 
+        claim.Value.ReusedWindow.ShouldBeFalse("one fresh look per kind (HO-01 D5)");
+        claim.Value.Reason.ShouldBeNull();
+        (await looks.ReadAsync(model, Ct)).State.ShouldBe("used");
+    }
+
+    [Fact]
+    public async Task At_block_one_a_model_registered_after_the_first_look_is_stored_not_predated_and_cannot_count()
+    {
+        var (looks, store) = Make(Block());
+        store.Unlocks.Add(new StoredUnlock("ORB", 1, "strategy", "owner", "owner", DateTimeOffset.UnixEpoch.AddDays(1), Hash, false, BlockStart, Guid.NewGuid(), null!));
+        var model = Model(registeredAt: DateTimeOffset.UnixEpoch.AddDays(2));
+
+        var claim = await looks.ClaimAsync(model, "owner", "owner", Hash, Ct);
+        var reading = await looks.ReadAsync(model, Ct);
+
         claim.Value.ReusedWindow.ShouldBeTrue();
-        (await looks.ReadAsync(model, Ct)).Facts!.Reused.ShouldBeTrue();
+        claim.Value.Reason.ShouldBe("not_predated");
+        claim.Value.Result.ReusedReason.ShouldBe("not_predated");
+        reading.State.ShouldBe("reused");
+    }
+
+    [Fact]
+    public async Task At_a_later_block_a_model_registered_on_or_after_its_start_is_not_predated_and_one_registered_before_is_fresh()
+    {
+        var later = new DateOnly(2026, 11, 1);
+        var (looks, store) = Make(Block(later) with { PrevStart = BlockStart });
+        var late = Model(7, hash: 'e', registeredAt: new DateTimeOffset(2026, 11, 1, 3, 0, 0, TimeSpan.Zero)); // 08:30 India time on the start date
+        var early = Model(8, featureVersion: "tf-2", hash: 'b', registeredAt: new DateTimeOffset(2026, 10, 31, 9, 0, 0, TimeSpan.Zero));
+
+        var lateClaim = await looks.ClaimAsync(late, "owner", "owner", Hash, Ct);
+        var earlyClaim = await looks.ClaimAsync(early, "owner", "owner", Hash, Ct);
+
+        (lateClaim.Value.ReusedWindow, lateClaim.Value.Reason).ShouldBe((true, "not_predated"));
+        (earlyClaim.Value.ReusedWindow, earlyClaim.Value.Reason).ShouldBe((false, null), "a not-predated look burns no slot");
+        store.Unlocks.Count.ShouldBe(2);
     }
 
     [Fact]
@@ -194,37 +228,75 @@ public sealed class ModelHoldOutLooksTests
     }
 
     [Fact]
-    public async Task When_the_owner_advances_the_block_the_family_gets_a_fresh_look_and_the_old_look_no_longer_counts()
+    public async Task When_the_block_advances_the_family_gets_a_fresh_look_and_the_model_still_reads_its_look_at_the_old_block()
     {
         var (looks, store) = Make(Block());
         var model = Model(holdOutStart: new DateOnly(2026, 1, 1));
         await looks.ClaimAsync(model, "owner", "owner", Hash, Ct);
-        var later = new DateOnly(2026, 11, 1); // a new, non-overlapping block: it starts after the old one (2026-05-01, six months) ends
-        store.Block = Block(later);
+        var later = new DateOnly(2026, 11, 1); // the next block of the chain: it starts after the old one ends
+        store.Block = Block(later) with { PrevStart = BlockStart };
 
         var before = await looks.ReadAsync(model, Ct);
         var claim = await looks.ClaimAsync(Model(9, hash: 'b', holdOutStart: new DateOnly(2026, 1, 1)), "owner", "owner", Hash, Ct);
 
-        before.State.ShouldBe("kept", "the look at the old block is not the look at the current one");
+        before.State.ShouldBe("used", "HO-01 D8: a release does not erase the model's hold-out figures");
+        before.BlockStart.ShouldBe(BlockStart);
         claim.IsSuccess.ShouldBeTrue();
         claim.Value.StrategyId.ShouldBe("model-family:tf-1@2026-11-01");
         claim.Value.ReusedWindow.ShouldBeFalse("the old look burned only the old block; nobody has looked at the new one");
     }
 
     [Fact]
-    public async Task A_fresh_place_taken_between_the_read_and_the_insert_stores_the_claim_as_a_reused_window()
+    public async Task The_model_reads_its_newest_fresh_look_across_blocks_so_a_later_fail_beats_an_earlier_pass()
+    {
+        var later = new DateOnly(2026, 11, 1);
+        var (looks, store) = Make(Block(later) with { PrevStart = BlockStart });
+        var model = Model(holdOutStart: new DateOnly(2026, 1, 1));
+        store.Unlocks.Add(LookRow(model, BlockStart, passed: true));
+        store.Unlocks.Add(LookRow(model, later, passed: false));
+
+        var reading = await looks.ReadAsync(model, Ct);
+
+        reading.State.ShouldBe("used");
+        reading.BlockStart.ShouldBe(later);
+        reading.Look.ShouldNotBeNull().Result.Passed.ShouldBeFalse("the newest fresh look is the one read");
+    }
+
+    [Fact]
+    public async Task A_re_used_look_never_hides_an_earlier_fresh_one()
+    {
+        var later = new DateOnly(2026, 11, 1);
+        var (looks, store) = Make(Block(later) with { PrevStart = BlockStart });
+        var model = Model(holdOutStart: new DateOnly(2026, 1, 1));
+        store.Unlocks.Add(LookRow(model, BlockStart, passed: true));
+        store.Unlocks.Add(LookRow(model, later, passed: false, reused: true));
+
+        var reading = await looks.ReadAsync(model, Ct);
+
+        reading.State.ShouldBe("used");
+        reading.BlockStart.ShouldBe(BlockStart);
+    }
+
+    private StoredUnlock LookRow(StoredModel model, DateOnly block, bool passed, bool reused = false)
+    {
+        var view = new HoldOutResultView("x", 1, "model", "owner", reused ? "reused" : "used", _time.GetUtcNow(), block, block, reused, false, passed, passed ? "pass" : "fail", "r", null, null, null, 0, null, Hash, "o", []);
+        return new StoredUnlock(ModelHoldOutLooks.LookKey(model.Model, block), 1, "model", "owner", "o", _time.GetUtcNow(), Hash, reused, block, ModelHoldOutLooks.LookId(model.Model), view);
+    }
+
+    [Fact]
+    public async Task A_model_slot_taken_between_the_read_and_the_insert_stores_the_claim_as_a_reused_window()
     {
         var (looks, store) = Make(Block());
         store.AfterAnyUnlock = () =>
         {
             store.AfterAnyUnlock = null;
-            store.Unlocks.Add(new StoredUnlock("ORB", 1, "strategy", "owner", "o", _time.GetUtcNow(), Hash, false, BlockStart, Guid.NewGuid(), null!));
+            store.Unlocks.Add(new StoredUnlock("model-family:tf-2@2026-05-01", 1, "model", "owner", "o", _time.GetUtcNow(), Hash, false, BlockStart, Guid.NewGuid(), null!));
         };
 
         var claim = await looks.ClaimAsync(Model(), "owner", "owner", Hash, Ct);
 
         claim.IsSuccess.ShouldBeTrue();
-        claim.Value.ReusedWindow.ShouldBeTrue("the block's one fresh look went to the other look");
+        claim.Value.ReusedWindow.ShouldBeTrue("the block's model slot went to the other look");
         store.Unlocks.Count.ShouldBe(2);
     }
 

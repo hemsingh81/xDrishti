@@ -20,6 +20,9 @@ internal static class HoldOutJob
 
     public static bool Is(LabRun run) => string.Equals(run.Method, Method, StringComparison.Ordinal);
 
+    /// <summary>The mode a job's look is recorded with: <c>auto</c> for an actor that is a system actor (<c>system:auto-unlock</c>), else <c>owner</c>. The password check of the owner act happens at the endpoint, so a system actor is only ever written by the seal step.</summary>
+    public static string ModeOf(string actor) => actor.StartsWith("system:", StringComparison.Ordinal) ? HoldOutUnlocker.AutoMode : HoldOutUnlocker.OwnerMode;
+
     public static string KeyOf(Guid runId) => LabRunIdentity.Sha256(string.Create(CultureInfo.InvariantCulture, $"holdout|{runId:D}"));
 
     public static string ConfigHash { get; } = LabRunIdentity.Sha256("holdout");

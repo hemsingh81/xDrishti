@@ -45111,10 +45111,14 @@
               "string"
             ]
           },
-          "freshLook": {
-            "type": [
-              "null",
-              "boolean"
+          "looks": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/HoldOutLooksView"
+              }
             ]
           },
           "releasedAt": {
@@ -45129,9 +45133,78 @@
               "null",
               "string"
             ]
+          },
+          "blockedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "A block of the hold-out chain as served (HO-01): `HistoryLast` is its last date. `State` is `filling`, `sealed`, `looked` or `released`; `FreshLook` says whether a fresh look was taken (for a released block, whether it had one when\nreleased); `ReleasedAt` and `Mode` (`owner` or `auto`) are set once it is released."
+        "description": "A block of the hold-out chain as served (HO-01): `HistoryLast` is its last date. `State` is `filling`, `sealed`, `looked` or `released`; `Looks` holds the three looks (strategy, model, system); `BlockedBy` names what keeps the block in force from being released by the auto option (set for the block in force only);\n`ReleasedAt` and `Mode` (`owner` or `auto`) are set once it is released."
+      },
+      "HoldOutLookView": {
+        "required": [
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "subject": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "passed": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "mode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One kind's look at a block: `State` is `fresh` (the slot is taken, with its subject, verdict and mode), `available` (free, an eligible subject exists), `no_subject` (free, none exists or the kind's path is not built), `unavailable` (the read failed)\nor `none` (not read: the block is released without a look of this kind, or not in force)."
+      },
+      "HoldOutLooksView": {
+        "required": [
+          "strategy",
+          "model",
+          "system"
+        ],
+        "type": "object",
+        "properties": {
+          "strategy": {
+            "$ref": "#/components/schemas/HoldOutLookView"
+          },
+          "model": {
+            "$ref": "#/components/schemas/HoldOutLookView"
+          },
+          "system": {
+            "$ref": "#/components/schemas/HoldOutLookView"
+          }
+        },
+        "description": "The three looks of a block (HO-01 D5): one per kind."
       },
       "HoldOutPlanView": {
         "required": [
@@ -45300,9 +45373,15 @@
             "items": {
               "type": "string"
             }
+          },
+          "reusedReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "What the one look at the hold-out said, as served and as stored (spec CF-06, D5). `State` is `used` (the first look at the block) or `reused` (a later look: the numbers are shown, the result counts as a trial and cannot count toward a pass).\n`Mode` is `owner` or `auto` (the auto option, recorded as auto and never as an owner approval). `RunSawHoldOut` is true when the run the plan came from had a window reaching into the block: such a look is never a pass."
+        "description": "What the one look at the hold-out said, as served and as stored (spec CF-06, D5). `State` is `used` (the first look at the block) or `reused` (a later look: the numbers are shown, the result counts as a trial and cannot count toward a pass).\n`Mode` is `owner` or `auto` (the auto option, recorded as auto and never as an owner approval). `ReusedReason` is `not_predated` when the look was stored re-used because its subject was not frozen before the block's horizon (HO-01 D5). `RunSawHoldOut` is true when the run the plan came from had a window reaching into the block: such a look is never a pass."
       },
       "HoldOutUnlockRequest": {
         "type": "object",

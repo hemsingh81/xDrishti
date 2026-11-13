@@ -74,7 +74,7 @@ public sealed class HoldOutPolicyTests
     {
         var o = new HoldOutOptions();
 
-        (o.Enforce, o.AutoUnlock, o.MinMonths, o.SharePercent, o.MinTrades, o.Retention).ShouldBe((false, true, 6, 20.0, 30, 0.5)); // AutoUnlock defaults ON (ADR 0282)
+        (o.Enforce, o.AutoUnlock, o.MinMonths, o.SharePercent, o.MinTrades, o.Retention).ShouldBe((true, true, 6, 20.0, 30, 0.5)); // Enforce and AutoUnlock default ON (ADR 0282)
         o.Problems().ShouldBeEmpty();
         new HoldOutOptions(MinMonths: 0).Problems().ShouldNotBeEmpty();
         new HoldOutOptions(SharePercent: 4).Problems().ShouldNotBeEmpty();
@@ -89,7 +89,7 @@ public sealed class HoldOutPolicyTests
         var a = new HoldOutOptions().SnapshotHash();
 
         a.Length.ShouldBe(64);
-        new HoldOutOptions(Enforce: true).SnapshotHash().ShouldNotBe(a);
+        new HoldOutOptions(Enforce: false).SnapshotHash().ShouldNotBe(a);
         new HoldOutOptions(AutoUnlock: false).SnapshotHash().ShouldNotBe(a);
         new HoldOutOptions(AutoRelease: false).SnapshotHash().ShouldNotBe(a);
         new HoldOutOptions(BlockMonths: 3).SnapshotHash().ShouldNotBe(a);

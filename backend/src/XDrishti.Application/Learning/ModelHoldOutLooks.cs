@@ -5,6 +5,7 @@ using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Lab;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Lab;
 using XDrishti.Domain.Learning;
 
 namespace XDrishti.Application.Learning;
@@ -43,35 +44,38 @@ internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time)
         return new Guid(SHA256.HashData(Encoding.UTF8.GetBytes("model-look|" + model.Sha256))[..16]);
     }
 
-    /// <summary>Reads where the model stands with the look at the current block. Nothing looked at reads as not scored, never as a pass.</summary>
+    /// <summary>
+    /// Reads where the model stands with the family's looks (HO-01 D8). The model's own newest fresh look across all blocks counts (<c>used</c>, with that block and look), so a release of the block in force does not erase its hold-out figures; a later fail beats an earlier pass because
+    /// the newest look is the one read. With no such look, a look of another model or a re-used one at the block in force reads as <c>reused</c>; a free block in force reads as <c>kept</c>. Nothing looked at reads as not scored, never as a pass.
+    /// </summary>
     public async ValueTask<HoldOutReading> ReadAsync(StoredModel model, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
         var kept = model.Model.HoldOutStart is not null;
         var block = await store.CurrentAsync(cancellationToken);
-        var look = block is null ? null : await store.GetUnlockAsync(LookKey(model.Model, block.Start), FamilyVersion, ModelKind, cancellationToken);
-        if (look is null)
-        {
-            return kept
-                ? new HoldOutReading("kept", null, null)
-                : new HoldOutReading("not_kept", new MlHoldOutFacts(false, false, null, null, null), null);
-        }
+        var family = await store.ListUnlocksByIdPrefixAsync(ModelKind, FamilyId(model.Model) + "@", cancellationToken);
+        var atBlock = block is null ? null : family.FirstOrDefault(l => l.BlockStart == block.Start);
 
         // a model that kept no hold-out never counts, and says so (not the look's owner or the block's history)
         if (!kept)
         {
-            return new HoldOutReading("not_kept", new MlHoldOutFacts(false, false, null, null, null), look.BlockStart);
+            return new HoldOutReading("not_kept", new MlHoldOutFacts(false, false, null, null, null), atBlock?.BlockStart);
         }
 
-        // the look is spent for everyone but the model that took it, and it counts for that model only if the block had not been seen before it and the hold-out the model kept
-        // really excludes the block (a model that kept a later start trained on days of the block)
-        var contaminated = model.Model.HoldOutStart is { } start && look.BlockStart < start;
-        if (look.RunId != LookId(model.Model) || look.ReusedWindow || contaminated)
+        // the model's own fresh looks count only if the hold-out it kept excludes the block (a model that kept a later start trained on days of the block); the newest block wins
+        var ownedId = LookId(model.Model);
+        var own = family
+            .Where(l => l.RunId == ownedId && !l.ReusedWindow && model.Model.HoldOutStart is { } start && l.BlockStart >= start)
+            .OrderByDescending(l => l.BlockStart)
+            .FirstOrDefault();
+        if (own is not null)
         {
-            return new HoldOutReading("reused", new MlHoldOutFacts(kept, true, null, null, null), look.BlockStart);
+            return new HoldOutReading(HoldOutReading.Used, new MlHoldOutFacts(true, false, null, null, null), own.BlockStart, own);
         }
 
-        return new HoldOutReading(HoldOutReading.Used, new MlHoldOutFacts(true, false, null, null, null), look.BlockStart);
+        return atBlock is null
+            ? new HoldOutReading("kept", null, null)
+            : new HoldOutReading("reused", new MlHoldOutFacts(true, true, null, null, null), atBlock.BlockStart);
     }
 
     /// <summary>
@@ -107,28 +111,31 @@ internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time)
             return Result.Failure<StoredUnlock>(MlInfluenceErrors.HoldOutUnavailable("The hold-out the model kept starts after the locked block, so the model was trained on days of the block."));
         }
 
-        // shortcut: "a fresh look per block" assumes the owner only ever advances to a new, non-overlapping block (one that starts after the old one ends); nothing here checks it. HoldOutStore.CurrentAsync returns the first block ever stored and has no advance operation, so
-        // whoever builds the advance (part 10d, the owner act) must enforce the non-overlap, or a later block could reuse days an earlier look already saw.
+        // the blocks of the chain never overlap (HO-01 D1), so a family's look at a later block reads days no earlier look saw
         var key = LookKey(model.Model, block.Start);
-        if (await store.GetUnlockAsync(key, FamilyVersion, ModelKind, cancellationToken) is not null)
+        if (await store.GetUnlockAsync(key, FamilyVersion, ModelKind, block.Start, cancellationToken) is not null)
         {
             return Result.Failure<StoredUnlock>(MlInfluenceErrors.HoldOutReused(key));
         }
 
-        var reused = await store.AnyUnlockAsync(block.Start, cancellationToken);
-        var look = Build(model, block, key, mode, actor, settingHash, reused);
+        // HO-01 D5: fresh only when the model was registered before the block's horizon and the model slot of the block is free
+        var firstBlock = block.PrevStart is null;
+        var firstLookAt = firstBlock ? await store.FirstLookAtAsync(block.Start, cancellationToken) : null;
+        var predated = HoldOutHorizon.IsPredated(ModelKind, firstBlock, block.Start, model.Model.CreatedAt, firstLookAt);
+        var reused = !predated || await store.HasFreshLookAsync(block.Start, ModelKind, cancellationToken);
+        var look = Build(model, block, key, mode, actor, settingHash, reused, predated);
         var stored = await store.InsertUnlockAsync(look, cancellationToken);
-        if (!stored && !reused && await store.GetUnlockAsync(key, FamilyVersion, ModelKind, cancellationToken) is null)
+        if (!stored && !reused && await store.GetUnlockAsync(key, FamilyVersion, ModelKind, block.Start, cancellationToken) is null)
         {
-            // another look took the block's one fresh place between the read and the insert: store this one as re-used
-            look = Build(model, block, key, mode, actor, settingHash, true);
+            // another look took the block's model slot between the read and the insert: store this one as re-used
+            look = Build(model, block, key, mode, actor, settingHash, true, predated);
             stored = await store.InsertUnlockAsync(look, cancellationToken);
         }
 
         return stored ? Result.Success(look) : Result.Failure<StoredUnlock>(MlInfluenceErrors.HoldOutReused(key));
     }
 
-    private StoredUnlock Build(StoredModel model, HoldOutBlock block, string key, string mode, string actor, string settingHash, bool reused)
+    private StoredUnlock Build(StoredModel model, HoldOutBlock block, string key, string mode, string actor, string settingHash, bool reused, bool predated)
     {
         var now = time.GetUtcNow();
         var view = new HoldOutResultView(
@@ -152,7 +159,8 @@ internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time)
             null,
             settingHash,
             actor,
-            reused ? ["Re-used window: the block was already looked at, so the look cannot count toward a pass."] : []);
-        return new StoredUnlock(key, FamilyVersion, ModelKind, mode, actor, now, settingHash, reused, block.Start, LookId(model.Model), view);
+            reused ? [predated ? "Re-used window: the block's model look was already taken, so the look cannot count toward a pass." : "Not pre-dated: the model was registered on or after the start of this block (or after its first look), so the look cannot count toward a pass."] : [],
+            predated ? null : HoldOutHorizon.NotPredated);
+        return new StoredUnlock(key, FamilyVersion, ModelKind, mode, actor, now, settingHash, reused, block.Start, LookId(model.Model), view, predated ? null : HoldOutHorizon.NotPredated);
     }
 }

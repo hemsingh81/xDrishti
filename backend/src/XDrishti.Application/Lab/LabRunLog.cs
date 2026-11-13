@@ -52,6 +52,12 @@ internal static partial class LabRunLog
     [LoggerMessage(EventId = 7093, Level = LogLevel.Error, Message = "lab.holdout.release_audit_failed block {Block} {Failure}")]
     public static partial void HoldOutReleaseAuditFailed(ILogger logger, string block, string failure);
 
+    [LoggerMessage(EventId = 7094, Level = LogLevel.Warning, Message = "lab.holdout.slot_failed kind {Kind} {Failure}; the kind reads as unavailable and keeps the block")]
+    public static partial void HoldOutSlotFailed(ILogger logger, string kind, string failure);
+
+    [LoggerMessage(EventId = 7095, Level = LogLevel.Warning, Message = "lab.holdout.seal_step_failed {Step} {Failure}; the step left the block as it was")]
+    public static partial void HoldOutSealStepFailed(ILogger logger, string step, string failure);
+
     [LoggerMessage(EventId = 7096, Level = LogLevel.Warning, Message = "lab.tiers.bars_unread instrument {InstrumentId} trades {Trades}; its trades count as tier and capacity unavailable")]
     public static partial void TiersBarsUnread(ILogger logger, Guid instrumentId, int trades, Exception exception);
 

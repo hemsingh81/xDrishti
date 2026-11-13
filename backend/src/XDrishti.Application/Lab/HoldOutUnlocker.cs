@@ -58,14 +58,15 @@ internal sealed class HoldOutUnlocker(
             return Result.Failure<UnlockPlan>(LabErrors.HoldOutUnavailable("This run was posted with non-default options (conservative slippage, a changed stress setting, `nulls: false` or its own `draws`); it is a what-if and cannot take the hold-out. Unlock a run posted with the default options."));
         }
 
-        if (await store.GetUnlockAsync(run.StrategyId, run.Version, StrategyKind, cancellationToken) is not null)
-        {
-            return Result.Failure<UnlockPlan>(LabErrors.HoldOutUsed(run.StrategyId, run.Version));
-        }
-
         if (await BlockAsync(cancellationToken) is not { } block)
         {
             return Result.Failure<UnlockPlan>(LabErrors.HoldOutUnavailable("The stored history is too short to keep a hold-out."));
+        }
+
+        // HO-01 D5: a version looks once per block
+        if (await store.GetUnlockAsync(run.StrategyId, run.Version, StrategyKind, block.Start, cancellationToken) is not null)
+        {
+            return Result.Failure<UnlockPlan>(LabErrors.HoldOutUsed(run.StrategyId, run.Version));
         }
 
         // D6: a block that is still filling has no valid look (its last session has not closed)
@@ -94,17 +95,22 @@ internal sealed class HoldOutUnlocker(
             return Result.Failure<HoldOutResultView>(figures.Error);
         }
 
-        // fresh is decided by the database: a partial unique index admits one non-reused look per block, so a look that loses the race is stored again as re-used (the figures are the same; only the flag and the verdict of it change)
-        var reused = await store.AnyUnlockAsync(block.Start, cancellationToken);
+        // HO-01 D5: fresh only when the version's plan was frozen before the block's horizon, and only while the kind's slot is free; the database decides the slot (a partial unique index admits one non-reused look per block and kind), so a look
+        // that loses the race is stored again as re-used (the figures are the same; only the flag and the verdict of it change)
+        var frozenAt = await freezes.FirstFrozenAtAsync(run.StrategyId, run.Version, cancellationToken);
+        var firstBlock = block.PrevStart is null;
+        var firstLookAt = firstBlock ? await store.FirstLookAtAsync(block.Start, cancellationToken) : null;
+        var predated = HoldOutHorizon.IsPredated(StrategyKind, firstBlock, block.Start, frozenAt, firstLookAt);
+        var reused = !predated || await store.HasFreshLookAsync(block.Start, StrategyKind, cancellationToken);
         var planHash = await freezes.FirstAsync(run.StrategyId, run.Version, cancellationToken);
         var now = time.GetUtcNow();
-        var view = Judge(run, verdict, figures.Value, mode, actor, reused, planHash, now);
-        var stored = await store.InsertUnlockAsync(new StoredUnlock(run.StrategyId, run.Version, StrategyKind, mode, actor, now, view.SettingHash, reused, block.Start, run.Id, view), cancellationToken);
-        if (!stored && !reused && await store.GetUnlockAsync(run.StrategyId, run.Version, StrategyKind, cancellationToken) is null)
+        var view = Judge(run, verdict, figures.Value, mode, actor, reused, predated, planHash, now);
+        var stored = await store.InsertUnlockAsync(Row(run, mode, actor, now, view, reused, predated, block), cancellationToken);
+        if (!stored && !reused && await store.GetUnlockAsync(run.StrategyId, run.Version, StrategyKind, block.Start, cancellationToken) is null)
         {
             reused = true;
-            view = Judge(run, verdict, figures.Value, mode, actor, reused, planHash, now);
-            stored = await store.InsertUnlockAsync(new StoredUnlock(run.StrategyId, run.Version, StrategyKind, mode, actor, now, view.SettingHash, reused, block.Start, run.Id, view), cancellationToken);
+            view = Judge(run, verdict, figures.Value, mode, actor, reused, predated, planHash, now);
+            stored = await store.InsertUnlockAsync(Row(run, mode, actor, now, view, reused, predated, block), cancellationToken);
         }
 
         if (!stored)
@@ -119,11 +125,14 @@ internal sealed class HoldOutUnlocker(
     private async ValueTask<HoldOutBlock?> BlockAsync(CancellationToken cancellationToken) =>
         await guard.HistoryAsync(cancellationToken) is { } history ? await guard.EnsureAsync(history.First, history.Last, cancellationToken) : null;
 
-    private HoldOutResultView Judge(LabRun run, LabVerdictView verdict, HoldOutFigures figures, string mode, string actor, bool reused, string? planHash, DateTimeOffset now)
+    private static StoredUnlock Row(LabRun run, string mode, string actor, DateTimeOffset now, HoldOutResultView view, bool reused, bool predated, HoldOutBlock block) =>
+        new(run.StrategyId, run.Version, StrategyKind, mode, actor, now, view.SettingHash, reused, block.Start, run.Id, view, predated ? null : HoldOutHorizon.NotPredated);
+
+    private HoldOutResultView Judge(LabRun run, LabVerdictView verdict, HoldOutFigures figures, string mode, string actor, bool reused, bool predated, string? planHash, DateTimeOffset now)
     {
         var sawIt = run.To >= figures.From;
         var counts = !reused && !sawIt;
-        var notCounted = reused ? "the block was already looked at" : "the run's window reached the hold-out";
+        var notCounted = !predated ? "the version's plan was not frozen before the block's horizon" : reused ? "the block's strategy look was already taken" : "the run's window reached the hold-out";
         var dev = verdict.Evidence.ExpectancyR ?? double.NaN;
         var hold = figures.MeanR ?? double.NaN;
         var judged = HoldOutRule.Evaluate(dev, hold, figures.Trades, options.MinTrades, options.Retention, counts, notCounted);
@@ -148,7 +157,8 @@ internal sealed class HoldOutUnlocker(
             planHash,
             options.SnapshotHash(),
             actor,
-            reused ? ["Re-used window: the numbers are shown, the result counts as a trial and cannot count toward a pass; only forward data can refresh the evidence."] : []);
+            reused ? [predated ? "Re-used window: the numbers are shown, the result counts as a trial and cannot count toward a pass; only forward data can refresh the evidence." : "Not pre-dated: the version's plan was frozen on or after the start of this block, so the look is stored re-used and cannot count toward a pass."] : [],
+            predated ? null : HoldOutHorizon.NotPredated);
     }
 
     /// <summary>The audit cross-index row (as P7-12): ids and state words only, the mode as <c>auto</c> or <c>owner</c> and never a number of the evidence. A failure of this second write is logged and does not undo the look, which is insert-only.</summary>

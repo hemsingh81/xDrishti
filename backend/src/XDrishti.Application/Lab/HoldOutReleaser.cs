@@ -89,11 +89,7 @@ internal sealed class HoldOutReleaser(HoldOutEpochs epochs, IHoldOutStore store,
             return new AutoReleaseResult(false, "no_strategy_slot");
         }
 
-        var kinds = new List<LookAvailability>();
-        foreach (var slot in slots)
-        {
-            kinds.Add(await slot.ReadAsync(current.Block.Start, cancellationToken));
-        }
+        var kinds = (await ReadSlotsAsync(current.Block.Start, cancellationToken)).Values.ToList();
 
         if (!HoldOutAutoRelease.Eligible(current.State, kinds, out var reason))
         {
@@ -102,6 +98,49 @@ internal sealed class HoldOutReleaser(HoldOutEpochs epochs, IHoldOutStore store,
 
         var released = await ReleaseAsync(current, AutoMode, HoldOutAutoRelease.Actor, cancellationToken);
         return new AutoReleaseResult(released.IsSuccess, released.IsSuccess ? string.Empty : released.Error.Code);
+    }
+
+    /// <summary>What each kind can still do at the block (HO-01 D4): a registered slot answers, a kind with no slot has no subject, and a slot that fails answers <see cref="LookAvailability.Unavailable"/>, which keeps the block.</summary>
+    public async ValueTask<IReadOnlyDictionary<string, LookAvailability>> ReadSlotsAsync(DateOnly blockStart, CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<string, LookAvailability>(StringComparer.Ordinal)
+        {
+            ["strategy"] = LookAvailability.NoSubject,
+            ["model"] = LookAvailability.NoSubject,
+            [HoldOutHorizon.SystemKind] = LookAvailability.NoSubject,
+        };
+        foreach (var slot in slots)
+        {
+            try
+            {
+                result[slot.Kind] = await slot.ReadAsync(blockStart, cancellationToken);
+            }
+            catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
+            {
+                LabRunLog.HoldOutSlotFailed(logger, slot.Kind, failure.GetType().Name);
+                result[slot.Kind] = LookAvailability.Unavailable;
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>What keeps the auto release from acting on the block in force, as a word (<c>auto_release_off</c>, <c>no_strategy_slot</c>, <c>filling</c>, <c>unlooked</c>, <c>look_available</c>, <c>unavailable</c>), or null when it would release now. Read only.</summary>
+    public async ValueTask<(string? Reason, IReadOnlyDictionary<string, LookAvailability> Kinds)> WhatHoldsAsync(BlockStatus current, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        var kinds = await ReadSlotsAsync(current.Block.Start, cancellationToken);
+        if (!slots.Any(s => string.Equals(s.Kind, "strategy", StringComparison.Ordinal)))
+        {
+            return ("no_strategy_slot", kinds);
+        }
+
+        if (!HoldOutAutoRelease.Eligible(current.State, [.. kinds.Values], out var reason))
+        {
+            return (reason, kinds);
+        }
+
+        return (options.AutoRelease ? null : "auto_release_off", kinds);
     }
 
     private async ValueTask<Result<HoldOutBlockView>> ReleaseAsync(BlockStatus target, string mode, string actor, CancellationToken cancellationToken)
@@ -119,7 +158,7 @@ internal sealed class HoldOutReleaser(HoldOutEpochs epochs, IHoldOutStore store,
 
         return outcome switch
         {
-            ReleaseOutcome.Released => Result.Success(BlockViews.Of(new BlockStatus(target.Stored with { Release = release }, HoldOutBlockState.Released, target.FreshLook))),
+            ReleaseOutcome.Released => Result.Success(BlockViews.Of(new BlockStatus(target.Stored with { Release = release }, HoldOutBlockState.Released, target.FreshLooks))),
             ReleaseOutcome.AlreadyReleased => Result.Failure<HoldOutBlockView>(LabErrors.HoldOutReleased(target.Block.Start)),
             _ => Result.Failure<HoldOutBlockView>(LabErrors.HoldOutUnavailable("The next block could not be stored, so nothing was released.")),
         };

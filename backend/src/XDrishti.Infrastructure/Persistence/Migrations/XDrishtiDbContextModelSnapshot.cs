@@ -3394,6 +3394,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("regime");
 
+                    b.Property<string>("SeenHoldOut")
+                        .HasColumnType("text")
+                        .HasColumnName("seen_holdout");
+
                     b.Property<string>("ShrinkMode")
                         .HasColumnType("text")
                         .HasColumnName("shrink_mode");
@@ -9760,6 +9764,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("mode");
 
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
                     b.Property<string>("Result")
                         .IsRequired()
                         .HasColumnType("jsonb")
@@ -9790,12 +9798,12 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_holdout_unlocks");
 
-                    b.HasIndex("BlockStart")
+                    b.HasIndex("BlockStart", "Kind")
                         .IsUnique()
                         .HasDatabaseName("uq_holdout_unlocks_fresh")
                         .HasFilter("NOT reused_window");
 
-                    b.HasIndex("StrategyId", "Version", "Kind")
+                    b.HasIndex("StrategyId", "Version", "Kind", "BlockStart")
                         .IsUnique()
                         .HasDatabaseName("uq_holdout_unlocks_version");
 
@@ -9804,7 +9812,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("holdout_unlocks", "lab", t =>
                         {
-                            t.HasCheckConstraint("ck_holdout_unlocks_shape", "version >= 1 AND kind IN ('strategy','model') AND mode IN ('owner','auto') AND setting_hash ~ '^[0-9a-f]{64}$'");
+                            t.HasCheckConstraint("ck_holdout_unlocks_shape", "version >= 1 AND kind IN ('strategy','model','system') AND mode IN ('owner','auto') AND setting_hash ~ '^[0-9a-f]{64}$'");
                         });
                 });
 

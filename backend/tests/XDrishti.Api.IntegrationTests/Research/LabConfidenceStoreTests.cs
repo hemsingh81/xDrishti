@@ -138,8 +138,8 @@ public sealed class LabConfidenceStoreTests(ApiFactory factory, ResearchGrantsTe
         var secondFresh = await WithAsync<IHoldOutStore, bool>(host, s => s.InsertUnlockAsync(Unlock("HO", 2, false), Ct).AsTask());
         var reused = await WithAsync<IHoldOutStore, bool>(host, s => s.InsertUnlockAsync(Unlock("HO", 2, true), Ct).AsTask());
         var sameVersion = await WithAsync<IHoldOutStore, bool>(host, s => s.InsertUnlockAsync(Unlock("HO", 1, true), Ct).AsTask());
-        var read = await WithAsync<IHoldOutStore, StoredUnlock?>(host, s => s.GetUnlockAsync("HO", 1, "strategy", Ct).AsTask());
-        var any = await WithAsync<IHoldOutStore, bool>(host, s => s.AnyUnlockAsync(block.Start, Ct).AsTask());
+        var read = await WithAsync<IHoldOutStore, StoredUnlock?>(host, s => s.GetUnlockAsync("HO", 1, "strategy", block.Start, Ct).AsTask());
+        var any = await WithAsync<IHoldOutStore, bool>(host, s => s.HasFreshLookAsync(block.Start, "strategy", Ct).AsTask());
         var list = await WithAsync<IHoldOutStore, IReadOnlyList<StoredUnlock>>(host, s => s.ListUnlocksAsync(10, Ct).AsTask());
 
         (inserted, again).ShouldBe((true, false));

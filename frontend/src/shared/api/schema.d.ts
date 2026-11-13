@@ -14380,8 +14380,8 @@ export interface components {
       from5: number;
     };
     /**
-     * @description A block of the hold-out chain as served (HO-01): `HistoryLast` is its last date. `State` is `filling`, `sealed`, `looked` or `released`; `FreshLook` says whether a fresh look was taken (for a released block, whether it had one when
-     *     released); `ReleasedAt` and `Mode` (`owner` or `auto`) are set once it is released.
+     * @description A block of the hold-out chain as served (HO-01): `HistoryLast` is its last date. `State` is `filling`, `sealed`, `looked` or `released`; `Looks` holds the three looks (strategy, model, system); `BlockedBy` names what keeps the block in force from being released by the auto option (set for the block in force only);
+     *     `ReleasedAt` and `Mode` (`owner` or `auto`) are set once it is released.
      */
     HoldOutBlockView: {
       /** Format: date */
@@ -14396,10 +14396,30 @@ export interface components {
       /** Format: date-time */
       createdAt: string;
       state?: null | string;
-      freshLook?: null | boolean;
+      looks?: null | components['schemas']['HoldOutLooksView'];
       /** Format: date-time */
       releasedAt?: null | string;
       mode?: null | string;
+      blockedBy?: null | string;
+    };
+    /**
+     * @description One kind's look at a block: `State` is `fresh` (the slot is taken, with its subject, verdict and mode), `available` (free, an eligible subject exists), `no_subject` (free, none exists or the kind's path is not built), `unavailable` (the read failed)
+     *     or `none` (not read: the block is released without a look of this kind, or not in force).
+     */
+    HoldOutLookView: {
+      state: string;
+      subject?: null | string;
+      passed?: null | boolean;
+      status?: null | string;
+      /** Format: date-time */
+      at?: null | string;
+      mode?: null | string;
+    };
+    /** @description The three looks of a block (HO-01 D5): one per kind. */
+    HoldOutLooksView: {
+      strategy: components['schemas']['HoldOutLookView'];
+      model: components['schemas']['HoldOutLookView'];
+      system: components['schemas']['HoldOutLookView'];
     };
     /** @description The sizing the policy gives for the stored history now (D4). */
     HoldOutPlanView: {
@@ -14423,7 +14443,7 @@ export interface components {
     };
     /**
      * @description What the one look at the hold-out said, as served and as stored (spec CF-06, D5). `State` is `used` (the first look at the block) or `reused` (a later look: the numbers are shown, the result counts as a trial and cannot count toward a pass).
-     *     `Mode` is `owner` or `auto` (the auto option, recorded as auto and never as an owner approval). `RunSawHoldOut` is true when the run the plan came from had a window reaching into the block: such a look is never a pass.
+     *     `Mode` is `owner` or `auto` (the auto option, recorded as auto and never as an owner approval). `ReusedReason` is `not_predated` when the look was stored re-used because its subject was not frozen before the block's horizon (HO-01 D5). `RunSawHoldOut` is true when the run the plan came from had a window reaching into the block: such a look is never a pass.
      */
     HoldOutResultView: {
       strategyId: string;
@@ -14455,6 +14475,7 @@ export interface components {
       settingHash: string;
       actor: string;
       notes: string[];
+      reusedReason?: null | string;
     };
     /** @description Body of `POST /api/lab/runs/{id}/holdout-unlock` (spec CF-06, D5): the owner's password, typed again for this act. */
     HoldOutUnlockRequest: {

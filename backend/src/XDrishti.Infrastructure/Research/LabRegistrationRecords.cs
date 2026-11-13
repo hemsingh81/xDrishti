@@ -102,4 +102,7 @@ internal sealed class HoldOutUnlockRecord
     public Guid LabRunId { get; set; }
 
     public string Result { get; set; } = string.Empty;
+
+    /// <summary>Why a look is stored <c>reused_window</c> when it was never a second look (HO-01b): <c>not_predated</c>; null otherwise.</summary>
+    public string? Reason { get; set; }
 }

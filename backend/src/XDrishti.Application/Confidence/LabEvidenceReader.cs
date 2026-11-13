@@ -47,10 +47,12 @@ internal sealed class LabEvidenceReader(
 
         var reg = await registration.HandleAsync(new GetRegistrationQuery(strategy, v), cancellationToken);
         bool? registered = reg.IsSuccess ? !string.IsNullOrWhiteSpace(reg.Value.TextHash) : reg.Error.Kind == ErrorKind.NotFound ? false : null;
-        var hold = await holdOut.HandleAsync(new GetHoldOutQuery(), cancellationToken);
+        var hold = await holdOut.HandleAsync(new GetHoldOutQuery { Slots = false }, cancellationToken);
         var results = hold.IsSuccess ? hold.Value.Unlocks.Where(u => u.StrategyId == strategy && u.Version == v).OrderByDescending(u => u.UnlockedAt).ToList() : null;
-        var holdStatus = results is null ? RowStatus.Unavailable : results.Count == 0 ? RowStatus.Unavailable : results[0].Passed && !results[0].ReusedWindow ? RowStatus.Pass : RowStatus.Fail;
-        rowNotes[12] = results is null ? "the hold-out record could not be read." : results.Count == 0 ? "the hold-out has not been unlocked yet." : results[0].Reason;
+        // HO-01 D7: row 12 reads the version's newest fresh look, so a later fail is never outweighed by an earlier pass; with only re-used looks the row fails
+        var newest = results is null ? null : results.FirstOrDefault(r => !r.ReusedWindow) ?? results.FirstOrDefault();
+        var holdStatus = results is null ? RowStatus.Unavailable : newest is null ? RowStatus.Unavailable : newest.Passed && !newest.ReusedWindow ? RowStatus.Pass : RowStatus.Fail;
+        rowNotes[12] = results is null ? "the hold-out record could not be read." : newest is null ? "the hold-out has not been unlocked yet." : newest.Reason;
         var reused = results is null ? FaultState.Unavailable : results.Any(r => r.ReusedWindow && r.Passed) ? FaultState.Fault : FaultState.Clear;
 
         var (verdict, why) = await VerdictAsync(strategy, v, cancellationToken);

@@ -126,4 +126,7 @@ internal sealed class CellStatsRecord
     public string? ShrinkMode { get; set; }
 
     public string? ShrinkNote { get; set; }
+
+    // HO-01b (ADR 0283, AC10): the labels of released hold-out blocks the row's trades exit inside, comma separated (seen_holdout:<start>); null when none (and in every row written before the migration)
+    public string? SeenHoldOut { get; set; }
 }

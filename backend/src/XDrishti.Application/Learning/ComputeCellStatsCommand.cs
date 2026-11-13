@@ -9,5 +9,6 @@ namespace XDrishti.Application.Learning;
 /// <param name="Options">The knobs; the doc 16 defaults when not given.</param>
 /// <param name="Actor">Who asks (<c>cli:xd</c> for the verb).</param>
 /// <param name="ByRegime">Also split every cell by the regime of its trades' entry day (P6-02, ADR 0146); the <c>*</c> rows are the same with and without it. Off by default.</param>
+/// <param name="ReleasedBlocks">The released hold-out blocks (start, end), so that a row resting on trades that exit inside one carries <c>seen_holdout:&lt;start&gt;</c> (HO-01b, ADR 0283); null or empty: no row is labelled. Not part of the snapshot key.</param>
 /// <param name="ByUniverse">Also split every <c>*</c> cell by the liquidity tier of its trades on their decision dates (BK-11, ADR 0261); the <c>*</c> rows are the same with and without it. Off by default.</param>
-public sealed record ComputeCellStatsCommand(DateOnly AsOf, IReadOnlyList<CellSource> Sources, CellStatsOptions Options, string Actor, bool ByRegime = false, bool ByUniverse = false) : ICommand;
+public sealed record ComputeCellStatsCommand(DateOnly AsOf, IReadOnlyList<CellSource> Sources, CellStatsOptions Options, string Actor, bool ByRegime = false, bool ByUniverse = false, IReadOnlyList<(DateOnly Start, DateOnly End)>? ReleasedBlocks = null) : ICommand;

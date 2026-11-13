@@ -422,7 +422,7 @@ internal sealed class ConfidenceSettings
 
     internal sealed class HoldOutSection
     {
-        public bool Enforce { get; set; }
+        public bool Enforce { get; set; } = true;
 
         public bool AutoUnlock { get; set; } = true;
 

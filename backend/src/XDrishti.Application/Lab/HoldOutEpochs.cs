@@ -5,8 +5,11 @@ using XDrishti.Domain.Lab;
 namespace XDrishti.Application.Lab;
 
 /// <summary>A block of the chain with its derived state (HO-01, D2).</summary>
-internal sealed record BlockStatus(StoredBlock Stored, HoldOutBlockState State, bool FreshLook)
+internal sealed record BlockStatus(StoredBlock Stored, HoldOutBlockState State, IReadOnlyList<StoredUnlock> FreshLooks)
 {
+    /// <summary>Whether any kind has a fresh look at the block.</summary>
+    public bool FreshLook => FreshLooks.Count > 0;
+
     public HoldOutBlock Block => Stored.Block;
 
     /// <summary>The last date of the block.</summary>
@@ -35,8 +38,8 @@ internal sealed class HoldOutEpochs(IHoldOutStore store, ITradingCalendar tradin
         {
             var released = stored.Release is not null;
             var sealedBlock = HoldOutChain.IsSealed(calendar, lastClosed, stored.Block.HistoryLast);
-            var fresh = !released && sealedBlock && await store.HasFreshLookAsync(stored.Block.Start, cancellationToken);
-            rows.Add(new BlockStatus(stored, HoldOutChain.StateOf(released, sealedBlock, fresh), fresh));
+            var looks = sealedBlock ? await store.ListFreshLooksAsync(stored.Block.Start, cancellationToken) : [];
+            rows.Add(new BlockStatus(stored, HoldOutChain.StateOf(released, sealedBlock, !released && looks.Count > 0), looks));
         }
 
         return rows;
@@ -47,6 +50,13 @@ internal sealed class HoldOutEpochs(IHoldOutStore store, ITradingCalendar tradin
     {
         var calendar = await tradingCalendar.GetAsync(cancellationToken);
         return HoldOutChain.IsSealed(calendar, calendar.LastClosedSession(time.GetUtcNow()), end);
+    }
+
+    /// <summary>How many trading sessions have closed after the block that ends on <paramref name="end"/> (0 while it is filling): the age of a sealed block.</summary>
+    public async ValueTask<int> SealedSessionsAsync(DateOnly end, CancellationToken cancellationToken)
+    {
+        var calendar = await tradingCalendar.GetAsync(cancellationToken);
+        return calendar.TradingDaysBetween(end, calendar.LastClosedSession(time.GetUtcNow()));
     }
 
     /// <summary>The block in force with its state, or null when none is fixed.</summary>

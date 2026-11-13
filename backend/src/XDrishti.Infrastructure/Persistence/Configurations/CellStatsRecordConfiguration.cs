@@ -41,6 +41,7 @@ internal sealed class CellStatsRecordConfiguration : IEntityTypeConfiguration<Ce
         builder.Property(x => x.StrengthSource).HasColumnType("text");
         builder.Property(x => x.ShrinkMode).HasColumnType("text");
         builder.Property(x => x.ShrinkNote).HasColumnType("text");
+        builder.Property(x => x.SeenHoldOut).HasColumnName("seen_holdout").HasColumnType("text");
         builder.HasIndex(x => new { x.SnapshotKey, x.CellKey, x.Window }).IsUnique().HasDatabaseName("uq_cell_stats_snapshot_cell_window");
         builder.HasIndex(x => new { x.AsOf, x.CreatedAt }).HasDatabaseName("ix_cell_stats_as_of_created");
         builder.HasIndex(x => x.CellKey).HasDatabaseName("ix_cell_stats_cell_key");

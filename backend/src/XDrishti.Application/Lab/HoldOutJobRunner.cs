@@ -32,7 +32,7 @@ internal sealed class HoldOutJobRunner(ILabRunStore runs, HoldOutUnlocker unlock
             }
             else
             {
-                var looked = await unlocker.UnlockAsync(job.RunId, HoldOutUnlocker.OwnerMode, job.Actor, hostStop);
+                var looked = await unlocker.UnlockAsync(job.RunId, HoldOutJob.ModeOf(job.Actor), job.Actor, hostStop);
                 state = looked.IsSuccess ? LabRunState.Succeeded : LabRunState.Failed;
                 if (looked.IsSuccess)
                 {
