@@ -1,4 +1,5 @@
 using NSubstitute;
+using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Confidence;
 using XDrishti.Application.LearnedSettings;
@@ -7,11 +8,13 @@ using XDrishti.Application.Paper;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Shadow;
 using XDrishti.Domain.Autonomy;
+using XDrishti.Domain.Confidence;
+using XDrishti.Domain.Learning;
 using XDrishti.Domain.Platform.Services;
 
 namespace XDrishti.Application.Tests.Platform.Services;
 
-/// <summary>AM-01a (ADR 0282): the six evidence services start enabled with no stored row, and a row the owner saved (paused) stays paused; table B (the shadow services, which wait for AM-01b, and ticket auto-approval) is pinned OFF.</summary>
+/// <summary>AM-01a (ADR 0282): the six evidence services (and, from AM-01b, the three shadow services) start enabled with no stored row, and a row the owner saved (paused) stays paused; table B (ticket auto-approval, the registration, null and cost-stress enforcement, the ML switches) is pinned OFF.</summary>
 public sealed class AutoModeServiceDefaultsTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -24,10 +27,6 @@ public sealed class AutoModeServiceDefaultsTests
         LearnedSettingsService.Definition,
         PaperCaptureService.Definition,
         PaperReviewService.Definition,
-    };
-
-    public static TheoryData<ServiceDefinition> StillOff => new()
-    {
         ShadowWriteService.Definition,
         ShadowGradeService.Definition,
         ShadowDigestService.Definition,
@@ -60,17 +59,22 @@ public sealed class AutoModeServiceDefaultsTests
         owner.Settings.Enabled.ShouldBeFalse("a service the owner paused stays paused");
     }
 
-    [Theory]
-    [MemberData(nameof(StillOff))]
-    public void The_shadow_services_stay_off_until_AM_01b(ServiceDefinition definition)
-    {
-        definition.Defaults.Enabled.ShouldBeFalse(definition.Id);
-    }
-
     [Fact]
     public void Ticket_auto_approval_and_reserve_promotion_stay_off()
     {
         AutonomySettings.Defaults.AutoApproveTickets.ShouldBeFalse();
         AutonomySettings.Defaults.PromoteFromReserve.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_table_B_configuration_defaults_stay_off()
+    {
+        new RegistrationOptions().Enforce.ShouldBeFalse();
+        new RegistrationOptions().CountInFactor.ShouldBeFalse();
+        new NullOptions().Enforce.ShouldBeFalse();
+        new CostStressOptions().Enforce.ShouldBeFalse();
+        // the three ML switches read OFF with no row (the stored-row read is pinned by EvidenceSetApiTests.Table_B_ML_switches_read_OFF_with_nothing_stored)
+        MlSwitch.Names.ShouldBe([MlSwitch.Influence, MlSwitch.AutoPromote, MlSwitch.AutoRollback]);
+        (MlSwitches.AllOff.Influence.On, MlSwitches.AllOff.AutoPromote.On, MlSwitches.AllOff.AutoRollback.On).ShouldBe((false, false, false));
     }
 }

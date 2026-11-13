@@ -273,6 +273,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM paper.shadow_entries;
                 DELETE FROM paper.shadow_sessions;
                 DELETE FROM paper.shadow_settings;
+                DELETE FROM paper.evidence_sets;
                 DELETE FROM paper.exits;
                 DELETE FROM paper.entries;
                 DELETE FROM paper.skips;
@@ -509,7 +510,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 TRUNCATE selection.basket_settings_changes, market.basket_context_daily RESTART IDENTITY;
                 TRUNCATE trading.loosening_dismissals, trading.loosening_settings RESTART IDENTITY;
                 TRUNCATE research.extension_evaluations;
-                DELETE FROM lab.test_ledger WHERE strategy_id LIKE '%:%' OR strategy_id = 'pead';
+                DELETE FROM lab.test_ledger WHERE strategy_id LIKE '%:%' OR strategy_id = 'pead' OR trial_kind = 'evidence_set';
                 DELETE FROM accounts.account_events WHERE event IN ('EventFilterSwitched', 'BasketSettingsChanged', 'LooseningDismissed', 'LooseningSettingsChanged');
                 DELETE FROM options.lot_sizes;
                 DELETE FROM options.contracts;

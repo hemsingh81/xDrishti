@@ -64,6 +64,9 @@ export const buildAutoSuggestions = (
 export const autoHandlers = [
   http.get('/api/auto', () => HttpResponse.json(buildAuto())),
   http.get('/api/paper/shadow/summary', () => HttpResponse.json({ enabled: false })),
+  http.get('/api/paper/shadow/evidence-set', () =>
+    HttpResponse.json({ edgeEpoch: null, state: 'frozen', versions: ['a'.repeat(64)], shadowEnabled: false, note: '' }),
+  ),
   http.get('/api/auto/scope', () => HttpResponse.json(buildAutoScope())),
   http.get('/api/auto/suggestions', () =>
     HttpResponse.json(

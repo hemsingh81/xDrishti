@@ -123,7 +123,7 @@ A due-diligence review on 2026-11-12 compared what is built with the owner's goa
 | DATA-01 | [Dated NSE ban and surveillance lists](../specs/DATA-01-dated-nse-ban-and-surveillance-lists.md) | 3 d | BK-01 pattern; the owner's NSE terms | Built 2026-11-12, merged and deployed 2026-11-13 (ADR 0274) |
 | AI-01 | [Assistant reads replay and readiness](../specs/AI-01-assistant-reads-replay-and-readiness.md) | 2 d | BK-12b | Built 2026-11-12, merged and deployed 2026-11-13; the owner re-accepts the eval baseline |
 | GAP-09 | The frozen "evidence set" of strategy versions for the shadow record | in AM-01b | CF-08 | Answered 2026-11-13: an automatic default (the eligible versions, registered and frozen at the start of each edge epoch; the owner may replace it before the first write), in AM-01b |
-| AM-01 | [Auto-mode defaults](../specs/AM-01-auto-mode-defaults.md) | 3 d (AM-01a 1, AM-01b 2) | CF-08, CF-11, CF-12, DATA-01, OPS-01 | Approved 2026-11-13 (owner; ADR 0282), not built: the evidence switches start ON where safe; NSE, Dhan-quota, recorder, ML-steering, ticket-approval and live switches stay the owner's |
+| AM-01 | [Auto-mode defaults](../specs/AM-01-auto-mode-defaults.md) | 3 d (AM-01a 1, AM-01b 2) | CF-08, CF-11, CF-12, DATA-01, OPS-01 | Approved 2026-11-13 (owner; ADR 0282); AM-01a built (list filter, kill switch, six services); AM-01b built (the frozen evidence set and the shadow default, ADR 0282 amendment), not deployed: the evidence switches start ON where safe; NSE, Dhan-quota, recorder, ML-steering, ticket-approval and live switches stay the owner's |
 
 ## P3 slices
 

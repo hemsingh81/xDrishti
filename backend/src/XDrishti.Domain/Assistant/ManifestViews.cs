@@ -212,6 +212,7 @@ internal static class ManifestViews
                 new("window_to", ColumnKind.Date, DataClass.C1, "India date", "Last date."),
                 new("method", ColumnKind.Code, DataClass.C1, "", "Test method."),
                 new("created_at", ColumnKind.Timestamp, DataClass.C1, "UTC", "Recorded."),
+                // shortcut: the kinds cells_refresh (LC-01) and evidence_set (AM-01b, a registration, not a look) are not named in this text: changing it changes the manifest fingerprint the assistant goldens pin, so add them with the next manifest change.
                 new("trial_kind", ColumnKind.Code, DataClass.C1, "", "Kind of look: run, replan, null, system_replay (a whole-system replay, counted as a look of each strategy it uses), or training_sweep (a training simulation, shown but not counted as a look)."),
             ]),
         new(

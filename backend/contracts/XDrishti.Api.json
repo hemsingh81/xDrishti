@@ -15017,6 +15017,116 @@
         }
       }
     },
+    "/api/paper/shadow/evidence-set": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The frozen evidence set of the current edge epoch of the shadow record (spec AM-01 GAP-09, ADR 0282): the strategy versions whose shadow rows count for the edge count and the readiness forward rows, its state (pending: none stored, the first shadow write registers the default, the versions of the eligible cells from a fresh configuration reading; open: stored, no shadow row of the epoch yet, the owner may replace it; frozen: never replaceable), who or what froze it (mode auto = system:default, owner, or backfill = the migration's set for rows that already existed, NOT a pre-registration) and why. Rows of other versions are still written and graded, labelled outside_set, and left out of the edge figures. Read only (a session; not one of the assistant's evidence GETs); no order exists",
+        "operationId": "GetShadowEvidenceSet",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceSetView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "Replace the evidence set of the current edge epoch as the owner, before the first shadow write of the epoch and never after. Stores one audited row and registers the versions in the trial ledger (a registration, not a look). Needs a session, the CSRF token and the password in the body, checked on EVERY change. 401 auth.invalid_credentials, 423 auth.locked, 403 paper.evidence_set_owner_only, 400 paper.evidence_set_reason_invalid, 400 paper.evidence_set_versions_invalid, 400 paper.evidence_set_unknown_version, 409 paper.evidence_set_frozen (a shadow row of the epoch exists), 429 auth.rate_limited",
+        "operationId": "ReplaceShadowEvidenceSet",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceSetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceSetReplaced"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/paper/phase-check": {
       "get": {
         "tags": [
@@ -40862,6 +40972,159 @@
           }
         },
         "description": "One figure of the evidence, built by the engine (P8-00 D1). Value is empty unless State is `value`: a figure that is insufficient or unavailable shows a word and no digit."
+      },
+      "EvidenceSetReplaced": {
+        "required": [
+          "edgeEpoch",
+          "setHash",
+          "versions"
+        ],
+        "type": "object",
+        "properties": {
+          "edgeEpoch": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The paper epoch, or null while none exists.",
+            "format": "int64"
+          },
+          "setHash": {
+            "type": "string",
+            "description": "The identity of the new set."
+          },
+          "versions": {
+            "type": "integer",
+            "description": "How many versions it holds.",
+            "format": "int32"
+          }
+        },
+        "description": "The answer of a replace: the set now in force."
+      },
+      "EvidenceSetRequest": {
+        "required": [
+          "versions",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "versions": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "The strategy version hashes (64 lower-case hex characters each, stored versions) that make the set: 1 to 500, distinct."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS change; checked on every request, wrong ones count toward the sign-in lockout."
+          }
+        },
+        "description": "The body of the evidence-set replacement. The owner is never part of it: the actor comes from the signed-in session."
+      },
+      "EvidenceSetView": {
+        "required": [
+          "edgeEpoch",
+          "state",
+          "versions",
+          "setHash",
+          "mode",
+          "actor",
+          "reason",
+          "createdAt",
+          "firstWriteAt",
+          "shadowEnabled",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "edgeEpoch": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The paper epoch the set belongs to, or null while no paper epoch exists.",
+            "format": "int64"
+          },
+          "state": {
+            "type": "string",
+            "description": "`pending` (no set stored: the first shadow write of the epoch registers the default), `open` (a set is stored, no shadow row of the epoch yet: the owner may still replace it) or `frozen` (a shadow row exists: never replaceable)."
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The versions of the stored set; for `pending` the versions the default rule would register now (empty when none is eligible)."
+          },
+          "setHash": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The identity of the stored set, or null while pending."
+          },
+          "mode": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`auto` (the system default rule), `owner`, or `backfill` (written by the AM-01b migration for rows that already existed: not a pre-registration); null while pending."
+          },
+          "actor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`system:default`, `system:migration` (a backfill) or the owner's actor; null while pending."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's reason; null for an automatic set or while pending."
+          },
+          "createdAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the stored set was written; null while pending.",
+            "format": "date-time"
+          },
+          "firstWriteAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the epoch's first shadow write was stored with the automatic set; null otherwise.",
+            "format": "date-time"
+          },
+          "shadowEnabled": {
+            "type": "boolean",
+            "description": "Whether the switch `paper.shadow.enabled` is ON."
+          },
+          "note": {
+            "type": "string",
+            "description": "What the state means and what happens next, in words."
+          }
+        },
+        "description": "The evidence set of the current edge epoch: the strategy versions whose shadow rows count for edge and for the readiness forward rows, and who or what froze it."
       },
       "EvidenceView": {
         "required": [
@@ -71250,6 +71513,12 @@
             "type": "integer",
             "description": "Edge candidates graded as not gradable.",
             "format": "int32"
+          },
+          "outsideSet": {
+            "type": "integer",
+            "description": "Candidates that would count for edge but whose strategy version is outside the epoch's frozen evidence set (spec AM-01 GAP-09): written and graded, labelled `outside_set`, left out of every edge figure.",
+            "format": "int32",
+            "default": 0
           }
         },
         "description": "The two counts side by side (criterion 10). The behavioural count is P10's own: the owner-approved, armed, primary, measured trades of the newest epoch. The edge count is the graded shadow trades that count for edge. They are never added."

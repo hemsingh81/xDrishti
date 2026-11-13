@@ -6,6 +6,7 @@ import { ErrorState, LoadingState } from '@/shared/ui';
 import { shadowSummaryQuery, type ShadowGroup, type ShadowSummary } from '../api/shadowQueries';
 import { toMetric } from '../lib/metric';
 import { SequentialBlock } from './SequentialState';
+import { EvidenceSetCard } from './EvidenceSetCard';
 import { ShadowSwitchDialog } from './ShadowSwitchDialog';
 
 const groupColumns: readonly Column<ShadowGroup>[] = [
@@ -78,6 +79,7 @@ function Body({ view }: { view: ShadowSummary }) {
           }}
         />
       )}
+      <EvidenceSetCard />
       {!view.hasRows && <Alert severity="info">{view.note ?? 'No shadow rows are stored yet.'}</Alert>}
       <Box component="section" aria-labelledby="shadow-sequential-heading">
         <Typography variant="h2" id="shadow-sequential-heading" sx={h2}>
@@ -105,6 +107,7 @@ function Body({ view }: { view: ShadowSummary }) {
           <li>
             Candidates: {formatCount(counts.candidates)}, counting for edge {formatCount(counts.edgeCandidates)}
           </li>
+          <li>Outside the evidence set (written and graded, not counted): {formatCount(counts.outsideSet)}</li>
           <li>
             Pending {formatCount(counts.pending)}, not triggered {formatCount(counts.notTriggered)}, not gradable{' '}
             {formatCount(counts.notGradable)}
