@@ -24,8 +24,10 @@ public sealed record MlTermView(string Name, string State, IReadOnlyList<MlReaso
 /// <param name="GainLow">The lower end of the interval of the mean log-loss gain over the baseline, or null.</param>
 /// <param name="GainHigh">The upper end, or null.</param>
 /// <param name="Mode"><c>owner</c> or <c>auto</c> (how the look was taken), or null.</param>
+/// <param name="Outcome">How the look ended: <c>scored</c>, <c>no_rows</c> or <c>failed</c> (terminal, no figures), or null while it is open or not taken.</param>
+/// <param name="OutcomeCode">Why a terminal look ended, or null.</param>
 /// <param name="CanScore">Whether the owner could take (or finish) the model's look now: the block in force is sealed, the model kept a hold-out before it, and its family has no finished look there. A hint for the button; the act decides.</param>
-public sealed record MlHoldOutView(string State, string Family, DateOnly? BlockStart, int? Rows, double? ProbabilityBeatsNoMl, double? PolicyEffectR, double? LogLossModel = null, double? LogLossBaseline = null, string? BaselineName = null, double? GainLow = null, double? GainHigh = null, string? Mode = null, bool CanScore = false);
+public sealed record MlHoldOutView(string State, string Family, DateOnly? BlockStart, int? Rows, double? ProbabilityBeatsNoMl, double? PolicyEffectR, double? LogLossModel = null, double? LogLossBaseline = null, string? BaselineName = null, double? GainLow = null, double? GainHigh = null, string? Mode = null, bool CanScore = false, string? Outcome = null, string? OutcomeCode = null);
 
 /// <summary><c>GET /api/learning/models/{id}/influence</c>: whether the model may influence a decision, term by term (CF-10 part 10c-2, ADR 0217).</summary>
 /// <param name="ModelId">The registry id.</param>

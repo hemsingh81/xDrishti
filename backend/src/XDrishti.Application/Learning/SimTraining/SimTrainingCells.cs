@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using XDrishti.Application.Abstractions.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Bars;
@@ -54,4 +55,13 @@ internal static class SimTrainingCells
 
     /// <summary>A stable bucket of a trade key, so thinning keeps the same trades on every run.</summary>
     public static uint Bucket(string key) => BitConverter.ToUInt32(SHA256.HashData(Encoding.UTF8.GetBytes(key)), 0);
+
+    /// <summary>The timeframe the training job ran a strategy version on: the built-in's default, else 15 minutes when the strategy allows it (or names none), else its first. One definition for the job and for the model's hold-out look.</summary>
+    public static Timeframe DefaultTimeframe(ISimulationEngine engine, string strategyId, StrategyDescription description)
+    {
+        ArgumentNullException.ThrowIfNull(engine);
+        ArgumentNullException.ThrowIfNull(description);
+        return engine.BuiltIns.FirstOrDefault(b => string.Equals(b.Id, strategyId, StringComparison.Ordinal))?.DefaultTimeframe
+            ?? (description.Timeframes.Contains(Timeframe.M15) || description.Timeframes.Count == 0 ? Timeframe.M15 : description.Timeframes[0]);
+    }
 }

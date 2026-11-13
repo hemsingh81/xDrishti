@@ -265,9 +265,18 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
         }
     }
 
+    /// <summary>The real simulation query, except that one strategy's run answers a failure while it is switched on (the engine reports some transient reads that way).</summary>
+    private sealed class FailingSimulation(IQueryHandler<RunSimulationQuery, Result<SimulationRun>> inner, string strategyId) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>
+    {
+        public bool Failing { get; set; } = true;
+
+        public ValueTask<Result<SimulationRun>> HandleAsync(RunSimulationQuery query, CancellationToken cancellationToken) =>
+            Failing && query.Request.StrategyId == strategyId ? ValueTask.FromResult(Result.Failure<SimulationRun>(Error.Conflict("events.calendar_not_available", "a read failed"))) : inner.HandleAsync(query, cancellationToken);
+    }
+
     private sealed record World(ModelHoldOutScorer Scorer, ModelHoldOutPass Pass, RecordingBars Bars, RecordingExtractor Extractor);
 
-    private static World Assemble(IServiceProvider sp, List<SimTrade> training, List<SimulationRequest> requests, bool simAll, string tradingStrategy)
+    private static World Assemble(IServiceProvider sp, List<SimTrade> training, List<SimulationRequest> requests, bool simAll, string tradingStrategy, FailingSimulation? failing = null)
     {
         var bars = new RecordingBars(sp.GetRequiredService<IBarStore>());
         var extractor = new RecordingExtractor(sp.GetRequiredService<ITradeFeatureExtractor>());
@@ -277,11 +286,14 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
         var jobs = Substitute.For<ISimAllStore>();
         jobs.GetAsync(JobId, Arg.Any<CancellationToken>()).Returns(new SimAllJob(JobId, "completed", null, new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 27), S, 1, "test", DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch));
         jobs.ListSweepsAsync(JobId, Arg.Any<CancellationToken>()).Returns(sweeps);
-        jobs.ListFinishedAsync(JobId, Arg.Any<CancellationToken>()).Returns(new SimAllFinished([RunKey], 0));
+        jobs.ListFinishedAsync(JobId, Arg.Any<CancellationToken>()).Returns(new SimAllFinished([.. sweeps.Select((_, i) => i == 0 ? RunKey : RunKey + i)], 0));
 
         var trainingRuns = Substitute.For<ITrainingRunReader>();
-        trainingRuns.ListByKeysAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>()).Returns(training.Count == 0 ? [] : [new TrainingRunHeader(RunKey, "ORB", new string('1', 64), new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 27), 2, 2, training.Count, 0, DateTimeOffset.UnixEpoch)]);
+        // every sweep finished a run (the plan follows the finished runs, as the training did); only the first run holds the scripted trades
+        var headers = training.Count == 0 ? [] : sweeps.Select((w, i) => new TrainingRunHeader(i == 0 ? RunKey : RunKey + i, w.StrategyId, w.StrategyHash, new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 27), 2, 2, i == 0 ? training.Count : 0, 0, DateTimeOffset.UnixEpoch)).ToList();
+        trainingRuns.ListByKeysAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>()).Returns(headers);
         trainingRuns.StreamTradesAsync(RunKey, Arg.Any<CancellationToken>()).Returns(_ => Stream(training));
+        trainingRuns.StreamTradesAsync(Arg.Is<string>(k => k != RunKey), Arg.Any<CancellationToken>()).Returns(_ => Stream([]));
 
         var runs = Substitute.For<IRunStore>();
         var planner = Substitute.For<ISourceRequestPlanner>();
@@ -295,7 +307,7 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
 
         var pass = new ModelHoldOutPass(
             sp.GetRequiredService<ITrainingSetSources>(), jobs, trainingRuns, new SimTrainingSettings(), runs, planner, strategies, sp.GetRequiredService<IStrategyChecker>(), sp.GetRequiredService<ISimulationEngine>(), sp.GetRequiredService<ICostSheetStore>(),
-            sp.GetRequiredService<LabSettings>(), sp.GetRequiredService<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>(), sp.GetRequiredService<IBasketQueries>(), bars, sp.GetRequiredService<IBackfillSeams>(), sp.GetRequiredService<IAdjustmentFactors>(),
+            sp.GetRequiredService<LabSettings>(), failing ?? sp.GetRequiredService<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>(), sp.GetRequiredService<IBasketQueries>(), bars, sp.GetRequiredService<IBackfillSeams>(), sp.GetRequiredService<IAdjustmentFactors>(),
             sp.GetRequiredService<ITradingCalendar>(), extractor, sp.GetRequiredService<ICellStatsStore>(), sp.GetRequiredService<IModelFiles>(), sp.GetRequiredService<IModelScorerLoader>());
         var scorer = new ModelHoldOutScorer(
             sp.GetRequiredService<IModelRegistry>(), sp.GetRequiredService<IHoldOutStore>(), sp.GetRequiredService<HoldOutEpochs>(), sp.GetRequiredService<ModelHoldOutLooks>(), pass, sp.GetRequiredService<IMlHoldOutScores>(), sp.GetRequiredService<IMlSwitchSettings>(),
@@ -314,7 +326,7 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
 
     private Task<long> CountAsync(string table) => ScalarAsync<long>($"SELECT count(*) FROM {table}");
 
-    private async Task<(long Model, World World, List<SimTrade> Probe)> ArrangeAsync(IServiceProvider sp, bool simAll)
+    private async Task<(long Model, World World, List<SimTrade> Probe)> ArrangeAsync(IServiceProvider sp, bool simAll, bool failOne = false, Action<FailingSimulation>? onFailing = null)
     {
         await SeedWorldAsync();
         var (probe, requests) = await ProbeAsync(sp);
@@ -327,7 +339,14 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
             await StoreSnapshotAsync(sp, TrainingTrades(probe, flipped: true), S, 'd'); // the first day of the block: never used
         }
 
-        return (model, Assemble(sp, simAll ? training : [], requests, simAll, probe[0].StrategyId), probe);
+        FailingSimulation? failing = null;
+        if (failOne)
+        {
+            failing = new FailingSimulation(sp.GetRequiredService<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>(), requests.Select(r => r.StrategyId).First(id => id != probe[0].StrategyId));
+            onFailing?.Invoke(failing);
+        }
+
+        return (model, Assemble(sp, simAll ? training : [], requests, simAll, probe[0].StrategyId, failing), probe);
     }
 
     private static void AssertNoBarAfterTheBlock(World world)
@@ -343,6 +362,7 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
     {
         using var scope = Factory.Services.CreateScope();
         var (model, world, probe) = await ArrangeAsync(scope.ServiceProvider, simAll: true);
+        var requestsCount = (await ProbeAsync(scope.ServiceProvider)).Runnable.Count;
 
         var result = await world.Scorer.ScoreAsync(model, "owner", "owner:test", Ct);
 
@@ -352,6 +372,8 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
         AssertNoBarAfterTheBlock(world);
         (await CountAsync("lab.holdout_unlocks")).ShouldBe(1);
         (await CountAsync("research.ml_holdout_scores")).ShouldBe(1);
+        (await ScalarAsync<int>("SELECT versions_planned FROM research.ml_holdout_scores")).ShouldBe(requestsCount, "the plan is the sweeps that finished a run");
+        (await ScalarAsync<int>("SELECT versions_run FROM research.ml_holdout_scores")).ShouldBe(requestsCount);
 
         var again = await world.Scorer.ScoreAsync(model, "owner", "owner:test", Ct);
         again.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutReusedCode);
@@ -432,5 +454,26 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
         result.Error.Code.ShouldBe(LabErrors.HoldOutFillingCode);
         (await CountAsync("lab.holdout_unlocks")).ShouldBe(0);
         (await CountAsync("research.ml_holdout_scores")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_planned_version_that_cannot_be_replayed_leaves_no_score_row_and_the_same_look_is_finished_later()
+    {
+        using var scope = Factory.Services.CreateScope();
+        FailingSimulation? failing = null;
+        var (model, world, _) = await ArrangeAsync(scope.ServiceProvider, simAll: true, failOne: true, onFailing: f => failing = f);
+
+        var first = await world.Scorer.ScoreAsync(model, "owner", "owner:test", Ct);
+
+        first.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutInterruptedCode);
+        (await CountAsync("lab.holdout_unlocks")).ShouldBe(1);
+        (await CountAsync("research.ml_holdout_scores")).ShouldBe(0, "a look from only some of the planned versions is never stored");
+
+        failing!.Failing = false;
+        var second = await world.Scorer.ScoreAsync(model, "owner", "owner:test", Ct);
+
+        second.IsSuccess.ShouldBeTrue(second.IsFailure ? second.Error.Code : string.Empty);
+        (await CountAsync("lab.holdout_unlocks")).ShouldBe(1, "the same look, not a second one");
+        (await CountAsync("research.ml_holdout_scores")).ShouldBe(1);
     }
 }

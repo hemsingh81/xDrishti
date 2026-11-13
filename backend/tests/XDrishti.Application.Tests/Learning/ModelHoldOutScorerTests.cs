@@ -98,7 +98,7 @@ public sealed class ModelHoldOutScorerTests
                 }
             }
 
-            return ValueTask.FromResult(Result.Success(new ModelHoldOutRows(rows, 0.5, new string('9', 64), 2)));
+            return ValueTask.FromResult(Result.Success(new ModelHoldOutRows(rows, 0.5, new string('9', 64), 2, 1, 1)));
         }
     }
 
@@ -106,12 +106,12 @@ public sealed class ModelHoldOutScorerTests
     {
         public List<StoredMlHoldOutScore> Rows { get; } = [];
 
-        public ValueTask<StoredMlHoldOutScore?> FindAsync(long modelId, DateOnly blockStart, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(Rows.FirstOrDefault(r => r.ModelId == modelId && r.BlockStart == blockStart));
+        public ValueTask<StoredMlHoldOutScore?> FindByLookAsync(string lookKey, DateOnly blockStart, Guid lookId, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(Rows.FirstOrDefault(r => r.LookKey == lookKey && r.BlockStart == blockStart && r.LookId == lookId));
 
         public ValueTask<bool> InsertAsync(StoredMlHoldOutScore score, CancellationToken cancellationToken)
         {
-            if (Rows.Any(r => r.ModelId == score.ModelId && r.BlockStart == score.BlockStart))
+            if (Rows.Any(r => (r.ModelId == score.ModelId || r.LookKey == score.LookKey) && r.BlockStart == score.BlockStart))
             {
                 return ValueTask.FromResult(false);
             }
@@ -182,18 +182,23 @@ public sealed class ModelHoldOutScorerTests
     }
 
     [Fact]
-    public async Task A_block_with_nothing_to_score_answers_422_code_and_the_look_stays_burned()
+    public async Task A_block_with_nothing_to_score_answers_422_code_and_ends_the_look_with_a_terminal_row_so_the_slot_reads_used()
     {
-        _pass.Answer = Result.Success(new ModelHoldOutRows([], 0.5, new string('9', 64), 4));
+        _pass.Answer = Result.Success(new ModelHoldOutRows([], 0.5, new string('9', 64), 4, 1, 1));
 
         var result = await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
         var reading = await Looks().ReadAsync(_model, Ct);
+        var slot = await new ModelLookSlot(_store, new ModelHoldOutCandidates(_registry, _store, _scores)).ReadAsync(Two, Ct);
+        var again = await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
 
         result.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutNoRowsCode);
         _store.Unlocks.Count.ShouldBe(1);
-        _scores.Rows.ShouldBeEmpty();
+        _scores.Rows.Single().Outcome.ShouldBe(MlHoldOutOutcome.NoRows);
+        _scores.Rows.Single().Rows.ShouldBeNull();
         reading.State.ShouldBe("used");
-        reading.Facts!.ProbabilityBeatsNoMl.ShouldBeNull("a look with no figures is unavailable, never a pass");
+        reading.Facts!.ProbabilityBeatsNoMl.ShouldBeNull("a terminal look has no figures: unavailable, never a pass");
+        slot.ShouldBe(LookAvailability.Used, "the release may go on");
+        again.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutReusedCode, "an ended look is not redone");
     }
 
     [Fact]
@@ -238,17 +243,85 @@ public sealed class ModelHoldOutScorerTests
     }
 
     [Fact]
-    public async Task A_failure_that_is_not_transient_still_throws_and_a_look_of_another_model_is_never_resumed()
+    public async Task A_failure_that_is_not_transient_ends_the_look_as_failed_with_its_code_and_a_look_of_another_file_is_never_resumed()
     {
         _pass.FailOnce = new InvalidOperationException("a bug");
-        await Should.ThrowAsync<InvalidOperationException>(async () => await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct));
+
+        var result = await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
+        var slot = await new ModelLookSlot(_store, new ModelHoldOutCandidates(_registry, _store, _scores)).ReadAsync(Two, Ct);
         var other = Model(8, hash: 'b');
         _registry.FindAsync(8, Arg.Any<CancellationToken>()).Returns(other);
-
         var refused = await Scorer().ScoreAsync(8, "owner", "owner:hem", Ct);
 
+        result.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutFailedCode);
+        _scores.Rows.Single().Outcome.ShouldBe(MlHoldOutOutcome.Failed);
+        _scores.Rows.Single().OutcomeCode.ShouldBe(nameof(InvalidOperationException));
+        slot.ShouldBe(LookAvailability.Used);
         refused.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutReusedCode);
         _store.Unlocks.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_planned_version_that_fails_stores_no_row_and_the_look_stays_open_to_be_finished()
+    {
+        _pass.Answer = Result.Failure<ModelHoldOutRows>(Error.Conflict(MlInfluenceErrors.HoldOutInterruptedCode, "a planned version could not be replayed"));
+
+        var first = await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
+        var slot = await new ModelLookSlot(_store, new ModelHoldOutCandidates(_registry, _store, _scores)).ReadAsync(Two, Ct);
+        _pass.Answer = null;
+        var second = await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
+
+        first.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutInterruptedCode);
+        slot.ShouldBe(LookAvailability.Available, "the release waits while the look can still be finished");
+        second.IsSuccess.ShouldBeTrue();
+        _store.Unlocks.Count.ShouldBe(1);
+        _scores.Rows.Single().Outcome.ShouldBe(MlHoldOutOutcome.Scored);
+        _scores.Rows.Single().VersionsPlanned.ShouldBe(1);
+        _scores.Rows.Single().VersionsRun.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_look_still_failing_after_the_resume_window_ends_as_failed_and_the_release_can_go_on()
+    {
+        _pass.FailOnce = new TimeoutException("db");
+        await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
+        _time.Advance(TimeSpan.FromDays(ModelHoldOutScorer.MaxResumeDays + 1));
+
+        var result = await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
+        var slot = await new ModelLookSlot(_store, new ModelHoldOutCandidates(_registry, _store, _scores)).ReadAsync(Two, Ct);
+
+        result.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutFailedCode);
+        _scores.Rows.Single().OutcomeCode.ShouldBe("resume_window_elapsed");
+        slot.ShouldBe(LookAvailability.Used);
+    }
+
+    [Fact]
+    public async Task A_second_registry_row_with_the_same_file_cannot_finish_or_redo_a_look_that_ended()
+    {
+        await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
+        var twin = Model(8); // the same file hash (the look belongs to the file)
+        _registry.FindAsync(8, Arg.Any<CancellationToken>()).Returns(twin);
+
+        var result = await Scorer().ScoreAsync(8, "owner", "owner:hem", Ct);
+        var reading = await Looks().ReadAsync(twin, Ct);
+
+        result.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutReusedCode);
+        _scores.Rows.Count.ShouldBe(1, "one set of figures per look");
+        reading.Facts!.Rows.ShouldBe(150, "the twin reads the figures of the look it shares");
+    }
+
+    [Fact]
+    public async Task A_model_whose_kept_hold_out_reaches_into_the_block_cannot_finish_a_claimed_look()
+    {
+        _pass.FailOnce = new TimeoutException("db");
+        await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
+        var changed = Model(7, holdOutStart: Two.AddDays(5));
+        _registry.FindAsync(7, Arg.Any<CancellationToken>()).Returns(changed);
+
+        var result = await Scorer().ScoreAsync(7, "owner", "owner:hem", Ct);
+
+        result.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutUnavailableCode);
+        _scores.Rows.ShouldBeEmpty();
     }
 
     [Fact]

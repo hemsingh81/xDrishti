@@ -31,7 +31,7 @@ public sealed class MlHoldOutScoresGrantsTests(ResearchGrantsTests.DedicatedServ
         """;
 
     private static string Score(long model, string block, string mode = "owner", string actor = "owner:me@x.test") =>
-        string.Create(CultureInfo.InvariantCulture, $"INSERT INTO research.ml_holdout_scores (model_id, block_start, look_key, row_count, day_count, logloss_model, logloss_baseline, baseline_name, p_better, low, high, policy_effect_r, input_hash, setting_hash, mode, actor, dropped, block_end, look_id) VALUES ({model}, '{block}', 'model-family:tf-1@{block}', 140, 30, 0.652, 0.671, 'cell_rate', 0.97, 0.001, 0.03, 0.04, '{Hash}', '{Hash}', '{mode}', '{actor}', 2, '{block}'::date + 30, '{LookId}')");
+        string.Create(CultureInfo.InvariantCulture, $"INSERT INTO research.ml_holdout_scores (model_id, block_start, look_key, row_count, day_count, logloss_model, logloss_baseline, baseline_name, p_better, low, high, policy_effect_r, input_hash, setting_hash, mode, actor, dropped, block_end, look_id, versions_planned, versions_run) VALUES ({model}, '{block}', 'model-family:tf-1@{block}', 140, 30, 0.652, 0.671, 'cell_rate', 0.97, 0.001, 0.03, 0.04, '{Hash}', '{Hash}', '{mode}', '{actor}', 2, '{block}'::date + 30, '{LookId}', 1, 1)");
 
     private static string Unlock(string block, bool reused = false) =>
         $"INSERT INTO lab.holdout_unlocks (strategy_id, version, kind, unlocked_at, mode, actor, setting_hash, reused_window, block_start, lab_run_id, result) VALUES ('model-family:tf-1@{block}', 1, 'model', now(), 'owner', 'owner:me@x.test', '{Hash}', {reused.ToString().ToLowerInvariant()}, '{block}', '{LookId}', '{{}}'::jsonb)";
@@ -101,5 +101,26 @@ public sealed class MlHoldOutScoresGrantsTests(ResearchGrantsTests.DedicatedServ
         (await SqlStateAsync(server.App, Score(model, "2027-05-01", "auto", "system:auto-score"))).ShouldBe(PostgresErrorCodes.CheckViolation, "the newest switch row is OFF");
         await SwitchAsync(true, server.App);
         (await SqlStateAsync(server.App, Score(model, "2027-05-01", "auto", "system:auto-score"))).ShouldBeNull();
+    }
+
+    private static string Terminal(long model, string block, string outcome, string? code) =>
+        $"INSERT INTO research.ml_holdout_scores (model_id, block_start, look_key, outcome, outcome_code, input_hash, setting_hash, mode, actor, dropped, block_end, look_id, versions_planned, versions_run) VALUES ({model}, '{block}', 'model-family:tf-1@{block}', '{outcome}', {(code is null ? "NULL" : "'" + code + "'")}, '{Hash}', '{Hash}', 'owner', 'owner:me@x.test', 0, '{block}'::date + 30, '{LookId}', 1, 0)";
+
+    [Fact]
+    public async Task A_terminal_row_carries_a_code_and_no_figures_and_a_look_has_one_row_whatever_the_registry_row()
+    {
+        await StoreKit.ExecuteAsync(server.Owner, TrainingSet, Ct);
+        var first = Model.Replace("repeat('7', 64)", "repeat('4', 64)", StringComparison.Ordinal);
+        var model = await ScalarAsync(server.Owner, first);
+        await StoreKit.ExecuteAsync(server.Owner, Unlock("2028-01-01"), Ct);
+        await StoreKit.ExecuteAsync(server.Owner, Unlock("2028-07-01"), Ct);
+
+        (await SqlStateAsync(server.App, Terminal(model, "2028-01-01", "no_rows", null))).ShouldBe(PostgresErrorCodes.CheckViolation, "a terminal row says why");
+        (await SqlStateAsync(server.App, Terminal(model, "2028-01-01", "gone", "x"))).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await SqlStateAsync(server.App, Terminal(model, "2028-01-01", "no_rows", "holdout.no_rows"))).ShouldBeNull();
+        (await SqlStateAsync(server.App, Score(model, "2028-01-01"))).ShouldNotBeNull("the look has ended: one row per look");
+        var twin = await ScalarAsync(server.Owner, first.Replace("(repeat('4', 64), repeat('4', 64)", "(repeat('3', 64), repeat('4', 64)", StringComparison.Ordinal));
+        (await SqlStateAsync(server.App, Terminal(twin, "2028-01-01", "failed", "x"))).ShouldBe(PostgresErrorCodes.UniqueViolation, "a second registry row of the same look never adds a row");
+        (await SqlStateAsync(server.App, Score(model, "2028-07-01").Replace("0.652", "NULL", StringComparison.Ordinal))).ShouldBe(PostgresErrorCodes.CheckViolation, "a scored row has its figures");
     }
 }

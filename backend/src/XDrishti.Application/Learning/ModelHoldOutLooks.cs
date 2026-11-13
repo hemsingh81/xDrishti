@@ -70,9 +70,9 @@ internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time, 
             .FirstOrDefault();
         if (own is not null)
         {
-            // the figures are those stored for exactly this look (CF-10e part 3): a look that was claimed and not scored has none, which is unavailable and never a pass
-            var score = await scores.FindAsync(model.Id, own.BlockStart, cancellationToken);
-            var facts = score is null ? new MlHoldOutFacts(true, false, null, null, null) : new MlHoldOutFacts(true, false, score.Rows, score.ProbabilityBetter, score.PolicyEffectR);
+            // the figures are those stored for exactly this look (found by the look, so every registry row of the same file reads the same row); a look that has no row yet, or ended without figures (a terminal outcome), has none: unavailable, never a pass
+            var score = await scores.FindByLookAsync(own.StrategyId, own.BlockStart, own.RunId, cancellationToken);
+            var facts = score is { IsScored: true } ? new MlHoldOutFacts(true, false, score.Rows, score.ProbabilityBetter, score.PolicyEffectR) : new MlHoldOutFacts(true, false, null, null, null);
             return new HoldOutReading(HoldOutReading.Used, facts, own.BlockStart, own, score);
         }
 
@@ -93,7 +93,7 @@ internal sealed class ModelHoldOutLooks(IHoldOutStore store, TimeProvider time, 
         }
 
         var atBlock = (await store.ListUnlocksByIdPrefixAsync(ModelKind, FamilyId(model.Model) + "@", cancellationToken)).FirstOrDefault(l => l.BlockStart == current.Block.Start);
-        return atBlock is null || (atBlock.RunId == LookId(model.Model) && !atBlock.ReusedWindow && await scores.FindAsync(model.Id, current.Block.Start, cancellationToken) is null);
+        return atBlock is null || (atBlock.RunId == LookId(model.Model) && !atBlock.ReusedWindow && await scores.FindByLookAsync(atBlock.StrategyId, current.Block.Start, atBlock.RunId, cancellationToken) is null);
     }
 
     /// <summary>

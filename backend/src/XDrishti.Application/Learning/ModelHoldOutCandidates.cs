@@ -13,12 +13,17 @@ internal sealed class ModelHoldOutCandidates(IModelRegistry registry, IHoldOutSt
 {
     private const int Limit = 50;
 
-    public async ValueTask<IReadOnlyList<StoredModel>> FindAsync(HoldOutBlock block, CancellationToken cancellationToken)
+    public async ValueTask<IReadOnlyList<StoredModel>> FindAsync(HoldOutBlock block, CancellationToken cancellationToken) => (await ScanAsync(block, cancellationToken)).Select(c => c.Model).ToList();
+
+    /// <summary>Whether a champion's own look at the block was claimed and has not ended (it is still failing or waiting to be finished).</summary>
+    public async ValueTask<bool> HasOpenLookAsync(HoldOutBlock block, CancellationToken cancellationToken) => (await ScanAsync(block, cancellationToken)).Any(c => c.Open);
+
+    private async ValueTask<List<(StoredModel Model, bool Open)>> ScanAsync(HoldOutBlock block, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(block);
         var firstBlock = block.PrevStart is null;
         var firstLookAt = firstBlock ? await store.FirstLookAtAsync(block.Start, cancellationToken) : null;
-        var found = new List<StoredModel>();
+        var found = new List<(StoredModel Model, bool Open)>();
         foreach (var champion in await registry.ListAsync(ModelRole.Champion, Limit, cancellationToken))
         {
             var model = champion.Model;
@@ -30,13 +35,14 @@ internal sealed class ModelHoldOutCandidates(IModelRegistry registry, IHoldOutSt
             }
 
             // a look the model claimed itself and has no figures for is still its to finish (ADR 0285, amendment); any other look at the block is taken
-            if (await store.GetUnlockAsync(ModelHoldOutLooks.LookKey(model, block.Start), ModelHoldOutLooks.FamilyVersion, ModelHoldOutLooks.ModelKind, block.Start, cancellationToken) is { } look
-                && (look.RunId != ModelHoldOutLooks.LookId(model) || look.ReusedWindow || await scores.FindAsync(champion.Id, block.Start, cancellationToken) is not null))
+            var existing = await store.GetUnlockAsync(ModelHoldOutLooks.LookKey(model, block.Start), ModelHoldOutLooks.FamilyVersion, ModelHoldOutLooks.ModelKind, block.Start, cancellationToken);
+            if (existing is { } look
+                && (look.RunId != ModelHoldOutLooks.LookId(model) || look.ReusedWindow || await scores.FindByLookAsync(look.StrategyId, block.Start, look.RunId, cancellationToken) is not null))
             {
                 continue;
             }
 
-            found.Add(champion);
+            found.Add((champion, existing is not null));
         }
 
         return found;

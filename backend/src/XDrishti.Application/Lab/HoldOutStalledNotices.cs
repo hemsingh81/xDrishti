@@ -9,7 +9,7 @@ namespace XDrishti.Application.Lab;
 /// The bell notice of a stalled hold-out block (HO-01 D4), derived on read like the other notices (P8-15): the block in force has been sealed for <see cref="HoldOutStall.Sessions"/> sessions or more without a release, and the notice names what keeps the auto release
 /// from acting (<see cref="HoldOutReleaser.WhatHoldsAsync"/>). It is present while the cause stands; it carries words and a date, no figure of the evidence. A read that fails shows nothing (the next read tries again). Nothing is stored or changed by reading it.
 /// </summary>
-internal sealed class HoldOutStalledNotices(HoldOutEpochs epochs, HoldOutReleaser releaser) : IBellNoticeSource
+internal sealed class HoldOutStalledNotices(HoldOutEpochs epochs, HoldOutReleaser releaser, IEnumerable<IHoldOutLookSlot>? slots = null) : IBellNoticeSource
 {
     public const string Kind = "holdout_stalled";
 
@@ -32,6 +32,23 @@ internal sealed class HoldOutStalledNotices(HoldOutEpochs epochs, HoldOutRelease
             return [];
         }
 
+        var notes = new List<string>();
+        foreach (var slot in slots ?? [])
+        {
+            try
+            {
+                if (await slot.StallNoteAsync(current.Block.Start, cancellationToken) is { } note)
+                {
+                    notes.Add(note);
+                }
+            }
+            catch (Exception failure) when (failure is not (OperationCanceledException or OutOfMemoryException))
+            {
+                // a note that cannot be read is left out: the notice still stands
+                _ = failure;
+            }
+        }
+
         var start = current.Block.Start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         return
         [
@@ -39,7 +56,7 @@ internal sealed class HoldOutStalledNotices(HoldOutEpochs epochs, HoldOutRelease
                 $"holdout:stalled:{start}:{reason}",
                 Kind,
                 "warning",
-                $"The hold-out block that starts {start} sealed {sessions.ToString(CultureInfo.InvariantCulture)} sessions ago and is not released, so no new session reaches learning. {Why(reason)}",
+                $"The hold-out block that starts {start} sealed {sessions.ToString(CultureInfo.InvariantCulture)} sessions ago and is not released, so no new session reaches learning. {Why(reason)}{(notes.Count == 0 ? string.Empty : " " + string.Join(' ', notes))}",
                 "/lab",
                 null,
                 null,

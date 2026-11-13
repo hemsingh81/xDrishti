@@ -17624,6 +17624,10 @@ export interface components {
        * @default false
        */
       canScore: boolean;
+      /** @description How the look ended: `scored`, `no_rows` or `failed` (terminal, no figures), or null while it is open or not taken. */
+      outcome?: null | string;
+      /** @description Why a terminal look ended, or null. */
+      outcomeCode?: null | string;
     };
     /** @description `GET /api/learning/models/{id}/influence`: whether the model may influence a decision, term by term (CF-10 part 10c-2, ADR 0217). */
     MlInfluenceView: {

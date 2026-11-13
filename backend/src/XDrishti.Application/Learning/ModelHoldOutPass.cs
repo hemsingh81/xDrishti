@@ -29,8 +29,8 @@ internal sealed record PlannedRun(string Hash, string StrategyId, string Style, 
 /// <summary>What the model's pass needs before the block is touched: the loaded scorer, the cell statistics known before the block, the base rate read from them and the planned replays. Nothing in it was read from the block.</summary>
 internal sealed record PreparedModelHoldOut(StoredModel Model, IExplainableScorer Scorer, IReadOnlyDictionary<string, CellStatsRow> Cells, double BaseRate, IReadOnlyList<PlannedRun> Runs);
 
-/// <summary>What the model's pass over the block produced: the scored rows, the base rate read before the block, a hash of the rows and how many candidates could not be scored (no feature or no cell statistics).</summary>
-internal sealed record ModelHoldOutRows(IReadOnlyList<ModelHoldOutRow> Rows, double BaseRate, string InputHash, int Dropped);
+/// <summary>What the model's pass over the block produced: the scored rows, the base rate read before the block, a hash of the rows, how many candidates could not be scored (no feature or no cell statistics) and how many strategy versions were planned and ran (a look is finished only when all of them ran).</summary>
+internal sealed record ModelHoldOutRows(IReadOnlyList<ModelHoldOutRow> Rows, double BaseRate, string InputHash, int Dropped, int VersionsPlanned, int VersionsRun);
 
 /// <summary>The pass of a model's strategy versions over the hold-out block, in two steps (an interface so the scoring can be tested without an engine): <see cref="PrepareAsync"/> reads no bar and no session of the block and runs before the look is claimed, so an input that is missing refuses the act before anything is burned.</summary>
 internal interface IModelHoldOutPass
@@ -149,10 +149,12 @@ internal sealed class ModelHoldOutPass(
             return Result.Failure<ModelHoldOutRows>(simulated.Error);
         }
 
+        var candidates = simulated.Value.Candidates;
+
         var calendar = await calendars.GetAsync(cancellationToken);
         var rows = new List<ModelHoldOutRow>();
         var dropped = 0;
-        foreach (var group in simulated.Value.GroupBy(c => c.InstrumentId))
+        foreach (var group in candidates.GroupBy(c => c.InstrumentId))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var decisions = group.Select(c => new TradeFeatureDecision(c.Key, c.Timeframe, c.DecisionEpoch, c.Side, c.Stop, c.Target)).ToList();
@@ -203,11 +205,14 @@ internal sealed class ModelHoldOutPass(
         }
 
         var text = string.Join('\n', rows.OrderBy(r => r.Key, StringComparer.Ordinal).Select(r => string.Create(CultureInfo.InvariantCulture, $"{r.Key}|{r.Day:yyyy-MM-dd}|{r.PWin:R}|{(r.Won ? 1 : 0)}|{r.R:R}|{r.CellRate:R}")));
-        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(string.Create(CultureInfo.InvariantCulture, $"model-holdout/1|{prepared.Model.Model.Sha256}|{block.Start:yyyy-MM-dd}|{prepared.BaseRate:R}\n{text}"))));
-        return Result.Success(new ModelHoldOutRows(rows, prepared.BaseRate, hash, dropped));
+        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(string.Create(CultureInfo.InvariantCulture, $"model-holdout/2|{prepared.Model.Model.Sha256}|{block.Start:yyyy-MM-dd}|{prepared.BaseRate:R}|{prepared.Runs.Count}|{simulated.Value.Ran}\n{text}"))));
+        return Result.Success(new ModelHoldOutRows(rows, prepared.BaseRate, hash, dropped, prepared.Runs.Count, simulated.Value.Ran));
     }
 
-    /// <summary>A model trained from a simulation job: the versions are the job's sweeps, replayed as the job's chunks were (default parameters and timeframe, the stored charge sheet), and the cells are rebuilt from the job's closed trades that ended before the block.</summary>
+    /// <summary>
+    /// A model trained from a simulation job: the versions are the job's sweeps that finished a run (as the training used only finished runs), replayed as the job's chunks were (default parameters and timeframe), costed as the job's trades were (all charged: the stored charge sheet; none: gross; a mix refuses), and the cells are rebuilt
+    /// from the job's closed trades that ended before the block.
+    /// </summary>
     private async ValueTask<Result<(IReadOnlyList<PlannedRun> Runs, IReadOnlyList<CellStatsRow> Stats)>> PlanSimulationAsync(string jobText, IReadOnlyList<Guid> instruments, DateOnly blockStart, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(jobText, out var jobId) || await jobs.GetAsync(jobId, cancellationToken) is not { } job)
@@ -215,27 +220,11 @@ internal sealed class ModelHoldOutPass(
             return Unavailable<(IReadOnlyList<PlannedRun>, IReadOnlyList<CellStatsRow>)>("The simulation job of the model's training set is not stored.");
         }
 
-        var sweeps = await jobs.ListSweepsAsync(jobId, cancellationToken);
-        var sheet = await sheets.FindAsync(labSettings.CostSheetId, cancellationToken);
-        var costs = sheet.IsSuccess && sheet.Value.Schedules.Count > 0 && sheet.Value.Schedules[0].EffectiveFrom <= blockStart ? CostChoice.Sheet(sheet.Value.Id) : CostChoice.Gross;
-        var planned = new List<PlannedRun>();
-        foreach (var sweep in sweeps)
-        {
-            var version = await strategies.GetByHashAsync(sweep.StrategyHash, cancellationToken);
-            if (version is null || checker.Check(version.SourceText).Description is not { } description)
-            {
-                return Unavailable<(IReadOnlyList<PlannedRun>, IReadOnlyList<CellStatsRow>)>("A strategy version of the training set is not stored or no longer compiles, so the model cannot be scored on it.");
-            }
-
-            var timeframe = engine.BuiltIns.FirstOrDefault(b => string.Equals(b.Id, sweep.StrategyId, StringComparison.Ordinal))?.DefaultTimeframe
-                ?? (description.Timeframes.Contains(Timeframe.M15) || description.Timeframes.Count == 0 ? Timeframe.M15 : description.Timeframes[0]);
-            var request = new SimulationRequest(sweep.StrategyId, new Dictionary<string, double>(), timeframe.ToCode(), blockStart, blockStart, [.. instruments], null, costs, false, null, null, null, null, sweep.StrategyHash);
-            planned.Add(new PlannedRun(sweep.StrategyHash, sweep.StrategyId, SimTrainingCells.Style, SimTrainingCells.ExitLabel, request));
-        }
-
-        // the cells, as the training built them, from the closed trades that ended before the block (the job's window ends before its hold-out; the filter makes it a property of this read too)
         var finished = await jobs.ListFinishedAsync(jobId, cancellationToken);
         var headers = await trainingRuns.ListByKeysAsync(finished.RunKeys, cancellationToken);
+        var sweeps = (await jobs.ListSweepsAsync(jobId, cancellationToken)).Where(w => headers.Any(h => string.Equals(h.StrategyId, w.StrategyId, StringComparison.Ordinal) && string.Equals(h.DefinitionSha256, w.StrategyHash, StringComparison.Ordinal))).ToList();
+
+        // the cells, as the training built them, from the closed trades that ended before the block (the job's window ends before its hold-out; the filter makes it a property of this read too)
         var sampleEvery = (int)Math.Max(1, (headers.Sum(h => (long)h.TradeCount) + trainingSettings.MaxRows - 1) / trainingSettings.MaxRows);
         var trades = new List<SimTrade>();
         foreach (var header in headers)
@@ -248,6 +237,38 @@ internal sealed class ModelHoldOutPass(
                     trades.Add(t);
                 }
             }
+        }
+
+        var charged = trades.Count(t => t.Costs == CostBasis.Charged && t.Costing is not null);
+        if (charged != 0 && charged != trades.Count)
+        {
+            return Unavailable<(IReadOnlyList<PlannedRun>, IReadOnlyList<CellStatsRow>)>("The training trades mix charged and gross R, so the cost basis of the hold-out cannot follow them.");
+        }
+
+        var costs = CostChoice.Gross;
+        if (charged > 0)
+        {
+            var sheet = await sheets.FindAsync(labSettings.CostSheetId, cancellationToken);
+            if (sheet.IsFailure || sheet.Value.Schedules.Count == 0 || sheet.Value.Schedules[0].EffectiveFrom > blockStart)
+            {
+                return Unavailable<(IReadOnlyList<PlannedRun>, IReadOnlyList<CellStatsRow>)>("The training trades were charged, but the charge sheet is not stored or not in force on the block's first day.");
+            }
+
+            costs = CostChoice.Sheet(sheet.Value.Id);
+        }
+
+        var planned = new List<PlannedRun>();
+        foreach (var sweep in sweeps)
+        {
+            var version = await strategies.GetByHashAsync(sweep.StrategyHash, cancellationToken);
+            if (version is null || checker.Check(version.SourceText).Description is not { } description)
+            {
+                return Unavailable<(IReadOnlyList<PlannedRun>, IReadOnlyList<CellStatsRow>)>("A strategy version of the training set is not stored or no longer compiles, so the model cannot be scored on it.");
+            }
+
+            var timeframe = SimTrainingCells.DefaultTimeframe(engine, sweep.StrategyId, description);
+            var request = new SimulationRequest(sweep.StrategyId, new Dictionary<string, double>(), timeframe.ToCode(), blockStart, blockStart, [.. instruments], null, costs, false, null, null, null, null, sweep.StrategyHash);
+            planned.Add(new PlannedRun(sweep.StrategyHash, sweep.StrategyId, SimTrainingCells.Style, SimTrainingCells.ExitLabel, request));
         }
 
         var inputs = SimTrainingCells.BuildInputs(trades);
@@ -285,22 +306,20 @@ internal sealed class ModelHoldOutPass(
         return Result.Success<IReadOnlyList<PlannedRun>>([.. planned.DistinctBy(p => (p.Hash, p.Style, p.Exit, p.Request.EvaluationTimeframe))]);
     }
 
-    private async ValueTask<Result<List<Candidate>>> SimulateAsync(IReadOnlyList<PlannedRun> plan, HoldOutBlock block, CancellationToken cancellationToken)
+    /// <summary>Replays every planned version over the block. If any one fails the whole run fails (a look that finished on only some of the versions would be a different look from the one the plan names, and could never be redone); nothing is stored then and the look stays open.</summary>
+    private async ValueTask<Result<(List<Candidate> Candidates, int Ran)>> SimulateAsync(IReadOnlyList<PlannedRun> plan, HoldOutBlock block, CancellationToken cancellationToken)
     {
         var result = new List<Candidate>();
-        var failed = 0;
-        Error? lastFailure = null;
+        var ran = 0;
         foreach (var v in plan)
         {
             var run = await simulation.HandleAsync(new RunSimulationQuery(v.Request with { From = block.Start, To = block.HistoryLast, Purpose = RunPurpose.Research }), cancellationToken);
             if (run.IsFailure)
             {
-                // a version that cannot run (as a failed chunk of the training job) contributes no candidate; if none runs at all the act is refused below
-                failed++;
-                lastFailure = run.Error;
-                continue;
+                return Result.Failure<(List<Candidate>, int)>(Error.Conflict(MlInfluenceErrors.HoldOutInterruptedCode, $"A planned strategy version could not be replayed over the block ({run.Error.Code}); nothing was stored and the look stays open."));
             }
 
+            ran++;
             foreach (var rt in run.Value.Trades)
             {
                 var t = rt.Trade;
@@ -309,7 +328,7 @@ internal sealed class ModelHoldOutPass(
             }
         }
 
-        return failed == plan.Count && lastFailure is not null ? Result.Failure<List<Candidate>>(lastFailure) : Result.Success(result);
+        return Result.Success((result, ran));
     }
 
     private async ValueTask<IReadOnlyList<Guid>> InstrumentsAsync(DateOnly asOf, CancellationToken cancellationToken)

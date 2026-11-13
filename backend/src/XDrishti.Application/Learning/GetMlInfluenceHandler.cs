@@ -32,7 +32,7 @@ internal sealed class GetMlInfluenceHandler(MlInfluenceEvaluator evaluator, Mode
             e.MayInfluence,
             [.. e.Terms.Select(t => new MlTermView(t.Name, t.State.ToString().ToLowerInvariant(), [.. t.Reasons.Select(Reason)]))],
             [.. e.Reasons.Select(Reason)],
-            new MlHoldOutView(e.HoldOut.State, ModelHoldOutLooks.FamilyId(e.Model.Model), e.HoldOut.BlockStart, facts?.Rows, facts?.ProbabilityBeatsNoMl, facts?.PolicyEffectR, score?.LogLossModel, score?.LogLossBaseline, score?.BaselineName, score?.GainLow, score?.GainHigh, score?.Mode, await looks.CanScoreAsync(e.Model, await epochs.InForceAsync(cancellationToken), cancellationToken)),
+            new MlHoldOutView(e.HoldOut.State, ModelHoldOutLooks.FamilyId(e.Model.Model), e.HoldOut.BlockStart, facts?.Rows, facts?.ProbabilityBeatsNoMl, facts?.PolicyEffectR, score?.LogLossModel, score?.LogLossBaseline, score?.BaselineName, score?.GainLow, score?.GainHigh, score?.Mode, await looks.CanScoreAsync(e.Model, await epochs.InForceAsync(cancellationToken), cancellationToken), score?.Outcome, score?.OutcomeCode),
             e.Facts.SwitchOn,
             e.SettingHash,
             options.KeyText(),

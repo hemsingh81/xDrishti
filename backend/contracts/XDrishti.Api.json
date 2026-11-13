@@ -54479,6 +54479,20 @@
             "type": "boolean",
             "description": "Whether the owner could take (or finish) the model's look now: the block in force is sealed, the model kept a hold-out before it, and its family has no finished look there. A hint for the button; the act decides.",
             "default": false
+          },
+          "outcome": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "How the look ended: `scored`, `no_rows` or `failed` (terminal, no figures), or null while it is open or not taken."
+          },
+          "outcomeCode": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why a terminal look ended, or null."
           }
         },
         "description": "Where the model stands with the locked hold-out."

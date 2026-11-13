@@ -103,6 +103,14 @@ function Body({ id, view }: { id: number; view: MlInfluence }) {
               ),
           },
           ...(holdOut.mode ? [{ label: 'Look taken as', value: holdOut.mode }] : []),
+          ...(holdOut.outcome && holdOut.outcome !== 'scored'
+            ? [
+                {
+                  label: 'Look outcome',
+                  value: `Ended without figures (${holdOut.outcome.replaceAll('_', ' ')}${holdOut.outcomeCode ? `: ${holdOut.outcomeCode}` : ''}). Not a pass.`,
+                },
+              ]
+            : []),
           { label: 'Thresholds', value: view.settings },
         ]}
       />

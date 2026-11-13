@@ -18,7 +18,7 @@ internal static class MlInfluenceKit
     /// <summary>A score store with no figures (the models of these tests never scored a hold-out).</summary>
     public sealed class NoScores : IMlHoldOutScores
     {
-        public ValueTask<StoredMlHoldOutScore?> FindAsync(long modelId, DateOnly blockStart, CancellationToken cancellationToken) => ValueTask.FromResult<StoredMlHoldOutScore?>(null);
+        public ValueTask<StoredMlHoldOutScore?> FindByLookAsync(string lookKey, DateOnly blockStart, Guid lookId, CancellationToken cancellationToken) => ValueTask.FromResult<StoredMlHoldOutScore?>(null);
 
         public ValueTask<bool> InsertAsync(StoredMlHoldOutScore score, CancellationToken cancellationToken) => ValueTask.FromResult(false);
     }

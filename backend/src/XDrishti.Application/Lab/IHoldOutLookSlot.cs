@@ -13,4 +13,7 @@ internal interface IHoldOutLookSlot
 
     /// <summary>What the kind can still do at the block.</summary>
     ValueTask<LookAvailability> ReadAsync(DateOnly blockStart, CancellationToken cancellationToken);
+
+    /// <summary>A sentence for the stall notice when this kind's look is held up by something other than a missing look (for example a claimed look that keeps failing), else null. Words only, no figure.</summary>
+    ValueTask<string?> StallNoteAsync(DateOnly blockStart, CancellationToken cancellationToken) => ValueTask.FromResult<string?>(null);
 }

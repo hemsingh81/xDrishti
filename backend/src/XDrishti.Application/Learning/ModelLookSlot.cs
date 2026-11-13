@@ -21,4 +21,12 @@ internal sealed class ModelLookSlot(IHoldOutStore store, ModelHoldOutCandidates 
 
         return await store.HasFreshLookAsync(blockStart, Kind, cancellationToken) ? LookAvailability.Used : LookAvailability.NoSubject;
     }
+
+    public async ValueTask<string?> StallNoteAsync(DateOnly blockStart, CancellationToken cancellationToken)
+    {
+        var block = (await store.ListBlocksAsync(cancellationToken)).Select(b => b.Block).FirstOrDefault(b => b.Start == blockStart);
+        return block is not null && await candidates.HasOpenLookAsync(block, cancellationToken)
+            ? "The model's claimed look keeps failing (see the log, learning.model.holdout_pass_failed); it ends as failed after its resume window, and then the block can be released."
+            : null;
+    }
 }
