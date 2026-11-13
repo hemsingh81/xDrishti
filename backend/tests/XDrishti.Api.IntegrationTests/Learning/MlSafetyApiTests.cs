@@ -394,12 +394,16 @@ public sealed class MlSafetyApiTests(ApiFactory factory) : DataTestBase(factory)
     [Fact]
     public async Task Any_change_of_the_auto_hold_out_score_needs_the_password_and_is_recorded_with_the_owner()
     {
-        var missing = await SendAsync(HttpMethod.Put, Settings, new { autoHoldOutScore = false, reason = "choose myself" });
-        var done = await SendAsync(HttpMethod.Put, Settings, new { autoHoldOutScore = false, reason = "choose myself", password = Factory.OwnerPassword });
+        // the test database has no seed row (the setup clears the table), so no row reads OFF and the first change is ON
+        var missing = await SendAsync(HttpMethod.Put, Settings, new { autoHoldOutScore = true, reason = "back on" });
+        var on = await SendAsync(HttpMethod.Put, Settings, new { autoHoldOutScore = true, reason = "back on", password = Factory.OwnerPassword });
+        var off = await SendAsync(HttpMethod.Put, Settings, new { autoHoldOutScore = false, reason = "choose myself", password = Factory.OwnerPassword });
 
         missing.Status.ShouldBe(HttpStatusCode.Forbidden);
-        done.Status.ShouldBe(HttpStatusCode.OK);
-        (await ScalarAsync<string>("SELECT name || '|' || enabled::text || '|' || actor FROM research.ml_switch_settings")).ShouldBe($"ml.holdout.auto_score|false|owner:{ApiFactory.OwnerEmail}");
+        on.Status.ShouldBe(HttpStatusCode.OK);
+        off.Status.ShouldBe(HttpStatusCode.OK);
+        (await ScalarAsync<long>("SELECT count(*) FROM research.ml_switch_settings WHERE name = 'ml.holdout.auto_score'")).ShouldBe(2);
+        (await ScalarAsync<string>("SELECT enabled::text || '|' || actor FROM research.ml_switch_settings ORDER BY id DESC LIMIT 1")).ShouldBe($"false|owner:{ApiFactory.OwnerEmail}");
     }
 
     [Fact]
