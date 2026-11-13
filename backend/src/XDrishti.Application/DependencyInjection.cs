@@ -772,6 +772,7 @@ public static class DependencyInjection
         services.AddScoped<LabHoldOutGuard>(); // the size, the block and the cut of the locked hold-out (CF-06)
         services.AddScoped<TrainingWindowResolver>(); // the training window: ends before the hold-out and its embargo, fail closed (AU-11, ADR 0243)
         services.AddScoped<IQueryHandler<GetRegistrationQuery, Result<RegistrationView>>, GetRegistrationHandler>(); // reads only the registration store; here, not in AddLabRunner, because the readiness gate (CF-11) of the lifecycle recorder reads it in every host that records a cell move
+        services.AddScoped<HoldOutEpochs>(); // the chain of hold-out blocks and their derived states (HO-01, ADR 0283); here, with the hold-out read that uses it
         services.AddScoped<IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>, GetHoldOutHandler>(); // reads the hold-out store and the guard; here for the same reason
         services.TryAddSingleton(LabSettings.Default); // the host replaces it with its configuration
         services.TryAddSingleton(new ShrinkageOptions()); // shrinkage of expectancy toward the parent (CF-02, ADR 0204): ReportOnly; the host replaces it with its configuration (section Confidence:Shrinkage)
@@ -819,7 +820,6 @@ public static class DependencyInjection
         services.AddScoped<HoldOutUnlocker>(); // the one look at the hold-out, by the owner or by the auto option (CF-06)
         services.AddScoped<ICommandHandler<RegisterStrategyCommand, RegistrationView>, RegisterStrategyHandler>();
         services.AddScoped<ICommandHandler<UnlockHoldOutCommand, LabRunView>, UnlockHoldOutHandler>();
-        services.AddScoped<HoldOutEpochs>(); // the chain of hold-out blocks and their derived states (HO-01, ADR 0283)
         services.AddScoped<HoldOutReleaser>(); // the one release of the block in force: the owner act and the auto option (HO-01); the seal step of HO-01b registers its IHoldOutLookSlot kinds
         services.AddScoped<ICommandHandler<ReleaseHoldOutCommand, HoldOutBlockView>, ReleaseHoldOutHandler>();
         services.AddScoped<LabPlateau>(); // the plateau gate beside the nulls, read from the stored sweep (CF-07 part C, ADR 0210)

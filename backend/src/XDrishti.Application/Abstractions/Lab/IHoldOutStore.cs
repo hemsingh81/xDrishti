@@ -6,7 +6,7 @@ namespace XDrishti.Application.Abstractions.Lab;
 /// <remarks><c>PrevStart</c> is the start of the block before it in the chain, null for block 1 (HO-01). A block of the chain ends on <c>HistoryLast</c>.</remarks>
 public sealed record HoldOutBlock(DateOnly Start, DateOnly HistoryFirst, DateOnly HistoryLast, int LengthMonths, string SettingHash, DateTimeOffset CreatedAt, DateOnly? PrevStart = null);
 
-/// <summary>The release of a block (HO-01 D4), as stored in <c>lab.holdout_releases</c>: owner or auto, the setting snapshot, whether the block had a fresh look, and the block it opened.</summary>
+/// <summary>The release of a block (HO-01 D4), as stored in the release table: owner or auto, the setting snapshot, whether the block had a fresh look, and the block it opened.</summary>
 public sealed record StoredRelease(DateOnly BlockStart, DateTimeOffset ReleasedAt, string Mode, string Actor, string SettingHash, bool Looked, DateOnly NextBlockStart);
 
 /// <summary>A block of the chain with its release, when it has one.</summary>
@@ -29,7 +29,7 @@ public enum ReleaseOutcome
 public sealed record StoredUnlock(string StrategyId, int Version, string Kind, string Mode, string Actor, DateTimeOffset UnlockedAt, string SettingHash, bool ReusedWindow, DateOnly BlockStart, Guid RunId, HoldOutResultView Result);
 
 /// <summary>
-/// <c>lab.holdout_blocks</c> and <c>lab.holdout_unlocks</c> behind a port (spec CF-06). Both are insert-only for the runtime role. This port reads the stored records of the hold-out, not market data: the sessions inside the hold-out are read only by the unlock
+/// The hold-out blocks, their releases and the looks taken (<c>lab.holdout_unlocks</c>) behind a port (spec CF-06, HO-01). All are insert-only for the runtime role. This port reads the stored records of the hold-out, not market data: the sessions inside the hold-out are read only by the unlock
 /// (<c>HoldOutPass</c>), which an architecture test pins.
 /// </summary>
 public interface IHoldOutStore
