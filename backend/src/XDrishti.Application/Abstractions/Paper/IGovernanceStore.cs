@@ -89,7 +89,8 @@ public sealed record StoredChange(long Id, long FromSnapshotId, long ToSnapshotI
 /// <param name="Straddle">Entries set aside.</param>
 /// <param name="RiskDownChanges">Risk-down changes noted in the epoch.</param>
 /// <param name="UnexplainedChanges">Changes with no explanation and no note.</param>
-public sealed record EpochSummary(EpochRow Epoch, string? Hash, int Counted, int Straddle, int RiskDownChanges, int UnexplainedChanges);
+/// <param name="CellsRefreshed">Noted cell-statistics snapshot changes in the epoch (decision 9, ADR 0286).</param>
+public sealed record EpochSummary(EpochRow Epoch, string? Hash, int Counted, int Straddle, int RiskDownChanges, int UnexplainedChanges, int CellsRefreshed = 0);
 
 /// <summary>An owner's note (<c>paper.epoch_notes</c>).</summary>
 /// <param name="Id">The id.</param>

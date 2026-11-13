@@ -37,8 +37,11 @@ public sealed class CashOnlyDecisionPathTests
     {
         var cell = new CellId("ORB", "15m", "BUY", "intraday", "FIXED_RR", Expression: expression);
         var row = new CellStatsRow(cell, CellWindow.All, new DateOnly(2026, 10, 23), true, 40, 20, 40, 0.5, 0.5, posterior, 0.5, 0.6, 2, -1, 0.5, 1.5, 3, 0.3, 0.8, 0.5, 1.5, true);
-        return new StoredCellStats(snapshot, DateTimeOffset.UnixEpoch, new CellStatsOptions(), "sources", row);
+        return new StoredCellStats(snapshot, DateTimeOffset.UnixEpoch, new CellStatsOptions(), "run1:intraday:FIXED_RR", row);
     }
+
+    private static StoredRunHeader Header() =>
+        new(1, "run1", "sim-1", 1, 1, "ORB", "def1", new DateOnly(2024, 1, 1), new DateOnly(2026, 10, 1), "index", "NIFTY 50", 50, 50, 10, 10, 10, 0, false, "next_open", null, null, 1, "r", "t", DateTimeOffset.UnixEpoch, "owner");
 
     private static async Task<List<string>> ComponentsAsync(IEnumerable<ChangelogEntry> log, params StoredCellStats[] stats)
     {
@@ -47,8 +50,10 @@ public sealed class CashOnlyDecisionPathTests
         var cellStats = Substitute.For<ICellStatsStore>();
         cellStats.ListLatestCashAsync(null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<StoredCellStats>>(stats));
         var strategies = Substitute.For<IStrategyStore>();
+        var runs = Substitute.For<IRunStore>();
+        runs.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<StoredRunHeader?>(Header()));
         var source = new ConfigSnapshotSource(
-            Substitute.For<IPlanningSettingsReader>(), Substitute.For<IAutonomySettingsStore>(), Substitute.For<IAccountStore>(), Substitute.For<IRiskProfileStore>(), changelog, strategies, cellStats,
+            Substitute.For<IPlanningSettingsReader>(), Substitute.For<IAutonomySettingsStore>(), Substitute.For<IAccountStore>(), Substitute.For<IRiskProfileStore>(), changelog, strategies, cellStats, runs,
             Substitute.For<IModelRegistry>(), Substitute.For<ISimulationEngine>(), Substitute.For<IGradeSettings>(), Substitute.For<ICostSheetStore>());
 
         var reading = await source.ReadAsync(Ct);

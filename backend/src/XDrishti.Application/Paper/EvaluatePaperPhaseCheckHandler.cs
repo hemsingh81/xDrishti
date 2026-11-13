@@ -79,7 +79,7 @@ internal sealed class EvaluatePaperPhaseCheckHandler(
         }
 
         var history = await governance.ListEpochsAsync(cancellationToken);
-        var historyFacts = history.OrderBy(h => h.Epoch.Id).Select(h => new PhaseEpochFact(h.Epoch.Id, h.Epoch.StartedOn, h.Epoch.Kind, h.Epoch.Reason, h.Counted, h.UnexplainedChanges, h.RiskDownChanges)).ToList();
+        var historyFacts = history.OrderBy(h => h.Epoch.Id).Select(h => new PhaseEpochFact(h.Epoch.Id, h.Epoch.StartedOn, h.Epoch.Kind, h.Epoch.Reason, h.Counted, h.UnexplainedChanges, h.RiskDownChanges, h.CellsRefreshed)).ToList();
         var setup = await SetupAsync(cancellationToken);
         var p7 = await P7Async(through, cancellationToken);
 

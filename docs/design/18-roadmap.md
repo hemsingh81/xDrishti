@@ -112,7 +112,7 @@ A due-diligence review on 2026-11-12 compared what is built with the owner's goa
 | Id | What | Size | Needs | Status |
 |----|------|------|-------|--------|
 | LC-01 | [Scheduled cell-statistics refresh](../specs/LC-01-scheduled-cell-statistics-refresh.md) | 2.5 d | nothing unbuilt | Built 2026-11-12, merged and deployed 2026-11-13 (ADR 0277); decision 9 answered 2026-11-13, option (a): slice DEC9 |
-| DEC9 | [Paper epoch freezes versions and rules, not the cell snapshot](../specs/LC-01-scheduled-cell-statistics-refresh.md#decision-9-owner-2026-11-13) | 1 d | LC-01, P10-05 | Approved 2026-11-13 (owner, decision 9), not built; ADR 0286 reserved |
+| DEC9 | [Paper epoch freezes versions and rules, not the cell snapshot](../specs/LC-01-scheduled-cell-statistics-refresh.md#decision-9-owner-2026-11-13) | 1 d | LC-01, P10-05 | Built 2026-11-13 (ADR 0286) |
 | HO-01 | [Hold-out epochs](../specs/HO-01-hold-out-epochs.md) | 4.5 d (HO-01a 2.5, HO-01b 2) | CF-06, LC-01 | Approved 2026-11-13 (owner, all eight questions as recommended, with the due diligence: one fresh look per kind, auto release ON), not built; ADR 0283 reserved |
 | CS-01 | [Cost sheet derived from Dhan reports](../specs/CS-01-cost-sheet-derive-from-dhan-reports.md) | 2 d | P2-17 | Built 2026-11-12, merged and deployed 2026-11-13 (`scripts/cost-sheet.sh derive`) |
 | CF-10e | [ML influence evidence sources](../specs/CF-10e-ml-influence-evidence-sources.md) | 6.5 d | CF-10; part 3 needs HO-01b | Parts 1–2 built 2026-11-12, merged and deployed 2026-11-13 (shadow scores, forward figures, calibration alarm, designate through promotion; ADR 0281); part 3 approved 2026-11-13, builds after HO-01b (own model slot, `ml.holdout.auto_score` ON); ADR 0285 reserved |

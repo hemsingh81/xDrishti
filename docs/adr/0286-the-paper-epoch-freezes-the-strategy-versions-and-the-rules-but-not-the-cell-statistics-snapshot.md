@@ -1,0 +1,19 @@
+# 0286 — The paper epoch freezes the strategy versions and the rules but not the cell-statistics snapshot
+
+- **Status:** Accepted (owner, 2026-11-13, roadmap open decision 9, option (a)).
+- **Date:** 2026-11-13.
+- **Relation to other ADRs:** Amends [0119](0119-a-measurement-epoch-freezes-the-measured-configuration-changes-are-detected-classed-and-labelled-and-nothing-is-applied-or-blocked.md) (the snapshot is no longer frozen) and [0277](0277-the-cell-statistics-refresh-repeats-the-newest-snapshot-to-the-hold-out-cut-fails-closed-and-resumes-only-with-the-owners-password.md) sections 7 and 11 (the paper blocker and the restart of the count). Spec: LC-01 *Decision 9*, P10-05 amendment.
+
+## Context
+A 12-week frozen cell snapshot can never pass the nightly selection gate, whose age rule is 5 sessions. With the LC-01 refresh on, every run restarted the paper count; with it off, the nightly plan failed.
+
+## Decision
+1. `cells.snapshot` is classified `free`: a new snapshot is a `noted` change and never starts an epoch.
+2. A new frozen component `cells.basis` holds the SHA-256 of the options and, per source, the strategy definition hash, universe, start, fills, cost choice and the style and exit labels, without the window end. A refresh only moves ends and keeps the basis; a recompute with other sources or options changes it and starts a new epoch. Its first appearance is `free`, so the deploy does not restart an open epoch. A source run that cannot be read makes the group unreadable (the capture is partial), never a guess.
+3. `cells-refresh` leaves `PaperConfigKeys.LearningWriterServices`; `cells`, `retrain` and `weekly` stay.
+4. The epoch view (`cellsRefreshed`) and the P10-06 phase check (`cells_refreshed: N` caveat) count the noted snapshot changes of the epoch. The P10-04 reference is unchanged.
+5. The age rule stays 5 sessions. No order is placed; nothing here loosens a gate.
+
+## Consequences
+- The paper count measures the frozen versions and rules with statistics refreshed from research runs, not one fixed snapshot (P10-05 question 2 had rejected that; the owner chose it).
+- The Auto evidence block says each refresh is noted in the paper epoch.

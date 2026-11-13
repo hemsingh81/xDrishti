@@ -34,6 +34,7 @@ internal sealed class ConfigSnapshotSource(
     ILearningChangelog changelog,
     IStrategyStore strategies,
     ICellStatsStore cellStats,
+    IRunStore runs,
     IModelRegistry models,
     ISimulationEngine engine,
     IGradeSettings grading,
@@ -175,9 +176,41 @@ internal sealed class ConfigSnapshotSource(
             result.Add(new ConfigComponent(PaperConfigKeys.CellsEligible + subject, hash));
         }
 
-        var keys = CashCells.Only(await cellStats.ListLatestCashAsync(null, null, cancellationToken), "paper_config", logger).Select(s => s.SnapshotKey).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
+        var snapshots = CashCells.Only(await cellStats.ListLatestCashAsync(null, null, cancellationToken), "paper_config", logger);
+        var keys = snapshots.Select(s => s.SnapshotKey).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
         result.Add(new ConfigComponent(PaperConfigKeys.CellsSnapshot, string.Join(',', keys) is { Length: > 0 } joined ? joined : "none"));
+        result.Add(new ConfigComponent(PaperConfigKeys.CellsBasis, await BasisAsync(snapshots, cancellationToken)));
         return result;
+    }
+
+    /// <summary>
+    /// SHA-256 of the options and the sources of the newest cash snapshots without their window ends (ADR 0286): per source the run's strategy definition hash, universe, start, fills, cost choice and the style and exit labels. A refresh only moves ends and
+    /// keeps it. A source that cannot be read throws, so the group is reported as unreadable (the snapshot is then partial), never guessed.
+    /// </summary>
+    private async Task<string> BasisAsync(IReadOnlyList<StoredCellStats> snapshots, CancellationToken cancellationToken)
+    {
+        if (snapshots.Count == 0)
+        {
+            return "none";
+        }
+
+        var parts = new List<string>();
+        foreach (var snapshot in snapshots.GroupBy(s => s.SnapshotKey, StringComparer.Ordinal).Select(g => g.First()).OrderBy(s => s.SnapshotKey, StringComparer.Ordinal))
+        {
+            var o = snapshot.Options;
+            var sources = CellSource.TryParseList(snapshot.Sources) ?? throw new InvalidOperationException("The snapshot's sources cannot be read.");
+            var lines = new List<string>();
+            foreach (var source in sources)
+            {
+                var run = await runs.FindAsync(source.RunKey, cancellationToken) ?? throw new InvalidOperationException("A source run is not stored.");
+                lines.Add(string.Join('|', run.DefinitionSha256, run.UniverseKind, run.UniverseLabel, run.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), run.Fills, run.AcknowledgeCsvAdjusted ? "adj" : "raw", run.CostsSheetId ?? "-", run.CostsRatesSha256 ?? "-", source.Style, source.Exit));
+            }
+
+            lines.Sort(StringComparer.Ordinal);
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"opt:{o.RecencyHalfLifeDays:R}:{o.PriorStrength:R}:{o.MinTrades}:{o.CredibleLevel:R}") + "\n" + string.Join('\n', lines));
+        }
+
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n--\n", parts))));
     }
 
     private async Task<List<ConfigComponent>> ModelsAsync(CancellationToken cancellationToken)

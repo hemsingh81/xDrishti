@@ -34,8 +34,11 @@ public static class PaperConfigKeys
     /// <summary>Prefix of one eligible cell: <c>cells.eligible/&lt;cell&gt;</c>, value the strategy hash.</summary>
     public const string CellsEligible = "cells.eligible/";
 
-    /// <summary>The cell-statistics snapshot in force.</summary>
+    /// <summary>The cell-statistics snapshot in force. A new snapshot is a noted change and never restarts the count (owner decision 9, ADR 0286).</summary>
     public const string CellsSnapshot = "cells.snapshot";
+
+    /// <summary>The rules that make the snapshot: its options and sources without their window ends (ADR 0286). A refresh only moves ends, so it keeps the basis; other sources or options change it and start a new epoch.</summary>
+    public const string CellsBasis = "cells.basis";
 
     /// <summary>Prefix of every <c>Planning:*</c> setting (flattened, lower-cased section path).</summary>
     public const string PlanningPrefix = "planning.";
@@ -66,8 +69,8 @@ public static class PaperConfigKeys
     /// <summary>Prefix of the engine facts.</summary>
     public const string EnginePrefix = "engine.";
 
-    /// <summary>Services that write learning state (cell statistics, models, learning) by id. Enabled during an epoch, each run restarts the count.</summary>
-    public static IReadOnlyList<string> LearningWriterServices { get; } = ["cells", "retrain", "weekly", "cells-refresh"];
+    /// <summary>Services that write learning state (cell statistics, models, learning) by id. Enabled during an epoch, each run restarts the count. The scheduled cells-refresh is not one: a refresh is a noted change (ADR 0286).</summary>
+    public static IReadOnlyList<string> LearningWriterServices { get; } = ["cells", "retrain", "weekly"];
 
     /// <summary>The warning shown beside an enabled learning writer.</summary>
     public const string BlockerText = "enabled during an epoch: each run restarts the count";
@@ -196,6 +199,11 @@ public static class PaperConfigKeys
             return ConfigClass.Free;
         }
 
+        if (key == CellsSnapshot || (key == CellsBasis && before is null))
+        {
+            return ConfigClass.Free;
+        }
+
         if (key.StartsWith(CellsEligible, StringComparison.Ordinal))
         {
             return after is null ? ConfigClass.RiskDown : ConfigClass.Frozen;
@@ -240,6 +248,16 @@ public static class PaperConfigKeys
         if (key == AutonomyRowHash)
         {
             return "free: shown, never restarts the count";
+        }
+
+        if (key == CellsSnapshot)
+        {
+            return "noted: a cell-statistics refresh (decision 9)";
+        }
+
+        if (key == CellsBasis)
+        {
+            return "frozen: the options and sources of the snapshot without their window ends (free when first added)";
         }
 
         if (key.StartsWith(CellsEligible, StringComparison.Ordinal))

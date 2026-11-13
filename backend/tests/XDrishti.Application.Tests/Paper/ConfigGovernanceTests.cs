@@ -308,7 +308,7 @@ public sealed class ConfigGovernanceTests
     }
 
     [Fact]
-    public async Task An_enabled_cell_statistics_refresh_shows_as_a_blocker_during_an_epoch()
+    public async Task An_enabled_cell_statistics_refresh_is_no_longer_a_blocker_during_an_epoch()
     {
         await RunAsync(D(11, 2));
         var services = Substitute.For<IServiceScheduleReader>();
@@ -316,14 +316,13 @@ public sealed class ConfigGovernanceTests
 
         var view = (await new GetConfigHandler(_source, _store, services).HandleAsync(new GetConfigQuery(), Ct)).Value;
 
-        view.Blockers.Select(b => b.ServiceId).ShouldBe(["cells-refresh"]);
-        view.Blockers[0].Text.ShouldContain("each run restarts the count");
+        view.Blockers.ShouldBeEmpty("a refresh is a noted change (decision 9, ADR 0286)");
     }
 
     [Fact]
     public void The_pinned_learning_writers_are_cells_retrain_and_weekly()
     {
-        PaperConfigKeys.LearningWriterServices.ShouldBe(["cells", "retrain", "weekly", "cells-refresh"]);
+        PaperConfigKeys.LearningWriterServices.ShouldBe(["cells", "retrain", "weekly"]);
     }
 
     private sealed class FakeStore : IGovernanceStore
