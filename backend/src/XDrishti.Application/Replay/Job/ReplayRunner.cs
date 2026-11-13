@@ -24,7 +24,7 @@ namespace XDrishti.Application.Replay.Job;
 /// The job reads stored bars and writes only the three replay tables and one trial-ledger row at the start; it places and references no order.
 /// </para>
 /// </summary>
-public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOptions options, TimeProvider time, ILogger<ReplayRunner> logger)
+public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOptions options, TimeProvider time, ILogger<ReplayRunner> logger, HoldOut.HoldOutRunActivity? holdOut = null)
 {
     /// <summary>The recovery class of the job (AU-01, ADR 0240): it is convergent, since running it again closes whatever a stop left open (a run goes on from its cursor). Pinned in <c>RecoveryClassTableTests</c>.</summary>
     public const RecoveryClass Recovery = RecoveryClass.Convergent;
@@ -49,7 +49,7 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
     private DateTimeOffset? _backfillCheckedAt;
     private bool _backfillIncomplete;
     private string? _lastYield;
-    private ActiveRun? _active;
+    private volatile ActiveRun? _active;
     private bool _recovered;
 
     /// <summary>Whether a run is in hand now (SR-03: the hold-out replay waits while it is, so two heavy replays never share the memory budget).</summary>
@@ -100,6 +100,11 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
 
         if (_active is null)
         {
+            if (holdOut is { Running: true })
+            {
+                return; // a hold-out system replay is running (SR-03): two heavy replays never share the memory budget
+            }
+
             var scope = scopes.CreateAsyncScope();
             if (await YieldAsync(scope.ServiceProvider, true, cancellationToken) is { } reason)
             {

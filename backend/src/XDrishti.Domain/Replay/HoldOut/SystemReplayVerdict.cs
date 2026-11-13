@@ -6,6 +6,9 @@ namespace XDrishti.Domain.Replay.HoldOut;
 /// <summary>The verdict of the system replay over a hold-out block: the status word (<see cref="HoldOutStatus"/>) and the reason in words.</summary>
 public sealed record SystemReplayVerdict(string Status, string Reason)
 {
+    /// <summary>The status of a run that could not be carried out (a failure of the run, not an unavailable figure): the look is spent and no verdict was reached. Never a pass.</summary>
+    public const string RunFailedStatus = "run_failed";
+
     /// <summary>The SR-02 answer that fails the rule.</summary>
     public const string BaselineBetter = "baseline_better";
 

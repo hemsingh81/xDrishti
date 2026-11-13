@@ -35,7 +35,9 @@ function Verdict({ registration }: { registration: HoldOutRegistration }) {
   return (
     <Box sx={{ mt: 1 }}>
       <Typography variant="subtitle2" component="p">
-        {`Verdict: ${result.verdict} (${result.mode})`}
+        {result.verdict === 'run_failed'
+          ? `The run failed and reached no verdict (${result.mode})`
+          : `Verdict: ${result.verdict} (${result.mode})`}
       </Typography>
       <Typography variant="body2">{result.reason}</Typography>
       {selection && (

@@ -112,6 +112,11 @@ internal sealed class RegisterHoldOutHandler(
         }
 
         var members = (await facts.UniverseAsync(parameters, IndiaTime.Today(now), cancellationToken)).Members.Select(m => m.Id).Union(scope.InstrumentIds).Distinct().Order().ToList();
+        if (members.Count == 0)
+        {
+            return Fail("scope_empty", "the scope resolves to no instrument");
+        }
+
         if (members.Count * replayOptions.BytesPerInstrument > replayOptions.MaxWindowMb * 1024L * 1024)
         {
             return Fail("scope_over_memory_cap", $"the scope reads {members.Count} instruments; the largest scope allowed is {replayOptions.MaxWindowMb * 1024L * 1024 / replayOptions.BytesPerInstrument} (Replay:MaxWindowMb)");

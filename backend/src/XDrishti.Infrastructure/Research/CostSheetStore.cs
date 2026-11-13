@@ -42,17 +42,30 @@ internal sealed class CostSheetStore(XDrishtiDbContext db) : ICostSheetStore
 
     public async ValueTask<IReadOnlyList<CostSheet>> ListCheckedAsync(CancellationToken cancellationToken)
     {
-        var rows = await db.AppSettings.AsNoTracking().Where(x => x.Id.StartsWith(AppSettingKeys.CostSheetPrefix)).OrderByDescending(x => x.UpdatedAt).Select(x => x.Value).ToListAsync(cancellationToken);
-        var sheets = new List<CostSheet>();
-        foreach (var text in rows)
+        var rows = await db.AppSettings.AsNoTracking().Where(x => x.Id.StartsWith(AppSettingKeys.CostSheetPrefix)).Select(x => new { x.Value, x.UpdatedAt }).ToListAsync(cancellationToken);
+        var sheets = new List<(CostSheet Sheet, DateOnly? CheckedOn, DateTimeOffset Written)>();
+        foreach (var row in rows)
         {
-            if (CostSheetJson.Parse(text) is { IsSuccess: true } parsed && parsed.Value.Checked is not null && !parsed.Value.IsTest)
+            if (CostSheetJson.Parse(row.Value) is { IsSuccess: true } parsed && parsed.Value.Checked is { } note && !parsed.Value.IsTest)
             {
-                sheets.Add(parsed.Value);
+                sheets.Add((parsed.Value, CheckedOn(note), row.UpdatedAt));
             }
         }
 
-        return sheets;
+        // most recently checked first: by the date written in the checked note (yyyy-mm-dd, or yyyy-mm as the first of the month), a sheet whose note has no date after those, then by when the sheet was written
+        return [.. sheets.OrderByDescending(s => s.CheckedOn ?? DateOnly.MinValue).ThenByDescending(s => s.Written).Select(s => s.Sheet)];
+    }
+
+    private static DateOnly? CheckedOn(string note)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(note, @"\b(\d{4})-(\d{2})(?:-(\d{2}))?\b", System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        var day = match.Groups[3].Success ? match.Groups[3].Value : "01";
+        return DateOnly.TryParseExact($"{match.Groups[1].Value}-{match.Groups[2].Value}-{day}", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date) ? date : null;
     }
 
     public async ValueTask SaveAsync(CostSheet sheet, string actor, DateTimeOffset now, CancellationToken cancellationToken)

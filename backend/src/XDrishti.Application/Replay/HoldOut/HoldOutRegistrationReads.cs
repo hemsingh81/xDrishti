@@ -30,6 +30,10 @@ internal sealed class HoldOutRegistrationViews(IHoldOutRegistrationStore store, 
         {
             state = "run";
         }
+        else if (XDrishti.Domain.Market.IndiaTime.Today(row.CreatedAt) >= row.BlockStart)
+        {
+            state = "late"; // stored on or after the block began: it can never take a fresh look
+        }
         else if (await store.NewestForBlockAsync(row.BlockStart, cancellationToken) is { } newest && newest.Id != row.Id)
         {
             state = "superseded";

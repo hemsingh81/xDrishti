@@ -82,9 +82,10 @@ internal sealed class HoldOutRegistrationStore(NpgsqlDataSource dataSource) : IH
     {
         try
         {
-            await using var command = dataSource.CreateCommand("SELECT DISTINCT ON (name) name, enabled FROM research.replay_holdout_settings ORDER BY name, at DESC, id DESC");
+            await using var command = dataSource.CreateCommand("SELECT DISTINCT ON (name) name, enabled, id, at FROM research.replay_holdout_settings ORDER BY name, at DESC, id DESC");
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             bool register = false, run = false; // a name with no row reads OFF
+            string? stamp = null;
             while (await reader.ReadAsync(cancellationToken))
             {
                 var enabled = reader.GetBoolean(1);
@@ -95,11 +96,12 @@ internal sealed class HoldOutRegistrationStore(NpgsqlDataSource dataSource) : IH
                         break;
                     case "replay.holdout.auto_run":
                         run = enabled;
+                        stamp = reader.GetGuid(2).ToString("N") + "@" + reader.GetFieldValue<DateTimeOffset>(3).ToString("O", System.Globalization.CultureInfo.InvariantCulture);
                         break;
                 }
             }
 
-            return new HoldOutAutoSwitches(register, run);
+            return new HoldOutAutoSwitches(register, run, stamp);
         }
         catch (NpgsqlException)
         {

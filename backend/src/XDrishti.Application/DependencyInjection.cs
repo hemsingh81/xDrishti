@@ -834,6 +834,7 @@ public static class DependencyInjection
         services.AddScoped<IBellNoticeSource, XDrishti.Application.Replay.HoldOut.SystemReplayNotices>(); // a drifted registration, no checked sheet (SR-03), derived on read
         services.AddScoped<XDrishti.Application.Replay.HoldOut.HoldOutInputCheck>();
         services.AddScoped<XDrishti.Application.Replay.HoldOut.HoldOutRegistrationViews>();
+        services.AddSingleton<XDrishti.Application.Replay.HoldOut.HoldOutRunAttempts>(); // transient failures of a claimed run, kept in memory (SR-03)
         services.AddScoped<XDrishti.Application.Replay.HoldOut.HoldOutSystemRunner>(); // the only builder of the hold-out block reader, from a claim (SR-03)
         services.AddScoped<ICommandHandler<XDrishti.Application.Replay.HoldOut.RegisterHoldOutCommand, XDrishti.Application.Replay.HoldOut.RegisteredHoldOut>, XDrishti.Application.Replay.HoldOut.RegisterHoldOutHandler>();
         services.AddScoped<ICommandHandler<XDrishti.Application.Replay.HoldOut.RunHoldOutRegistrationCommand, XDrishti.Application.Replay.HoldOut.StartedHoldOutRun>, XDrishti.Application.Replay.HoldOut.RunHoldOutRegistrationHandler>();
@@ -870,6 +871,7 @@ public static class DependencyInjection
     public static IServiceCollection AddReplayRunner(this IServiceCollection services)
     {
         services.AddSingleton<XDrishti.Application.Replay.Job.ReplayRunner>();
+        services.AddSingleton<XDrishti.Application.Replay.HoldOut.HoldOutRunActivity>(); // the two replay loops never run together (SR-03)
         services.AddSingleton<XDrishti.Application.Replay.HoldOut.HoldOutSystemRunLoop>(); // runs the claimed system replays over a hold-out block (SR-03)
         return services;
     }

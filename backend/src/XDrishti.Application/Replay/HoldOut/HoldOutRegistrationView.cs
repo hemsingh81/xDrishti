@@ -9,7 +9,7 @@ public sealed record HoldOutResultBody(SystemReplayVerdict Verdict, SystemRunFig
 public sealed record HoldOutRegistrationResultView(string Verdict, string Reason, SystemRunFigures Figures, IReadOnlyList<Guid> RunIds, string EngineVersions, string Mode, string Actor, DateTimeOffset At);
 
 /// <summary>
-/// A registration as served (SR-03): the frozen hash and the inputs it fixed, the rule first, the state and, when it ran, the result. <c>State</c> is <c>waiting</c>, <c>superseded</c>, <c>drift</c> (a stored input no longer resolves; read live), <c>claimed</c> (the look is taken
+/// A registration as served (SR-03): the frozen hash and the inputs it fixed, the rule first, the state and, when it ran, the result. <c>State</c> is <c>waiting</c>, <c>superseded</c>, <c>late</c> (stored on or after the block began), <c>drift</c> (a stored input no longer resolves; read live), <c>claimed</c> (the look is taken
 /// and the run follows) or <c>run</c> (the result is stored). The hindsight text is always present.
 /// </summary>
 public sealed record HoldOutRegistrationView(

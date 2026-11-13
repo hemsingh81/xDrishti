@@ -121,7 +121,7 @@ public sealed partial class ReplayArchitectureTests
 
     private static readonly string[] ResolvedAllowed = ["IReplayStore", "IReplayReads", "ReplayDriver", "ReplayInputHasher", "IFreeDiskProbe", "ITradingCalendar", "ISimAllBackfillGate", "ISimAllStore"];
 
-    private static readonly string[] ConstructorAllowed = ["IServiceScopeFactory", "SystemReplayOptions", "TimeProvider", "ILogger`1", "ReplayDriver", "ReplayInputHasher", "IReplayInputs", "IReplayStore", "IReplayReads", "ITestLedger", "ISimAllBackfillGate"];
+    private static readonly string[] ConstructorAllowed = ["IServiceScopeFactory", "SystemReplayOptions", "TimeProvider", "ILogger`1", "ReplayDriver", "ReplayInputHasher", "IReplayInputs", "IReplayStore", "IReplayReads", "ITestLedger", "ISimAllBackfillGate", "HoldOutRunActivity"]; // SR-03: the one flag that keeps the queued job and the hold-out loop from running together (a bool, no store or gate)
 
     [GeneratedRegex(@"Get(Required)?Service<(?<t>\w+)>", RegexOptions.CultureInvariant)]
     private static partial Regex ResolvedType();

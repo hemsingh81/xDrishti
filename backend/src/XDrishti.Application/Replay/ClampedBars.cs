@@ -12,7 +12,7 @@ namespace XDrishti.Application.Replay;
 /// The only way the replay reaches stored bars (SR-01, AC 3): every read is asked for a session <c>cut</c>, and a cut after the hold-out start less one day and less the embargo throws <see cref="ReplayHoldOutException"/> before anything is read. With no hold-out block fixed it
 /// fails closed. A bar after the close of the cut is never returned.
 /// </summary>
-internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options, IBarStore minutes, IBackfillSeams seams, IBarQueries days, int readAheadSessions = 40, HoldOut.HoldOutBlockReader? block = null)
+internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options, IBarStore minutes, IBackfillSeams seams, IBarQueries days, int readAheadSessions = 40)
 {
     private readonly int _readAheadDays = (readAheadSessions * 7 / 5) + 3;
 
@@ -22,8 +22,16 @@ internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options,
     private static readonly TimeSpan IndiaOffset = TimeSpan.FromHours(5.5);
 
     private readonly Dictionary<Guid, Window> _windows = [];
+    private HoldOut.HoldOutBlockReader? _block;
     private DateOnly? _last;
     private DateOnly? _horizon;
+
+    /// <summary>The reader of a claimed hold-out block (SR-03): reads up to the end of the block instead of the training clamp. Only <see cref="ReplayFacts.UseBlock"/> calls this, for the runner that stands on a claim.</summary>
+    internal static ClampedBars ForBlock(IHoldOutStore holdOut, HoldOutOptions options, IBarStore minutes, IBackfillSeams seams, IBarQueries days, int readAheadSessions, HoldOut.HoldOutBlockReader reader)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+        return new ClampedBars(holdOut, options, minutes, seams, days, readAheadSessions) { _block = reader };
+    }
 
     /// <summary>The last session that may be read.</summary>
     public async ValueTask<DateOnly> LastReadableAsync(CancellationToken cancellationToken)
@@ -33,9 +41,9 @@ internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options,
             return known;
         }
 
-        if (block is not null)
+        if (_block is not null)
         {
-            return (_last = block.End).Value; // the SR-03 reader after its claim: up to the end of the claimed block, never past it
+            return (_last = _block.End).Value; // the SR-03 reader after its claim: up to the end of the claimed block, never past it
         }
 
         var current = await holdOut.CurrentAsync(cancellationToken) ?? throw new ReplayHoldOutException();

@@ -44,7 +44,8 @@ public sealed class HoldOutBlockReaderTests
         });
         var seams = Substitute.For<IBackfillSeams>();
         seams.SeamOfAsync(Id, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<DateTimeOffset?>(null));
-        return (new ClampedBars(holdOut, new HoldOutOptions(TrainingEmbargoDays: 30), store, seams, Substitute.For<IBarQueries>(), 40, reader), reads);
+        var options = new HoldOutOptions(TrainingEmbargoDays: 30);
+        return (reader is null ? new ClampedBars(holdOut, options, store, seams, Substitute.For<IBarQueries>()) : ClampedBars.ForBlock(holdOut, options, store, seams, Substitute.For<IBarQueries>(), 40, reader), reads);
     }
 
     [Fact]

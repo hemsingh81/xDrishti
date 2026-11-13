@@ -61,6 +61,7 @@ export function holdOutReplayProblem(error: unknown): string {
 export const stateWords: Record<string, string> = {
   waiting: 'Waiting for the block to seal',
   superseded: 'Superseded by a newer registration',
+  late: 'Stored on or after the block began: it can never run',
   drift: 'Drift: a stored input changed',
   claimed: 'Look claimed, the run follows',
   run: 'Run',

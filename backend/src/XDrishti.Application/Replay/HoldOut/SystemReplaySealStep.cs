@@ -41,7 +41,7 @@ internal sealed class SystemReplaySealStep(
             {
                 null => "run unavailable",
                 false => "auto run off",
-                true => await ClaimAsync(current.Block.Start, cancellationToken),
+                true => await ClaimAsync(current.Block.Start, switches.AutoRunStamp, cancellationToken),
             },
         };
 
@@ -71,7 +71,7 @@ internal sealed class SystemReplaySealStep(
         return string.Join(", ", parts);
     }
 
-    private async ValueTask<string> ClaimAsync(DateOnly blockStart, CancellationToken cancellationToken)
+    private async ValueTask<string> ClaimAsync(DateOnly blockStart, string? stamp, CancellationToken cancellationToken)
     {
         if (await store.NewestForBlockAsync(blockStart, cancellationToken) is not { } newest)
         {
@@ -83,7 +83,7 @@ internal sealed class SystemReplaySealStep(
             return "run done";
         }
 
-        var claimed = await run.HandleAsync(new RunHoldOutRegistrationCommand(newest.Id, RegisterHoldOutHandler.AutoMode, Actor), cancellationToken);
+        var claimed = await run.HandleAsync(new RunHoldOutRegistrationCommand(newest.Id, RegisterHoldOutHandler.AutoMode, Actor, stamp), cancellationToken);
         return claimed.IsSuccess ? "look claimed, run follows" : "not run: " + claimed.Error.Code;
     }
 }

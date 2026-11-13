@@ -14623,7 +14623,7 @@ export interface components {
       at: string;
     };
     /**
-     * @description A registration as served (SR-03): the frozen hash and the inputs it fixed, the rule first, the state and, when it ran, the result. `State` is `waiting`, `superseded`, `drift` (a stored input no longer resolves; read live), `claimed` (the look is taken
+     * @description A registration as served (SR-03): the frozen hash and the inputs it fixed, the rule first, the state and, when it ran, the result. `State` is `waiting`, `superseded`, `late` (stored on or after the block began), `drift` (a stored input no longer resolves; read live), `claimed` (the look is taken
      *     and the run follows) or `run` (the result is stored). The hindsight text is always present.
      */
     HoldOutRegistrationView: {
@@ -24926,7 +24926,7 @@ export interface components {
        */
       maxDrawdownPct: number;
     };
-    /** @description What is stored with a result: both arms, the comparison, the rule it was judged by and the labels. */
+    /** @description What is stored with a result: both arms, the comparison, the rule it was judged by, the labels, the failure of a run that failed (the verdict is then `run_failed`) and the cell-statistics snapshot the arms started from (its keys and newest creation time). */
     SystemRunFigures: {
       selection: null | components['schemas']['SystemArmFigures'];
       baseline: null | components['schemas']['SystemArmFigures'];
@@ -24935,6 +24935,9 @@ export interface components {
       labels: string[];
       engineChanged: boolean;
       failure: null | string;
+      snapshotKeys?: null | string[];
+      /** Format: date-time */
+      snapshotCreatedAt?: null | string;
     };
     /** @description The system card (spec CF-11 D5). */
     SystemScorecardView: {

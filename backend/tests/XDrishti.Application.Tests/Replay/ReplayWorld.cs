@@ -66,6 +66,14 @@ internal sealed class ReplayWorld
 
     public bool NoHoldOut { get; set; }
 
+    /// <summary>The <c>to</c> of every minute-bar read and the exclusive end of every day-bar read, across every <see cref="Facts"/> built (SR-03: a test can see that nothing past the block end was read).</summary>
+    public List<DateTimeOffset> MinuteReadEnds { get; } = [];
+
+    public List<DateOnly> DayReadEnds { get; } = [];
+
+    /// <summary>When set, every bar read throws it (a failing database, or a defect).</summary>
+    public Exception? ReadFailure { get; set; }
+
     public SelectionRules Rules { get; set; } = Loose;
 
     public IBasketQueries? Baskets { get; private set; }
@@ -192,6 +200,12 @@ internal sealed class ReplayWorld
         var minute = Substitute.For<IBarStore>();
         minute.ReadAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
+            if (ReadFailure is { } failure)
+            {
+                throw failure;
+            }
+
+            MinuteReadEnds.Add(call.ArgAt<DateTimeOffset>(2));
             var symbol = Ids.First(p => p.Value == call.Arg<Guid>()).Key;
             var from = call.ArgAt<DateTimeOffset>(1).ToUnixTimeSeconds();
             var to = call.ArgAt<DateTimeOffset>(2).ToUnixTimeSeconds();
@@ -202,6 +216,12 @@ internal sealed class ReplayWorld
         var days = Substitute.For<IBarQueries>();
         days.ReadDailyBarsAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
+            if (ReadFailure is { } failure)
+            {
+                throw failure;
+            }
+
+            DayReadEnds.Add(call.ArgAt<DateOnly>(2));
             var symbol = Ids.First(p => p.Value == call.Arg<Guid>()).Key;
             var from = call.ArgAt<DateOnly>(1);
             var toExclusive = call.ArgAt<DateOnly>(2);

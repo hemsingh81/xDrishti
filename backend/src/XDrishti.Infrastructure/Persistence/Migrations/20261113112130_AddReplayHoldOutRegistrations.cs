@@ -40,7 +40,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     at timestamptz NOT NULL,
                     CONSTRAINT pk_replay_holdout_results PRIMARY KEY (registration_id),
                     CONSTRAINT fk_replay_holdout_results_registration FOREIGN KEY (registration_id) REFERENCES research.replay_holdout_registrations (id) ON DELETE RESTRICT,
-                    CONSTRAINT ck_replay_holdout_results_shape CHECK (verdict IN ('pass', 'fail', 'inconclusive') AND mode IN ('owner', 'auto'))
+                    CONSTRAINT ck_replay_holdout_results_shape CHECK (verdict IN ('pass', 'fail', 'inconclusive', 'run_failed') AND mode IN ('owner', 'auto'))
                 )
                 """);
             migrationBuilder.Sql("""
@@ -52,9 +52,24 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     reason text NOT NULL,
                     at timestamptz NOT NULL,
                     CONSTRAINT pk_replay_holdout_settings PRIMARY KEY (id),
-                    CONSTRAINT ck_replay_holdout_settings_name CHECK (name IN ('replay.holdout.auto_register', 'replay.holdout.auto_run'))
+                    CONSTRAINT ck_replay_holdout_settings_shape CHECK (
+                        name IN ('replay.holdout.auto_register', 'replay.holdout.auto_run') AND length(btrim(actor)) > 0 AND length(btrim(reason)) > 0
+                        AND ((actor LIKE 'owner:%' AND length(btrim(actor)) > 6) OR (actor = 'system:default' AND enabled AND reason = 'ADR 0282')))
                 )
                 """);
+
+            // as AM-01a's kill-switch seed: the system default row of a switch is written once, by this migration (the owner role), and never by the runtime role, so the runtime can never turn an automatic step back on without the owner's password
+            migrationBuilder.Sql("""
+                CREATE FUNCTION research.guard_replay_holdout_setting() RETURNS trigger LANGUAGE plpgsql AS $fn$
+                BEGIN
+                    IF NEW.actor = 'system:default' AND (current_user = 'xd_app' OR EXISTS (SELECT 1 FROM research.replay_holdout_settings WHERE name = NEW.name)) THEN
+                        RAISE EXCEPTION 'the system default row of a hold-out replay switch is written once, by the migration, for a switch with no row' USING ERRCODE = '23514';
+                    END IF;
+                    RETURN NEW;
+                END
+                $fn$
+                """);
+            migrationBuilder.Sql("CREATE TRIGGER trg_replay_holdout_settings_guard BEFORE INSERT ON research.replay_holdout_settings FOR EACH ROW EXECUTE FUNCTION research.guard_replay_holdout_setting()");
 
             // the two switches default ON (ADR 0282); no row reads OFF
             migrationBuilder.Sql("""
@@ -84,6 +99,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 """);
             migrationBuilder.Sql("DROP TABLE IF EXISTS research.replay_holdout_results");
             migrationBuilder.Sql("DROP TABLE IF EXISTS research.replay_holdout_settings");
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS research.guard_replay_holdout_setting()");
             migrationBuilder.Sql("DROP TABLE IF EXISTS research.replay_holdout_registrations");
         }
     }

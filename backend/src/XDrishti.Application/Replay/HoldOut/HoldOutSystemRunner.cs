@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -15,23 +16,28 @@ namespace XDrishti.Application.Replay.HoldOut;
 /// <summary>The figures of one arm over the block (net when the sheet charged every trade).</summary>
 public sealed record SystemArmFigures(string Arm, int ClosedTrades, decimal Capital, decimal FinalEquity, decimal NetReturnPct, double? CagrPct, decimal? MaxDrawdownPct, bool NetBasis, string Basis, int Sessions);
 
-/// <summary>What is stored with a result: both arms, the comparison, the rule it was judged by and the labels.</summary>
-public sealed record SystemRunFigures(SystemArmFigures? Selection, SystemArmFigures? Baseline, ReplayArmResult? Comparison, SystemReplayPassRule Rule, IReadOnlyList<string> Labels, bool EngineChanged, string? Failure);
+/// <summary>What is stored with a result: both arms, the comparison, the rule it was judged by, the labels, the failure of a run that failed (the verdict is then <c>run_failed</c>) and the cell-statistics snapshot the arms started from (its keys and newest creation time).</summary>
+public sealed record SystemRunFigures(SystemArmFigures? Selection, SystemArmFigures? Baseline, ReplayArmResult? Comparison, SystemReplayPassRule Rule, IReadOnlyList<string> Labels, bool EngineChanged, string? Failure, IReadOnlyList<string>? SnapshotKeys = null, DateTimeOffset? SnapshotCreatedAt = null);
 
 /// <summary>
-/// Runs a claimed registration (SR-03 D4): the only code that builds a <see cref="HoldOutBlockReader"/>, and only from a <see cref="HoldOutClaim"/> made out of the stored fresh <c>system</c> look. Each arm runs in its own scope with the stored settings snapshot and strategy versions
-/// (never today's) over <c>[block start, block end]</c>, in memory; nothing of the block's bars is written anywhere. The result (figures, verdict) is stored insert-only with the registration, behind the replay fence: no evidence reader reads it. A run that fails is stored
-/// <c>inconclusive</c> with the reason, so the look is not retried; a cancel (host stopping) leaves the claim and the run resumes at the next start. Places no order.
+/// Runs a claimed registration (SR-03 D4): the only code that builds a <see cref="HoldOutBlockReader"/>, and only from a <see cref="HoldOutClaim"/> made out of the stored fresh <c>system</c> look, with the end of the <b>stored</b> block (never the registration's computed end). Each arm runs
+/// in its own scope with the stored settings snapshot and strategy versions (never today's) over <c>[block start, block end]</c>, in memory; nothing of the block's bars is written anywhere. The result (figures, verdict) is stored insert-only with the registration, behind the replay fence: no
+/// evidence reader reads it.
+/// <para>
+/// A failure of a database, a timeout or an I/O leaves the claim without a result and the next pass tries again, up to <see cref="HoldOutRunAttempts.Max"/> times; then, and at once for any other failure (a replay error, a defect), the result is stored <c>run_failed</c>
+/// with the reason, so the look is never retried for ever. <c>inconclusive</c> stays for an unavailable figure of the rule. A stop (cancel) leaves the claim and the run resumes at the next start. If the stored block no longer ends where the registration said, nothing is
+/// read or stored. Places no order.
+/// </para>
 /// </summary>
-internal sealed class HoldOutSystemRunner(IServiceScopeFactory scopes, IHoldOutRegistrationStore store, IHoldOutStore blocks, ISimulationEngineVersion engine, TimeProvider time, ILogger<HoldOutSystemRunner> logger)
+internal sealed class HoldOutSystemRunner(IServiceScopeFactory scopes, IHoldOutRegistrationStore store, IHoldOutStore blocks, ISimulationEngineVersion engine, HoldOutRunAttempts attempts, TimeProvider time, ILogger<HoldOutSystemRunner> logger)
 {
-    private const int Look = 50;
+    private const int Newest = 50;
 
-    /// <summary>Runs every claimed registration that has no result yet, one at a time; returns how many were stored.</summary>
+    /// <summary>Runs every claimed registration that has no result yet, one at a time; returns how many results were stored.</summary>
     public async ValueTask<int> RunPendingAsync(CancellationToken cancellationToken)
     {
         var done = 0;
-        foreach (var registration in await store.ListAsync(Look, cancellationToken))
+        foreach (var registration in await store.ListAsync(Newest, cancellationToken))
         {
             if (await store.GetResultAsync(registration.Id, cancellationToken) is not null)
             {
@@ -58,25 +64,46 @@ internal sealed class HoldOutSystemRunner(IServiceScopeFactory scopes, IHoldOutR
         var config = ReplayJson.Read<HoldOutRegistrationConfig>(registration.ConfigJson);
         if (config is null)
         {
-            return await StoreAsync(registration, claim, new SystemRunFigures(null, null, null, SystemReplayPassRule.Default, [], false, "the stored registration cannot be read"), SystemReplayPassRule.Default, null, cancellationToken);
+            return await StoreAsync(registration, claim, Failed(SystemReplayPassRule.Default, "the stored registration cannot be read"), null, cancellationToken);
+        }
+
+        // the reader's end is the stored block's, never the registration's computed one: a changed BlockMonths must not let the run read past the block
+        var block = (await blocks.ListBlocksAsync(cancellationToken)).Select(b => b.Block).FirstOrDefault(b => b.Start == registration.BlockStart);
+        if (block is null || block.HistoryLast != config.BlockEnd)
+        {
+            HoldOutSystemLog.BlockChanged(logger, registration.Id);
+            return false;
         }
 
         SystemRunFigures figures;
         try
         {
-            figures = await FiguresAsync(config, new HoldOutBlockReader(claim, config.BlockEnd), cancellationToken);
+            figures = await FiguresAsync(config, new HoldOutBlockReader(claim, block.HistoryLast), cancellationToken);
+        }
+        catch (Exception failure) when (failure is DbException or TimeoutException or IOException)
+        {
+            var count = attempts.Add(registration.Id);
+            HoldOutSystemLog.RunRetry(logger, registration.Id, failure.GetType().Name, count);
+            if (count < HoldOutRunAttempts.Max)
+            {
+                return false; // the claim stays; the next pass tries again
+            }
+
+            figures = Failed(config.PassRule, $"run_failed: {failure.GetType().Name} on {count.ToString(CultureInfo.InvariantCulture)} tries");
         }
         catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
         {
             HoldOutSystemLog.RunFailed(logger, registration.Id, failure.GetType().Name);
-            figures = new SystemRunFigures(null, null, null, config.PassRule, [], false, "run_failed: " + failure.GetType().Name);
+            figures = Failed(config.PassRule, "run_failed: " + failure.GetType().Name);
         }
 
         var verdict = figures.Failure is { } failed
-            ? new SystemReplayVerdict(HoldOutStatus.Inconclusive, failed)
+            ? new SystemReplayVerdict(SystemReplayVerdict.RunFailedStatus, failed)
             : SystemReplayVerdict.Evaluate(config.PassRule, new SystemReplayFigures(figures.Selection?.ClosedTrades, figures.Selection?.NetBasis ?? false, figures.Selection?.CagrPct, figures.Selection?.MaxDrawdownPct, figures.Comparison?.AnswerCode));
-        return await StoreAsync(registration, claim, figures, config.PassRule, verdict, cancellationToken, config);
+        return await StoreAsync(registration, claim, figures, verdict, cancellationToken, config);
     }
+
+    private static SystemRunFigures Failed(SystemReplayPassRule rule, string reason) => new(null, null, null, rule, [], false, reason);
 
     private async ValueTask<SystemRunFigures> FiguresAsync(HoldOutRegistrationConfig config, HoldOutBlockReader reader, CancellationToken cancellationToken)
     {
@@ -84,15 +111,16 @@ internal sealed class HoldOutSystemRunner(IServiceScopeFactory scopes, IHoldOutR
         var selection = await ArmAsync(config, versions, reader, ReplayArm.Selection, cancellationToken);
         if (selection.Failure is not null)
         {
-            return new SystemRunFigures(null, null, null, config.PassRule, [], false, selection.Failure);
+            return Failed(config.PassRule, selection.Failure);
         }
 
         var baseline = await ArmAsync(config, versions, reader, ReplayArm.Baseline, cancellationToken);
         if (baseline.Failure is not null)
         {
-            return new SystemRunFigures(selection.Figures, null, null, config.PassRule, selection.Labels, false, baseline.Failure);
+            return Failed(config.PassRule, baseline.Failure);
         }
 
+        // an arm comparison that cannot be made is an unavailable figure of the rule (inconclusive), not a failed run
         var compared = ReplayPairComparison.CompareArms(selection.Series, baseline.Series, config.Parameters.Capital);
         var labels = selection.Labels.Union(baseline.Labels).Order(StringComparer.Ordinal).ToList();
         var changed = !string.Equals(engine.EngineVersion, config.EngineVersion, StringComparison.Ordinal);
@@ -101,7 +129,7 @@ internal sealed class HoldOutSystemRunner(IServiceScopeFactory scopes, IHoldOutR
             labels.Add("engine_changed");
         }
 
-        return new SystemRunFigures(selection.Figures, baseline.Figures, compared.IsSuccess ? compared.Value : null, config.PassRule, labels, changed, compared.IsFailure ? "unavailable: the comparison could not be made (" + compared.Error.Code + ")" : null);
+        return new SystemRunFigures(selection.Figures, baseline.Figures, compared.IsSuccess ? compared.Value : null, config.PassRule, labels, changed, null, selection.SnapshotKeys, selection.SnapshotCreatedAt);
     }
 
     private async ValueTask<ArmRun> ArmAsync(HoldOutRegistrationConfig config, IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>> versions, HoldOutBlockReader reader, ReplayArm arm, CancellationToken cancellationToken)
@@ -122,6 +150,9 @@ internal sealed class HoldOutSystemRunner(IServiceScopeFactory scopes, IHoldOutR
             return ArmRun.Failed(prepared.Error.Code + ": " + prepared.Error.Message);
         }
 
+        var cells = (await facts.CellsAsync(parameters, parameters.From, cancellationToken)).Cells;
+        var keys = cells.Select(c => c.Stored.SnapshotKey).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+        DateTimeOffset? created = cells.Count == 0 ? null : cells.Max(c => c.Stored.CreatedAt);
         var series = new List<ReplayDayEquity>();
         var labels = new SortedSet<string>(HindsightLabels.For(parameters), StringComparer.Ordinal);
         foreach (var day in prepared.Value.Sessions)
@@ -144,19 +175,21 @@ internal sealed class HoldOutSystemRunner(IServiceScopeFactory scopes, IHoldOutR
         var figures = new SystemArmFigures(
             arm == ReplayArm.Baseline ? "baseline" : "selection", final.ClosedCount, parameters.Capital, equity, Math.Round((equity - parameters.Capital) / parameters.Capital * 100, 4), cagr, final.MaxDrawdownPct,
             string.Equals(final.Basis, PaperWording.AfterStoredSheet, StringComparison.Ordinal), final.Basis, series.Count);
-        return new ArmRun(figures, series, [.. labels], null);
+        return new ArmRun(figures, series, [.. labels], null, keys, created);
     }
 
-    private async ValueTask<bool> StoreAsync(StoredHoldOutRegistration registration, HoldOutClaim claim, SystemRunFigures figures, SystemReplayPassRule rule, SystemReplayVerdict? verdict, CancellationToken cancellationToken, HoldOutRegistrationConfig? config = null)
+    private async ValueTask<bool> StoreAsync(StoredHoldOutRegistration registration, HoldOutClaim claim, SystemRunFigures figures, SystemReplayVerdict? verdict, CancellationToken cancellationToken, HoldOutRegistrationConfig? config = null)
     {
-        var used = verdict ?? SystemReplayVerdict.Evaluate(rule, new SystemReplayFigures(null, false, null, null, null));
+        var used = verdict ?? new SystemReplayVerdict(SystemReplayVerdict.RunFailedStatus, figures.Failure ?? "run_failed");
         var stored = new StoredHoldOutResult(
             registration.Id, claim.Look.RunId, [HoldOutRegistrationIds.ArmId(registration.Id, "selection"), HoldOutRegistrationIds.ArmId(registration.Id, "baseline")], used.Status,
             ReplayJson.Canonical(new { verdict = used, figures }), string.Create(CultureInfo.InvariantCulture, $"registered={config?.EngineVersion ?? "unknown"};current={engine.EngineVersion}"), claim.Look.Mode, claim.Look.Actor, time.GetUtcNow());
-        return await store.InsertResultAsync(stored, cancellationToken);
+        var inserted = await store.InsertResultAsync(stored, cancellationToken);
+        attempts.Clear(registration.Id);
+        return inserted;
     }
 
-    private sealed record ArmRun(SystemArmFigures? Figures, IReadOnlyList<ReplayDayEquity> Series, IReadOnlyList<string> Labels, string? Failure)
+    private sealed record ArmRun(SystemArmFigures? Figures, IReadOnlyList<ReplayDayEquity> Series, IReadOnlyList<string> Labels, string? Failure, IReadOnlyList<string>? SnapshotKeys = null, DateTimeOffset? SnapshotCreatedAt = null)
     {
         public static ArmRun Failed(string reason) => new(null, [], [], reason);
     }

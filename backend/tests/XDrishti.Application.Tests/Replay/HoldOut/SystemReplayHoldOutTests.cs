@@ -52,7 +52,9 @@ public sealed class SystemReplayHoldOutTests
     private readonly IRiskProfileStore _profiles = Substitute.For<IRiskProfileStore>();
     private readonly ISimulationEngineVersion _engine = Substitute.For<ISimulationEngineVersion>();
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2027, 4, 20, 6, 0, 0, TimeSpan.Zero));
+    private readonly ITestLedger _ledger = Substitute.For<ITestLedger>();
     private int _members = 2;
+    private DateTimeOffset _snapshotCreated = DateTimeOffset.UnixEpoch;
 
     public SystemReplayHoldOutTests()
     {
@@ -64,7 +66,7 @@ public sealed class SystemReplayHoldOutTests
         _profiles.ListAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<XDrishti.Domain.Accounts.RiskProfile>>([]));
         _facts.SettingsAsync(Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(Snapshot()));
         _facts.UniverseAsync(Arg.Any<ReplayParams>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(new ReplayUniverse([.. Enumerable.Range(0, _members).Select(i => new ReplayInstrument(new Guid(i + 1, 0, 0, new byte[8]), "S" + i))], false)));
-        _facts.CellsAsync(Arg.Any<ReplayParams>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(c => ValueTask.FromResult(Cells(c.ArgAt<DateOnly>(1))));
+        _facts.CellsAsync(Arg.Any<ReplayParams>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(c => ValueTask.FromResult(Cells(c.ArgAt<DateOnly>(1), _snapshotCreated)));
         _inputs.VersionsAsync(Arg.Any<ReplayParams>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>>>(new Dictionary<string, IReadOnlyList<StoredVersion>> { ["S1"] = [Version()] }));
         _strategies.ListVersionsAsync("S1", Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<StoredVersion>>([Version()]));
     }
@@ -77,31 +79,31 @@ public sealed class SystemReplayHoldOutTests
     private static ReplaySettingsSnapshot Snapshot() =>
         new(new SelectionRules(), new SmartRulesOptions(), new FillConstraints(), new BasketSettingsState(BasketSettings.Defaults, 1), new SizingState(SizingSettings.Defaults, 0), new Dictionary<Guid, double>(), 0.2);
 
-    private static ReplayCells Cells(DateOnly cut)
+    private static ReplayCells Cells(DateOnly cut, DateTimeOffset created)
     {
         var cell = new CellId("S1", "1D", "BUY", "swing", "FIXED_RR{rr=2}", Expression: Expression.Cash);
-        var stored = new StoredCellStats(new string('1', 64), DateTimeOffset.UnixEpoch, new CellStatsOptions(), "run:swing", new CellStatsRow(cell, CellWindow.All, cut, true, 40, 20, 40, 0.5, 0.5, 0.55, 0.50, 0.6, 2.0, -1.0, 0.5, 1.5, 3, 0.3, 0.8, 0.5, 1.5, true));
+        var stored = new StoredCellStats(new string('1', 64), created, new CellStatsOptions(), "run:swing", new CellStatsRow(cell, CellWindow.All, cut, true, 40, 20, 40, 0.5, 0.5, 0.55, 0.50, 0.6, 2.0, -1.0, 0.5, 1.5, 3, 0.3, 0.8, 0.5, 1.5, true));
         return new ReplayCells([new ReplayCell(stored, null, null)], []);
     }
 
     private HoldOutEpochs Epochs() => new(_blocks, new FixedCalendar(), _time);
 
-    private HoldOutInputCheck Check() => new(_facts, _strategies, _sheets);
+    private HoldOutInputCheck Check() => new(_facts, _strategies, _sheets, new SystemReplayOptions());
 
     private RegisterHoldOutHandler Register(HoldOutOptions? options = null) =>
         new(_blocks, _regs, _facts, _inputs, _sheets, _autoScope, _profiles, _engine, new SystemReplayOptions(), options ?? new HoldOutOptions(), _time);
 
-    private RunHoldOutRegistrationHandler Run() => new(_blocks, _regs, Epochs(), Check(), new HoldOutOptions(), _time);
+    private RunHoldOutRegistrationHandler Run() => new(_blocks, _regs, Epochs(), Check(), _ledger, new HoldOutOptions(), _time);
 
     private static RegisterHoldOutCommand Command(string? sheet = "dhan-2026-04", string mode = "owner", double? limit = null) =>
         new(null, [new Guid(1, 0, 0, new byte[8])], null, null, sheet, limit, mode, "owner:x");
 
     /// <summary>Block 3 is in force (block 2 released) and its last session has closed: the registration made on 2027-04-20 can be run.</summary>
-    private async Task<Guid> SealedBlockThreeWithRegistrationAsync(bool sealedNow = true)
+    private async Task<Guid> SealedBlockThreeWithRegistrationAsync(bool sealedNow = true, HoldOutOptions? registeredUnder = null)
     {
         _blocks.Releases.Add(new StoredRelease(Two, DateTimeOffset.UnixEpoch, "owner", "owner:x", Hash, true, Three));
         _blocks.Blocks.Add(new HoldOutBlock(Three, new DateOnly(2024, 10, 1), ThreeEnd, 6, Hash, DateTimeOffset.UnixEpoch, Two));
-        var made = await Register().HandleAsync(Command(), Ct);
+        var made = await Register(registeredUnder).HandleAsync(Command(), Ct);
         made.IsSuccess.ShouldBeTrue(made.IsFailure ? made.Error.Message : null);
         _time.SetUtcNow(sealedNow ? new DateTimeOffset(2027, 11, 5, 6, 0, 0, TimeSpan.Zero) : new DateTimeOffset(2027, 10, 1, 6, 0, 0, TimeSpan.Zero));
         return made.Value.Id;
@@ -270,6 +272,77 @@ public sealed class SystemReplayHoldOutTests
         HoldOutClaim.From(Look("system", true, key), id).IsFailure.ShouldBeTrue();
         HoldOutClaim.From(Look("strategy", false, key), id).IsFailure.ShouldBeTrue();
         HoldOutClaim.From(Look("system", false, HoldOutRegistrationIds.LookKey(Guid.NewGuid())), id).IsFailure.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_block_that_ends_elsewhere_than_registered_is_drift_before_the_claim_so_the_reader_cannot_pass_the_block()
+    {
+        // registered under BlockMonths 3 (the block would end 2027-08-04); the block was stored under 6 (it ends 2027-11-04)
+        var made = await Register(new HoldOutOptions(BlockMonths: 3)).HandleAsync(Command(), Ct);
+        _blocks.Releases.Add(new StoredRelease(Two, DateTimeOffset.UnixEpoch, "owner", "owner:x", Hash, true, Three));
+        _blocks.Blocks.Add(new HoldOutBlock(Three, new DateOnly(2024, 10, 1), ThreeEnd, 6, Hash, DateTimeOffset.UnixEpoch, Two));
+        _time.SetUtcNow(new DateTimeOffset(2027, 11, 5, 6, 0, 0, TimeSpan.Zero));
+        var id = made.Value.Id;
+
+        var run = await Run().HandleAsync(new RunHoldOutRegistrationCommand(id, "owner", "owner:x"), Ct);
+
+        run.Error.Code.ShouldBe(HoldOutRegistrationErrors.DriftCode);
+        run.Error.Message.ShouldContain("block's end changed");
+        _blocks.Unlocks.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_sheet_that_lost_its_checked_note_a_snapshot_written_on_the_block_start_and_a_scope_grown_over_the_cap_are_each_drift()
+    {
+        var id = await SealedBlockThreeWithRegistrationAsync();
+
+        _sheets.With(Sheet("dhan-2026-04", checkedNote: false));
+        var unchecked_ = await Run().HandleAsync(new RunHoldOutRegistrationCommand(id, "owner", "owner:x"), Ct);
+        _sheets.With(Sheet("dhan-2026-04"));
+        _snapshotCreated = new DateTimeOffset(2027, 5, 5, 0, 0, 0, TimeSpan.FromHours(5.5));
+        var late = await Run().HandleAsync(new RunHoldOutRegistrationCommand(id, "owner", "owner:x"), Ct);
+        _snapshotCreated = DateTimeOffset.UnixEpoch;
+        _members = 80;
+        var capped = await Run().HandleAsync(new RunHoldOutRegistrationCommand(id, "owner", "owner:x"), Ct);
+
+        unchecked_.Error.Message.ShouldContain("no longer checked");
+        late.Error.Message.ShouldContain("created on or after the block start");
+        capped.Error.Message.ShouldContain("memory cap");
+        new[] { unchecked_, late, capped }.ShouldAllBe(r => r.Error.Code == HoldOutRegistrationErrors.DriftCode);
+        _blocks.Unlocks.ShouldBeEmpty();
+        _ledger.ReceivedCalls().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_claim_appends_one_system_replay_ledger_row_per_strategy_version_keyed_by_the_look()
+    {
+        var id = await SealedBlockThreeWithRegistrationAsync();
+
+        var run = await Run().HandleAsync(new RunHoldOutRegistrationCommand(id, "auto", "system:holdout-replay", "abc@2027-11-05"), Ct);
+
+        run.IsSuccess.ShouldBeTrue(run.IsFailure ? run.Error.Message : null);
+        await _ledger.Received(1).AppendAsync(Arg.Is<LedgerRow>(r => r.TrialKind == LedgerRow.SystemReplayKind && r.StrategyId == "S1" && r.Version == 1 && r.StrategyHash == VersionHash && r.From == Three && r.To == ThreeEnd && r.RunKey == ReplayJson.Sha256(HoldOutRegistrationIds.LookId(id).ToString("N"))), Arg.Any<CancellationToken>());
+        _blocks.Unlocks.Single(u => u.Kind == "system").Result.Notes.ShouldContain(n => n.Contains("abc@2027-11-05", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_basket_scope_that_resolves_to_no_instrument_is_scope_empty()
+    {
+        _members = 0;
+
+        var result = await Register().HandleAsync(new RegisterHoldOutCommand([Guid.NewGuid()], null, null, null, "dhan-2026-04", null, "owner", "owner:x"), Ct);
+
+        result.Error.Message.ShouldStartWith("scope_empty:");
+    }
+
+    [Fact]
+    public async Task A_registration_stored_on_the_block_start_is_never_the_newest_and_holds_nothing()
+    {
+        await SealedBlockThreeWithRegistrationAsync();
+        _regs.Registrations[0] = _regs.Registrations[0] with { CreatedAt = new DateTimeOffset(2027, 5, 5, 6, 0, 0, TimeSpan.Zero) };
+
+        (await new SystemLookSlot(_regs).ReadAsync(Three, Ct)).ShouldBe(LookAvailability.NoSubject);
+        (await _regs.NewestForBlockAsync(Three, Ct)).ShouldBeNull();
     }
 
     // ---- the slot (AC 10)

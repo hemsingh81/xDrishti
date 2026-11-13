@@ -102,6 +102,39 @@ describe('HoldOutReplayCard (SR-03)', () => {
     expect(screen.queryByRole('button', { name: /Run once/ })).not.toBeInTheDocument();
   });
 
+  it('says a failed run reached no verdict, with its reason, and never as a verdict', async () => {
+    serve([
+      registration({
+        state: 'run',
+        result: {
+          verdict: 'run_failed',
+          reason: 'run_failed: InvalidOperationException',
+          figures: {
+            selection: null,
+            baseline: null,
+            comparison: null,
+            rule: { minTrades: 30, maxDrawdownPct: 15 },
+            labels: [],
+            engineChanged: false,
+            failure: 'run_failed: InvalidOperationException',
+            snapshotKeys: null,
+            snapshotCreatedAt: null,
+          },
+          runIds: [],
+          engineVersions: 'registered=sim-5;current=sim-5',
+          mode: 'owner',
+          actor: 'owner:x',
+          at: '2027-11-05T00:00:00Z',
+        },
+      }),
+    ]);
+    renderWithProviders(<HoldOutReplayCard />);
+
+    expect(await screen.findByText('The run failed and reached no verdict (owner)')).toBeInTheDocument();
+    expect(screen.getByText('run_failed: InvalidOperationException')).toBeInTheDocument();
+    expect(screen.queryByText(/^Verdict:/)).not.toBeInTheDocument();
+  });
+
   it('runs once behind the password dialog, which says the read is irreversible, and says a drift refusal in words', async () => {
     serve([registration()]);
     server.use(

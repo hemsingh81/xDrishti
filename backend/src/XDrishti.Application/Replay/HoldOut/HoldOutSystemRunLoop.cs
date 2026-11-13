@@ -8,7 +8,7 @@ namespace XDrishti.Application.Replay.HoldOut;
 /// The loop of the host (xd-api) that runs the claimed system replays (SR-03): every poll it runs, one at a time, each registration whose <c>system</c> look is claimed and that has no result. It waits while a queued replay runs, so two heavy replays never share the
 /// memory budget. All logic is in <see cref="HoldOutSystemRunner"/>. Off when <c>Replay:RunWorker</c> is false (the tests drive the runner).
 /// </summary>
-public sealed class HoldOutSystemRunLoop(IServiceScopeFactory scopes, SystemReplayOptions options, ReplayRunner replays, TimeProvider time, ILogger<HoldOutSystemRunLoop> logger)
+public sealed class HoldOutSystemRunLoop(IServiceScopeFactory scopes, SystemReplayOptions options, ReplayRunner replays, HoldOutRunActivity activity, TimeProvider time, ILogger<HoldOutSystemRunLoop> logger)
 {
     private static readonly TimeSpan Poll = TimeSpan.FromSeconds(30);
 
@@ -45,10 +45,17 @@ public sealed class HoldOutSystemRunLoop(IServiceScopeFactory scopes, SystemRepl
             }
 
             await using var scope = scopes.CreateAsyncScope();
-
-            if (await scope.ServiceProvider.GetRequiredService<HoldOutSystemRunner>().RunPendingAsync(cancellationToken) is > 0 and var stored)
+            activity.Set(true);
+            try
             {
-                HoldOutSystemLog.Stored(logger, stored);
+                if (await scope.ServiceProvider.GetRequiredService<HoldOutSystemRunner>().RunPendingAsync(cancellationToken) is > 0 and var stored)
+                {
+                    HoldOutSystemLog.Stored(logger, stored);
+                }
+            }
+            finally
+            {
+                activity.Set(false);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

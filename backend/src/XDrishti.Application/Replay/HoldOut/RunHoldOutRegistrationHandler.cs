@@ -8,8 +8,8 @@ using XDrishti.Domain.Lab;
 
 namespace XDrishti.Application.Replay.HoldOut;
 
-/// <summary>The one run of a registration (SR-03 D4). <c>Mode</c> is <c>owner</c> (the password was checked at the endpoint) or <c>auto</c> (the seal step, with its settings snapshot).</summary>
-public sealed record RunHoldOutRegistrationCommand(Guid RegistrationId, string Mode, string Actor) : ICommand;
+/// <summary>The one run of a registration (SR-03 D4). <c>Mode</c> is <c>owner</c> (the password was checked at the endpoint) or <c>auto</c> (the seal step, with its settings snapshot); <c>SwitchStamp</c> names the <c>auto_run</c> switch row that allowed an auto run (id and time), kept with the look.</summary>
+public sealed record RunHoldOutRegistrationCommand(Guid RegistrationId, string Mode, string Actor, string? SwitchStamp = null) : ICommand;
 
 /// <summary>The ids of the two arm results the run will store.</summary>
 public sealed record StartedHoldOutRun(IReadOnlyList<Guid> RunIds);
@@ -24,6 +24,7 @@ internal sealed class RunHoldOutRegistrationHandler(
     IHoldOutRegistrationStore store,
     HoldOutEpochs epochs,
     HoldOutInputCheck inputs,
+    ITestLedger ledger,
     HoldOutOptions options,
     TimeProvider time) : ICommandHandler<RunHoldOutRegistrationCommand, StartedHoldOutRun>
 {
@@ -80,6 +81,12 @@ internal sealed class RunHoldOutRegistrationHandler(
             return Result.Failure<StartedHoldOutRun>(HoldOutRegistrationErrors.Drift("The stored registration cannot be read."));
         }
 
+        // the reader ends where the STORED block ends: a block that is not the one registered (a changed BlockMonths between registration and release) is drift, before anything is claimed
+        if (config.BlockStart != block.Start || config.BlockEnd != block.HistoryLast)
+        {
+            return Result.Failure<StartedHoldOutRun>(HoldOutRegistrationErrors.Drift("The block's end changed since registration."));
+        }
+
         if (await inputs.DriftAsync(config, cancellationToken) is { } drift)
         {
             return Result.Failure<StartedHoldOutRun>(HoldOutRegistrationErrors.Drift("A stored input no longer resolves: " + drift + "."));
@@ -100,11 +107,19 @@ internal sealed class RunHoldOutRegistrationHandler(
         var view = new HoldOutResultView(
             key, HoldOutRegistrationIds.LookVersion, HoldOutHorizon.SystemKind, command.Mode, "used", now, block.Start, block.HistoryLast, false, false, false, HoldOutStatus.Inconclusive,
             "The system look is claimed; the verdict is stored with the registration (GET /api/replay/holdout-registrations).", null, null, null, 0, registration.ConfigHash, options.SnapshotHash(), command.Actor,
-            ["Research only: unseen by the system; the owner may have seen these prices elsewhere."]);
+            command.SwitchStamp is { } stamp ? ["Research only: unseen by the system; the owner may have seen these prices elsewhere.", "Allowed by the auto_run switch row " + stamp + "."] : ["Research only: unseen by the system; the owner may have seen these prices elsewhere."]);
         var look = new StoredUnlock(key, HoldOutRegistrationIds.LookVersion, HoldOutHorizon.SystemKind, command.Mode, command.Actor, now, options.SnapshotHash(), false, block.Start, HoldOutRegistrationIds.LookId(registration.Id), view);
         if (!await blocks.InsertUnlockAsync(look, cancellationToken))
         {
             return Result.Failure<StartedHoldOutRun>(HoldOutRegistrationErrors.Used("The system look could not be claimed: the slot was taken, or the block was released, between the check and the claim."));
+        }
+
+        // one trial-ledger look of kind system_replay per strategy version the run uses, keyed by the look (no figure: the run has not read anything yet)
+        var runKey = ReplayJson.Sha256(HoldOutRegistrationIds.LookId(registration.Id).ToString("N"));
+        foreach (var v in config.Versions.Values.SelectMany(l => l))
+        {
+            var rowId = new Guid(Convert.FromHexString(ReplayJson.Sha256($"system-replay|{runKey}")[..16] + ReplayJson.Sha256($"system-replay|{runKey}|{v.Hash}")[..16]));
+            await ledger.AppendAsync(new LedgerRow(rowId, runKey, v.StrategyId, v.Version, v.Hash, null, "system replay", config.BlockStart, config.BlockEnd, LedgerRow.SystemReplayKind, now, LedgerRow.SystemReplayKind, 0), cancellationToken);
         }
 
         return Result.Success(new StartedHoldOutRun(runIds));

@@ -81,7 +81,7 @@ internal sealed class ReplayFacts(
     private TradingCalendar? _calendar;
 
     /// <summary>SR-03: reads through the reader of a claimed hold-out block (up to its end) instead of the training clamp. Only the system-replay runner calls it, after the claim; call before <see cref="BeginRun"/>.</summary>
-    internal void UseBlock(HoldOut.HoldOutBlockReader reader) => _bars = new ClampedBars(holdOut, holdOutOptions, minuteBars, seams, dayBars, options.ReadAheadSessions, reader);
+    internal void UseBlock(HoldOut.HoldOutBlockReader reader) => _bars = ClampedBars.ForBlock(holdOut, holdOutOptions, minuteBars, seams, dayBars, options.ReadAheadSessions, reader);
 
     public ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken) => _bars.LastReadableAsync(cancellationToken);
 
