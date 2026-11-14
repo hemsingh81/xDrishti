@@ -204,7 +204,8 @@ public sealed class HoldOutSealTests
         _store.Releases.Clear();
         _store.Blocks.RemoveAll(b => b.Start == Two); // block 1 in force and sealed (its last session closed on 2026-10-30)
         var o = options ?? new HoldOutOptions();
-        return new SimDaysHoldOut(Epochs(Later), _store, Step(o, Later), new LabHoldOutGuard(_store, _bars, o, Later), o, new FixedCalendar(), Later);
+        _runs.ListAsync(Arg.Any<string?>(), Arg.Any<LabRunState?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns((IReadOnlyList<LabRun>)[]);
+        return new SimDaysHoldOut(Epochs(Later), _store, Step(o, Later), _runs, new LabHoldOutGuard(_store, _bars, o, Later), o, new FixedCalendar(), Later);
     }
 
     [Fact]
@@ -213,8 +214,11 @@ public sealed class HoldOutSealTests
         Run("ORB", 3, new DateOnly(2026, 4, 1));
         var holdOut = SimHoldOut();
 
-        var answer = await holdOut.ResolveAsync(new DateOnly(2026, 10, 30), Ct);
+        var decided = await holdOut.ResolveAsync(new DateOnly(2026, 10, 30), Ct);
+        await _runs.DidNotReceive().InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>()); // the decision claims nothing
+        var answer = await holdOut.ClaimAsync(decided, Ct);
 
+        decided.Claim!.Start.ShouldBe(One);
         answer.End.ShouldBe(HoldOutOptions.TrainingCut(One, new HoldOutOptions().TrainingEmbargoDays));
         answer.ReadThrough.ShouldBeNull();
         answer.Note!.ShouldContain("claimed automatically");
@@ -231,7 +235,8 @@ public sealed class HoldOutSealTests
 
         var answer = await holdOut.ResolveAsync(new DateOnly(2026, 10, 30), Ct);
 
-        (answer.End, answer.ReadThrough).ShouldBe((new DateOnly(2026, 10, 30), new DateOnly(2026, 10, 30)));
+        (answer.End, answer.ReadThrough, answer.Claim).ShouldBe((new DateOnly(2026, 10, 30), new DateOnly(2026, 10, 30), null));
+        answer.Note!.ShouldContain("mode owner, actor owner:x");
         await _runs.DidNotReceive().InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>());
     }
 
@@ -241,12 +246,28 @@ public sealed class HoldOutSealTests
         Run("ORB", 3, new DateOnly(2026, 4, 1));
         var off = await SimHoldOut(new HoldOutOptions(AutoUnlock: false)).ResolveAsync(new DateOnly(2026, 10, 30), Ct);
         _listed.Clear();
-        var none = await SimHoldOut().ResolveAsync(new DateOnly(2026, 10, 30), Ct);
+        var holdOut = SimHoldOut();
+        var none = await holdOut.ClaimAsync(await holdOut.ResolveAsync(new DateOnly(2026, 10, 30), Ct), Ct);
 
         off.Note!.ShouldContain("AutoUnlock is off");
         none.Note!.ShouldContain("unavailable");
         (off.ReadThrough, none.ReadThrough).ShouldBe((null, null));
         await _runs.DidNotReceive().InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task While_a_hold_out_look_is_queued_the_simulation_claims_nothing_again()
+    {
+        Run("ORB", 3, new DateOnly(2026, 4, 1));
+        var holdOut = SimHoldOut();
+        _runs.ListAsync(null, LabRunState.Queued, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(_ => (IReadOnlyList<LabRun>)[.. _jobs.Values]);
+        await holdOut.ClaimAsync(await holdOut.ResolveAsync(new DateOnly(2026, 10, 30), Ct), Ct);
+
+        var again = await holdOut.ResolveAsync(new DateOnly(2026, 10, 30), Ct);
+
+        again.Claim.ShouldBeNull();
+        again.Note!.ShouldContain("queued or running");
+        await _runs.Received(1).InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -86,10 +86,11 @@ internal sealed class ReplayFacts(
     public async ValueTask<IReadOnlyList<(DateOnly Start, DateOnly End)>> ReleasedHoldOutAsync(CancellationToken cancellationToken) =>
         _readInside && await holdOut.CurrentAsync(cancellationToken) is { } inside ? [.. await holdOut.ReleasedAsync(cancellationToken), (inside.Start, inside.HistoryLast)] : await holdOut.ReleasedAsync(cancellationToken);
 
-    public void ReadInsideHoldOut(DateOnly through)
+    public bool ReadInsideHoldOut(DateOnly through)
     {
         _bars.Widen(through);
         _readInside = true;
+        return true;
     }
 
     public async ValueTask<IReadOnlyList<(DateOnly Session, double Close)>> DayClosesAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>

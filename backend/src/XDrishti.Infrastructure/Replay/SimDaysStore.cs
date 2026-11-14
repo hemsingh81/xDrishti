@@ -15,7 +15,7 @@ internal sealed class SimDaysStore(NpgsqlDataSource dataSource) : ISimDaysStore
                r.read_through, r.holdout_note, r.fail_reason, r.pending_session, r.pending_record::text, r.pending_trades::text, r.pending_equity, r.pending_hash, r.pending_end,
                (SELECT count(*)::int FROM research.sim_days_snapshots s WHERE s.run_id = r.id),
                (SELECT s.equity_close FROM research.sim_days_snapshots s WHERE s.run_id = r.id ORDER BY s.session DESC LIMIT 1),
-               r.created_at, r.updated_at
+               r.created_at, r.updated_at, r.manual, r.waiting
         FROM research.sim_days_runs r
         """;
 
@@ -64,6 +64,12 @@ internal sealed class SimDaysStore(NpgsqlDataSource dataSource) : ISimDaysStore
             c.Parameters.AddWithValue("to", NpgsqlDbType.Varchar, to);
         }, cancellationToken);
 
+    public ValueTask<bool> RequestSettleAsync(Guid id, bool manual, DateTimeOffset now, CancellationToken cancellationToken) =>
+        UpdateAsync("UPDATE research.sim_days_runs SET phase = 'settling', manual = @manual, waiting = NULL, updated_at = @now WHERE id = @id AND phase = 'idle'", id, now, c => c.Parameters.AddWithValue("manual", NpgsqlDbType.Boolean, manual), cancellationToken);
+
+    public async ValueTask SetWaitingAsync(Guid id, string? reason, DateTimeOffset now, CancellationToken cancellationToken) =>
+        await UpdateAsync("UPDATE research.sim_days_runs SET waiting = @reason, updated_at = @now WHERE id = @id AND waiting IS DISTINCT FROM @reason AND phase IN ('idle', 'settling', 'settled')", id, now, c => c.Parameters.AddWithValue("reason", NpgsqlDbType.Varchar, (object?)Cap(reason, 40) ?? DBNull.Value), cancellationToken);
+
     public ValueTask<bool> SetAutoAsync(Guid id, bool on, DateTimeOffset now, CancellationToken cancellationToken) =>
         UpdateAsync("UPDATE research.sim_days_runs SET auto = @on, updated_at = @now WHERE id = @id AND " + Active, id, now, c => c.Parameters.AddWithValue("on", NpgsqlDbType.Boolean, on), cancellationToken);
 
@@ -71,7 +77,7 @@ internal sealed class SimDaysStore(NpgsqlDataSource dataSource) : ISimDaysStore
     {
         ArgumentNullException.ThrowIfNull(pending);
         return UpdateAsync("""
-            UPDATE research.sim_days_runs SET phase = 'settled', pending_session = @session, pending_record = @record, pending_trades = @trades, pending_equity = @equity, pending_hash = @hash, pending_end = @end_in_force, updated_at = @now
+            UPDATE research.sim_days_runs SET phase = 'settled', waiting = NULL, pending_session = @session, pending_record = @record, pending_trades = @trades, pending_equity = @equity, pending_hash = @hash, pending_end = @end_in_force, updated_at = @now
             WHERE id = @id AND phase = 'settling' AND cursor_session = @session
             """, id, now, c =>
         {
@@ -152,13 +158,13 @@ internal sealed class SimDaysStore(NpgsqlDataSource dataSource) : ISimDaysStore
 
     public ValueTask<bool> FailAsync(Guid id, string reason, DateTimeOffset now, CancellationToken cancellationToken) =>
         UpdateAsync("""
-            UPDATE research.sim_days_runs SET phase = 'error', fail_reason = @reason, auto = false, pending_session = NULL, pending_record = NULL, pending_trades = NULL, pending_equity = NULL, pending_hash = NULL, pending_end = NULL, updated_at = @now
+            UPDATE research.sim_days_runs SET phase = 'error', waiting = NULL, fail_reason = @reason, auto = false, pending_session = NULL, pending_record = NULL, pending_trades = NULL, pending_equity = NULL, pending_hash = NULL, pending_end = NULL, updated_at = @now
             WHERE id = @id AND
             """ + " " + Active, id, now, c => c.Parameters.AddWithValue("reason", NpgsqlDbType.Varchar, Cap(reason, 400)!), cancellationToken);
 
     public ValueTask<bool> CancelAsync(Guid id, DateTimeOffset now, CancellationToken cancellationToken) =>
         UpdateAsync("""
-            UPDATE research.sim_days_runs SET phase = 'cancelled', auto = false, pending_session = NULL, pending_record = NULL, pending_trades = NULL, pending_equity = NULL, pending_hash = NULL, pending_end = NULL, updated_at = @now
+            UPDATE research.sim_days_runs SET phase = 'cancelled', waiting = NULL, auto = false, pending_session = NULL, pending_record = NULL, pending_trades = NULL, pending_equity = NULL, pending_hash = NULL, pending_end = NULL, updated_at = @now
             WHERE id = @id AND phase IN ('idle', 'settling', 'settled', 'complete')
             """, id, now, null, cancellationToken);
 
@@ -213,7 +219,7 @@ internal sealed class SimDaysStore(NpgsqlDataSource dataSource) : ISimDaysStore
         return new SimDaysRunRow(
             reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), Text(5), reader.GetDecimal(6), reader.GetString(7), reader.GetFieldValue<DateOnly>(8), reader.GetFieldValue<DateOnly>(9), reader.GetFieldValue<DateOnly>(10),
             reader.GetFieldValue<DateOnly>(11), reader.GetString(12), reader.GetBoolean(13), Date(14), Text(15), Text(16), pending, reader.GetInt32(23), reader.IsDBNull(24) ? null : reader.GetDecimal(24),
-            reader.GetFieldValue<DateTimeOffset>(25), reader.GetFieldValue<DateTimeOffset>(26));
+            reader.GetFieldValue<DateTimeOffset>(25), reader.GetFieldValue<DateTimeOffset>(26), reader.GetBoolean(27), Text(28));
     }
 
     private static string? Cap(string? text, int max) => text is null || text.Length <= max ? text : text[..max];

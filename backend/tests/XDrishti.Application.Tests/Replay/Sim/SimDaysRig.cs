@@ -42,16 +42,21 @@ internal sealed class SimDaysRig(ReplayWorld world)
     }
 
     /// <summary>Stores a run over the first <paramref name="sessions"/> sessions of the world, as the start handler would (the parameters, the one settings snapshot and the versions of a fresh rig).</summary>
-    public async Task<Guid> StartAsync(int sessions, ReplayMode mode = ReplayMode.Frozen)
+    public async Task<Guid> StartAsync(int sessions, ReplayMode mode = ReplayMode.Frozen, DateOnly? readThrough = null)
     {
         var rig = ReplayRig.Create(World);
         var p = ReplayRig.Params(sessions, mode: mode);
+        if (readThrough is { } through)
+        {
+            rig.Facts.ReadInsideHoldOut(through).ShouldBeTrue();
+        }
+
         var prepared = await rig.Driver.PrepareAsync(p, null, null, Ct);
         prepared.IsSuccess.ShouldBeTrue(prepared.IsFailure ? prepared.Error.Message : string.Empty);
         var versions = await rig.Facts.VersionsAsync(p, Ct);
         var learning = await rig.Facts.LearningSourcesAsync(p, Ct);
         var id = Guid.CreateVersion7();
-        (await Store.InsertAsync(new NewSimDaysRun(id, new string('a', 64), ReplayJson.Canonical(p), ReplayJson.Canonical(prepared.Value.Run.Settings), ReplayJson.Canonical(versions), learning, p.Capital, mode == ReplayMode.Learning ? "learning" : "frozen", p.From, p.To, p.To, prepared.Value.Sessions[0], null, null, Time.GetUtcNow()), Ct)).ShouldBeTrue();
+        (await Store.InsertAsync(new NewSimDaysRun(id, new string('a', 64), ReplayJson.Canonical(p), ReplayJson.Canonical(prepared.Value.Run.Settings), ReplayJson.Canonical(versions), learning, p.Capital, mode == ReplayMode.Learning ? "learning" : "frozen", p.From, p.To, p.To, prepared.Value.Sessions[0], readThrough, null, Time.GetUtcNow()), Ct)).ShouldBeTrue();
         return id;
     }
 

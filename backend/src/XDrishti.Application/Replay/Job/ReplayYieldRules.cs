@@ -17,7 +17,7 @@ public sealed class ReplayYieldRules(SystemReplayOptions options, TimeProvider t
     private bool _backfillIncomplete;
 
     /// <summary>Why the job should wait now, or null. The rules of <c>SimAllRunner.YieldAsync</c>, and a simulate-everything chunk in flight. Cheap checks first; the backfill is asked once a minute.</summary>
-    public async ValueTask<string?> ReasonAsync(IServiceProvider services, bool includeBackfill, CancellationToken cancellationToken)
+    public async ValueTask<string?> ReasonAsync(IServiceProvider services, bool includeBackfill, CancellationToken cancellationToken, bool marketHours = true)
     {
         var now = time.GetUtcNow();
         if (services.GetRequiredService<IFreeDiskProbe>().FreeBytes() is not { } free || free < options.MinFreeBytes)
@@ -25,7 +25,7 @@ public sealed class ReplayYieldRules(SystemReplayOptions options, TimeProvider t
             return SimAllPause.LowDisk;
         }
 
-        if (!options.RunInMarketHours)
+        if (marketHours && !options.RunInMarketHours)
         {
             var calendar = await services.GetRequiredService<ITradingCalendar>().GetAsync(cancellationToken);
             if (SimAllPause.InMarketHours(calendar, now) || (SimAllPause.NextWindowStart(calendar, now) is { } next && next - now < WindowMargin))

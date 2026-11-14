@@ -39,10 +39,18 @@ internal sealed class FakeSimDaysStore : ISimDaysStore
 
     public ValueTask<bool> MovePhaseAsync(Guid id, string from, string to, DateTimeOffset now, CancellationToken cancellationToken) => Move(id, r => r.Phase == from, r => r with { Phase = to });
 
+    public ValueTask<bool> RequestSettleAsync(Guid id, bool manual, DateTimeOffset now, CancellationToken cancellationToken) => Move(id, r => r.Phase == SimDays.Idle, r => r with { Phase = SimDays.Settling, Manual = manual, Waiting = null });
+
+    public ValueTask SetWaitingAsync(Guid id, string? reason, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        Moved(id, r => SimDays.IsActive(r.Phase), r => r with { Waiting = reason });
+        return ValueTask.CompletedTask;
+    }
+
     public ValueTask<bool> SetAutoAsync(Guid id, bool on, DateTimeOffset now, CancellationToken cancellationToken) => Move(id, r => SimDays.IsActive(r.Phase), r => r with { Auto = on });
 
     public ValueTask<bool> SettleAsync(Guid id, SimDayPending pending, DateTimeOffset now, CancellationToken cancellationToken) =>
-        Move(id, r => r.Phase == SimDays.Settling && r.Cursor == pending.Session, r => r with { Phase = SimDays.Settled, Pending = pending });
+        Move(id, r => r.Phase == SimDays.Settling && r.Cursor == pending.Session, r => r with { Phase = SimDays.Settled, Pending = pending, Waiting = null });
 
     public ValueTask<bool> AdvanceAsync(Guid id, SimDaySnapshotRow snapshot, DateOnly? next, DateTimeOffset now, CancellationToken cancellationToken)
     {

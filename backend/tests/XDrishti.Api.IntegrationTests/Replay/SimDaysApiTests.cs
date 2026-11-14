@@ -181,4 +181,44 @@ public sealed class SimDaysApiTests(ApiFactory factory) : DataTestBase(factory)
         reopen.Parameters.AddWithValue("id", id);
         (await Should.ThrowAsync<PostgresException>(() => reopen.ExecuteNonQueryAsync(Ct))).SqlState.ShouldBe(PostgresErrorCodes.CheckViolation, "the trigger keeps a cancelled run final");
     }
+
+    /// <summary>The row count of every table of the planning, paper, trading, selection, settings and confidence schemas and of every research table but the simulation's own.</summary>
+    private async Task<Dictionary<string, long>> CountsAsync()
+    {
+        await using var connection = await OpenAsync();
+        var tables = new List<string>();
+        await using (var list = new NpgsqlCommand("SELECT schemaname || '.' || tablename FROM pg_tables WHERE schemaname IN ('workflow', 'paper', 'trading', 'selection', 'config', 'confidence', 'research') AND tablename NOT LIKE 'sim_days_%' ORDER BY 1", connection))
+        await using (var reader = await list.ExecuteReaderAsync(Ct))
+        {
+            while (await reader.ReadAsync(Ct))
+            {
+                tables.Add(reader.GetString(0));
+            }
+        }
+
+        var counts = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (var table in tables)
+        {
+            await using var count = new NpgsqlCommand("SELECT count(*) FROM " + table, connection);
+            counts[table] = (long)(await count.ExecuteScalarAsync(Ct))!;
+        }
+
+        return counts;
+    }
+
+    [Fact]
+    public async Task A_settled_and_advanced_day_writes_no_planning_paper_shadow_statistics_model_or_settings_row()
+    {
+        var id = await StoredAsync();
+        var before = await CountsAsync();
+        before.Keys.ShouldContain("research.cell_stats");
+
+        (await PostAsync($"/api/sim/days/{id}/settle")).Status.ShouldBe(HttpStatusCode.Accepted);
+        (await WithStoreAsync(s => s.SettleAsync(id, Pending(D1), T0, Ct).AsTask())).ShouldBeTrue();
+        (await PostAsync($"/api/sim/days/{id}/advance")).Status.ShouldBe(HttpStatusCode.OK);
+        (await PostAsync($"/api/sim/days/{id}/auto", new { on = true })).Status.ShouldBe(HttpStatusCode.OK);
+        (await PostAsync($"/api/sim/days/{id}/cancel")).Status.ShouldBe(HttpStatusCode.OK);
+
+        (await CountsAsync()).ShouldBe(before);
+    }
 }

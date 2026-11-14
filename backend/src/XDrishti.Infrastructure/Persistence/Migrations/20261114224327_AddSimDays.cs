@@ -29,6 +29,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     cursor_session date NOT NULL,
                     phase varchar(12) NOT NULL,
                     auto boolean NOT NULL DEFAULT false,
+                    manual boolean NOT NULL DEFAULT false,
+                    waiting varchar(40) NULL,
                     read_through date NULL,
                     holdout_note varchar(1000) NULL,
                     fail_reason varchar(400) NULL,
@@ -103,7 +105,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 END $$;
                 """);
             migrationBuilder.GrantColumnUpdateToAppRole(
-                Schemas.Research, "sim_days_runs", "range_end", "requested_end", "cursor_session", "phase", "auto", "read_through", "holdout_note", "fail_reason",
+                Schemas.Research, "sim_days_runs", "range_end", "requested_end", "cursor_session", "phase", "auto", "manual", "waiting", "read_through", "holdout_note", "fail_reason",
                 "pending_session", "pending_record", "pending_trades", "pending_equity", "pending_hash", "pending_end", "updated_at");
         }
 

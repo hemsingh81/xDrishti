@@ -12,7 +12,7 @@ namespace XDrishti.Application.Replay.Sim;
 
 /// <summary>
 /// Starts a day-by-day simulation (SR-04, AC 1 and 2; ADR 0293): checks the input, applies the hold-out rule (<see cref="SimDaysHoldOut"/>: inside block 1 only once its strategy look is stored, taken automatically when free; else the end is clamped and the note says why), prepares the SR-01 run
-/// (the one settings snapshot, today's versions labelled hindsight, gross), hashes the input, stores the run with its cursor on the first session and records it in the trial ledger as a <c>system_replay</c> look. A run whose ledger rows cannot be written is cancelled and the failure goes on.
+/// (the one settings snapshot, today's versions labelled hindsight, gross), hashes the input, claims block 1's free look only once every check has passed, stores the run with its cursor on the first session and records it in the trial ledger as a <c>system_replay</c> look. A run whose ledger rows cannot be written is cancelled and the failure goes on.
 /// </summary>
 internal sealed class StartSimDaysHandler(
     ReplayDriver driver, IReplayFacts facts, ReplayInputHasher hasher, IReplayInputs inputs, SimDaysHoldOut holdOut, IRiskProfileStore profiles, SystemReplayOptions replayOptions, SimDaysOptions options, ISimDaysStore store, ITestLedger ledger, TimeProvider time, ILogger<StartSimDaysHandler> logger)
@@ -100,9 +100,15 @@ internal sealed class StartSimDaysHandler(
             return Invalid("the whole range lies inside the hold-out: " + answer.Note);
         }
 
-        if (answer.ReadThrough is { } through)
+        if (answer.ReadThrough is { } through && !facts.ReadInsideHoldOut(through))
         {
-            facts.ReadInsideHoldOut(through);
+            // the facts cannot read inside the block: stay before the cut, and say so
+            var cut = await facts.LastReadableSessionAsync(cancellationToken);
+            answer = new Lab.SimHoldOutAnswer(cut, null, $"The end is clamped to {cut:yyyy-MM-dd}: the replay cannot read inside the hold-out block.");
+            if (answer.End < command.Start)
+            {
+                return Invalid("the whole range lies inside the hold-out: " + answer.Note);
+            }
         }
 
         var p = new ReplayParams(command.Start, answer.End, scope, capital, profile, null, ReplayVersionRule.Start, mode);
@@ -126,6 +132,7 @@ internal sealed class StartSimDaysHandler(
             return Invalid($"the scope reads {instruments} instruments; the largest scope allowed is {replayOptions.MaxWindowMb * 1024L * 1024 / replayOptions.BytesPerInstrument} (Replay:MaxWindowMb)");
         }
 
+        answer = await holdOut.ClaimAsync(answer, cancellationToken); // only now, with every check passed: block 1's look is spent for good
         var now = time.GetUtcNow();
         var id = Guid.CreateVersion7(now);
         var run = new NewSimDaysRun(

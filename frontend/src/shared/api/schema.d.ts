@@ -23843,7 +23843,7 @@ export interface components {
       /** Format: uuid */
       id: string;
     };
-    /** @description The status of a day-by-day simulation (SR-04): the cursor day, the phase, the equity and how many days are done of the total, with the hindsight labels, the cost basis and the hold-out note. */
+    /** @description The status of a day-by-day simulation (SR-04): the cursor day, the phase, the equity and how many days are done of the total, with the hindsight labels, the cost basis, the hold-out note and why the runner waits (`market_hours`, `low_disk`, `data_job`, `backfill`, `sim_all`), or null. */
     SimDaysView: {
       /** Format: uuid */
       id: string;
@@ -23869,6 +23869,7 @@ export interface components {
       /** Format: int32 */
       daysTotal: number;
       holdOutNote: null | string;
+      waiting: null | string;
       failReason: null | string;
       hindsight: components['schemas']['ReplayLabelView'][];
       costsLabel: string;

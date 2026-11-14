@@ -5,7 +5,7 @@ using XDrishti.Domain.Common;
 
 namespace XDrishti.Application.Replay.Sim;
 
-/// <summary>Asks for the cursor day to be settled (SR-04, Instant): <c>idle</c> to <c>settling</c>; the runner settles it and moves it to <c>settled</c>. A repeat while it settles answers the same; a settled day must be advanced first (409 <c>sim.busy</c>).</summary>
+/// <summary>Asks for the cursor day to be settled (SR-04, Instant): <c>idle</c> to <c>settling</c>; the runner settles it and moves it to <c>settled</c>. A request while auto-run is off is the owner's manual one, which the runner settles in market hours too (ADR 0293); a repeat while it settles answers the same; a settled day must be advanced first (409 <c>sim.busy</c>).</summary>
 internal sealed class SettleSimDayHandler(ISimDaysStore store, ITradingCalendar calendars, SimDaysOptions options, TimeProvider time) : ICommandHandler<SettleSimDayCommand, SimDaysView>
 {
     public async ValueTask<Result<SimDaysView>> HandleAsync(SettleSimDayCommand command, CancellationToken cancellationToken)
@@ -16,7 +16,7 @@ internal sealed class SettleSimDayHandler(ISimDaysStore store, ITradingCalendar 
             return Result.Failure<SimDaysView>(SimDays.NotFound);
         }
 
-        if (row.Phase == SimDays.Idle && !await store.MovePhaseAsync(row.Id, SimDays.Idle, SimDays.Settling, time.GetUtcNow(), cancellationToken))
+        if (row.Phase == SimDays.Idle && !await store.RequestSettleAsync(row.Id, !row.Auto, time.GetUtcNow(), cancellationToken))
         {
             return Result.Failure<SimDaysView>(SimDays.Busy("The simulation moved meanwhile; read it again."));
         }

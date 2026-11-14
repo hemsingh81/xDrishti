@@ -182,6 +182,9 @@ public sealed partial class ReplayArchitectureTests
         SqlWrite().IsMatch("SELECT id FROM research.replay_runs FOR UPDATE SKIP LOCKED").ShouldBeFalse("a row lock is not a write");
     }
 
+    // the store, the ledger port, and holdOut: SimDaysHoldOut.ClaimAsync, block 1's look through the HO-01b claim of the seal service (ADR 0293)
+    private static readonly string[] SimWriteReceivers = ["store", "ledger", "holdOut"];
+
     private static readonly string[] SimResolvedAllowed = ["ISimDaysStore", "ReplayDriver", "IReplayFacts", "ICommandHandler"];
 
     private static readonly string[] SimConstructorAllowed = ["IServiceScopeFactory", "SimDaysOptions", "SystemReplayOptions", "TimeProvider", "ILogger`1", "ReplayDriver", "IReplayFacts", "ReplayInputHasher", "IReplayInputs", "SimDaysHoldOut", "IRiskProfileStore", "ISimDaysStore", "ITestLedger", "ITradingCalendar"];
@@ -203,7 +206,7 @@ public sealed partial class ReplayArchitectureTests
             Banned().IsMatch(text).ShouldBeFalse(file);
             foreach (Match write in ReceiverOfWrite().Matches(text))
             {
-                WriteReceivers.ShouldContain(write.Groups["receiver"].Value, $"{Path.GetFileName(file)}: {write.Value} writes through something other than the simulation store or the ledger port (SR-04, AC 12)");
+                SimWriteReceivers.ShouldContain(write.Groups["receiver"].Value, $"{Path.GetFileName(file)}: {write.Value} writes through something other than the simulation store, the ledger port or the hold-out claim (SR-04, AC 12)");
             }
 
             foreach (Match m in ResolvedType().Matches(text))

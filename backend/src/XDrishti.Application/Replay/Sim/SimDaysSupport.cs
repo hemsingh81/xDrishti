@@ -45,7 +45,7 @@ internal static class SimDaysSupport
 
     public static SimDaysView View(SimDaysRunRow row, TradingCalendar calendar, SimDaysOptions options) => new(
         row.Id, row.Start, row.End, row.RequestedEnd, row.Cursor, row.Phase, row.Auto, row.Mode, row.Capital, row.LastEquity ?? row.Capital, row.Pending?.EquityClose, row.DaysDone, Count(calendar, row.Start, row.End),
-        row.HoldOutNote, row.FailReason, Labels(row), CostsLabel, options.DefaultSpeedSecondsPerMinute, row.CreatedAt, row.UpdatedAt);
+        row.HoldOutNote, row.Waiting, row.FailReason, Labels(row), CostsLabel, options.DefaultSpeedSecondsPerMinute, row.CreatedAt, row.UpdatedAt);
 
     public static SimDaySnapshotView Snapshot(SimDaysRunRow row, DateOnly session, bool stored, string recordJson, string tradesJson, string hash)
     {

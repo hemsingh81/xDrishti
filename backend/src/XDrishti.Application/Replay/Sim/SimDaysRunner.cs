@@ -97,9 +97,11 @@ public sealed class SimDaysRunner(IServiceScopeFactory scopes, SimDaysOptions op
 
                     break;
                 case SimDays.Settling:
-                    if (await _yield.ReasonAsync(services, true, cancellationToken) is { } reason)
+                    // the owner's manual Run day goes on in market hours; auto-run and every other rule (low disk, data jobs, the backfill, a simulate-everything chunk) still wait (ADR 0293)
+                    if (await _yield.ReasonAsync(services, true, cancellationToken, marketHours: !row.Manual) is { } reason)
                     {
                         Waiting = reason;
+                        await store.SetWaitingAsync(row.Id, reason, time.GetUtcNow(), cancellationToken);
                         return;
                     }
 

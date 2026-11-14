@@ -40,19 +40,27 @@ internal sealed class ContinueSimDaysHandler(ISimDaysStore store, SimDaysHoldOut
 
         var answer = await holdOut.ResolveAsync(history.LastComplete, cancellationToken);
         var calendar = await calendars.GetAsync(cancellationToken);
+        if (answer.End <= row.End && answer.Claim is not null)
+        {
+            // clamped at the cut with block 1's look free: claim it now (Continue extends once it is stored)
+            answer = await holdOut.ClaimAsync(answer, cancellationToken);
+            return Result.Failure<SimDaysView>(Error.Conflict(SimDays.NothingNewCode, answer.Note!));
+        }
+
         if (answer.End <= row.End || SimDaysSupport.Next(calendar, row.Cursor, answer.End) is not { } cursor)
         {
             return Result.Failure<SimDaysView>(Error.Conflict(SimDays.NothingNewCode, answer.Note ?? "No trading session newer than the end is stored."));
         }
 
+        // the look first: the trial-ledger rows have ids fixed by the run and the new end, so a retry after a failure writes nothing twice; a look recorded for an extension that then fails to store over-counts (the safe side), it never loses one
         var now = time.GetUtcNow();
+        var versions = ReplayJson.Read<Dictionary<string, List<StoredVersion>>>(row.VersionsJson) ?? [];
+        await SimDaysLedger.RecordAsync(ledger, row.Id, row.InputHash, versions.ToDictionary(p => p.Key, p => (IReadOnlyList<StoredVersion>)p.Value, StringComparer.Ordinal), cursor, answer.End, now, cancellationToken);
+        answer = await holdOut.ClaimAsync(answer, cancellationToken);
         if (!await store.ExtendAsync(row.Id, answer.End, history.LastComplete, cursor, answer.ReadThrough ?? row.ReadThrough, answer.Note ?? row.HoldOutNote, now, cancellationToken))
         {
             return Result.Failure<SimDaysView>(SimDays.Busy("The simulation moved meanwhile, or another one is active."));
         }
-
-        var versions = ReplayJson.Read<Dictionary<string, List<StoredVersion>>>(row.VersionsJson) ?? [];
-        await SimDaysLedger.RecordAsync(ledger, row.Id, row.InputHash, versions.ToDictionary(p => p.Key, p => (IReadOnlyList<StoredVersion>)p.Value, StringComparer.Ordinal), cursor, answer.End, now, cancellationToken);
         SimDaysLog.Continued(logger, row.Id, answer.End);
         return Result.Success(SimDaysSupport.View(await store.GetAsync(row.Id, cancellationToken) ?? row, calendar, options));
     }

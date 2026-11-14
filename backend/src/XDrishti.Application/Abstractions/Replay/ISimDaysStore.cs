@@ -20,6 +20,12 @@ public interface ISimDaysStore
     /// <summary>Moves the phase from <paramref name="from"/> to <paramref name="to"/>; false when the run is not in <paramref name="from"/>.</summary>
     ValueTask<bool> MovePhaseAsync(Guid id, string from, string to, DateTimeOffset now, CancellationToken cancellationToken);
 
+    /// <summary><c>idle</c> to <c>settling</c>, marked as the owner's manual request or auto-run's; false when the run is not idle.</summary>
+    ValueTask<bool> RequestSettleAsync(Guid id, bool manual, DateTimeOffset now, CancellationToken cancellationToken);
+
+    /// <summary>Records why the runner waits on the run (a yield rule), or clears it with null.</summary>
+    ValueTask SetWaitingAsync(Guid id, string? reason, DateTimeOffset now, CancellationToken cancellationToken);
+
     /// <summary>Sets the auto flag of an active run; false when it is not active.</summary>
     ValueTask<bool> SetAutoAsync(Guid id, bool on, DateTimeOffset now, CancellationToken cancellationToken);
 

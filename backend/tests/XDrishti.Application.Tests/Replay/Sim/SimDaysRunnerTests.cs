@@ -225,17 +225,42 @@ public sealed class SimDaysRunnerTests
     }
 
     [Fact]
-    public async Task In_market_hours_the_runner_waits_and_settles_nothing()
+    public async Task In_market_hours_the_owners_manual_run_day_settles()
     {
         var rig = new SimDaysRig(World());
         var id = await rig.StartAsync(3);
         rig.Time.SetUtcNow(new DateTimeOffset(2026, 11, 11, 5, 0, 0, TimeSpan.Zero)); // 10:30 IST on a Wednesday
         await rig.Settle().HandleAsync(new SettleSimDayCommand(id), Ct);
-        var runner = rig.Runner();
 
-        await runner.TickAsync(Ct);
+        await rig.Runner().TickAsync(Ct);
 
-        rig.Store.Row(id).Phase.ShouldBe(SimDays.Settling);
-        runner.Waiting.ShouldNotBeNull();
+        (rig.Store.Row(id).Phase, rig.Store.Row(id).Manual, rig.Store.Row(id).Waiting).ShouldBe((SimDays.Settled, true, null));
+    }
+
+    [Fact]
+    public async Task In_market_hours_auto_run_waits_and_the_status_says_why()
+    {
+        var rig = new SimDaysRig(World());
+        var id = await rig.StartAsync(3);
+        rig.Time.SetUtcNow(new DateTimeOffset(2026, 11, 11, 5, 0, 0, TimeSpan.Zero));
+
+        await AutoToTheEnd(rig, id);
+
+        var view = await new GetSimDaysHandler(rig.Store, rig.Calendar, rig.Options).HandleAsync(new GetSimDaysQuery(id), Ct);
+        (view.Value.Phase, view.Value.Waiting).ShouldBe((SimDays.Settling, "market_hours"));
+        rig.Store.Row(id).Manual.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task A_manual_run_day_still_waits_for_low_disk()
+    {
+        var rig = new SimDaysRig(World());
+        var id = await rig.StartAsync(3);
+        rig.Disk.Free = 1;
+        await rig.Settle().HandleAsync(new SettleSimDayCommand(id), Ct);
+
+        await rig.Runner().TickAsync(Ct);
+
+        (rig.Store.Row(id).Phase, rig.Store.Row(id).Waiting).ShouldBe((SimDays.Settling, "low_disk"));
     }
 }
