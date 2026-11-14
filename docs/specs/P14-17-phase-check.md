@@ -20,7 +20,7 @@ One command says whether P14's exit criterion holds, per family and overall, fro
 **Out:** running any evaluation; changing a switch or stopping the archive (an owner act); a screen.
 
 ## The rule
-Families: `expr:option_buy` (the **primary** family of the criterion), `expr:debit_spread`, `expr:credit_spread`, `expr:iron_condor`, `ext:iv-1`, `pairs:intraday-1`, `basis:carry-1`. Cut families are listed as cut and not counted. For each, the newest record **for the current versions** (re-mark version, engine, archive watermark not older than `StaleAfterDays` (90), spread model id, cost sheet hash, profile set); an older one is `stale`.
+Families: `expr:option_buy` (the **primary** family of the criterion), `expr:debit_spread`, `expr:credit_spread`, `expr:iron_condor`, `ext:iv-1`, `pairs:intraday-1` (basis dropped, ADR 0289). Cut families are listed as cut and not counted. For each, the newest record **for the current versions** (re-mark version, engine, archive watermark not older than `StaleAfterDays` (90), spread model id, cost sheet hash, profile set); an older one is `stale`.
 - **resolved** = KEEP or DROP with its evidence block and on the net basis where the protocol requires it; **open** = INCONCLUSIVE, NOT_EVALUABLE, stale or none.
 - **violation** = a non-cash expression **in use**: any stored plan run, ticket or paper capture whose cell key has a non-cash eighth part (P14-06 makes this impossible by construction; the check proves it from stored rows), or a KEEP read by a decision path (none exists). Reported, never blocked.
 - **Overall:** MET iff every non-cut family is resolved, no violation, and **either** `expr:option_buy` (or another `expr:*` family) is KEEP with a hold-out-confirmed record **or** every `expr:*` family is DROP (the option expression "stays disabled": `expression` stays `cash`). NOT MET iff a violation exists. Otherwise NOT EVALUABLE, naming each open family and its missing quantity.
@@ -30,7 +30,7 @@ Families: `expr:option_buy` (the **primary** family of the criterion), `expr:deb
 ## Acceptance criteria
 1. **Verdict table.** Fixtures: all `expr:*` DROP, the others DROP or cut, no violation → MET with "option expressions stay disabled"; `expr:option_buy` KEEP confirmed on the hold-out and the rest resolved → MET; a development KEEP without a hold-out record → NOT EVALUABLE (`hold-out not read`); one NOT_EVALUABLE → NOT EVALUABLE naming it and its missing quantity; a stored plan with an eight-part non-cash key → NOT MET with the row id; no records → NOT EVALUABLE "no P14 evaluation stored".
 2. **Stale and gross.** A KEEP for an older re-mark version → `stale`; a record whose protocol requires net but is gross can only be INCONCLUSIVE (as stored), so the family is open.
-3. **Cut families.** `--cut basis:carry-1,expr:iron_condor` lists them as cut and leaves them out; an unknown family in `--cut` → exit 1; without the flag nothing is cut.
+3. **Cut families.** `--cut expr:iron_condor,expr:credit_spread` lists them as cut and leaves them out; an unknown family in `--cut` → exit 1; without the flag nothing is cut.
 4. **Read only.** Architecture test: only read ports; the record store and the plan stores run through a SELECT-only test role; nothing is written.
 5. **Honest output.** No digit for a non-value; the limits block always printed; `--json` has the same fields (snapshot test); P15's `xd events phase-check` unchanged (golden).
 6. **Determinism.** Same stored rows → identical output.

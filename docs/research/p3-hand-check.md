@@ -140,7 +140,7 @@ One block per pack. **No price, no R value and no count of a group.** The trade 
 | Open model or implementation defects | |
 | Owner's statement and date | |
 
-Seeds used so far (all of them, including abandoned ones): `p3-check-1`.
+Seeds used so far (all of them, including abandoned ones): `p3-check-1`; `p3-roundb-1` (Round B: `VWAP_PULLBACK`, `BASE_BREAKOUT`, written 2026-11-14 before its draw by the coordinator under the owner's instruction of 2026-11-14 in chat; same window 2024-04-01 to 2025-10-31, `--gross`, the same 214 stored symbols).
 
 ## 11. The assisted check (P3-09c, ADR 0046, Amendment 1 (the assisted check))
 

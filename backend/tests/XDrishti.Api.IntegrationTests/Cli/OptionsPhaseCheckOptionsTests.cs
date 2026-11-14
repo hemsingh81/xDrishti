@@ -18,9 +18,9 @@ public sealed class OptionsPhaseCheckOptionsTests
     [Fact]
     public void A_cut_list_and_the_json_flag_are_read_in_any_order_and_a_family_named_twice_counts_once()
     {
-        var (options, _) = OptionsPhaseCheckOptions.Parse(["--json", "--cut", "expr:iron_condor, basis:carry-1,basis:carry-1"]);
+        var (options, _) = OptionsPhaseCheckOptions.Parse(["--json", "--cut", "expr:iron_condor, ext:iv-1,ext:iv-1"]);
 
-        options!.Cut.ShouldBe(["expr:iron_condor", "basis:carry-1"]);
+        options!.Cut.ShouldBe(["expr:iron_condor", "ext:iv-1"]);
         options.Json.ShouldBeTrue();
     }
 
@@ -39,7 +39,7 @@ public sealed class OptionsPhaseCheckOptionsTests
     public void A_missing_value_or_a_repeated_flag_is_refused()
     {
         OptionsPhaseCheckOptions.Parse(["--cut"]).Options.ShouldBeNull();
-        OptionsPhaseCheckOptions.Parse(["--cut", "basis:carry-1", "--cut", "ext:iv-1"]).Options.ShouldBeNull();
+        OptionsPhaseCheckOptions.Parse(["--cut", "pairs:intraday-1", "--cut", "ext:iv-1"]).Options.ShouldBeNull();
         OptionsPhaseCheckOptions.Parse(["--json", "--json"]).Options.ShouldBeNull();
     }
 
@@ -48,7 +48,7 @@ public sealed class OptionsPhaseCheckOptionsTests
     {
         OptionsPhaseCheckOptions.Usage.ShouldContain("nothing is written");
         OptionsPhaseCheckOptions.Usage.ShouldContain("no switch or setting is changed");
-        OptionsPhaseCheckOptions.Usage.ShouldContain("basis:carry-1");
+        OptionsPhaseCheckOptions.Usage.ShouldContain("pairs:intraday-1");
         OptionsPhaseCheckOptions.Usage.ShouldContain("0 done (whatever the verdict)");
     }
 }
