@@ -79,10 +79,12 @@ public sealed class StoredDaysTests
     {
         // admission off: the run record has no seam line, so the engine and the reader see the same cut bars
         (await Vwap(null, admittedSeam: null)).ShouldBeNull();
+        // admitted: the reader drops the bars before the seam and the run keeps them, so they differ whenever the seam is after the first loaded date, wherever it falls
         (await Vwap(null, admittedSeam: Day.AddDays(-30))).ShouldNotBeNull().ShouldContain("pre-seam");
-        (await Vwap(null, admittedSeam: From)).ShouldNotBeNull();
+        (await Vwap(null, admittedSeam: Day)).ShouldNotBeNull();
+        (await Vwap(null, admittedSeam: Day.AddDays(5))).ShouldNotBeNull(); // after the range
+        (await Vwap(null, admittedSeam: From)).ShouldBeNull(); // nothing is cut
         (await Vwap(null, admittedSeam: From.AddDays(-1))).ShouldBeNull();
-        (await Vwap(null, admittedSeam: Day)).ShouldBeNull();
     }
 
     [Fact]

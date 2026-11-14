@@ -51,6 +51,20 @@ public sealed class GateRulesTests
     }
 
     [Fact]
+    public void Hand_check_rows_and_missing_source_rows_together_print_both_sets_of_next_actions()
+    {
+        var caveated = new RowVerdict(Row(2) with { HistoryCaveat = "a corporate action (ex-date 2026-02-20) lies inside the history" }, Verdicts.ReaderDiffers, ["exit reason"], []);
+
+        var d = Decide([Agree(1), caveated, Unavailable(3)]);
+
+        d.Status.ShouldBe(GateStatus.RerunNeeded);
+        d.Reruns.Count.ShouldBe(2);
+        d.Defects.ShouldBeEmpty();
+        d.NextActions.ShouldContain(a => a.StartsWith("Hand check needed:", StringComparison.Ordinal));
+        d.NextActions.ShouldContain(a => a.StartsWith("Reconnect the second source", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void A_source_unavailable_row_is_RERUN_NEEDED()
     {
         var d = Decide([Agree(1), Unavailable(2)]);

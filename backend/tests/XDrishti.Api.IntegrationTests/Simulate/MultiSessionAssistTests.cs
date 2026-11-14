@@ -272,6 +272,29 @@ public sealed class MultiSessionAssistTests
         outcome.Exit.ShouldBe(10);
     }
 
+    [Fact]
+    public async Task A_trade_day_before_the_seam_the_run_admitted_from_is_a_hand_check_not_a_defect_when_the_stored_day_is_cut_empty()
+    {
+        MemoryFolder Pack(string? seam)
+        {
+            var folder = Folder([Symbol]);
+            var instruments = seam is null ? string.Empty : "\"instruments\":[{\"symbol\":\"" + Symbol + "\",\"run_key\":\"rk\",\"pre_seam\":\"" + seam + "\"}],";
+            folder.Files[PackFiles.PackJsonName] = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(folder.Files[PackFiles.PackJsonName]).Replace("\"spots\":[]", instruments + "\"spots\":[]", StringComparison.Ordinal));
+            return Seal(folder);
+        }
+
+        var withSeam = Pack("2026-03-05");
+        var without = Pack(null);
+
+        var hand = await GateRunner.RunAsync(withSeam, new FakeSecond(_ => new SecondDay(BuyDay(), null)), new FakeStored([]), TestContext.Current.CancellationToken);
+        var blocked = await GateRunner.RunAsync(without, new FakeSecond(_ => new SecondDay(BuyDay(), null)), new FakeStored([]), TestContext.Current.CancellationToken);
+
+        hand.Status.ShouldBe(GateStatus.RerunNeeded);
+        hand.Exit.ShouldBe(10);
+        Encoding.UTF8.GetString(withSeam.Files[GateRunner.MarkdownName]).ShouldContain("the trade day is before the seam (2026-03-05)");
+        blocked.Status.ShouldBe(GateStatus.BlockedDefect);
+    }
+
     [Theory]
     [InlineData("VWAP_PULLBACK|NSE:AAA|Buy|not-a-date", "2026-03-02", "does not end in a yyyy-MM-dd decision date")]
     [InlineData("VWAP_PULLBACK|NSE:AAA|Buy|2026-02-27", "2026-03-02", "intraday trade whose decision date 2026-02-27 is not its date 2026-03-02")]

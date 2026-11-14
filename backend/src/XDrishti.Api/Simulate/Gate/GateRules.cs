@@ -162,16 +162,7 @@ internal static class GateRules
                 "Where the gap is in the second source and not in the stored bars, move second-source-bars.csv away (or fix the folder file) so that the day is fetched again.",
                 "Re-run the gate: scripts/verify-pack.sh --gate <pack-folder>. A change of the stored bars changes the trades, so if the engine's trades change, draw a new pack.",
             ],
-            GateStatus.RerunNeeded when reruns.Count > 0 && reruns.All(r => r.Detail.StartsWith(HandCheck, StringComparison.Ordinal)) =>
-            [
-                "Hand check needed: each listed row used raw stored history that a corporate action or the backfill seam may make different from the engine's, so the machine cannot say whether the engine or the reader is right. Compare the engine's trade with the adjusted history or a chart by hand; this is neither an engine defect nor a pass.",
-                "Record the outcome of the hand check next to the pack; the gate does not pass these rows by itself. Any change of the engine or of the data voids the pack.",
-            ],
-            GateStatus.RerunNeeded =>
-            [
-                "Reconnect the second source (the Dhan token in the vault, or the network) or put the missing files in the second-source folder (<TICKER>_<yyyy-MM-dd>.csv); the rows and reasons are listed.",
-                "Re-run the gate: scripts/verify-pack.sh --gate <pack-folder> [--second-source-folder <dir>]. The days already fetched are kept in second-source-bars.csv.",
-            ],
+            GateStatus.RerunNeeded => RerunActions(reruns),
             GateStatus.PassWithDataFindings =>
             [
                 "Record each data finding as an open data-quality finding (the rows, fields and missing minutes are listed); they are not P3 blockers. A hole inside the backfill lookback can be closed with the gap backfill; a hole older than the lookback cannot be reached by it and stays open for a later repair command (the stored history is not edited for the gate).",
@@ -195,6 +186,25 @@ internal static class GateRules
             AddCount(open, counts.Reruns, "rerun rows");
             AddCount(open, counts.DataFindings, "data findings");
             actions.Add("Counts are independent, none is masked by the status: " + string.Join(", ", open.DefaultIfEmpty("none")) + ".");
+        }
+
+        return actions;
+    }
+
+    /// <summary>The next actions of RERUN_NEEDED: those of the rows that need a hand check and those of the rows with no second source, both when both kinds are listed.</summary>
+    private static List<string> RerunActions(List<GateFinding> reruns)
+    {
+        var actions = new List<string>();
+        if (reruns.Any(r => r.Detail.StartsWith(HandCheck, StringComparison.Ordinal)))
+        {
+            actions.Add("Hand check needed: each row marked so used raw stored history that a corporate action or the backfill seam may make different from the engine's, so the machine cannot say whether the engine or the reader is right. Compare the engine's trade with the adjusted history or a chart by hand; this is neither an engine defect nor a pass.");
+            actions.Add("Record the outcome of the hand check next to the pack; the gate does not pass these rows by itself. Any change of the engine or of the data voids the pack.");
+        }
+
+        if (reruns.Any(r => !r.Detail.StartsWith(HandCheck, StringComparison.Ordinal)))
+        {
+            actions.Add("Reconnect the second source (the Dhan token in the vault, or the network) or put the missing files in the second-source folder (<TICKER>_<yyyy-MM-dd>.csv); the rows and reasons are listed.");
+            actions.Add("Re-run the gate: scripts/verify-pack.sh --gate <pack-folder> [--second-source-folder <dir>]. The days already fetched are kept in second-source-bars.csv.");
         }
 
         return actions;

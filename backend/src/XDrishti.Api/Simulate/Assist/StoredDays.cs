@@ -42,7 +42,7 @@ internal sealed class StoredDays(
 
     /// <summary>
     /// The raw stored bars of a range are not the engine's when an applied corporate action's ex-date lies after <paramref name="from"/> and up to <paramref name="lastUsed"/> (the engine adjusts the older side; the factor at the first date differs from the one at the last used date),
-    /// or when the run admitted pre-seam bars (<paramref name="admittedSeam"/>, from the run record) from a seam inside the range. With admission off the engine and the reader see the same cut bars, so a seam alone is no caveat. The multi-session readers adjust nothing (ADR 0291).
+    /// or when the run admitted pre-seam bars (<paramref name="admittedSeam"/>, from the run record): the reader drops the bars dated before the seam and an admitting run keeps them, so they differ whenever the seam is after the first loaded date, wherever it falls. With admission off the engine and the reader see the same cut bars, so a seam alone is no caveat. The multi-session readers adjust nothing (ADR 0291).
     /// shortcut: an action after <paramref name="lastUsed"/> scales every bar of the range evenly and is not flagged (the same gap as ORB's adjusted_instrument); the ratios the readers use are unchanged by it.
     /// </summary>
     internal static async Task<string?> CaveatAsync(XDrishti.Application.Market.Actions.IAdjustmentFactors factors, Guid instrumentId, DateOnly from, DateOnly to, DateOnly lastUsed, DateOnly? admittedSeam, CancellationToken cancellationToken)
@@ -54,9 +54,9 @@ internal sealed class StoredDays(
             return "a corporate action (ex-date " + action.ExDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ") lies inside the history the reader used, which is raw and unadjusted";
         }
 
-        if (admittedSeam is { } seam && seam >= from && seam <= to)
+        if (admittedSeam is { } seam && seam > from)
         {
-            return "the run admitted pre-seam bars from the seam (" + seam.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ") inside the history the reader used, which is raw and not source-aware";
+            return "the run admitted pre-seam bars from the seam (" + seam.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ") after the first date of the history the reader used, which is cut at the seam and not source-aware";
         }
 
         return null;

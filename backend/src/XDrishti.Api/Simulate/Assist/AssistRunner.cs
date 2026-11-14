@@ -219,7 +219,9 @@ internal static class AssistRunner
             }
         }
 
-        return new AssistRow(row, null, label, reading, storedDay.Tick, minutes, storedDay.TickFallback, offsetNote, storedReading, storedNote, secondNote, reader.Caveat);
+        // a trade day before the seam the run admitted from: the stored day is cut (empty) here and the engine's is not, so the machine cannot judge the row
+        var caveat = reader.Caveat ?? (row.AdmittedSeam is { } seam && row.Date < seam ? "the trade day is before the seam (" + seam.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + ") from which the run admitted pre-seam bars: the stored day is cut here and the engine's is not" : null);
+        return new AssistRow(row, null, label, reading, storedDay.Tick, minutes, storedDay.TickFallback, offsetNote, storedReading, storedNote, secondNote, caveat);
     }
 
     /// <summary>The bar comparison of every fetched day (one for an intraday row, the decision day and the entry day for a swing row): the minutes, the first offset note and the price ratio of each day that has one.</summary>
