@@ -181,6 +181,18 @@ public sealed class EvalSummaryTests
     }
 
     [Fact]
+    public void Auto_accept_needs_every_gating_set_the_baseline_has_and_no_regression()
+    {
+        var baseline = Summary(EvalVerdict.Pass, false, 29, 10, 10);
+        var missing = new RunSummary(EvalVerdict.Pass, false, [Set("data", "pass", 29), Set("plans", "repaired_pass", 10), Set("ideas", "other", 10)], string.Empty);
+
+        EvalAcceptance.AutoEligible(Summary(EvalVerdict.Pass, false, 29, 10, 10), baseline).ShouldBeTrue();
+        EvalAcceptance.AutoEligible(Summary(EvalVerdict.Pass, false, 28, 10, 10), baseline).ShouldBeFalse();
+        EvalAcceptance.AutoEligible(missing, baseline).ShouldBeFalse();
+        EvalAcceptance.AutoEligible(missing, null).ShouldBeTrue();
+    }
+
+    [Fact]
     public void A_comparison_counts_discordant_pairs_and_flags_a_regression_by_the_rule_of_each_set()
     {
         IReadOnlyDictionary<string, bool> Cases(string prefix, int count, Func<int, bool> pass) => Enumerable.Range(1, count).ToDictionary(i => $"{prefix}-{i:D2}", pass);

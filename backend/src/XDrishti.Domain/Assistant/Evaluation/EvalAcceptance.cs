@@ -37,7 +37,13 @@ public static class EvalAcceptance
     public static bool AutoEligible(RunSummary run, RunSummary? baseline)
     {
         ArgumentNullException.ThrowIfNull(run);
-        return !run.NonGating && run.Verdict == EvalVerdict.Pass && Worse(run, baseline).Count == 0;
+        return !run.NonGating && run.Verdict == EvalVerdict.Pass && Worse(run, baseline).Count == 0 && !MissesABaselineSet(run, baseline);
+    }
+
+    /// <summary>A gating set the baseline has but the run does not: never auto-accepted, since no comparison exists (unavailable never counts as a pass).</summary>
+    private static bool MissesABaselineSet(RunSummary run, RunSummary? baseline)
+    {
+        return baseline is not null && EvalVerdict.Gating.Any(set => baseline.PrimaryPasses(set) is not null && run.PrimaryPasses(set) is null);
     }
 
     public static Result Check(RunSummary run, RunSummary? baseline, string? reason)
