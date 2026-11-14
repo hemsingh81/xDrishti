@@ -2,7 +2,6 @@ using System.Globalization;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 using XDrishti.Simulation.Running;
-using XDrishti.Simulation.Scanning;
 using XDrishti.Strategies.Compilation;
 using XDrishti.Strategies.Model;
 
@@ -151,13 +150,6 @@ public static class InstrumentReplayer
         if (input.PresetSkip is { } preset)
         {
             return Same(new InstrumentReplay(Record(input, facts, preset, input.SkipDetail, Scanned.None), [], []), count);
-        }
-
-        if (strategy.ReadsContext && ContextReader.Of(input.ContextDays) is null)
-        {
-            // The market context is missing or refused: the strategy cannot be evaluated on this instrument, and an empty result with no reason would look like "no signals" (P3-lift, ADR 0145, D3).
-            var cause = input.ContextDays is { Count: > 0 } ? "context_invalid" : (input.ContextNote ?? "no_context");
-            return Same(new InstrumentReplay(Record(input, facts, SkipReason.ContextUnavailable, cause, Scanned.None), [], []), count);
         }
 
         if (strategy.ReadsEvents && input.Events is null)
@@ -403,16 +395,15 @@ public static class InstrumentReplayer
     /// <summary>One call of the simulator on a segment: the results of the one candidate of a plain strategy, or of every candidate of a comparison (one scan).</summary>
     private static ComparisonResult RunSegment(PreparedStrategy strategy, InstrumentRef instrument, IReadOnlyList<Bar> list, InstrumentReplayInput input, CancellationToken cancellationToken)
     {
-        var context = strategy.ReadsContext ? ContextReader.Of(input.ContextDays) : null;   // the replay has already skipped an instrument whose strategy has no context
         if (strategy.Comparison is { } comparison)
         {
-            var many = comparison.RunUntilCancelled(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays, input.TierOn, input.TurnoverOn, cancellationToken, input.MemberOn);
+            var many = comparison.RunUntilCancelled(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), input.Events, input.ResultsDays, input.TierOn, input.TurnoverOn, cancellationToken, input.MemberOn);
             return many.IsFailure
                 ? throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + many.Error.Code + ": " + many.Error.Message)
                 : many.Value;
         }
 
-        var run = strategy.Simulator.RunUntilCancelled(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays, input.TierOn, input.TurnoverOn, cancellationToken, input.RelativeStrength, input.MemberOn);
+        var run = strategy.Simulator.RunUntilCancelled(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), input.Events, input.ResultsDays, input.TierOn, input.TurnoverOn, cancellationToken, input.RelativeStrength, input.MemberOn);
         return run.IsFailure
             ? throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + run.Error.Code + ": " + run.Error.Message)
             : new ComparisonResult([run.Value], run.Value.Scans);

@@ -18,17 +18,15 @@ internal static class Vocabulary
     /// <summary>The one named argument: <c>ema(20, source=high)</c>.</summary>
     public const string SourceArgument = "source";
 
-    private static readonly string[] BuiltinNameList = ["crosses_above", "crosses_below", "rising", "falling", "between", "abs", "min", "max", "regime"];
+    private static readonly string[] BuiltinNameList = ["crosses_above", "crosses_below", "rising", "falling", "between", "abs", "min", "max"];
 
     private static readonly string[] ConstantNameList = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
-    private static readonly string[] ScopeNameList = ["prev_day", "today", "index"];
+    private static readonly string[] ScopeNameList = ["prev_day", "today"];
 
     private static readonly string[] PrevDayMembers = ["open", "high", "low", "close", "volume"];
 
     private static readonly string[] TodayMembers = ["open", "high", "low"];
-
-    private static readonly string[] IndexMembers = ["trend", "adx"];
 
     /// <summary>The four prices <c>source=</c> may name (volume is the feature <c>volume</c>, not a price source).</summary>
     public static readonly IReadOnlyList<string> PriceSourceNames = ["close", "open", "high", "low"];
@@ -64,7 +62,6 @@ internal static class Vocabulary
         {
             "prev_day" => PrevDayMembers,
             "today" => TodayMembers,
-            "index" => IndexMembers,
             _ => [],
         };
         return members.Count > 0;
@@ -109,7 +106,6 @@ internal static class Vocabulary
         Builtin.Between => "between",
         Builtin.Abs => "abs",
         Builtin.Min => "min",
-        Builtin.Max => "max",
-        _ => "regime",
+        _ => "max",
     };
 }

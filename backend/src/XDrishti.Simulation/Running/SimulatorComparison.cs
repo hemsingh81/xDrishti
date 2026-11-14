@@ -73,19 +73,14 @@ public sealed class SimulatorComparison
 
     /// <summary>Scans the minutes of one instrument once per side and walks every entry candidate under every member. Same arguments and same refusals as <see cref="Simulator.Run"/>.</summary>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<ComparisonResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null) =>
-        RunUntilCancelled(instrument, bars, tick, calendar, quantity, context, events, resultsDays, tierOn, turnoverOn, CancellationToken.None);
+    public Result<ComparisonResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null) =>
+        RunUntilCancelled(instrument, bars, tick, calendar, quantity, events, resultsDays, tierOn, turnoverOn, CancellationToken.None);
 
     /// <summary>As <c>Run</c>, looking at <paramref name="cancellationToken"/> every few thousand minutes of the scan; a stop raises <see cref="OperationCanceledException"/> (AU-12). A separate overload so that existing callers are unchanged.</summary>
-    public Result<ComparisonResult> RunUntilCancelled(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, ScanContext? context, EventCalendarSnapshot? events, ResultsDayInputs? resultsDays, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn, CancellationToken cancellationToken, Func<DateOnly, bool>? memberOn = null)
+    public Result<ComparisonResult> RunUntilCancelled(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, EventCalendarSnapshot? events, ResultsDayInputs? resultsDays, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn, CancellationToken cancellationToken, Func<DateOnly, bool>? memberOn = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
-        if (_union.Any(s => s.NeedsContext) && context is null)
-        {
-            return Result.Failure<ComparisonResult>(Simulator.ContextNotGivenError());
-        }
-
         // shortcut: a comparison (several exits in one scan) does not read the stored relative-strength rows (BK-09): a member that names one of the features gets a frame without them and fails closed in EntryScanner.Create (options.relativeStrength); a later slice passes them here
         var readsDays = _members.Any(m => m.ReadsResultsDays);
         if (readsDays && (resultsDays is null || calendar is null))
@@ -109,7 +104,7 @@ public sealed class SimulatorComparison
         var series = readsDays ? ResultsDaysScan.For(resultsDays!, instrument.Id, bars, calendar!) : null;
         for (var s = 0; s < _union.Length; s++)
         {
-            var created = EntryScanner.Create(_union[s], instrument, calendar, context, series);
+            var created = EntryScanner.Create(_union[s], instrument, calendar, series);
             if (created.IsFailure)
             {
                 return Result.Failure<ComparisonResult>(created.Error);

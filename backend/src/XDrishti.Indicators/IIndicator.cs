@@ -5,8 +5,7 @@ namespace XDrishti.Indicators;
 /// <summary>
 /// A streaming indicator (ADR 0031): it is fed one <b>closed</b> bar at a time, in time order, and keeps constant (or amortised constant) work and memory per bar. It holds no reference to
 /// future data, so its value after bar <i>k</i> is a function of the bars <i>1..k</i> only — with one family of exceptions that read no more than the past as well: the <b>date-driven</b> features
-/// (<see cref="DateFeature"/>, ADR 0033) are a function of the <i>India dates</i> of the bars <i>1..k</i> and of read-only data given at construction (the days of a <see cref="MarketContext"/> strictly before each date, the
-/// set of expiry dates), not of the prices of those bars; a later bar or a later context day never changes a value already given. An instance is thread-confined (no locking).
+/// (<see cref="DateFeature"/>, ADR 0033) are a function of the <i>India dates</i> of the bars <i>1..k</i> and of read-only data given at construction (the set of expiry dates), not of the prices of those bars; a later bar never changes a value already given. An instance is thread-confined (no locking).
 /// </summary>
 /// <remarks>
 /// A value that is not ready is <see cref="double.NaN"/> with <see cref="IsReady"/> false; callers treat it as a false condition. For a bar-driven indicator readiness is reached after <see cref="WarmUp"/> bars and

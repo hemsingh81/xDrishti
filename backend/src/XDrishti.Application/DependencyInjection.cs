@@ -541,17 +541,11 @@ public static class DependencyInjection
         services.AddScoped<ObservedCalendarRunner>();
         services.AddScoped<ICalendarUpkeep, CalendarUpkeep>();
 
-        // The market context (P3-01d, ADR 0033): written by the data job after the aggregates, read through IContextFigures, coverage at /api/data/context.
-        services.AddScoped<ICommandHandler<RefreshContextCommand, ContextRefreshed>, RefreshContextHandler>();
-        services.AddScoped<ICommandHandler<LoadContextInboxCommand, ContextInboxLoaded>, LoadContextInboxHandler>(); // the owner-dropped NSE CSVs of NIFTY 50 and INDIA VIX, insert-only fallback (P3-01d D, ADR 0290)
-        services.AddScoped<ICommandHandler<ComputeBreadthCommand, BreadthComputed>, ComputeBreadthHandler>(); // the breadth of the owner's tracked shares, set once per context day (P3-01e)
-        services.AddScoped<ICommandHandler<RebuildBreadthCommand, BreadthRebuilt>, RebuildBreadthHandler>();
-        services.AddScoped<IContextUpkeep, ContextUpkeep>();
+        // The basket upkeep after a data job (BK-08, BK-09): the gate basket's context and the relative strength. The NIFTY 50 / INDIA VIX market context was dropped (ADR 0291).
+        services.AddScoped<IBasketUpkeep, BasketUpkeep>();
         services.AddScoped<ICommandHandler<ComputeRelativeStrengthCommand, RelativeStrengthComputed>, ComputeRelativeStrengthHandler>(); // the relative strength of the missing sessions, insert-once, OFF by default (BK-09, ADR 0263)
         services.AddScoped<IRelativeStrengthRunSource, RelativeStrengthRunReader>(); // what a Lab run reads of the stored rows (BK-09)
         services.AddScoped<IQueryHandler<GetRelativeStrengthQuery, Result<RelativeStrengthView>>, GetRelativeStrengthHandler>();
-        services.AddScoped<IQueryHandler<GetContextCoverageQuery, ContextCoverageView>, GetContextCoverageHandler>();
-        services.AddScoped<IQueryHandler<GetRegimeLabelsQuery, Result<RegimeLabelsView>>, GetRegimeLabelsHandler>(); // the regime label of each session, read before the day (P6-02, ADR 0146)
         services.AddScoped<IQueryHandler<GetCalendarQuery, Result<CalendarView>>, GetCalendarHandler>();
         services.AddScoped<ICommandHandler<AddCalendarDayCommand, AddedCalendarDay>, AddCalendarDayHandler>();
         services.AddScoped<ICommandHandler<ConfirmCalendarDayCommand, CalendarDayView>, ConfirmCalendarDayHandler>();
@@ -919,7 +913,6 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ChangeUniverseSettingsCommand, UniverseSettingsView>, ChangeUniverseSettingsHandler>(); // owner only, password every change; applies no restriction (BK-11)
         services.AddScoped<IQueryHandler<ListUniverseCellsQuery, Result<IReadOnlyList<CellStatsView>>>, ListUniverseCellsHandler>(); // the liquidity-tier cells of the newest snapshot that has them (BK-11, ADR 0261)
         services.AddScoped<IQueryHandler<GetUniverseLinksQuery, Result<IReadOnlyList<UniverseLinkView>>>, GetUniverseLinksHandler>(); // each tier cell read against its all-shares parent; observations only, nothing is applied (BK-11)
-        services.AddScoped<IQueryHandler<ListRegimeCellsQuery, Result<IReadOnlyList<CellStatsView>>>, ListRegimeCellsHandler>(); // the regime cells of the newest snapshot that has them (P6-02, ADR 0146)
         services.AddScoped<IQueryHandler<EvaluateCounterfactualQuery, Result<CounterfactualReport>>, EvaluateCounterfactualHandler>(); // frozen-model counterfactual, evidence only (P6-12, ADR 0077)
         services.AddScoped<IQueryHandler<EvaluateMetaPolicyQuery, Result<MetaPolicyReport>>, EvaluateMetaPolicyHandler>(); // meta-labelling policy of the champion, evidence only (P6-13, ADR 0075)
         services.AddScoped<ICommandHandler<TrainModelCommand, TrainModelOutcome>, TrainModelHandler>(); // train, validate and register a model (P6-07, ADR 0070)

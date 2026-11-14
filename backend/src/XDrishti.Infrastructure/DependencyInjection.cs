@@ -20,7 +20,6 @@ using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Market.Quality;
 using XDrishti.Application.Abstractions.Market.Strength;
 using XDrishti.Application.Abstractions.OpeningBars;
@@ -58,7 +57,6 @@ using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Actions;
 using XDrishti.Infrastructure.Market.Bars;
 using XDrishti.Infrastructure.Market.Calendar;
-using XDrishti.Infrastructure.Market.Context;
 using XDrishti.Infrastructure.Market.Live;
 using XDrishti.Infrastructure.Market.Quality;
 using XDrishti.Infrastructure.Market.Strength;
@@ -694,17 +692,10 @@ public static class DependencyInjection
             .ValidateOnStart();
         services.AddSingleton<IDataSettings, DataSettings>();
 
-        // The market context (P3-01d): its settings, the daily rows of the two indices, the insert-only store and the reader that builds the library's context.
-        services.AddSingleton<IContextSettings, ContextSettings>();
-        services.AddSingleton<ContextFiguresAdapter.Cache>();
-        services.AddScoped<IContextBarSource, ContextBarSource>();
-        services.AddScoped<IContextDayStore, ContextDayStore>();
-        services.AddSingleton<IContextInbox, FolderContextInbox>(); // the owner's CSV drop folder for NIFTY 50 and INDIA VIX (P3-01d fallback D)
-        services.AddScoped<IBreadthSource, BreadthSource>();
+        services.AddScoped<IBenchmarkIndex, BenchmarkIndex>(); // the tracked Nifty 50 the relative-strength features and the derived baskets measure against (BK-03, BK-09)
         services.AddOptions<RelativeStrengthSettings>().Bind(configuration.GetSection(RelativeStrengthSettings.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the relative-strength step: OFF by default, the catch-up and the minimum samples (spec BK-09, ADR 0263)
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<RelativeStrengthSettings>>().Value);
         services.AddScoped<IRelativeStrengthStore, RelativeStrengthStore>(); // the relative-strength tables, insert-once (BK-09)
-        services.AddScoped<IContextFigures, ContextFiguresAdapter>();
         services.AddSingleton<ICsvFolder, CsvFolder>();
         services.AddSingleton<IDataJobChannel, DataJobChannel>();
         services.AddScoped<IDataJobStore, DataJobStore>();

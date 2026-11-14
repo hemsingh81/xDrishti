@@ -2,8 +2,8 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.LiveTrading;
 using XDrishti.Application.Abstractions.Market;
-using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Context;
+using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Portfolio;
@@ -12,7 +12,6 @@ using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Checklist;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.LiveTrading;
-using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Paper;
 using XDrishti.Domain.Selection;
 using XDrishti.Domain.Selection.SmartRules;
@@ -34,7 +33,6 @@ internal sealed class StoredPlanContextSource(
     IBarQueries bars,
     IOpenBookSettings openBook,
     IPaperBookReader paperBook,
-    IContextFigures contextFigures,
     IRampStore ramp,
     ILiveRampSettings rampSettings,
     ILiveReadyFactsSource liveFacts,
@@ -119,44 +117,26 @@ internal sealed class StoredPlanContextSource(
     }
 
     /// <summary>
-    /// The market figures of the latest stored context day before the planned date (P3-01d/e): the VIX, and the breadth of the owner's tracked shares. The context holds the breadth as a percent (0 to 100) and <c>SmartRulesOptions.BreadthMin</c> is a
-    /// fraction (0 to 1): the one conversion between them is here. The events figure has no source before P15 and stays unknown, so the gate reads normal only when it is known. No day, a stale day or no usable figure is no gate (unavailable, never a pass).
+    /// The market gate input (BK-08, criterion 9): only when the owner chose a basket as the gate's breadth source, the breadth of the basket's newest stored row before the planned day. A missing, stale or insufficient row is no breadth (unavailable, never a pass) and never the tracked set's figure.
+    /// The note names the basket, either way. With no basket chosen, or no store, there is no gate (the NIFTY 50 / INDIA VIX context that fed the VIX and the tracked-set breadth was dropped, ADR 0291). The VIX and events figures have no source and stay unknown.
     /// </summary>
     private async ValueTask<(MarketGateInput? Gate, string? Note)> GateAsync(DateOnly forDate, CancellationToken cancellationToken)
     {
-        var read = await contextFigures.AsOfAsync(forDate, cancellationToken);
-        // BK-08: only when the owner chose a basket as the gate's breadth source; with the default (the tracked set) or no store this method is what it was.
         var source = basketSettings is null ? BasketSettings.Defaults : (await basketSettings.CurrentAsync(cancellationToken)).Settings;
-        if (source.GateBasketId is { } basketId && basketContext is not null)
-        {
-            return await BasketGateAsync(basketId, read.Figures, forDate, cancellationToken);
-        }
-
-        if (read.Figures is not { } figures || (figures.Vix is null && figures.Breadth is null))
+        if (source.GateBasketId is not { } basketId || basketContext is null)
         {
             return (null, null);
         }
 
-        var gate = new MarketGateInput(figures.AsOf, figures.Vix, figures.Breadth is { } percent ? percent / 100.0 : null, null);
-        return (gate, figures.Breadth is null ? null : PlanContextNotes.MarketBreadth(figures.BreadthUniverse));
-    }
-
-    /// <summary>
-    /// The gate when the breadth source is a basket (BK-08, criterion 9): the VIX as before, the breadth of the basket's newest stored row before the planned day. A missing, stale or insufficient row is no breadth (unavailable, never a pass) and never the tracked set's figure.
-    /// The note names the basket, either way.
-    /// </summary>
-    private async ValueTask<(MarketGateInput? Gate, string? Note)> BasketGateAsync(Guid basketId, ContextFigures? figures, DateOnly forDate, CancellationToken cancellationToken)
-    {
-        var row = await basketContext!.LatestBeforeAsync(basketId, forDate, cancellationToken);
+        var row = await basketContext.LatestBeforeAsync(basketId, forDate, cancellationToken);
         var name = basketQueries is null ? null : (await basketQueries.GetAsync(basketId, cancellationToken))?.Name;
         var breadth = GateBreadthSource.FromBasket(name ?? basketId.ToString("D"), row?.AsOf, row?.B20, row?.State, forDate, (smartOptions ?? new SmartRulesOptions()).GateMaxAgeDays);
         if (logger is not null)
         {
             GateSourceLog.Used(logger, basketId, forDate, row?.State ?? "none", breadth.Breadth is not null, breadth.Reason);
         }
-        // The input is stamped with the older of the two days: the gate's age check then covers the basket row as well as the VIX day.
-        var asOf = figures is null ? row?.AsOf : row is null ? figures.AsOf : (figures.AsOf < row.AsOf ? figures.AsOf : row.AsOf);
-        return asOf is { } day ? (new MarketGateInput(day, figures?.Vix, breadth.Breadth, null), breadth.Note) : (null, breadth.Note);
+
+        return row?.AsOf is { } day ? (new MarketGateInput(day, null, breadth.Breadth, null), breadth.Note) : (null, breadth.Note);
     }
 
     /// <summary>A paper account with the ledger's equity, open risk, funds, held symbols and loss carried; an account the ledger has no capital for keeps null numbers (the plan treats its limits as unknown).</summary>

@@ -99,7 +99,6 @@ public static class StrategyCompiler
             filters,
             parts.Features,
             parts.HistoryDepth,
-            parts.NeedsContext,
             parts.NeedsExpiryDays,
             warnings);
         return new StrategyCompileResult(compiled, problems);

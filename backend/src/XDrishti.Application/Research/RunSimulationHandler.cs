@@ -5,7 +5,6 @@ using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Baskets;
 using XDrishti.Application.Abstractions.Market.Calendar;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Market.Actions;
@@ -16,7 +15,6 @@ using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
-using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Research;
@@ -39,7 +37,6 @@ internal sealed class RunSimulationHandler(
     ISimulationEngine engine,
     IStrategyStore strategies,
     ICostSheetStore costSheets,
-    IContextDayStore contextDays,
     IEventCalendarSnapshots eventSnapshots,
     IResultsFilingTimes filingTimes,
     ISurpriseInputsReader surpriseReader,
@@ -259,17 +256,14 @@ internal sealed class RunSimulationHandler(
         var calendar = await calendars.GetAsync(cancellationToken);
         var csvThrough = targets.Ids.Count == 0 ? new Dictionary<Guid, DateOnly>() : await actions.ListCsvAdjustedThroughAsync(targets.Ids, cancellationToken);
 
-        // P3-lift (ADR 0145): a strategy that reads the market context gets the stored days, read once for the whole run; one that does not reads none and its run key is unchanged.
-        var readsContext = prepared.Value.ReadsContext;
-        var days = readsContext ? await contextDays.ListAsync(cancellationToken) : null;
         if (basisSink is not null)
         {
-            basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough, days, events, resultsDays, entryTiers, request.Fills?.ConservativeSlippage == true, targets.Dated);
+            basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough, events, resultsDays, entryTiers, request.Fills?.ConservativeSlippage == true, targets.Dated);
         }
 
         // BK-09: a strategy that names mom_rank, rs_vs_index or sector_rs gets the stored rows of the previous closed sessions, read once per instrument; the step being off means there are none and every instrument is skipped with a reason.
         var strength = prepared.Value.ReadsRelativeStrength && relativeStrength is not null ? await relativeStrength.BeginAsync(targets.Ids, request.To, cancellationToken) : null;
-        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext, days, events, resultsDays, prepared.Value.ReadsTurnover, strength);
+        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext, events, resultsDays, prepared.Value.ReadsTurnover, strength);
         var readTime = time.GetElapsedTime(started);
         var replayTime = TimeSpan.Zero;
         var candidates = prepared.Value.Candidates;
@@ -340,7 +334,7 @@ internal sealed class RunSimulationHandler(
                 universeRecord,
                 calendar,
                 costContext is null ? null : CostRecord.Of(costContext),
-                days is null ? null : ContextFingerprint.Of(days, request.To),
+                null,
                 events is null ? null : new EventFilterRecord(events.Sha256, events.RowCount, events.LagMinutes, EventCalendarSnapshot.RuleVersion),
                 resultsDays is null ? null : new ResultsDaysRecord(resultsDays.Calendar?.Sha256 ?? "-", resultsDays.Calendar?.RowCount ?? 0, resultsDays.FilingsSha256, resultsDays.FilingCount, resultsDays.LagMinutes, ResultsDaySeries.Version, resultsDays.Surprises?.Sha256, resultsDays.Surprises?.Rows ?? 0, resultsDays.Surprises is null ? null : SurpriseInputs.Version, resultsDays.Surprises?.UnverifiedRows ?? 0, resultsDays.Surprises?.Seasons ?? 0, resultsDays.Surprises?.ThinSeasons ?? 0, missed.Missed, missed.Total),
                 Purpose: request.Purpose,
@@ -554,7 +548,7 @@ internal sealed class RunSimulationHandler(
         var read = await _reader.ReadAsync(id, request.To, context.CsvThrough.TryGetValue(id, out var through) ? through : null, cancellationToken);
         context.Admission.Count(read.Decision);
         var (raw, factors) = (read.Bars, read.Factors);
-        var built = InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.ContextDays, context.ContextDays is { Count: > 0 } ? null : (context.ContextDays is null ? null : "no_context"), context.Events, context.ResultsDays,
+        var built = InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.Events, context.ResultsDays,
             request.Fills?.ConservativeSlippage == true && entryTiers is not null ? await entryTiers.ForAsync(id, request.From, request.To, cancellationToken) : null,
             context.ReadsTurnover && entryTiers is not null ? await entryTiers.TurnoverForAsync(id, request.From, request.To, cancellationToken) : null,
             read.Decision.Admitted);
@@ -575,7 +569,6 @@ internal sealed class RunSimulationHandler(
         Universe Targets,
         ReplayOptions Options,
         CostContext? Costs,
-        IReadOnlyList<ContextDayRecord>? ContextDays,
         EventCalendarSnapshot? Events,
         ResultsDayInputs? ResultsDays = null,
         bool ReadsTurnover = false,

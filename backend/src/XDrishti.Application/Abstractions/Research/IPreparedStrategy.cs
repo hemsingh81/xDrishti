@@ -18,9 +18,6 @@ public interface IPreparedStrategy
     /// <summary>The strategy holds its positions overnight (a swing strategy): a comparison of its candidates is not gated (P4-05, D4).</summary>
     bool HoldsOvernight { get; }
 
-    /// <summary>The strategy reads the daily market context (P3-lift, ADR 0145): a run gives the replay the stored context days, and an instrument is skipped with <c>context_unavailable</c> when there are none.</summary>
-    bool ReadsContext { get; }
-
     /// <summary>The strategy names the filter <c>not_event_day</c> (P15-06): a run gives the replay a results-calendar snapshot, is refused with <c>simulation.filter_not_available</c> when the window has no calendar row at all, and an instrument is skipped with <c>event_calendar_unavailable</c> when it is given none.</summary>
     bool ReadsEvents { get; }
 

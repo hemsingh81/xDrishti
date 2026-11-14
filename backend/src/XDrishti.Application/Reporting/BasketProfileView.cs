@@ -18,7 +18,6 @@ namespace XDrishti.Application.Reporting;
 /// <param name="Dispersion">Dispersion of member returns.</param>
 /// <param name="Correlation">Average correlation, effective bets and the matrix.</param>
 /// <param name="Contribution">Who made the return.</param>
-/// <param name="Regime">The index by regime.</param>
 /// <param name="Turnover">Member turnover.</param>
 /// <param name="Capacity">Liquidity and capacity.</param>
 /// <param name="HoldOut">The median split of the strategy trades of this basket (m23).</param>
@@ -40,7 +39,6 @@ public sealed record BasketProfileView(
     ProfileDispersionView Dispersion,
     ProfileCorrelationView Correlation,
     ProfileContributionView Contribution,
-    ProfileRegimeView Regime,
     ProfileTurnoverView Turnover,
     ProfileCapacityView Capacity,
     ProfileHoldOutView HoldOut,
@@ -116,12 +114,6 @@ public sealed record ContributionRowView(string Symbol, double ReturnPct, double
 
 /// <summary>Who made the return: the five largest and five smallest parts, the share of the three largest and every member (empty unless the shares exist).</summary>
 public sealed record ProfileContributionView(MetricView Top3Share, int Included, IReadOnlyList<ContributionRowView> Top, IReadOnlyList<ContributionRowView> Bottom, IReadOnlyList<ContributionRowView> Rows);
-
-/// <summary>The index on days that followed one regime of the previous session.</summary>
-public sealed record RegimeRowView(int Code, string Label, int Days, MetricView MeanReturn, MetricView Vol, MetricView HitRate, string State);
-
-/// <summary>The regime panel: <c>Status</c> is a value when a regime was recorded, else why not; <c>Unknown</c> days sit in no row.</summary>
-public sealed record ProfileRegimeView(MetricView Status, int Unknown, int MinDays, IReadOnlyList<RegimeRowView> Rows);
 
 /// <summary>Member turnover over the window.</summary>
 public sealed record ProfileTurnoverView(MetricView Turnover, int Adds, int Removes);

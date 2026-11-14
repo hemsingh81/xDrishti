@@ -1,4 +1,3 @@
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Learning;
 using XDrishti.Domain.Filings;
@@ -11,7 +10,7 @@ namespace XDrishti.Application.Research;
 /// Reads the surprise numbers of the filings of a run (P15-09) with the extractor of the extensions: for each filing that names a period, the features of <c>fu-1</c> (<c>sue_yoy</c>) and <c>ev-1</c> (<c>results_car3</c>) at the close of its reaction session, the first instant at which both are
 /// computable. Every read is at or before that instant by the functions of the domain; nothing later is looked at. A filing whose reaction session the calendar cannot find is left out (it ranks nothing).
 /// </summary>
-internal sealed class SurpriseInputsReader(ExtensionFeatureExtractor extractor, IContextDayStore contextDays) : ISurpriseInputsReader
+internal sealed class SurpriseInputsReader(ExtensionFeatureExtractor extractor) : ISurpriseInputsReader
 {
     private static readonly int SueIndex = FundamentalFeatureCatalog.Names.ToList().IndexOf("sue_yoy");
 
@@ -23,8 +22,7 @@ internal sealed class SurpriseInputsReader(ExtensionFeatureExtractor extractor, 
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(calendar);
         var byInstrument = filings.GroupBy(f => f.InstrumentId).ToDictionary(g => g.Key, g => (IReadOnlyList<ResultsFilingTime>)g.ToList());
-        var days = await contextDays.ListAsync(cancellationToken);
-        var sources = new ExtensionSources(calendar, lag, snapshot, byInstrument, days.Count == 0 ? null : days.ToDictionary(d => d.Date, d => d.IndexClose));
+        var sources = new ExtensionSources(calendar, lag, snapshot, byInstrument, null);
         var observations = new List<SurpriseObservation>();
         foreach (var (instrument, list) in byInstrument.OrderBy(p => p.Key))
         {

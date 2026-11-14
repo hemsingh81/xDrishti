@@ -11,7 +11,7 @@ namespace XDrishti.Indicators;
 /// </summary>
 public static class IndicatorCatalog
 {
-    /// <summary>The largest period, window or slope distance an indicator parameter (and a <see cref="ContextOptions"/> period) accepts.</summary>
+    /// <summary>The largest period, window or slope distance an indicator parameter accepts.</summary>
     internal const int MaxPeriod = 10_000;
 
     private static readonly IndicatorInfo[] Entries = Build();
@@ -194,29 +194,13 @@ public static class IndicatorCatalog
         }
     }
 
-    /// <summary>
-    /// The calendar and market-context features (P3-01c, ADR 0033): twelve names without parameters, asked for on 1m only, that change at most once per India date. They do not read bars: the frame refreshes them at
-    /// the first accepted step of each date, from the date itself or from the latest <see cref="MarketContext"/> day strictly before it. All are <see cref="SessionBehaviour.Continuous"/>. The warm-up is counted in days of the
-    /// context, for the default <see cref="ContextOptions"/> (a frame's instance reports it for the options of its own context): 1 for the calendar features and the VIX and the breadth, 2 for the VIX change, 28 for the
-    /// ADX, 55 for the trend, 252 for the VIX percentile and 265 for the index volatility percentile, the volatility class and the regime.
-    /// </summary>
+    /// <summary>The calendar, results-event and relative-strength features (P3-01c, P15, BK-09): names asked for on 1m only that change at most once per India date. They do not read bars: the frame refreshes them at the first accepted step of each date. The NIFTY 50 / INDIA VIX context features were dropped (ADR 0291).</summary>
     private static void AddDateFeatures(List<IndicatorInfo> list)
     {
-        var defaults = new ContextOptions();
         foreach (var (name, kind, text) in new[]
         {
             ("day_of_week", DateFeatureKind.Weekday, "ISO weekday of the India date of the step: Monday 1 to Sunday 7."),
             ("is_expiry_day", DateFeatureKind.ExpiryDay, "1 when the India date of the step is one of the expiry dates given in the frame options, else 0."),
-            ("index_trend", DateFeatureKind.IndexTrend, "Trend of the regime index as of the previous session: +1 up, 0 range, -1 down (by default: close against its 50-day average, the average's 5-day slope and an ADX(14) of at least 20)."),
-            ("index_adx", DateFeatureKind.IndexAdx, "Wilder ADX(14) of the regime index's daily bars as of the previous session."),
-            ("index_vol_pct", DateFeatureKind.IndexVolPct, "Percentile rank (0 to 100) of the regime index's ATR as a percent of its close over the last 252 sessions (by default), as of the previous session."),
-            ("vix", DateFeatureKind.Vix, "VIX close of the previous session; not ready when that session has none."),
-            ("vix_pct", DateFeatureKind.VixPct, "Percentile rank (0 to 100) of the VIX close of the previous session over the last 252 sessions (by default) that have one."),
-            ("vix_chg", DateFeatureKind.VixChg, "Percent change of the VIX close of the previous session against the session before it; not ready when either has none."),
-            ("breadth", DateFeatureKind.Breadth, "Breadth of the previous session in percent (tracked stocks above their 20-day average); not ready when that session has none."),
-            ("regime_trend", DateFeatureKind.RegimeTrend, "Trend part of the market regime as of the previous session: +1 up, 0 range, -1 down (the same as index_trend)."),
-            ("regime_vol", DateFeatureKind.RegimeVol, "Volatility part of the market regime as of the previous session: 0 low, 1 normal, 2 high (terciles of the mean of the VIX and index percentiles)."),
-            ("regime", DateFeatureKind.Regime, "Market regime as of the previous session: 1 (UP_LOW_VOL) to 9 (DOWN_HIGH_VOL), (1 - regime_trend) * 3 + regime_vol + 1."),
             ("days_to_results", DateFeatureKind.DaysToResults, "Trading sessions from the India date of the step to the next results event of the instrument, as known at the start of that date (0 on the event session); not ready when no calendar row says (P15-05)."),
             ("days_since_results", DateFeatureKind.DaysSinceResults, "Trading sessions from the reaction session of the newest results filing visible at the start of the India date of the step to that date (0 on the reaction session); not ready when no filing is visible (P15-05)."),
             ("results_sue_q", DateFeatureKind.ResultsSueQuintile, "Quintile 1 to 5 of the sue_yoy of the newest visible results filing, by the breakpoints of the previous complete season; known as of the close of the date, so it is read on the 1D timeframe only; not ready when unknown (P15-09)."),
@@ -226,8 +210,8 @@ public static class IndicatorCatalog
             var captured = kind;
             list.Add(new IndicatorInfo(
                 name, text, [], SessionBehaviour.Continuous, false, PriceSource.Close, false,
-                _ => DateFeature.WarmUpDays(captured, defaults), _ => new DateFeature(captured),
-                dateFeature: kind, requiresContext: DateFeature.ReadsContext(kind), requiresExpiryDays: kind == DateFeatureKind.ExpiryDay, requiresResultsDays: kind is DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults or DateFeatureKind.ResultsSueQuintile or DateFeatureKind.ResultsCar3Quintile));
+                _ => 1, _ => new DateFeature(captured),
+                dateFeature: kind, requiresExpiryDays: kind == DateFeatureKind.ExpiryDay, requiresResultsDays: kind is DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults or DateFeatureKind.ResultsSueQuintile or DateFeatureKind.ResultsCar3Quintile));
         }
 
         AddRelativeStrength(list);

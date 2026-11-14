@@ -34,11 +34,7 @@ internal sealed class DataOptions
     [Required]
     public QualityDataOptions Quality { get; set; } = new();
 
-    /// <summary>The market context job (P3-01d).</summary>
-    [Required]
-    public ContextDataOptions Context { get; set; } = new();
-
-    public const string InvalidMessage = "Data:Dhan:InitialDays must be 1 to 3650, Data:Dhan:InitialDaysIndex 365 to 1825 and Data:Dhan:RequestsPerSecond 1 to 5; Data:Csv:MaxRowsPerFile must be 1000 to 100000000, Data:Csv:MaxBytesPerFile 1048576 to 17179869184 and Data:Csv:MaxSpanDays 31 to 36500; Data:Gaps:LookbackSessions must be 1 to 250; Data:Repair:MaxSessions must be 0 to 60; Data:Eod:TimeIst must be a time of day as HH:mm (24-hour), India time, e.g. 15:50; Data:Quality:Sessions must be 1 to 60, Data:Quality:SpikeMultiple 2 to 1000, Data:Quality:MaxMissingPercent 0 to 100 and Data:Quality:MaxFailedPercent 0 to 100; Data:Context:VixGraceSessions must be 1 to 30 and Data:Context:MinDayFraction 0.5 to 1; Data:Context:BreadthGraceSessions must be 1 to 30, Data:Context:Breadth:SmaSessions 2 to 250, MinVoters 1 to 1000, MinShare 0.1 to 1 and MinBarShare 0 to 1.";
+    public const string InvalidMessage = "Data:Dhan:InitialDays must be 1 to 3650, Data:Dhan:InitialDaysIndex 365 to 1825 and Data:Dhan:RequestsPerSecond 1 to 5; Data:Csv:MaxRowsPerFile must be 1000 to 100000000, Data:Csv:MaxBytesPerFile 1048576 to 17179869184 and Data:Csv:MaxSpanDays 31 to 36500; Data:Gaps:LookbackSessions must be 1 to 250; Data:Repair:MaxSessions must be 0 to 60; Data:Eod:TimeIst must be a time of day as HH:mm (24-hour), India time, e.g. 15:50; Data:Quality:Sessions must be 1 to 60, Data:Quality:SpikeMultiple 2 to 1000, Data:Quality:MaxMissingPercent 0 to 100 and Data:Quality:MaxFailedPercent 0 to 100.";
 
     /// <summary>The settings of the nested section are checked here: the data-annotation validation does not look into nested objects.</summary>
     public static bool IsValid(DataOptions options) =>
@@ -47,8 +43,7 @@ internal sealed class DataOptions
         && options.Gaps is { LookbackSessions: >= 1 and <= 250 }
         && options.Repair is { MaxSessions: >= 0 and <= 60 }
         && options.Eod is { } eod && EodDataOptions.IsValidTime(eod.TimeIst)
-        && options.Quality is { Sessions: >= 1 and <= 60, SpikeMultiple: >= 2 and <= 1000, MaxMissingPercent: >= 0 and <= 100, MaxFailedPercent: >= 0 and <= 100 }
-        && options.Context is { VixGraceSessions: >= 1 and <= 30, MinDayFraction: >= 0.5 and <= 1, BreadthGraceSessions: >= 1 and <= 30, Breadth: { SmaSessions: >= 2 and <= 250, MinVoters: >= 1 and <= 1000, MinShare: >= 0.1 and <= 1, MinBarShare: >= 0 and <= 1 } };
+        && options.Quality is { Sessions: >= 1 and <= 60, SpikeMultiple: >= 2 and <= 1000, MaxMissingPercent: >= 0 and <= 100, MaxFailedPercent: >= 0 and <= 100 };
 }
 
 /// <summary>The fetch of 1-minute bars from Dhan's Data API (<c>Data:Dhan</c>).</summary>
@@ -58,7 +53,7 @@ internal sealed class DhanDataOptions
     [Range(1, 3650)]
     public int InitialDays { get; set; } = 365;
 
-    /// <summary>How many days back the first fetch of an instrument of type index goes (the market context needs years of NIFTY 50 and INDIA VIX, P3-01d).</summary>
+    /// <summary>How many days back the first fetch of an instrument of type index goes (the relative-strength and derived-basket features need years of NIFTY 50).</summary>
     [Range(365, 1825)]
     public int InitialDaysIndex { get; set; } = 1825;
 
@@ -133,58 +128,4 @@ internal sealed class QualityDataOptions
     /// <summary>The gate blocks when more than this percentage of the tracked instruments fail.</summary>
     [Range(0.0, 100.0)]
     public double MaxFailedPercent { get; set; } = 5;
-}
-
-/// <summary>The market context job (<c>Data:Context</c>, P3-01d): the symbols of the two indices (empty: the defaults), how long a day waits for its VIX, and how full a day must be.</summary>
-internal sealed class ContextDataOptions
-{
-    /// <summary>Whether the data job writes the context.</summary>
-    public bool Enabled { get; set; } = true;
-
-    /// <summary>Whether the data job loads the NSE CSVs the owner dropped into <see cref="InboxPath"/> (P3-01d fallback D, ADR 0290). It only reads local files.</summary>
-    public bool InboxEnabled { get; set; } = true;
-
-    /// <summary>The folder the owner drops NIFTY 50 and INDIA VIX history CSVs into; handled files move to <c>done/</c> or <c>failed/</c> inside it (in the container <c>/data/inbox/context</c>).</summary>
-    public string InboxPath { get; set; } = "data/inbox/context";
-
-    /// <summary>Canonical symbols of the regime index, in order; empty means <c>NSE:NIFTY</c>.</summary>
-    public string[] IndexSymbols { get; set; } = [];
-
-    /// <summary>Canonical symbols of the volatility index, in order; empty means <c>NSE:INDIA_VIX</c> then <c>NSE:INDIAVIX</c>.</summary>
-    public string[] VixSymbols { get; set; } = [];
-
-    /// <summary>Sessions a day waits for its VIX leg before it is written without.</summary>
-    [Range(1, 30)]
-    public int VixGraceSessions { get; set; } = 5;
-
-    /// <summary>The share of the calendar's expected minutes a leg needs to count.</summary>
-    [Range(0.5, 1.0)]
-    public double MinDayFraction { get; set; } = 0.96;
-
-    /// <summary>Sessions an insufficient breadth may still be recomputed after a late load of stock bars (P3-01e).</summary>
-    [Range(1, 30)]
-    public int BreadthGraceSessions { get; set; } = 5;
-
-    /// <summary>The breadth of the owner's tracked shares (<c>Data:Context:Breadth</c>, P3-01e).</summary>
-    public BreadthDataOptions Breadth { get; set; } = new();
-}
-
-/// <summary>The definition and thresholds of the breadth figure (<c>Data:Context:Breadth</c>, P3-01e).</summary>
-internal sealed class BreadthDataOptions
-{
-    /// <summary>Sessions of the average a close is compared with (20 by the definition; kept so tests can shrink it).</summary>
-    [Range(2, 250)]
-    public int SmaSessions { get; set; } = 20;
-
-    /// <summary>The fewest voters for a number.</summary>
-    [Range(1, 1000)]
-    public int MinVoters { get; set; } = 50;
-
-    /// <summary>The least share of the shares with a bar on the day that must vote.</summary>
-    [Range(0.1, 1.0)]
-    public double MinShare { get; set; } = 0.5;
-
-    /// <summary>The least share of the whole universe that must have a bar on the day; under it the day is a partial load (insufficient).</summary>
-    [Range(0.0, 1.0)]
-    public double MinBarShare { get; set; } = 0.9;
 }

@@ -1,14 +1,11 @@
 using System.Globalization;
 using XDrishti.Application.Abstractions.Lab;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
-using XDrishti.Application.Learning;
 using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Lab;
-using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 
@@ -26,12 +23,9 @@ internal sealed record DelaySignals(int Minutes, IReadOnlyList<(double BaseR, do
 /// The robustness checks of a <c>robust</c> run (spec P5-05, ADR 0062): a one-at-a-time sensitivity sweep (each point a plain run of the default exit, in-sample), a seeded Monte Carlo and a sign-flip baseline over the out-of-sample trades of the full test,
 /// and the same trades by year. Nothing is written here and the verdict is not touched.
 /// </summary>
-internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<SimulationRun>> simulation, LabSettings settings, IContextFigures? contextFigures = null, BootstrapOptions? bootstrap = null, CostStressOptions? costStress = null, PboOptions? pbo = null)
+internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<SimulationRun>> simulation, LabSettings settings, BootstrapOptions? bootstrap = null, CostStressOptions? costStress = null, PboOptions? pbo = null)
 {
     private readonly PboOptions _pbo = pbo ?? new PboOptions();
-
-    /// <summary>Said in the block when there is no source of regime labels at all (P6-02: with one, the text names the reason of each missing label).</summary>
-    public const string RegimeUnavailable = "unavailable: no market-context source is available";
 
     /// <summary>XORed into the seed of the sign-flip baseline so its draws do not repeat those of the Monte Carlo.</summary>
     private const ulong FlipSeedMask = 0xA5A5_5A5A_C3C3_3C3CUL;
@@ -132,8 +126,6 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
             limits.Add("fewer than " + MonteCarlo.MinTrades.ToString(CultureInfo.InvariantCulture) + " out-of-sample trades: no Monte Carlo and no baseline");
         }
 
-        var regime = await RegimeAsync(full, cancellationToken);
-
         // CF-03 part B: PBO of the base and the sweep points as daily series; nothing here moves the outcome (the Gate, if the owner set it, is applied by the runner)
         // shortcut: the stored series has no size bound (variants x trade days in the run's document); move it to a side table or compress it when runs grow
         var (pboView, series) = LabPbo.Compute(_pbo, pboVariants, 1 + plan.Count - pboVariants.Count);
@@ -142,10 +134,7 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
             mc is null ? null : new MonteCarloView(mc.Trades, mc.Draws, mc.Seed.ToString(CultureInfo.InvariantCulture), mc.ObservedMeanR, mc.ObservedMaxDrawdownR, mc.MeanP05, mc.MeanP50, mc.MeanP95, mc.DrawdownP50, mc.DrawdownP95, mc.ShareNotPositive, mc.DrawdownP90),
             [.. YearBreakdown.Of(full.OosTrades).Select(y => new YearView(y.Year, y.Trades, y.MeanR, y.TotalR, y.ProfitFactor, y.Positive))],
             flip is null ? null : new SignFlipBaselineView("sign_flip", flip.Trades, flip.Draws, flip.Seed.ToString(CultureInfo.InvariantCulture), flip.ObservedMeanR, flip.NullMeanP95, flip.PValue, "each trade keeps its size, its sign is a coin flip; not a random-entry run"),
-            regime?.Text ?? RegimeUnavailable,
             limits,
-            regime is null ? null : [.. regime.Buckets.Select(b => new RegimeBucketView(b.Part, b.Basis, b.Trades, b.MeanR, b.TotalR, b.Enough))],
-            regime is null ? null : [.. regime.Tally.UnavailableByReason.Select(r => new RegimeMissingView(r.Key, r.Value))],
             BlockOf(full.OosTrades, seed ^ BlockSeedMask, draws, mc),
             [.. QuarterBreakdown.Of(full.OosTrades).Select(q => new QuarterView(q.Year, q.Quarter, q.Trades, q.MeanR))],
             InstrumentShareOf(full),
@@ -263,18 +252,6 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
         return new MonteCarloBlockView(
             options.Mode.ToString(), result.Sessions, result.BlockLength, result.Draws, seedText, result.ObservedMeanR, result.MeanP05, result.MeanP50, result.MeanP95, result.DrawdownP50, result.DrawdownP95, result.ShareNotPositive,
             iidWidth > 0 ? (result.MeanP95 - result.MeanP05) / iidWidth : null, settingsText, string.Join("; ", notes));
-    }
-
-    /// <summary>The out-of-sample trades split by the regime of their entry day (P6-02, ADR 0146); null when no source of labels is available.</summary>
-    private async ValueTask<RegimeBreakdownResult?> RegimeAsync(FullTestOutcome full, CancellationToken cancellationToken)
-    {
-        if (contextFigures is null)
-        {
-            return null;
-        }
-
-        var labels = await RegimeTags.LabelsAsync(contextFigures, full.OosTrades.Select(t => t.Entry), cancellationToken);
-        return RegimeBreakdown.Of([.. full.OosTrades.Select(t => (labels[t.Entry], t.R))]);
     }
 
     /// <summary>A sweep point's result and the moments of its trades (null when it ran no trade or failed).</summary>

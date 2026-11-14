@@ -15,7 +15,6 @@ internal static class Describe
         BoundType.Number => "a number",
         BoundType.Bool => "a true/false value",
         BoundType.Time => "the time of day",
-        BoundType.Regime => "a market regime",
         BoundType.Text => "a text",
         _ => "a value",
     };
@@ -24,8 +23,7 @@ internal static class Describe
     public static string Hint(BoundType type) => type switch
     {
         BoundType.Time => " Compare `time` with a text, like time >= \"09:45\".",
-        BoundType.Regime => " Compare it with a regime name, like regime() == \"UP_LOW_VOL\".",
-        BoundType.Text => " A text can only be compared with `time` or `regime()`.",
+        BoundType.Text => " A text can only be compared with `time`.",
         _ => string.Empty,
     };
 

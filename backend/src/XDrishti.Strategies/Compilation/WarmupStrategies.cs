@@ -101,7 +101,7 @@ internal static class WarmupStrategies
         [Side.Buy],
         [new StrategyParam("breakout_len", 20)],
         new SideRules(
-            All("regime() == \"UP_LOW_VOL\"", "is_expiry_day == 0"),
+            All("day_of_week == 2", "is_expiry_day == 0"),
             All("close > highest(breakout_len)", "rsi(14) > 50"),
             null,
             new EntrySpec(EntryKind.AtClose),

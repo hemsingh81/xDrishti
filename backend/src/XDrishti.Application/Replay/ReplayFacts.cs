@@ -45,7 +45,6 @@ internal sealed class ReplayFacts(
     IBackfillSeams seams,
     IBarQueries dayBars,
     ITradingCalendar calendars,
-    IContextFigures contextFigures,
     IHoldingClassifications classifications,
     ICostSheetStore costSheets,
     IBasketSettingsStore basketSettings,
@@ -419,7 +418,7 @@ internal sealed class ReplayFacts(
         var key = "replay-learning:" + asOf.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
         var created = new DateTimeOffset(asOf.ToDateTime(TimeOnly.MinValue), IndiaOffset);
         var wanted = frozen.Select(r => r.Row.Cell.Key).ToHashSet(StringComparer.Ordinal);
-        IReadOnlyList<StoredCellStats> rows = [.. CellStatsCalculator.Compute(_learningInputs, asOf, first.Options, null, confidence, shrinkage)
+        IReadOnlyList<StoredCellStats> rows = [.. CellStatsCalculator.Compute(_learningInputs, asOf, first.Options, confidence, shrinkage)
             .Where(r => r.Window == CellWindow.All && wanted.Contains(r.Cell.Key))
             .Select(r => new StoredCellStats(key, created, first.Options, first.Sources, r))];
         _learned[asOf] = rows;
@@ -453,23 +452,16 @@ internal sealed class ReplayFacts(
 
     private async ValueTask<(MarketGateInput? Gate, string? Note)> GateAsync(DateOnly forDate, CancellationToken cancellationToken)
     {
-        var read = await contextFigures.AsOfAsync(forDate, cancellationToken);
         var state = (await SettingsAsync(cancellationToken)).Basket.Settings;
-        if (state.GateBasketId is { } basketId && basketContext is not null)
-        {
-            var row = await basketContext.LatestBeforeAsync(basketId, forDate, cancellationToken);
-            var name = (await baskets.GetAsync(basketId, cancellationToken))?.Name;
-            var breadth = GateBreadthSource.FromBasket(name ?? basketId.ToString("D"), row?.AsOf, row?.B20, row?.State, forDate, (smart ?? new SmartRulesOptions()).GateMaxAgeDays);
-            var asOf = read.Figures is null ? row?.AsOf : row is null ? read.Figures.AsOf : (read.Figures.AsOf < row.AsOf ? read.Figures.AsOf : row.AsOf);
-            return asOf is { } day ? (new MarketGateInput(day, read.Figures?.Vix, breadth.Breadth, null), breadth.Note) : (null, breadth.Note);
-        }
-
-        if (read.Figures is not { } figures || (figures.Vix is null && figures.Breadth is null))
+        if (state.GateBasketId is not { } basketId || basketContext is null)
         {
             return (null, null);
         }
 
-        return (new MarketGateInput(figures.AsOf, figures.Vix, figures.Breadth is { } percent ? percent / 100.0 : null, null), figures.Breadth is null ? null : PlanContextNotes.MarketBreadth(figures.BreadthUniverse));
+        var row = await basketContext.LatestBeforeAsync(basketId, forDate, cancellationToken);
+        var name = (await baskets.GetAsync(basketId, cancellationToken))?.Name;
+        var breadth = GateBreadthSource.FromBasket(name ?? basketId.ToString("D"), row?.AsOf, row?.B20, row?.State, forDate, (smart ?? new SmartRulesOptions()).GateMaxAgeDays);
+        return row?.AsOf is { } day ? (new MarketGateInput(day, null, breadth.Breadth, null), breadth.Note) : (null, breadth.Note);
     }
 
     private async ValueTask<CorrelationTable?> CorrelationsAsync(IReadOnlyList<ContextInstrument> ranked, DateOnly session, DateOnly forDate, CancellationToken cancellationToken)

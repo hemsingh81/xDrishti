@@ -23,7 +23,6 @@ internal sealed class SideCompiler(ProblemSink sink, DeclaredParams declared)
         IReadOnlyList<OverlayPlan> Overlays,
         IReadOnlyList<FeatureSpec> Features,
         int HistoryDepth,
-        bool NeedsContext,
         bool NeedsExpiryDays);
 
     /// <summary>
@@ -82,7 +81,7 @@ internal sealed class SideCompiler(ProblemSink sink, DeclaredParams declared)
             features.Add(close.DefaultSpec(evaluationTimeframe));
         }
 
-        return new Parts(setup, trigger, invalidate, entry, stop?.Plan, exits, overlays, features.AsReadOnly(), plan.HistoryDepth, plan.NeedsContext, plan.NeedsExpiryDays);
+        return new Parts(setup, trigger, invalidate, entry, stop?.Plan, exits, overlays, features.AsReadOnly(), plan.HistoryDepth, plan.NeedsExpiryDays);
     }
 
     /// <summary>Whether an entry condition (setup or trigger) reads the named feature: the definition of an event side (P15-09, ADR 0040 amendment).</summary>

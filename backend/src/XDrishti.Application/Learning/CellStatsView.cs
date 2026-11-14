@@ -52,12 +52,6 @@ public sealed record CellStatsView(
     /// <summary>CF-01 <c>IndependentN</c>: trades after same-session and serial correction; null when not computed. Three different numbers: <see cref="EffectiveN"/> is the recency-weight sum, <c>shrinkage.nUsed</c> (CF-02) is the smaller of this and the Kish weight n (sum w)^2 / sum w^2.</summary>
     public double? IndependentN => Dependence?.NEff;
 
-    /// <summary>The regime name of a regime cell (P6-02), null for a <c>*</c> cell.</summary>
-    public string? RegimeName => Domain.Market.Context.RegimeNames.ParsePart(Regime)?.Name;
-
-    /// <summary>What the regime of the cell was built from: <c>index_and_vix</c> or <c>index_only</c>, or <c>all</c> for a <c>*</c> cell. A cell never mixes the two.</summary>
-    public string RegimeBasis => Domain.Market.Context.RegimeNames.ParsePart(Regime)?.Basis ?? "all";
-
     private static string LimitsOf(Domain.Learning.CellStatsRow r) =>
         LimitsText + (r.Dependence is { Mode: not Domain.Confidence.ConfidenceMode.Off } ? " " + DependenceView.LimitsText : string.Empty) + (r.Shrinkage is { Mode: not Domain.Confidence.ConfidenceMode.Off } ? " " + ShrinkageView.LimitsText : string.Empty);
 

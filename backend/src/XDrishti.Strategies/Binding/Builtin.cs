@@ -26,7 +26,4 @@ internal enum Builtin
 
     /// <summary><c>max(a, b)</c>.</summary>
     Max,
-
-    /// <summary><c>regime()</c>: the catalog feature <c>regime</c>, typed as a regime so that it can be compared with the nine names.</summary>
-    Regime,
 }

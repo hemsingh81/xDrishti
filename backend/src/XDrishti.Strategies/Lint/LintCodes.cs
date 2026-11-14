@@ -69,7 +69,7 @@ public static class LintCodes
 
     /// <summary>
     /// A value of the wrong type for its place: an operator or builtin given the wrong type (<c>and</c> of a number, <c>+</c> of a true/false value), a comparison between types that cannot be compared (a number with
-    /// <c>time</c>, <c>regime()</c> with a number outside 1 to 9, two <c>regime()</c>), a condition that is not true/false, a text anywhere but next to <c>time</c> or <c>regime()</c>, or a parameter that is not a
+    /// <c>time</c>), a condition that is not true/false, a text anywhere but next to <c>time</c>, or a parameter that is not a
     /// finite number. The message names both sides of a comparison. The span is the whole comparison, otherwise the operand. Error.
     /// </summary>
     public const string TypeMismatch = "strategy.lint.type_mismatch";
@@ -87,9 +87,6 @@ public static class LintCodes
 
     /// <summary><c>tf("15m")</c> on a feature when the strategy already runs on 15m. The span is the whole feature; the suggestion is the feature without <c>tf(…)</c>. Warning.</summary>
     public const string RedundantTimeframe = "strategy.lint.redundant_timeframe";
-
-    /// <summary>The condition reads a feature of the daily market context, so the frame must be created with <see cref="Indicators.FrameOptions.Context"/>. The span is the first such feature. Information, reported only when the condition has no error (a condition that cannot be used needs nothing).</summary>
-    public const string NeedsContext = "strategy.lint.needs_context";
 
     /// <summary>The condition reads <c>is_expiry_day</c>, so the frame must be created with <see cref="Indicators.FrameOptions.ExpiryDays"/>. The span is the first such feature. Information, reported only when the condition has no error.</summary>
     public const string NeedsExpiryDays = "strategy.lint.needs_expiry_days";

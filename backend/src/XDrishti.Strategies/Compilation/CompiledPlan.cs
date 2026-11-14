@@ -10,12 +10,11 @@ namespace XDrishti.Strategies.Compilation;
 /// </summary>
 public sealed class CompiledPlan
 {
-    internal CompiledPlan(IReadOnlyList<CompiledCondition> conditions, IReadOnlyList<FeatureSpec> features, int historyDepth, bool needsContext, bool needsExpiryDays)
+    internal CompiledPlan(IReadOnlyList<CompiledCondition> conditions, IReadOnlyList<FeatureSpec> features, int historyDepth, bool needsExpiryDays)
     {
         Conditions = conditions;
         Features = features;
         HistoryDepth = historyDepth;
-        NeedsContext = needsContext;
         NeedsExpiryDays = needsExpiryDays;
     }
 
@@ -27,9 +26,6 @@ public sealed class CompiledPlan
 
     /// <summary>The history the frame must keep: the largest <see cref="CompiledCondition.HistoryDepth"/> of the conditions (1 when there are none).</summary>
     public int HistoryDepth { get; }
-
-    /// <summary>Whether any condition needs the frame to be created with <see cref="FrameOptions.Context"/>.</summary>
-    public bool NeedsContext { get; }
 
     /// <summary>Whether any condition needs the frame to be created with <see cref="FrameOptions.ExpiryDays"/>.</summary>
     public bool NeedsExpiryDays { get; }

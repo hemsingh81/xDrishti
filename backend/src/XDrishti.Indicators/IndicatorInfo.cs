@@ -31,7 +31,6 @@ public sealed class IndicatorInfo
         Func<FeatureSpec, IIndicator> factory,
         Func<FeatureSpec, SpecProblem?>? extraCheck = null,
         DateFeatureKind? dateFeature = null,
-        bool requiresContext = false,
         bool requiresExpiryDays = false,
         bool requiresResultsDays = false,
         bool requiresRelativeStrength = false)
@@ -47,7 +46,6 @@ public sealed class IndicatorInfo
         _factory = factory;
         _extraCheck = extraCheck;
         _dateFeature = dateFeature;
-        RequiresContext = requiresContext;
         RequiresExpiryDays = requiresExpiryDays;
         RequiresResultsDays = requiresResultsDays;
         RequiresRelativeStrength = requiresRelativeStrength;
@@ -85,9 +83,7 @@ public sealed class IndicatorInfo
     public bool IntradayOnly { get; }
 
     /// <summary>
-    /// Whether the feature changes at most once per India date and is asked for on 1m only: the two calendar features (<c>day_of_week</c>, <c>is_expiry_day</c>) and the ten that read the daily
-    /// <see cref="MarketContext"/>. The frame keeps them in a lane of their own that is refreshed at the first accepted step of each date and writes their history once per date (ADR 0033); their warm-up is counted
-    /// in days of the context (see <see cref="DateFeature"/>). The ones that read the context need <see cref="FrameOptions.Context"/> (<see cref="RequiresContext"/>), <c>is_expiry_day</c> needs <see cref="FrameOptions.ExpiryDays"/> (<see cref="RequiresExpiryDays"/>).
+    /// Whether the feature changes at most once per India date and is asked for on 1m only: the calendar, results and relative-strength features. The frame keeps them in a lane of their own that is refreshed at the first accepted step of each date and writes their history once per date (ADR 0033); <c>is_expiry_day</c> needs <see cref="FrameOptions.ExpiryDays"/> (<see cref="RequiresExpiryDays"/>).
     /// </summary>
     public bool DateDriven => _dateFeature is not null;
 
@@ -100,14 +96,6 @@ public sealed class IndicatorInfo
     /// </summary>
     /// <param name="spec">The feature: the same name restarts on 1m to 1h and not on 1D.</param>
     public bool RestartsEachSession(in FeatureSpec spec) => SessionBehaviour == SessionBehaviour.PerSession && spec.Timeframe.Minutes() > 0;
-
-    /// <summary>
-    /// Whether a frame that computes this feature must be given <see cref="FrameOptions.Context"/>: true for exactly the ten date-driven features that read the daily <see cref="MarketContext"/>
-    /// (<c>index_trend</c>, <c>index_adx</c>, <c>index_vol_pct</c>, <c>vix</c>, <c>vix_pct</c>, <c>vix_chg</c>, <c>breadth</c>, <c>regime_trend</c>, <c>regime_vol</c>, <c>regime</c>), false for every other name
-    /// (<c>day_of_week</c> and <c>is_expiry_day</c> read only the date). <see cref="FeatureFrame.Create(IReadOnlyList{FeatureSpec}, FrameOptions?)"/> refuses a spec of such a feature without the context; a caller
-    /// that compiles conditions (the strategy language, ADR 0034) asks the catalog here instead of knowing which names those are.
-    /// </summary>
-    public bool RequiresContext { get; }
 
     /// <summary>
     /// Whether a frame that computes this feature must be given <see cref="FrameOptions.ExpiryDays"/>: true for <c>is_expiry_day</c> only (an empty set is a valid set), false for every other name.
@@ -141,21 +129,19 @@ public sealed class IndicatorInfo
 
     /// <summary>
     /// The bars of the spec's own timeframe after which the indicator is first ready on an unbroken series (a session indicator: counted from the first bar of the first session). For the pivots it is the
-    /// earliest bar at which a pivot can be confirmed (<c>2n + 1</c>): they are ready from the first pivot on, which depends on the data. For a date-driven feature (<see cref="DateDriven"/>) it is counted in
-    /// <b>days of the market context</b> and declared for the default <see cref="ContextOptions"/> (the instance a frame runs reports the number for the options of its own context): 1 for <c>day_of_week</c>,
-    /// <c>is_expiry_day</c>, <c>vix</c> and <c>breadth</c>, 55 for <c>index_trend</c>, 265 for <c>regime</c> (see <see cref="DateFeature"/>).
+    /// earliest bar at which a pivot can be confirmed (<c>2n + 1</c>): they are ready from the first pivot on, which depends on the data. For a date-driven feature (<see cref="DateDriven"/>) it is 1 (ready at the first date).
     /// </summary>
     public int WarmUp(in FeatureSpec spec) => _warmUp(spec);
 
     /// <summary>
-    /// A fresh instance for the spec (a <see cref="PriceSource.Default"/> source is resolved first). The spec must have been validated. A date-driven feature is created without a context or expiry dates, so only
-    /// <c>day_of_week</c> is ever ready on it; the frame builds the others with <see cref="FrameOptions.Context"/> and <see cref="FrameOptions.ExpiryDays"/>.
+    /// A fresh instance for the spec (a <see cref="PriceSource.Default"/> source is resolved first). The spec must have been validated. A date-driven feature is created without expiry dates, so only
+    /// <c>day_of_week</c> is ever ready on it; the frame builds the others with <see cref="FrameOptions.ExpiryDays"/>.
     /// </summary>
     public IIndicator Create(in FeatureSpec spec) => _factory(Canonical(spec));
 
-    /// <summary>A fresh instance for the spec, given the context and the expiry dates of the frame: a date-driven feature reads them, any other indicator is created as by <see cref="Create(in FeatureSpec)"/>.</summary>
-    internal IIndicator CreateWith(in FeatureSpec spec, MarketContext? context, IReadOnlySet<DateOnly>? expiryDays, IReadOnlyDictionary<DateOnly, ResultsDayValues>? resultsDays = null, RelativeStrengthDays? relativeStrength = null) =>
-        _dateFeature is { } kind ? new DateFeature(kind, context, expiryDays, resultsDays, relativeStrength, (int)spec.P1, (int)spec.P2, (int)spec.P3) : _factory(Canonical(spec));
+    /// <summary>A fresh instance for the spec, given the expiry dates of the frame: a date-driven feature reads them, any other indicator is created as by <see cref="Create(in FeatureSpec)"/>.</summary>
+    internal IIndicator CreateWith(in FeatureSpec spec, IReadOnlySet<DateOnly>? expiryDays, IReadOnlyDictionary<DateOnly, ResultsDayValues>? resultsDays = null, RelativeStrengthDays? relativeStrength = null) =>
+        _dateFeature is { } kind ? new DateFeature(kind, expiryDays, resultsDays, relativeStrength, (int)spec.P1, (int)spec.P2, (int)spec.P3) : _factory(Canonical(spec));
 
     /// <summary>A spec of this indicator with the default parameters and source on the timeframe. The defaults are those of 1-minute bars: an opening range on a longer timeframe needs a whole number of bars, so its default may be refused there.</summary>
     public FeatureSpec DefaultSpec(Timeframe timeframe = Timeframe.M1) => new(

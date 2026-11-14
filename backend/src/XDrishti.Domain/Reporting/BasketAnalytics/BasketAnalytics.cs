@@ -51,7 +51,6 @@ public static class BasketAnalytics
             turnover,
             capacity,
             contribution,
-            RegimeSplit.Compute(index, benchmarkReturns, input.Regimes, options),
             contribution.ReturnPct,
             indexHold,
             contribution.ReturnPct.Number is { } basket && indexHold.Number is { } passive ? Metric.Of(basket - passive) : Metric.Unavailable("the basket or the index has no return for the window"),

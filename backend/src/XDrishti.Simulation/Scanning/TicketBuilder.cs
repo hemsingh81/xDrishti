@@ -13,7 +13,7 @@ namespace XDrishti.Simulation.Scanning;
 /// The ticket builder (spec P7-04, ADR 0088): classifies the setup of a stored strategy for an instrument from the bars up to the close of D, with Kleene logic, and states the levels as of that close. Pure and deterministic: no
 /// clock, no I/O. <b>Bars at or after the close of D are dropped before anything is computed</b> (<see cref="TicketBars.Prepare"/>), so nothing after the close can change a ticket (the truncation property).
 /// <para>
-/// A condition is <i>known at the close</i> when it reads only 1D, 1W or 1M features and not the clock, a market context or expiry days. Every other condition is Unknown whatever the frame says at the last minute of D, because an
+/// A condition is <i>known at the close</i> when it reads only 1D, 1W or 1M features and not the clock or expiry days. Every other condition is Unknown whatever the frame says at the last minute of D, because an
 /// intraday value at that minute describes D, not tomorrow. A known condition that is Unknown is data not ready (also: a weekly or monthly part without a trading calendar). Such parts are enumerated as true and false: when the outcome
 /// is not the same for every assignment the result is Unavailable, never a guess. The same condition text in two lists is one part.
 /// </para>
@@ -128,10 +128,10 @@ public static class TicketBuilder
     private static TicketPart Classify(CompiledItem item, Truth truth, bool hasCalendar)
     {
         var c = item.Condition;
-        var known = !c.ReadsClock && !c.NeedsContext && !c.NeedsExpiryDays && c.Features.All(f => f.Timeframe >= Timeframe.D1);
+        var known = !c.ReadsClock && !c.NeedsExpiryDays && c.Features.All(f => f.Timeframe >= Timeframe.D1);
         if (!known)
         {
-            return new TicketPart(item.Path, c.Source, SetupTruth.Unknown, false, "knowable only on tomorrow's bars (reads intraday data, the clock or a market context)");
+            return new TicketPart(item.Path, c.Source, SetupTruth.Unknown, false, "knowable only on tomorrow's bars (reads intraday data, the clock or the expiry days)");
         }
 
         if (!hasCalendar && c.Features.Any(f => f.Timeframe is Timeframe.W1 or Timeframe.Mo1))

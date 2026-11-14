@@ -188,7 +188,6 @@ internal static class ReportHtml
             h.Append("<p>").Append(Html.Text(s.Label)).Append(" p-value ").Append(N(s.PValue)).Append(".</p>\n");
         }
 
-        h.Append("<p>By regime: ").Append(Html.Text(b.ByRegime)).Append("</p>\n");
     }
 
     private static string I(int value) => value.ToString(CultureInfo.InvariantCulture);

@@ -30,7 +30,6 @@ public sealed class CompiledSide
         IReadOnlyList<string> filters,
         IReadOnlyList<FeatureSpec> features,
         int historyDepth,
-        bool needsContext,
         bool needsExpiryDays,
         IReadOnlyList<LocatedProblem> warnings)
     {
@@ -49,7 +48,6 @@ public sealed class CompiledSide
         Filters = filters;
         Features = features;
         HistoryDepth = historyDepth;
-        NeedsContext = needsContext;
         NeedsExpiryDays = needsExpiryDays;
         Warnings = warnings;
         var items = new List<CompiledItem>();
@@ -121,9 +119,6 @@ public sealed class CompiledSide
     /// <summary>The history the frame must keep.</summary>
     public int HistoryDepth { get; }
 
-    /// <summary>Whether the frame must be created with <see cref="FrameOptions.Context"/>.</summary>
-    public bool NeedsContext { get; }
-
     /// <summary>Whether the frame must be created with <see cref="FrameOptions.ExpiryDays"/>.</summary>
     public bool NeedsExpiryDays { get; }
 
@@ -152,7 +147,7 @@ public sealed class CompiledSide
             }
         }
 
-        return new CompiledSide(StrategyId, Side, Style, EvaluationTimeframe, Setup, Trigger, Invalidate, Entry, Stop, exits.AsReadOnly(), Overlays, TimeRules, Filters, features.AsReadOnly(), HistoryDepth, NeedsContext, NeedsExpiryDays, Warnings);
+        return new CompiledSide(StrategyId, Side, Style, EvaluationTimeframe, Setup, Trigger, Invalidate, Entry, Stop, exits.AsReadOnly(), Overlays, TimeRules, Filters, features.AsReadOnly(), HistoryDepth, NeedsExpiryDays, Warnings);
     }
 
     /// <summary>

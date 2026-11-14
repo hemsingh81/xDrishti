@@ -15,7 +15,6 @@ using XDrishti.Infrastructure.Capabilities;
 using XDrishti.Infrastructure.Learning;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Bars;
-using XDrishti.Infrastructure.Market.Context;
 using XDrishti.Infrastructure.Market.Live;
 using XDrishti.Infrastructure.Paper;
 using XDrishti.Infrastructure.Planning;
@@ -266,10 +265,6 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<AiEvalBaselineRecord> AiEvalBaselines => Set<AiEvalBaselineRecord>();
 
     internal DbSet<AiEvalMarkerRecord> AiEvalMarker => Set<AiEvalMarkerRecord>();
-
-    internal DbSet<ContextDailyRecord> ContextDaily => Set<ContextDailyRecord>();
-
-    internal DbSet<ContextVixCsvRecord> ContextVixCsv => Set<ContextVixCsvRecord>();
 
     internal DbSet<ChargeSheetEventRecord> ChargeSheetEvents => Set<ChargeSheetEventRecord>();
     internal DbSet<CapabilityChangeRecord> CapabilityChanges => Set<CapabilityChangeRecord>();

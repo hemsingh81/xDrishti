@@ -3,14 +3,12 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Learning;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Bars;
-using XDrishti.Domain.Market.Context;
 
 namespace XDrishti.Application.Learning;
 
@@ -19,7 +17,7 @@ namespace XDrishti.Application.Learning;
 /// source), runs the pure <see cref="CellStatsCalculator"/> and appends the snapshot. The same inputs give the same snapshot key and a second run writes nothing. R is net of charges when the run was costed, else from the filled prices; each row says which.
 /// Nothing of a trade is logged.
 /// </summary>
-internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore store, IContextFigures contextFigures, TimeProvider time, ILogger<ComputeCellStatsHandler> logger, ConfidenceOptions? confidence = null, ShrinkageOptions? shrinkage = null, IUniverseSeriesSource? universeSource = null) : ICommandHandler<ComputeCellStatsCommand, CellStatsOutcome>
+internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore store, TimeProvider time, ILogger<ComputeCellStatsHandler> logger, ConfidenceOptions? confidence = null, ShrinkageOptions? shrinkage = null, IUniverseSeriesSource? universeSource = null) : ICommandHandler<ComputeCellStatsCommand, CellStatsOutcome>
 {
     /// <summary>The most runs one snapshot reads.</summary>
     public const int MaxSources = 50;
@@ -48,18 +46,6 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
 
         var ordered = read.Value.Cells;
         var tradeCount = read.Value.Trades.Count;
-        RegimeCells? regime = null;
-        string? regimeText = null;
-        if (command.ByRegime)
-        {
-            // P6-02 (ADR 0146): the label of each trade is the regime of the day before its entry day, or the reason there is none; the labels used are part of the snapshot key.
-            var labels = await RegimeTags.LabelsAsync(contextFigures, read.Value.Trades.Select(t => t.Trade.TradeDate), cancellationToken);
-            var byCell = read.Value.Trades.ToLookup(t => t.CellKey, StringComparer.Ordinal);   // in the order the trades were read, which is the order of CellInput.Trades
-            var perCell = ordered.Select(c => (IReadOnlyList<RegimeLabel>)[.. byCell[c.Cell.Key].Select(t => labels[t.Trade.TradeDate])]).ToList();
-            regime = RegimeCellBuilder.Build(ordered, perCell);
-            regimeText = RegimeTags.Canonical(labels);
-        }
-
         UniverseCells? universe = null;
         string? universeText = null;
         if (command.ByUniverse)
@@ -88,10 +74,10 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
             universeText = UniverseTagger.Canonical(TierOptions, tagged);
         }
 
-        var rows = CellStatsCalculator.Compute(ordered, command.AsOf, command.Options, regime?.Cells, confidence, shrinkage, universe?.Cells);
+        var rows = CellStatsCalculator.Compute(ordered, command.AsOf, command.Options, confidence, shrinkage, universe?.Cells);
         var sources = string.Join(',', command.Sources.OrderBy(s => s.RunKey, StringComparer.Ordinal).Select(s => $"{s.RunKey}:{s.Style}:{s.Exit}"));
-        var key64 = KeyOf(command.AsOf, command.Options, sources, regimeText, confidence, shrinkage, universeText);
-        var seen = SeenLabels(command.ReleasedBlocks, ordered, regime?.Cells, universe?.Cells);
+        var key64 = KeyOf(command.AsOf, command.Options, sources, confidence, shrinkage, universeText);
+        var seen = SeenLabels(command.ReleasedBlocks, ordered, universe?.Cells);
         var snapshot = new CellSnapshotToStore(key64, command.AsOf, command.Options, sources, rows, command.Actor, time.GetUtcNow(), seen);
         bool written;
         try
@@ -107,7 +93,7 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
         var shrunk = rows.Count(r => r.Shrinkage is { IsAvailable: true });
         var floorRows = rows.Count(r => r.Shrinkage is { IsAvailable: true, TauSource: "floor" });
         var universeTally = universe is null ? null : new UniverseTally(universe.Cells.Count, universe.Cells.Sum(c => c.Trades.Count), universe.Unknown, universe.Unavailable);
-        var outcome = new CellStatsOutcome(key64, ordered.Count, rows.Count, tradeCount, !written, regime?.Tally, regime?.Cells.Count ?? 0, shrunk, floorRows, universeTally);
+        var outcome = new CellStatsOutcome(key64, ordered.Count, rows.Count, tradeCount, !written, shrunk, floorRows, universeTally);
         var asOfText = command.AsOf.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
         CellStatsLog.Completed(logger, key64[..12], asOfText, outcome.Cells, outcome.Rows, tradeCount, written ? "stored" : "already stored", elapsedMs);
@@ -124,7 +110,7 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
         return Result.Success(outcome);
     }
 
-    /// <summary>HO-01b: for each cell (all-shares, regime and tier cells alike) whose trades exit inside a released block, the labels of those blocks. A window row shares its cell's label, which is the safe side (a 60-day row of a labelled cell may not hold such a trade).</summary>
+    /// <summary>HO-01b: for each cell (all-shares and tier cells alike) whose trades exit inside a released block, the labels of those blocks. A window row shares its cell's label, which is the safe side (a 60-day row of a labelled cell may not hold such a trade).</summary>
     private static Dictionary<string, string>? SeenLabels(IReadOnlyList<(DateOnly Start, DateOnly End)>? released, params IReadOnlyList<CellInput>?[] groups)
     {
         if (released is not { Count: > 0 })
@@ -145,10 +131,10 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
         return labels.Count == 0 ? null : labels;
     }
 
-    internal static string KeyOf(DateOnly asOf, CellStatsOptions o, string sources, string? regimeLabels = null, ConfidenceOptions? confidence = null, ShrinkageOptions? shrinkage = null, string? universeTiers = null)
+    internal static string KeyOf(DateOnly asOf, CellStatsOptions o, string sources, ConfidenceOptions? confidence = null, ShrinkageOptions? shrinkage = null, string? universeTiers = null)
     {
-        // the regime part is appended only when the split was asked for, so the key of every snapshot without it is the key it always had; the same for the confidence part (CF-01), which is added only when effective n is computed, and the shrinkage part (CF-02, with the sigma floor of CF-01 it reads), added only when shrinkage is computed, so a changed setting is a new snapshot; the universe part (BK-11) is added only when the tier split was asked for
-        var text = string.Create(CultureInfo.InvariantCulture, $"cell-stats/1|{asOf:yyyy-MM-dd}|{o.RecencyHalfLifeDays:R}|{o.PriorStrength:R}|{o.MinTrades}|{o.CredibleLevel:R}|{sources}") + (regimeLabels is null ? string.Empty : "|regime=" + regimeLabels)
+        // the confidence part (CF-01), which is added only when effective n is computed, and the shrinkage part (CF-02, with the sigma floor of CF-01 it reads), added only when shrinkage is computed, so a changed setting is a new snapshot; the universe part (BK-11) is added only when the tier split was asked for
+        var text = string.Create(CultureInfo.InvariantCulture, $"cell-stats/1|{asOf:yyyy-MM-dd}|{o.RecencyHalfLifeDays:R}|{o.PriorStrength:R}|{o.MinTrades}|{o.CredibleLevel:R}|{sources}")
             + (confidence is { IsOn: true } ? "|confidence=" + confidence.KeyText() : string.Empty)
             + (shrinkage is { IsOn: true } ? "|shrinkage=" + shrinkage.KeyText() + "/" + (confidence ?? new ConfidenceOptions()).SigmaFloorR.ToString("R", CultureInfo.InvariantCulture) : string.Empty)
             + (universeTiers is null ? string.Empty : "|universe=" + universeTiers);

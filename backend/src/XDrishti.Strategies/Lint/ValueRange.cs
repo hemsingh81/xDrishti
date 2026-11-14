@@ -14,12 +14,11 @@ internal readonly record struct ValueRange(double Minimum, double Maximum, bool 
     private static FrozenDictionary<string, ValueRange> BuildTable()
     {
         var table = new Dictionary<string, ValueRange>(StringComparer.Ordinal);
-        foreach (var name in new[] { "rsi", "plus_di", "minus_di", "adx", "index_vol_pct", "vix_pct", "breadth" })
+        foreach (var name in new[] { "rsi", "plus_di", "minus_di", "adx" })
         {
             table[name] = new ValueRange(0, 100);
         }
 
-        table["regime_vol"] = new ValueRange(0, 2);
         foreach (var name in new[] { "supertrend_dir", "engulfing" })
         {
             table[name] = new ValueRange(-1, 1);

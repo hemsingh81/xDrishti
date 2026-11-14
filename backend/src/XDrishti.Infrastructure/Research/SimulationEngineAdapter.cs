@@ -142,7 +142,6 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine, IRandomEntryE
 
         public bool HoldsOvernight => Strategy.HoldsOvernight;
 
-        public bool ReadsContext => Strategy.ReadsContext;
 
         public bool ReadsEvents => Strategy.ReadsEvents;
 

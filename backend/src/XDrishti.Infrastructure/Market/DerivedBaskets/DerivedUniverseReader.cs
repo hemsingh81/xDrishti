@@ -1,7 +1,7 @@
 using Npgsql;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Baskets;
-using XDrishti.Application.Abstractions.Market.Context;
+using XDrishti.Application.Abstractions.Market.Strength;
 using XDrishti.Domain.Baskets.Derived;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Baskets.Lists;
@@ -11,9 +11,9 @@ namespace XDrishti.Infrastructure.Market.DerivedBaskets;
 /// <summary>
 /// The universe of the derived baskets (BK-03), read from our own tables only (no network): every share with complete daily rows (<c>1D</c> of <c>market.bars_agg</c>) in the window, <b>retired ones included</b>, in one query. The raw prices are adjusted by the applied corporate actions
 /// (bars before the ex-date times the factor, volume divided by it; an action on or before the date the owner's CSV files reach is skipped, those files are adjusted already). An unresolved suggestion with an ex-date in the window marks the instrument <c>CorporateActionUnresolved</c>.
-/// The Nifty 50 (basket 5 and 14) comes from the context source. The point-in-time flags of basket 13 come from the dated list baskets of BK-05 (ASM/GSM, ban, trade-for-trade); until all three have been recorded there are none (a missing flag is not a pass).
+/// The Nifty 50 (basket 5 and 14) comes from the benchmark index source. The point-in-time flags of basket 13 come from the dated list baskets of BK-05 (ASM/GSM, ban, trade-for-trade); until all three have been recorded there are none (a missing flag is not a pass).
 /// </summary>
-internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorporateActionQueries actions, IContextBarSource context, IContextSettings contextSettings) : IDerivedUniverseReader
+internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorporateActionQueries actions, IBenchmarkIndex benchmarkIndex) : IDerivedUniverseReader
 {
     public async ValueTask<IReadOnlyList<UniverseInstrument>> ReadAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {
@@ -26,8 +26,8 @@ internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorpor
         var ids = rows.Select(r => r.Id).ToList();
         var csvThrough = await actions.ListCsvAdjustedThroughAsync(ids, cancellationToken);
         var corporate = await ActionsAsync(ids, from, to, cancellationToken);
-        var legs = await context.ReadAsync(contextSettings.IndexSymbols, contextSettings.VixSymbols, cancellationToken);
-        var benchmark = legs.IndexLegs.Where(l => l.Complete && l.Date >= from && l.Date <= to).OrderBy(l => l.Date).Select(l => new Bar(l.Date, l.Close, l.High, l.Low, l.Close, 0)).ToArray();
+        var index = await benchmarkIndex.FindAsync(cancellationToken);
+        var benchmark = index is { } indexId ? await IndexBarsAsync(indexId, from, to, cancellationToken) : [];
 
         var flags = await FlagsAsync(ids, cancellationToken);
         var result = new List<UniverseInstrument>(rows.Count);
@@ -44,6 +44,25 @@ internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorpor
         }
 
         return result;
+    }
+
+    /// <summary>The complete daily rows of the benchmark index in the window, oldest first (the same rows the relative-strength features read).</summary>
+    private async ValueTask<Bar[]> IndexBarsAsync(Guid indexId, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT ts, high, low, close FROM market.bars_agg WHERE instrument_id = @id AND timeframe = '1D' AND complete AND ts >= market.backfill_cut(instrument_id) ORDER BY ts");
+        command.Parameters.AddWithValue("id", indexId);
+        var bars = new List<Bar>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var date = IndiaTime.Today(reader.GetFieldValue<DateTimeOffset>(0));
+            if (date >= from && date <= to)
+            {
+                bars.Add(new Bar(date, reader.GetDouble(3), reader.GetDouble(1), reader.GetDouble(2), reader.GetDouble(3), 0));
+            }
+        }
+
+        return [.. bars];
     }
 
     private static Bar Adjust(Bar bar, List<CorporateAction> applied)

@@ -1,18 +1,16 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Market.Bars;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
-using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Reporting;
 using XDrishti.Domain.Selection.SmartRules;
 
 namespace XDrishti.Application.Reporting;
 
 /// <summary>
-/// The performance profile of one basket (BK-07, ADR 0262): the membership by date, the stored daily bars of the members and of the index (one read each), the regimes of the window and the median split of the basket's strategy trades, composed into the pure
+/// The performance profile of one basket (BK-07, ADR 0262): the membership by date, the stored daily bars of the members and of the index (one read each), and the median split of the basket's strategy trades, composed into the pure
 /// <see cref="BasketAnalytics"/> input and mapped to the wire view. Reads only. The answer is cached under a key that holds everything it depends on (the basket, its parameter hash and membership version, the window, the index and the newest stored bar), so a second
 /// call reads no bars and returns the same bytes, and a new bar is a new key.
 /// </summary>
@@ -20,7 +18,6 @@ internal sealed class GetBasketProfileHandler(
     ProfileWindowResolver windows,
     BasketMembershipLoader memberships,
     IBarQueries bars,
-    IContextFigures context,
     ReportLoader trades,
     IReportTradeSource runs,
     IProfileCache cache,
@@ -90,8 +87,7 @@ internal sealed class GetBasketProfileHandler(
         }
 
         IReadOnlyList<DailyClose> benchmark = win.Index is { } index ? (await reader.ReadAsync(index.Id, win.From, win.To, cancellationToken)).Closes : [];
-        var regimes = await RegimesAsync(members, benchmark, win, cancellationToken);
-        var input = new BasketProfileInput(members, basket.At, basket.SnapshotDates, benchmark, regimes, new ProfileWindow(win.From, win.To));
+        var input = new BasketProfileInput(members, basket.At, basket.SnapshotDates, benchmark, new ProfileWindow(win.From, win.To));
         var profile = BasketAnalytics.Profile(input, options);
 
         var asOf = profile.AsOf;
@@ -106,11 +102,6 @@ internal sealed class GetBasketProfileHandler(
         if (noBenchmark is not null)
         {
             unavailable.Add("benchmark index: " + noBenchmark);
-        }
-
-        if (profile.Regime.Status.State == MetricState.Unavailable)
-        {
-            unavailable.Add("regime: " + profile.Regime.Status.Reason);
         }
 
         return new BasketProfileView(
@@ -130,7 +121,6 @@ internal sealed class GetBasketProfileHandler(
             new ProfileCorrelationView(ReportViews.Metric(profile.Correlation.AveragePairwise), ReportViews.Metric(profile.Correlation.EffectiveBets), profile.Correlation.Members, profile.Correlation.Pairs, profile.Correlation.Sampled,
                 BasketProfileMapper.Matrix(returns, profile, sectors, options)),
             BasketProfileMapper.Contribution(profile.Contribution),
-            BasketProfileMapper.Regime(profile.Regime, options.MinDaysPerRegime),
             new ProfileTurnoverView(ReportViews.Metric(profile.Turnover.Turnover), profile.Turnover.Adds, profile.Turnover.Removes),
             BasketProfileMapper.Capacity(profile.Capacity, options.CapacityPct),
             hold,
@@ -185,32 +175,6 @@ internal sealed class GetBasketProfileHandler(
         }
 
         return limits;
-    }
-
-    private async ValueTask<IReadOnlyDictionary<DateOnly, int?>> RegimesAsync(List<MemberSeries> members, IReadOnlyList<DailyClose> benchmark, ResolvedWindow win, CancellationToken cancellationToken)
-    {
-        var sessions = new HashSet<DateOnly>();
-        foreach (var c in benchmark.Count > 0 ? benchmark : members.SelectMany(m => m.Closes).ToList())
-        {
-            if (c.Date >= win.From && c.Date <= win.To)
-            {
-                sessions.Add(c.Date);
-            }
-        }
-
-        // the label of a session is the regime of the context day read for the next date; it counts only when that very session is the day read
-        var reads = sessions.Count == 0 ? new Dictionary<DateOnly, ContextRead>() : new Dictionary<DateOnly, ContextRead>(await context.AsOfManyAsync([.. sessions.Select(s => s.AddDays(1))], cancellationToken));
-        var codes = new Dictionary<DateOnly, int?>();
-        foreach (var s in sessions)
-        {
-            var label = reads.TryGetValue(s.AddDays(1), out var read) ? RegimeLabel.Of(s.AddDays(1), read) : null;
-            if (label is { IsAvailable: true, ContextAsOf: { } day } && day == s)
-            {
-                codes[s] = label.Code;
-            }
-        }
-
-        return codes;
     }
 
     private async ValueTask<ProfileHoldOutView> HoldOutAsync(Guid basketId, CancellationToken cancellationToken)

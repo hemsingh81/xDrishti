@@ -318,7 +318,6 @@ internal static class LabReportBuilder
             {
                 Parameters = [.. v.Robustness.Sensitivity.Parameters.Select(p => p with { Param = S(p.Param), Verdict = S(p.Verdict), Reason = S(p.Reason) })],
             },
-            ByRegime = S(v.Robustness.ByRegime),
             Limits = [.. v.Robustness.Limits.Select(S)],
             VariantSeries = null, // CF-03 part B: the daily series stay in the run's document; the report prints the figure they gave
         },

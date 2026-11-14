@@ -1,4 +1,3 @@
-using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Reporting;
 using XDrishti.Domain.Selection.SmartRules;
 
@@ -78,12 +77,6 @@ internal static class BasketProfileMapper
         static ContributionRowView Row(ContributionRow r) => new(r.Symbol, r.ReturnPct, r.Share);
         return new ProfileContributionView(M(c.Top3Share), c.Included, [.. c.Top.Select(Row)], [.. c.Bottom.Select(Row)], [.. c.Rows.Select(Row)]);
     }
-
-    public static ProfileRegimeView Regime(RegimeResult r, int minDays) => new(
-        M(r.Status),
-        r.Unknown,
-        minDays,
-        [.. r.Rows.Select(x => new RegimeRowView(x.Code, x.Code is >= 1 and <= 9 ? RegimeNames.NameOf(x.Code) : "unknown", x.Days, M(x.MeanDailyReturn), M(x.AnnualVolatility), M(x.HitRate), ReportViews.Metric(x.MeanDailyReturn).State))]);
 
     public static ProfileCapacityView Capacity(BasketCapacityResult c, double capacityPct) =>
         new(M(c.MedianAdv), M(c.P10Adv), M(c.BasketCapacity), M(c.AsmGsmShare), M(c.FnoShare), c.Counted, c.ShortMembers, capacityPct);

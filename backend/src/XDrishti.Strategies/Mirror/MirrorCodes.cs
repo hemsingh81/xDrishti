@@ -8,7 +8,7 @@ public static class MirrorCodes
     /// <summary>The SELL side was produced by the mirror; the message holds the printed block. Information.</summary>
     public const string Applied = Prefix + "applied";
 
-    /// <summary>The condition reads the market context or the calendar (regime, VIX, breadth, index, day of week, expiry day); whether the SELL wants the same filter or the opposite one is the author's call.</summary>
+    /// <summary>The condition reads the calendar, the results events or the relative strength (day of week, expiry day); whether the SELL wants the same filter or the opposite one is the author's call.</summary>
     public const string ContextName = Prefix + "context_name";
 
     /// <summary>The shape has no single mirror (a product or ratio of prices, a sum of prices, a bare price in <c>abs</c>).</summary>

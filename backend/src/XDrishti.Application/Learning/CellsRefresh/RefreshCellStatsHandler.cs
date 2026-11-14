@@ -142,10 +142,9 @@ internal sealed class RefreshCellStatsHandler(
             finalSources.Add(source with { RunKey = p.Run.RunKey });
         }
 
-        // phase 3: the snapshot, as of the last closed session, with the splits of the template
-        var regime = (await cells.ListRegimeLatestAsync(null, null, cancellationToken)).Any(r => r.SnapshotKey == newest.SnapshotKey);
+        // phase 3: the snapshot, as of the last closed session, with the split of the template
         var universe = (await cells.ListUniverseLatestAsync(null, null, cancellationToken)).Any(r => r.SnapshotKey == newest.SnapshotKey && r.Row.Cell.Universe != "*");
-        var computed = await compute.HandleAsync(new ComputeCellStatsCommand(session, finalSources, newest.Options, command.Actor, regime, universe, released), cancellationToken);
+        var computed = await compute.HandleAsync(new ComputeCellStatsCommand(session, finalSources, newest.Options, command.Actor, universe, released), cancellationToken);
         if (computed.IsFailure)
         {
             return Fail(CellsRefreshErrors.Wrap(computed.Error, end));

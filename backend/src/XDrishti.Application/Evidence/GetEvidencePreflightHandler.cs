@@ -7,9 +7,7 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Application.AutoSwitch;
-using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Lab;
-using XDrishti.Application.Market.Context;
 using XDrishti.Application.Market.History;
 using XDrishti.Application.Paper;
 using XDrishti.Application.Platform.SystemStatus;
@@ -28,8 +26,6 @@ namespace XDrishti.Application.Evidence;
 internal sealed class GetEvidencePreflightHandler(
     IQueryHandler<GetSystemStatusQuery, SystemStatusResponse> status,
     IEvidencePreflightHost host,
-    IQueryHandler<GetChargeSheetStatusQuery, Result<ChargeSheetStatusView>> chargeSheet,
-    IQueryHandler<GetContextCoverageQuery, ContextCoverageView> context,
     IQueryHandler<GetHoldOutQuery, Result<HoldOutView>> holdOut,
     ICellStatsStore cells,
     ITradingCalendar calendar,
@@ -52,8 +48,6 @@ internal sealed class GetEvidencePreflightHandler(
     public const int MaxCellSnapshotSessions = 5;
 
     public const string DeployedVersion = "deployed version";
-    public const string ChargeSheetItem = "charge sheet confirmed at current rates";
-    public const string ContextItem = "context probe (index, VIX, regime)";
     public const string HoldOutItem = "hold-out fixed";
     public const string CellsItem = "newest cell snapshot age";
     public const string ChampionItem = "champion designated";
@@ -71,8 +65,6 @@ internal sealed class GetEvidencePreflightHandler(
         return new EvidencePreflightView(
         [
             await GuardAsync(DeployedVersion, "run deploy/xd-up.sh", () => VersionAsync(ct), ct),
-            await GuardAsync(ChargeSheetItem, "load a sheet, check it against your Dhan reports, then Confirm on Settings > Advanced > Charge sheet (runbook step 3)", () => ChargeSheetAsync(ct), ct),
-            await GuardAsync(ContextItem, "track NIFTY 50, INDIA VIX and Nifty 500, update the data, then scripts/context.sh coverage (runbook step 4)", () => ContextAsync(ct), ct),
             await GuardAsync(HoldOutItem, "it is fixed at the first Lab post: load history first, then run a Lab test (runbook steps 5-7)", () => HoldOutAsync(ct), ct),
             await GuardAsync(CellsItem, "xd learn cells --as-of YYYY-MM-DD --run RUNKEY:STYLE:EXIT (runbook step 8)", () => CellsAsync(ct), ct),
             await GuardAsync(ChampionItem, "xd learn designate --model N --role champion --reason TEXT (runbook step 9)", () => ChampionAsync(ct), ct),
@@ -113,30 +105,6 @@ internal sealed class GetEvidencePreflightHandler(
 
         var met = db.PendingMigrations == 0 && db.LatestMigration == compiled;
         return (met, $"applied {db.LatestMigration ?? "none"}, this build {compiled}, pending {db.PendingMigrations} (the image tag proves nothing)");
-    }
-
-    private async ValueTask<(bool? Met, string Reason)> ChargeSheetAsync(CancellationToken ct)
-    {
-        var result = await chargeSheet.HandleAsync(new GetChargeSheetStatusQuery(null), ct);
-        if (result.IsFailure)
-        {
-            return (null, "the status was refused: " + result.Error.Code);
-        }
-
-        var state = result.Value.State;
-        return (state == "confirmed", state == "stale" ? "stale: the confirmation carries another rates hash than the stored sheet" : "state " + state);
-    }
-
-    private async ValueTask<(bool? Met, string Reason)> ContextAsync(CancellationToken ct)
-    {
-        var c = await context.HandleAsync(new GetContextCoverageQuery(), ct);
-        if (!c.Enabled || c.Missing is not null)
-        {
-            return (false, c.Missing ?? "the context is switched off");
-        }
-
-        var met = c.IndexTrendReadableFrom is not null && c.RegimeReadableFrom is not null && c.VixPctReadableFrom is not null;
-        return (met, $"index trend from {Date(c.IndexTrendReadableFrom)}, regime from {Date(c.RegimeReadableFrom)}, VIX percentile from {Date(c.VixPctReadableFrom)}");
     }
 
     private async ValueTask<(bool? Met, string Reason)> HoldOutAsync(CancellationToken ct)
