@@ -45,6 +45,11 @@ Architecture tests (no context references; no charge-sheet check path per Q2), m
    - (b) Remove the net path entirely: everything stays gross forever; `CostChoice`, the stored sheet, net R and the bill check are removed.
 3. **SR-03 — follows Q2 (b): removed.** With Q2 (a) it registers automatically and stays. With Q2 (b) it is removed (code, tables via a NEW down migration, UI card). Recommendation: follows Q2 (a), keep.
 
+## Build state (2026-11-14)
+- R1 and R2 (the market context and the CSV inbox) are built and merged-ready on `feature/drop-owner-inputs`: migration `DropMarketContext`, the removal test (`DropMarketContextMigrationTests`), the architecture pin (`ContextDroppedArchitectureTests`), the validate test (`A_removed_market_context_name_is_refused_as_an_unknown_name_that_is_quoted`).
+- R3 (the charge sheet, Q2) and R4 (SR-03, Q3) are decided and **not built**: about 180 source files and their tests, two more migrations; see the build handover in the ADR 0291 thread.
+- R5 (owner to-dos) is open for the Q1 items and R3/R4.
+
 ## Done when
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors

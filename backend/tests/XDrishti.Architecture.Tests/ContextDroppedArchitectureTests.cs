@@ -38,7 +38,7 @@ public sealed class ContextDroppedArchitectureTests
     {
         var domain = Assemblies[0];
 
-        var names = domain.GetTypes().Where(t => t.Namespace == "XDrishti.Domain.Market.Context").Select(t => t.Name).Order(StringComparer.Ordinal).ToList();
+        var names = domain.GetTypes().Where(t => t.Namespace == "XDrishti.Domain.Market.Context" && !t.Name.StartsWith('<')).Select(t => t.Name).Order(StringComparer.Ordinal).ToList();
 
         names.ShouldBe(["BreadthCalculator", "BreadthInput", "BreadthOptions", "BreadthResult"]);
     }

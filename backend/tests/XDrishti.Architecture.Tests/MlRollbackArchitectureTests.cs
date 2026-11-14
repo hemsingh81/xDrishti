@@ -601,8 +601,8 @@ public sealed class MlRollbackArchitectureTests
         ours.GetTypes().Count().ShouldBeGreaterThan(15);
         var result = ours.Should().NotHaveDependencyOnAny(forbidden).GetResult();
         result.IsSuccessful.ShouldBeTrue(string.Join(", ", result.FailingTypeNames ?? []));
-        var domain = Types.InAssembly(Domain).That().HaveNameMatching("^(MlPromotion|MlPromotionFacts|MlPromotionResult|RollbackPolicy|RollbackDecision|RollbackTrigger|RollbackInputs|RollbackCellSeries|RegimeCellRule|MlSwitch)$");
-        domain.GetTypes().Count().ShouldBe(10);
+        var domain = Types.InAssembly(Domain).That().HaveNameMatching("^(MlPromotion|MlPromotionFacts|MlPromotionResult|RollbackPolicy|RollbackDecision|RollbackTrigger|RollbackInputs|RollbackCellSeries|MlSwitch)$");
+        domain.GetTypes().Count().ShouldBe(9);
         domain.Should().NotHaveDependencyOnAny([.. forbidden, "System.IO", "System.Net", "System.Data", "System.Threading.Tasks", "System.TimeProvider", "System.Random", "Npgsql", "Microsoft.EntityFrameworkCore", "XDrishti.Application", "XDrishti.Infrastructure"]).GetResult().IsSuccessful.ShouldBeTrue();
         foreach (var store in new[] { "RollbackProposals", "MlSwitchSettings", "MlMonitorChecks" })
         {
