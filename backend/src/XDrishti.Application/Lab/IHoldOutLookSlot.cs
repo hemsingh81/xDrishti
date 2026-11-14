@@ -4,7 +4,7 @@ namespace XDrishti.Application.Lab;
 
 /// <summary>
 /// One kind of look at the block in force (strategy, model, system), as the seal step reads it for the auto release (HO-01 D4, D10): whether the kind's fresh slot is used, or free with or without an eligible subject. HO-01b registers the strategy slot, CF-10e part 3 the
-/// model slot and SR-03 the system slot; until a kind is registered it holds no block. A read that cannot be answered returns <see cref="LookAvailability.Unavailable"/>, which keeps the block.
+/// model slot (the system slot went with SR-03, ADR 0292); until a kind is registered it holds no block. A read that cannot be answered returns <see cref="LookAvailability.Unavailable"/>, which keeps the block.
 /// </summary>
 internal interface IHoldOutLookSlot
 {

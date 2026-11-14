@@ -738,7 +738,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>, GetHoldOutHandler>(); // reads the hold-out store and the guard; here for the same reason
         services.AddScoped<HoldOutReleaser>(); // the one release of the block in force: the owner act and the auto option (HO-01)
         services.AddScoped<HoldOutStrategyCandidates>(); // the versions that can still take a block's fresh strategy look (HO-01b)
-        services.AddScoped<IHoldOutLookSlot, StrategyLookSlot>(); // the strategy kind's slot; CF-10e part 3 and SR-03 add the model and system slots with one line each
+        services.AddScoped<IHoldOutLookSlot, StrategyLookSlot>(); // the strategy kind's slot; CF-10e part 3 adds the model slot with one line (the system kind has no slot since SR-03 was dropped, ADR 0292)
         services.AddScoped<IBellNoticeSource, HoldOutStalledNotices>(); // a sealed block unreleased after 20 sessions, naming what holds it (HO-01 D4), derived on read
         services.TryAddSingleton(LabSettings.Default); // the host replaces it with its configuration
         services.TryAddSingleton(new ShrinkageOptions()); // shrinkage of expectancy toward the parent (CF-02, ADR 0204): ReportOnly; the host replaces it with its configuration (section Confidence:Shrinkage)
@@ -790,19 +790,6 @@ public static class DependencyInjection
         services.AddScoped<IHoldOutSealStep, HoldOutAutoReleaseStep>(); // seal step 90: the auto release (HO-01 D4)
         services.AddScoped<ICommandHandler<RunHoldOutEpochsCommand, HoldOutEpochsOutcome>, RunHoldOutEpochsHandler>(); // the evening run of the seal steps (HO-01 D10)
         services.AddScoped<ICommandHandler<ReleaseHoldOutCommand, HoldOutBlockView>, ReleaseHoldOutHandler>();
-        services.AddScoped<IHoldOutLookSlot, XDrishti.Application.Replay.HoldOut.SystemLookSlot>(); // the system kind's slot (SR-03)
-        services.AddScoped<IHoldOutSealStep, XDrishti.Application.Replay.HoldOut.SystemReplaySealStep>(); // seal step 40: the auto registration and the auto claim of the system replay (SR-03, ADR 0284)
-        services.AddScoped<IBellNoticeSource, XDrishti.Application.Replay.HoldOut.SystemReplayNotices>(); // a drifted registration, no checked sheet (SR-03), derived on read
-        services.AddScoped<XDrishti.Application.Replay.HoldOut.HoldOutInputCheck>();
-        services.AddScoped<XDrishti.Application.Replay.HoldOut.HoldOutRegistrationViews>();
-        services.AddSingleton<XDrishti.Application.Replay.HoldOut.HoldOutRunAttempts>(); // transient failures of a claimed run, kept in memory (SR-03)
-        services.AddScoped<XDrishti.Application.Replay.HoldOut.HoldOutSystemRunner>(); // the only builder of the hold-out block reader, from a claim (SR-03)
-        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.HoldOut.RegisterHoldOutCommand, XDrishti.Application.Replay.HoldOut.RegisteredHoldOut>, XDrishti.Application.Replay.HoldOut.RegisterHoldOutHandler>();
-        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.HoldOut.RunHoldOutRegistrationCommand, XDrishti.Application.Replay.HoldOut.StartedHoldOutRun>, XDrishti.Application.Replay.HoldOut.RunHoldOutRegistrationHandler>();
-        services.AddScoped<IQueryHandler<XDrishti.Application.Replay.HoldOut.GetHoldOutRegistrationQuery, Result<XDrishti.Application.Replay.HoldOut.HoldOutRegistrationView>>, XDrishti.Application.Replay.HoldOut.GetHoldOutRegistrationHandler>();
-        services.AddScoped<IQueryHandler<XDrishti.Application.Replay.HoldOut.ListHoldOutRegistrationsQuery, Result<IReadOnlyList<XDrishti.Application.Replay.HoldOut.HoldOutRegistrationView>>>, XDrishti.Application.Replay.HoldOut.ListHoldOutRegistrationsHandler>();
-        services.AddScoped<IQueryHandler<XDrishti.Application.Replay.HoldOut.GetHoldOutAutoSettingsQuery, XDrishti.Application.Replay.HoldOut.HoldOutAutoSettingsView>, XDrishti.Application.Replay.HoldOut.GetHoldOutAutoSettingsHandler>();
-        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.HoldOut.SetHoldOutAutoSettingsCommand, XDrishti.Application.Replay.HoldOut.HoldOutAutoSettingsView>, XDrishti.Application.Replay.HoldOut.SetHoldOutAutoSettingsHandler>();
         services.AddScoped<LabPlateau>(); // the plateau gate beside the nulls, read from the stored sweep (CF-07 part C, ADR 0210)
         services.AddScoped<LabNulls>(); // the random-entry null beside the outcome and its ledger row (CF-07, ADR 0208)
         services.AddScoped<LabPlacebos>(); // the placebo set and the mirror gate beside it, and their ledger row (CF-07 part B, ADR 0209)
@@ -832,8 +819,6 @@ public static class DependencyInjection
     public static IServiceCollection AddReplayRunner(this IServiceCollection services)
     {
         services.AddSingleton<XDrishti.Application.Replay.Job.ReplayRunner>();
-        services.AddSingleton<XDrishti.Application.Replay.HoldOut.HoldOutRunActivity>(); // the two replay loops never run together (SR-03)
-        services.AddSingleton<XDrishti.Application.Replay.HoldOut.HoldOutSystemRunLoop>(); // runs the claimed system replays over a hold-out block (SR-03)
         return services;
     }
 

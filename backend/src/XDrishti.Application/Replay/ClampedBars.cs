@@ -22,16 +22,8 @@ internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options,
     private static readonly TimeSpan IndiaOffset = TimeSpan.FromHours(5.5);
 
     private readonly Dictionary<Guid, Window> _windows = [];
-    private HoldOut.HoldOutBlockReader? _block;
     private DateOnly? _last;
     private DateOnly? _horizon;
-
-    /// <summary>The reader of a claimed hold-out block (SR-03): reads up to the end of the block instead of the training clamp. Only <see cref="ReplayFacts.UseBlock"/> calls this, for the runner that stands on a claim.</summary>
-    internal static ClampedBars ForBlock(IHoldOutStore holdOut, HoldOutOptions options, IBarStore minutes, IBackfillSeams seams, IBarQueries days, int readAheadSessions, HoldOut.HoldOutBlockReader reader)
-    {
-        ArgumentNullException.ThrowIfNull(reader);
-        return new ClampedBars(holdOut, options, minutes, seams, days, readAheadSessions) { _block = reader };
-    }
 
     /// <summary>The last session that may be read.</summary>
     public async ValueTask<DateOnly> LastReadableAsync(CancellationToken cancellationToken)
@@ -39,11 +31,6 @@ internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options,
         if (_last is { } known)
         {
             return known;
-        }
-
-        if (_block is not null)
-        {
-            return (_last = _block.End).Value; // the SR-03 reader after its claim: up to the end of the claimed block, never past it
         }
 
         var current = await holdOut.CurrentAsync(cancellationToken) ?? throw new ReplayHoldOutException();
