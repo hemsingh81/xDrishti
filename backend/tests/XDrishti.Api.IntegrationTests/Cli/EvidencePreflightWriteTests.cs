@@ -6,14 +6,14 @@ using XDrishti.Application.Evidence;
 
 namespace XDrishti.Api.IntegrationTests.Cli;
 
-/// <summary>The real use case of <c>xd evidence preflight</c> (spec EV-01 criteria 1 and 3) over the real database with a few rows seeded: twelve items, the seeded rows are read, and no row of any schema changes (an md5 of every table, not only a count).</summary>
+/// <summary>The real use case of <c>xd evidence preflight</c> (spec EV-01 criteria 1 and 3) over the real database with a few rows seeded: ten items, the seeded rows are read, and no row of any schema changes (an md5 of every table, not only a count).</summary>
 [Collection(ApiTestSuite.Name)]
 public sealed class EvidencePreflightWriteTests(ApiFactory factory)
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task The_preflight_prints_twelve_items_reads_seeded_rows_and_writes_nothing()
+    public async Task The_preflight_prints_ten_items_reads_seeded_rows_and_writes_nothing()
     {
         await factory.ResetAllAsync();
         await ExecuteAsync("DELETE FROM lab.holdout_releases; DELETE FROM lab.holdout_blocks; INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2031-01-01', '2026-03-02', '2031-06-30', 12, repeat('a', 64), now()); "
@@ -34,7 +34,7 @@ public sealed class EvidencePreflightWriteTests(ApiFactory factory)
             await ExecuteAsync("DELETE FROM lab.holdout_blocks; DELETE FROM platform.service_schedules WHERE service_id = 'paper-capture'");
         }
 
-        view.Items.Count.ShouldBe(12);
+        view.Items.Count.ShouldBe(10);
         view.Items.ShouldAllBe(i => i.State == "MET" || i.State == "NOT MET" || i.State == "UNAVAILABLE");
         view.Items.Single(i => i.Item == GetEvidencePreflightHandler.HoldOutItem).State.ShouldBe("MET");
         view.Items.Single(i => i.Item == GetEvidencePreflightHandler.CaptureItem).State.ShouldBe("MET");

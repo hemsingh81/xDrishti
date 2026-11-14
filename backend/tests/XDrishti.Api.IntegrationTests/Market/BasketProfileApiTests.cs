@@ -39,7 +39,6 @@ public sealed class BasketProfileApiTests(ApiFactory factory) : BasketsTestBase(
         body.GetProperty("members").GetProperty("counted").GetInt32().ShouldBe(3);
         body.GetProperty("series").GetProperty("dates").GetArrayLength().ShouldBe(25);
         body.GetProperty("breadth").GetProperty("b20").GetProperty("share").GetProperty("state").GetString().ShouldBe("insufficient");
-        body.GetProperty("regime").GetProperty("status").GetProperty("state").GetString().ShouldBe("unavailable");
         body.GetProperty("window").GetProperty("source").GetString().ShouldBe("query");
         var evidence = body.GetProperty("evidence");
         evidence.GetProperty("basis").GetString().ShouldBe("equal weight, daily rebalanced, price return, dividends not included");

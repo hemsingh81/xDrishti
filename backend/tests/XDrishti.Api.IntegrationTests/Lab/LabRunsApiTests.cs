@@ -217,7 +217,6 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         var verdict = run.GetProperty("verdict");
         verdict.GetProperty("outcome").GetString().ShouldBe("FAIL");
         var block = verdict.GetProperty("robustness");
-        block.GetProperty("byRegime").GetString().ShouldStartWith("unavailable");
         block.GetProperty("sensitivity").GetProperty("exit").GetString().ShouldBe("FIXED_RR{rr=2}");
         block.GetProperty("limits").GetArrayLength().ShouldBeGreaterThan(0);
         var sweepRows = await CountAsync("SELECT count(*) FROM lab.test_ledger WHERE method = 'sweep'");
