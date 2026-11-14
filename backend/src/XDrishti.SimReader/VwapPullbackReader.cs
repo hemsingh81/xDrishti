@@ -42,14 +42,15 @@ public static class VwapPullbackReader
             }
 
             priorBuckets.AddRange(ReaderBuckets.Build(sessionBars, Evaluation));
-            priorHourly.AddRange(ReaderBuckets.Build(sessionBars, Hour).Select(b => b.Close));
+            var sessionHourly = ReaderBuckets.Build(sessionBars, Hour);
+            priorHourly.AddRange(ReaderBuckets.Closes(sessionBars, sessionHourly, Hour, false).Select(c => sessionHourly[c.Bucket].Close)); // the bars that closed, as for today's below
             priorDaily.Add(ReaderDaily.CloseOf(sessionBars));
         }
 
         var buckets = ReaderBuckets.Build(bars, Evaluation);
         var closes = ReaderBuckets.Closes(bars, buckets, Evaluation);
         var hourly = ReaderBuckets.Build(bars, Hour);
-        var hourlyCloses = ReaderBuckets.Closes(bars, hourly, Hour);
+        var hourlyCloses = ReaderBuckets.Closes(bars, hourly, Hour, false);
         var atr = Atr(priorBuckets, buckets);
         var vwap = Vwap(buckets);
         var buy = side == ReaderSide.Buy;

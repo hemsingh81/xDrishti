@@ -48,7 +48,8 @@ internal static class VerifyPackAssist
             provider.GetRequiredService<IQueryHandler<ResolveInstrumentsQuery, Result<ResolveResult>>>(),
             provider.GetRequiredService<IQueryHandler<GetInstrumentQuery, Result<InstrumentDetail>>>(),
             provider.GetRequiredService<IBarStore>(),
-            provider.GetRequiredService<XDrishti.Application.Abstractions.Market.History.IBackfillSeams>());
+            provider.GetRequiredService<XDrishti.Application.Abstractions.Market.History.IBackfillSeams>(),
+            provider.GetRequiredService<XDrishti.Application.Market.Actions.IAdjustmentFactors>());
 
         if (gate)
         {

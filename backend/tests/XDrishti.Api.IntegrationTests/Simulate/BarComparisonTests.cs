@@ -188,7 +188,7 @@ public sealed class BarComparisonTests
     {
         var reading = Read(BuyDay());
 
-        var minutes = BarComparison.Minutes(Epoch("09:15"), ReaderStrategy.OrbV1(0.05m), reading).Select(BarComparison.Label).ToList();
+        var minutes = BarComparison.Minutes(Epoch("09:15"), 15, 15, reading).Select(BarComparison.Label).ToList();
 
         minutes.ShouldContain("09:15");
         minutes.ShouldContain("09:29");

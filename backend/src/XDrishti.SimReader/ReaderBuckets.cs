@@ -31,9 +31,9 @@ internal static class ReaderBuckets
 
     /// <summary>
     /// A bucket closes at the first minute present that starts at or after the last minute of its span; one minute closing several buckets decides the last.
-    /// Returns (bucket position, index of the closing minute) in order.
+    /// <paramref name="oneDecisionPerMinute"/> merges buckets that close at the same minute into the last (a decision rule); a series of bars (the hourly trend) keeps every closed bucket. Returns (bucket position, index of the closing minute) in order.
     /// </summary>
-    public static List<(int Bucket, int Closing)> Closes(List<ReaderBar> bars, List<Bucket> buckets, int minutes)
+    public static List<(int Bucket, int Closing)> Closes(List<ReaderBar> bars, List<Bucket> buckets, int minutes, bool oneDecisionPerMinute = true)
     {
         var closes = new List<(int Bucket, int Closing)>();
         for (var b = 0; b < buckets.Count; b++)
@@ -55,7 +55,7 @@ internal static class ReaderBuckets
                 continue;
             }
 
-            if (closes.Count > 0 && closes[^1].Closing == closing)
+            if (oneDecisionPerMinute && closes.Count > 0 && closes[^1].Closing == closing)
             {
                 closes[^1] = (b, closing);
             }

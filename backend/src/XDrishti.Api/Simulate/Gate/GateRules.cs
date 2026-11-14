@@ -37,7 +37,13 @@ internal static class GateRules
                 continue;
             }
 
-            if (v.Verdict == Verdicts.CannotRead || v.Fields.Count > 0)
+            var parts = new List<string>();
+            if (row.HistoryCaveat is not null)
+            {
+                // the multi-session reader used raw history that may differ from the engine's: not machine-checkable, so a data finding, never a defect and never a pass (ADR 0291)
+                parts.Add("history not machine-checkable: " + row.HistoryCaveat + "; reader on the stored bars " + (v.Verdict == Verdicts.CannotRead ? "read no trade or the engine row is absent" : v.Fields.Count > 0 ? "differs from the engine on " + string.Join(", ", v.Fields) : "agrees with the engine"));
+            }
+            else if (v.Verdict == Verdicts.CannotRead || v.Fields.Count > 0)
             {
                 defects.Add(Finding(row, Repro(v, engine)));
             }
@@ -48,13 +54,12 @@ internal static class GateRules
                 repairs.Add(Finding(row, string.Join("; ", gross.Where(b => !IsHole(b)).Select(b => b.Minute + " " + b.Words))));
             }
 
-            var parts = new List<string>();
             if (gross.Any(IsHole))
             {
                 parts.Add("missing minutes: " + string.Join(", ", gross.Where(IsHole).Select(b => b.Minute + " " + b.Words + Between(row, b.Minute))));
             }
 
-            if (v.Fields.Count == 0 && v.SecondFields.Count > 0)
+            if (row.HistoryCaveat is null && v.Fields.Count == 0 && v.SecondFields.Count > 0)
             {
                 parts.Add("the reader on the second source differs from the engine on: " + string.Join(", ", v.SecondFields) + "; " + Gap(row));
             }

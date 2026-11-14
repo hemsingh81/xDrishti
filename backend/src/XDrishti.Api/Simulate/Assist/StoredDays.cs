@@ -13,7 +13,8 @@ internal sealed class StoredDays(
     IQueryHandler<ResolveInstrumentsQuery, Result<ResolveResult>> resolve,
     IQueryHandler<GetInstrumentQuery, Result<InstrumentDetail>> details,
     IBarStore bars,
-    XDrishti.Application.Abstractions.Market.History.IBackfillSeams seams) : IStoredDays
+    XDrishti.Application.Abstractions.Market.History.IBackfillSeams seams,
+    XDrishti.Application.Market.Actions.IAdjustmentFactors factors) : IStoredDays
 {
     private static readonly TimeSpan India = TimeSpan.FromMinutes(330);
 
@@ -28,12 +29,36 @@ internal sealed class StoredDays(
     public async ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {
         var (tick, _, read) = await ReadAsync(symbol, from, to, cancellationToken);
-        var sessions = read
+        var caveat = _known.GetValueOrDefault(symbol) is { } instrument ? await CaveatAsync(instrument.Id, from, to, cancellationToken) : null;
+        return new StoredRange(tick, Sessions(read), caveat);
+    }
+
+    /// <summary>One session per India date, ascending. Pure; the date is the India date of the bar start.</summary>
+    internal static List<ReaderSession> Sessions(IReadOnlyList<ReaderBar> read) =>
+        [.. read
             .GroupBy(b => DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(b.EpochSeconds).ToOffset(India).DateTime))
             .OrderBy(g => g.Key)
-            .Select(g => new ReaderSession(g.Key, [.. g]))
-            .ToList();
-        return new StoredRange(tick, sessions);
+            .Select(g => new ReaderSession(g.Key, [.. g]))];
+
+    /// <summary>The raw stored bars of a range are not the engine's when a corporate action's ex-date or the seam lies inside it: the engine adjusts the older side and may read across the seam. The multi-session readers do neither (ADR 0291).</summary>
+    private async Task<string?> CaveatAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        var applied = await factors.GetAsync(instrumentId, cancellationToken);
+        if (applied.Actions.FirstOrDefault(a => a.ExDate >= from && a.ExDate <= to) is { } action)
+        {
+            return "a corporate action (ex-date " + action.ExDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ") lies inside the history the reader used, which is raw and unadjusted";
+        }
+
+        if (await seams.SeamOfAsync(instrumentId, cancellationToken) is { } seam)
+        {
+            var seamDate = DateOnly.FromDateTime(seam.ToOffset(India).DateTime);
+            if (seamDate >= from && seamDate <= to)
+            {
+                return "the backfill seam (" + seamDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ") lies inside the history the reader used: bars before it are cut here, and the engine may admit them";
+            }
+        }
+
+        return null;
     }
 
     private async Task<(decimal Tick, bool Fallback, IReadOnlyList<ReaderBar> Bars)> ReadAsync(string symbol, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)

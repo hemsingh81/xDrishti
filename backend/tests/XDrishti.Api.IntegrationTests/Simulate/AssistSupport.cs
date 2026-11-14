@@ -52,6 +52,14 @@ internal static class AssistSupport
             "{\"format\":\"" + PackFiles.Format + "\",\"pack_id\":\"t-1\",\"pack_key\":\"" + PackKey + "\",\"count\":" + symbols.Length + ",\"seed\":\"seed-1\",\"runs\":[{\"strategy\":\"" + strategy + "\",\"parameters\":{\"or_min\":\"15\",\"rr\":\"2\"},\"run_key\":\"rk\"}],\"rows\":[" + string.Join(',', rows) + "],\"spots\":[]}");
     }
 
+    /// <summary>The engine's side for one row of any strategy, equal to the reading unless <paramref name="change"/> alters a column.</summary>
+    public static byte[] EngineValuesFor(string tradeKey, ReaderReading reading, Action<Dictionary<string, string>>? change = null) =>
+        EngineValues(reading, [Symbol], cells =>
+        {
+            cells["trade_key"] = tradeKey;
+            change?.Invoke(cells);
+        });
+
     /// <summary>The engine's side for the rows, equal to the reading unless <paramref name="change"/> alters a column.</summary>
     public static byte[] EngineValues(ReaderReading reading, string[] symbols, Action<Dictionary<string, string>>? change = null)
     {

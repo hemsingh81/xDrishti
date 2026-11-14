@@ -173,45 +173,88 @@ public sealed class VwapPullbackReaderTests
     }
 
     [Fact]
-    public void V11_No_trade_when_the_trigger_comes_before_the_first_entry()
+    public void V11_A_trigger_decided_exactly_at_10_00_counts()
     {
-        // the same six bars shifted: the same pattern decided at 09:30 to 10:45 is fine, but a pattern that completes at bar 2 (decided 09:45) cannot fire: bar 1 has no lag
+        // b1 111.00/112.00/110.50/111.50, b2 (the dip: lower low 110.00) 111.50/111.60/110.00/111.40, b3 (trigger, decided 10:00) 111.40/112.50/111.40/112.40; vwap 111.333, 111.167, 111.478; stop 110.00
         var day = new DatedDay(FixtureDate(21))
-            .Bar("09:15", 110.5m, 111.5m, 110.5m, 111.25m)
-            .Bar("09:30", 111.25m, 112.25m, 111.25m, 112m);
+            .Bar("09:15", 111m, 112m, 110.5m, 111.5m)
+            .Bar("09:30", 111.5m, 111.6m, 110m, 111.4m)
+            .Bar("09:45", 111.4m, 112.5m, 111.4m, 112.4m);
+
+        var r = Buy(day);
+
+        r.ShouldNotBeNull();
+        r.TriggerBarStartEpoch.ShouldBe(day.Epoch("09:45"));
+        r.EntryEpoch.ShouldBe(day.Epoch("10:00"));
+        r.EntryPrice.ShouldBe(112.4m);
+        r.Stop.ShouldBe(110m);
+        r.ExitReason.ShouldBe(ReaderExitReason.SquareOff);
+    }
+
+    [Fact]
+    public void V11b_The_first_two_bars_of_the_day_never_trigger()
+    {
+        // the pattern completed by bar 2 (decided 09:45) has no lag for the bar before the dip: no trade
+        var day = new DatedDay(FixtureDate(21))
+            .Bar("09:15", 111.5m, 112m, 110m, 111.4m)
+            .Bar("09:30", 111.4m, 112.5m, 111.4m, 112.4m);
 
         Buy(day).ShouldBeNull();
     }
 
-    [Fact]
-    public void V12_The_first_candidate_is_the_only_one()
+    /// <summary>15 flat bars 110.50/111.00/110.00/110.50 from 09:15, then V1's six bars from <paramref name="first"/>; pull_atr 2.0 makes the dip count (spec P3-05 V4).</summary>
+    private static DatedDay Late(string first)
     {
-        // a miss of the first candidate (no touch of the limit) is final even if a later bar triggers again
-        var day = V1().Bar("10:45", 114m, 114.5m, 113.9m, 114m).Bar("11:00", 114m, 115m, 113.5m, 115m);
-
-        Buy(day).ShouldBeNull();
-    }
-
-    [Fact]
-    public void V13_A_trigger_after_14_30_is_ignored()
-    {
-        // V1's six bars moved to start at 13:00: the trigger bar closes at 14:30 + 15 = 14:45 decided, after the last entry 14:30
-        var day = new DatedDay(FixtureDate(21)).Flat("09:15", 110.5m);
-        var bars = new (string At, decimal O, decimal H, decimal L, decimal C)[]
+        var day = new DatedDay(FixtureDate(21));
+        for (var m = DatedDay.Minute("09:15"); m < DatedDay.Minute(first); m += 15)
         {
-            ("13:30", 110.5m, 111.5m, 110.5m, 111.25m),
-            ("13:45", 111.25m, 112.25m, 111.25m, 112m),
-            ("14:00", 112m, 113m, 112m, 112.75m),
-            ("14:15", 112.75m, 113.75m, 112.75m, 113.5m),
-            ("14:30", 113.5m, 113.5m, 112.5m, 113m),
-            ("14:45", 113m, 114m, 113m, 113.75m),
-        };
-        foreach (var (at, o, h, l, c) in bars)
-        {
-            day.Bar(at, o, h, l, c);
+            day.Bar(TimeSpan.FromMinutes(m).ToString(@"hh\:mm", System.Globalization.CultureInfo.InvariantCulture), 110.5m, 111m, 110m, 110.5m);
         }
 
-        Buy(day).ShouldBeNull();
+        var at = DatedDay.Minute(first);
+        var bars = new (decimal O, decimal H, decimal L, decimal C)[] { (110.5m, 111.5m, 110.5m, 111.25m), (111.25m, 112.25m, 111.25m, 112m), (112m, 113m, 112m, 112.75m), (112.75m, 113.75m, 112.75m, 113.5m), (113.5m, 113.5m, 112.5m, 113m), (113m, 114m, 113m, 113.75m) };
+        for (var i = 0; i < bars.Length; i++)
+        {
+            day.Bar(TimeSpan.FromMinutes(at + (i * 15)).ToString(@"hh\:mm", System.Globalization.CultureInfo.InvariantCulture), bars[i].O, bars[i].H, bars[i].L, bars[i].C);
+        }
+
+        return day;
+    }
+
+    [Fact]
+    public void V13_A_trigger_decided_exactly_at_14_30_counts_and_one_decided_at_14_45_does_not()
+    {
+        var wide = Strategy with { PullAtr = 2m };
+        var onTime = Late("13:00");
+
+        var on = Buy(onTime, strategy: wide);
+        var after = Buy(Late("13:15"), strategy: wide);
+
+        on.ShouldNotBeNull();
+        on.TriggerBarStartEpoch.ShouldBe(onTime.Epoch("14:15"));
+        after.ShouldBeNull();
+    }
+
+    [Fact]
+    public void V12_A_missed_first_fill_is_final_even_though_a_second_valid_pattern_follows_and_the_twin_trades_the_first()
+    {
+        // b6 triggers; the fill minute 10:45 opens 114.00 above the limit 113.85 and never trades back (low 113.90): a miss. b7 114.00/114.50/113.90/114.00, b8 (dip) 114/114/113.00/113.50, b9 (trigger) 113.50/114.50/113.50/114.25.
+        DatedDay Later(DatedDay d) => d
+            .Bar("11:00", 114m, 114m, 113m, 113.5m)
+            .Bar("11:15", 113.5m, 114.5m, 113.5m, 114.25m);
+        var missed = Later(V1().Bar("10:45", 114m, 114.5m, 113.9m, 114m));
+        var filled = Later(V1().Flat("10:45", 113.75m));
+        // the b9 pattern on its own: b6 is not bullish (closes 113.00 below its open), so the only candidate is b9, decided 11:30
+        var alone = Later(V1().Bar("10:30", 113.75m, 114m, 113m, 113m).Bar("10:45", 114m, 114.5m, 113.9m, 114m));
+
+        Buy(missed).ShouldBeNull();
+        var first = Buy(filled);
+        var second = Buy(alone);
+
+        first.ShouldNotBeNull();
+        first.TriggerBarStartEpoch.ShouldBe(filled.Epoch("10:30"));
+        second.ShouldNotBeNull();
+        second.TriggerBarStartEpoch.ShouldBe(alone.Epoch("11:15"));
     }
 
     [Fact]

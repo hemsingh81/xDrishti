@@ -166,10 +166,7 @@ internal static class BarComparison
         return (ratio, "price level offset: stored is " + ratio.ToString("0.00000", CultureInfo.InvariantCulture) + " x second source (adjusted history?)");
     }
 
-    /// <summary>The minutes that matter for a reading: the opening range, the trigger bar, the entry and the exit minute, each with the minute before and after.</summary>
-    public static IReadOnlyCollection<long> Minutes(long dayOpenEpoch, ReaderStrategy strategy, ReaderReading? reading) => Minutes(dayOpenEpoch, strategy.OrMinutes, strategy.EvaluationMinutes, reading);
-
-    /// <summary>The same for any strategy: <paramref name="openingMinutes"/> minutes from the open, then the trigger bar of <paramref name="evaluationMinutes"/>, the entry and the exit.</summary>
+    /// <summary>The minutes that matter for a reading: <paramref name="openingMinutes"/> minutes from the open (the opening range), the trigger bar of <paramref name="evaluationMinutes"/>, the entry and the exit minute, each with the minute before and after.</summary>
     public static IReadOnlyCollection<long> Minutes(long dayOpenEpoch, int openingMinutes, int evaluationMinutes, ReaderReading? reading)
     {
         var epochs = new SortedSet<long>();

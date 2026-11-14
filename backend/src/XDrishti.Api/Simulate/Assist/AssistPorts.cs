@@ -12,7 +12,10 @@ internal sealed record SecondDay(IReadOnlyList<ReaderBar>? Bars, string? Unavail
 }
 
 /// <summary>The stored sessions of one instrument over a range of dates (a session per India date that has bars, ascending), with the master tick in rupees.</summary>
-internal sealed record StoredRange(decimal Tick, IReadOnlyList<ReaderSession> Sessions);
+/// <param name="Tick">The master tick in rupees.</param>
+/// <param name="Sessions">One session per date that has bars.</param>
+/// <param name="Caveat">Why the raw stored bars of the range may differ from the engine's (a corporate action ex-date or the seam cut inside it), or null.</param>
+internal sealed record StoredRange(decimal Tick, IReadOnlyList<ReaderSession> Sessions, string? Caveat = null);
 
 /// <summary>The stored bars (read from the database by the host; a fake in tests).</summary>
 internal interface IStoredDays
