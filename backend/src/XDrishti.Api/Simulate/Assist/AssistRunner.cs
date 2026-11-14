@@ -51,6 +51,11 @@ internal static class AssistRunner
 
         foreach (var row in pack.Rows)
         {
+            if (DateProblem(row) is { } problem)
+            {
+                return Refused(problem + "; nothing was read or written");
+            }
+
             if (row.Missing(RequiredParameters(row.Strategy)) is { Count: > 0 } absent)
             {
                 return Refused("pack row " + row.Seq.ToString(CultureInfo.InvariantCulture) + " (" + row.Strategy + ") lacks the parameter " + string.Join(", ", absent) + ": the reader does not guess a default; nothing was read or written");
@@ -74,13 +79,13 @@ internal static class AssistRunner
             }
 
             var day = await source.GetAsync(key.Symbol, key.Date, cancellationToken);
-            if (day.Bars is { } bars)
+            if (day.Bars is { Count: > 0 } bars)
             {
                 days[key] = new AssistBarsCsv.CachedDay(source.Name, bars);
             }
             else
             {
-                missing[key] = day.Unavailable ?? "unavailable";
+                missing[key] = day.Unavailable ?? (day.Bars is null ? "unavailable" : "the second source returned no bars for the day");
             }
         }
 
@@ -126,6 +131,24 @@ internal static class AssistRunner
         lines.AddRange(AssistCounters.Lines(verdicts));
         lines.Add("this is an assisted read, not a signed check: check-log.csv was not touched and no verdict was written");
         return new AssistOutcome(SimulateCommand.Done, lines, logHash, engineHash, new AssistDetails(pack.PackId, pack.Seed, verdicts, engine, cacheHash));
+    }
+
+    /// <summary>The trade key ends in the decision date (ADR 0043 D6); an intraday trade is decided and filled on one date, a swing trade is filled after the day it is decided.</summary>
+    private static string? DateProblem(PackedTrade row)
+    {
+        var where = "pack row " + row.Seq.ToString(CultureInfo.InvariantCulture) + " (trade key '" + row.TradeKey + "')";
+        if (row.DecisionDate is not { } decision)
+        {
+            return where + " does not end in a yyyy-MM-dd decision date";
+        }
+
+        var swing = string.Equals(row.Strategy, BaseBreakout, StringComparison.Ordinal);
+        if (!swing && decision != row.Date)
+        {
+            return where + " is an intraday trade whose decision date " + decision.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + " is not its date " + row.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        return swing && decision >= row.Date ? where + " is a swing trade whose decision date " + decision.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + " is not before its entry date " + row.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null;
     }
 
     private static IReadOnlyList<string> RequiredParameters(string strategy) => strategy switch
@@ -229,11 +252,11 @@ internal static class AssistRunner
         switch (row.Strategy)
         {
             case VwapPullback:
-                var prior = await stored.GetRangeAsync(row.Symbol, row.Date.AddDays(-HistoryDays), row.Date.AddDays(-1), cancellationToken);
+                var prior = await stored.GetRangeAsync(row.Symbol, row.Date.AddDays(-HistoryDays), row.Date.AddDays(-1), row.Date, row.AdmittedSeam, cancellationToken);
                 var vwap = new VwapPullbackStrategy(row.Parameter("pull_atr"), row.Parameter("rr"), tick);
                 return new RowReader(ov => VwapPullbackReader.Read(prior.Sessions, ov.GetValueOrDefault(row.Date) ?? storedDay.Bars, vwap, row.Side), d => storedDay.Bars, 0, 15, prior.Caveat);
             case BaseBreakout:
-                var around = await stored.GetRangeAsync(row.Symbol, row.Signal.AddDays(-HistoryDays), row.Signal.AddDays(HoldDays), cancellationToken);
+                var around = await stored.GetRangeAsync(row.Symbol, row.Signal.AddDays(-HistoryDays), row.Signal.AddDays(HoldDays), row.Signal.AddDays(HoldDays), row.AdmittedSeam, cancellationToken);
                 var swing = new BaseBreakoutStrategy((int)row.Parameter("base_len"), row.Parameter("base_pct"), row.Parameter("vol_x"), row.Parameter("rr"), tick);
                 return new RowReader(
                     ov => BaseBreakoutReader.Read([.. around.Sessions.Where(a => !ov.ContainsKey(a.Date)).Concat(ov.Select(o => new ReaderSession(o.Key, o.Value))).OrderBy(a => a.Date)], row.Signal, swing),
@@ -338,6 +361,16 @@ internal static class AssistRunner
                 var runs = root.GetProperty("runs").EnumerateArray().ToDictionary(
                     r => r.GetProperty("run_key").GetString()!,
                     r => (Strategy: r.GetProperty("strategy").GetString()!, Parameters: r.GetProperty("parameters")));
+                // the seam date the run admitted pre-seam bars from, per instrument and run (the run record's seam line); absent for a run that admitted none and for a pack drawn before it was recorded
+                var seams = new Dictionary<(string, string), DateOnly>();
+                if (root.TryGetProperty("instruments", out var instruments))
+                {
+                    foreach (var i in instruments.EnumerateArray().Where(i => i.TryGetProperty("pre_seam", out _)))
+                    {
+                        seams[(i.GetProperty("symbol").GetString()!, i.GetProperty("run_key").GetString()!)] = DateOnly.ParseExact(i.GetProperty("pre_seam").GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    }
+                }
+
                 var rows = new List<PackedTrade>();
                 foreach (var r in root.GetProperty("rows").EnumerateArray())
                 {
@@ -356,7 +389,8 @@ internal static class AssistRunner
                         rr,
                         parameters.EnumerateObject().Where(o => o.Value.ValueKind == JsonValueKind.String && decimal.TryParse(o.Value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out _))
                             .ToDictionary(o => o.Name, o => decimal.Parse(o.Value.GetString()!, NumberStyles.Float, CultureInfo.InvariantCulture), StringComparer.Ordinal),
-                        DateOnly.ParseExact(tradeKey[(tradeKey.LastIndexOf('|') + 1)..], "yyyy-MM-dd", CultureInfo.InvariantCulture)));
+                        DateOnly.TryParseExact(tradeKey[(tradeKey.LastIndexOf('|') + 1)..], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var decision) ? decision : null,
+                        seams.TryGetValue((r.GetProperty("symbol").GetString()!, r.GetProperty("run_key").GetString()!), out var seam) ? seam : null));
                 }
 
                 return new Pack(root.GetProperty("pack_id").GetString()!, root.GetProperty("seed").GetString()!, rows);

@@ -20,8 +20,11 @@ internal sealed record StoredRange(decimal Tick, IReadOnlyList<ReaderSession> Se
 /// <summary>The stored bars (read from the database by the host; a fake in tests).</summary>
 internal interface IStoredDays
 {
-    /// <summary>The sessions from <paramref name="from"/> to <paramref name="to"/>, both included: the history the VWAP_PULLBACK and BASE_BREAKOUT readers need.</summary>
-    ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, CancellationToken cancellationToken);
+    /// <summary>
+    /// The sessions from <paramref name="from"/> to <paramref name="to"/>, both included: the history the VWAP_PULLBACK and BASE_BREAKOUT readers need. <paramref name="lastUsed"/> is the last date the reader uses (the trade day for VWAP_PULLBACK, <paramref name="to"/> for BASE_BREAKOUT)
+    /// and <paramref name="admittedSeam"/> the seam date the RUN admitted pre-seam bars from (the run record's seam line, carried in the pack), null when it admitted none: they decide the caveat of the result.
+    /// </summary>
+    ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, DateOnly lastUsed, DateOnly? admittedSeam, CancellationToken cancellationToken);
 
     ValueTask<StoredDay> GetAsync(string symbol, DateOnly date, CancellationToken cancellationToken);
 }

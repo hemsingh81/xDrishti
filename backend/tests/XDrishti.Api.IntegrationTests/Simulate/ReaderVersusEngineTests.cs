@@ -214,7 +214,8 @@ public sealed class ReaderVersusEngineTests
 
         foreach (var side in new[] { ReaderSide.Buy, ReaderSide.Sell })
         {
-            foreach (var reason in Enum.GetValues<ReaderExitReason>())
+            // MaxHold is the swing hold (ADR 0040 X8); ORB is intraday and never produces it
+            foreach (var reason in Enum.GetValues<ReaderExitReason>().Where(r => r != ReaderExitReason.MaxHold))
             {
                 reads.Count(x => x.Side == side && x.Reading?.ExitReason == reason).ShouldBeGreaterThanOrEqualTo(8, side + " " + reason);
             }

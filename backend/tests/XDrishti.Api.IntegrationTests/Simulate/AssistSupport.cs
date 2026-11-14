@@ -146,7 +146,7 @@ internal static class AssistSupport
     {
         public ValueTask<StoredDay> GetAsync(string symbol, DateOnly date, CancellationToken cancellationToken) => ValueTask.FromResult(new StoredDay(0.05m, bars));
 
-        public ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, CancellationToken cancellationToken) => ValueTask.FromResult(new StoredRange(0.05m, []));
+        public ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, DateOnly lastUsed, DateOnly? admittedSeam, CancellationToken cancellationToken) => ValueTask.FromResult(new StoredRange(0.05m, []));
     }
 
     internal sealed class FakeSecond(Func<string, SecondDay> answer, string name = "fake") : ISecondSource

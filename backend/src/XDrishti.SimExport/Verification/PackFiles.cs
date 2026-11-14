@@ -395,6 +395,12 @@ public static class PackFiles
             json.WriteString("run_key", runs[row.RunIndex].Run.RunKey);
             json.WriteString("bars_sha256_12", instrument?.BarsSha256 is { Length: >= 12 } hash ? hash[..12] : string.Empty);
             json.WriteString("bars_sha256", instrument?.BarsSha256 ?? string.Empty);
+            if (instrument?.PreSeam is { } preSeam)
+            {
+                // only an instrument whose pre-seam bars the run admitted (CF-04d) has it, so every other pack is as before; the gate reads it to tell when raw history differs from the engine's (ADR 0291)
+                json.WriteString("pre_seam", preSeam.SeamDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+            }
+
             json.WriteEndObject();
         }
 

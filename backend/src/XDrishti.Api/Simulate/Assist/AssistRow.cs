@@ -6,7 +6,7 @@ namespace XDrishti.Api.Simulate.Assist;
 /// A trade row of <c>pack.json</c> with the strategy definition the reader needs. <see cref="Date"/> is the ENTRY (fill) date, <see cref="DecisionDate"/> the date of the decision, the last segment of the trade key (ADR 0043 D6);
 /// they differ for a swing trade whose order rests overnight (BASE_BREAKOUT) and are equal for an intraday trade.
 /// </summary>
-internal sealed record PackedTrade(int Seq, string TradeKey, string Symbol, ReaderSide Side, DateOnly Date, string Strategy, int OrMinutes, decimal RewardRisk, IReadOnlyDictionary<string, decimal>? Parameters = null, DateOnly? DecisionDate = null)
+internal sealed record PackedTrade(int Seq, string TradeKey, string Symbol, ReaderSide Side, DateOnly Date, string Strategy, int OrMinutes, decimal RewardRisk, IReadOnlyDictionary<string, decimal>? Parameters = null, DateOnly? DecisionDate = null, DateOnly? AdmittedSeam = null)
 {
     /// <summary>The date of the decision.</summary>
     public DateOnly Signal => DecisionDate ?? Date;

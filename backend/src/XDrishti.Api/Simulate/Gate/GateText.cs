@@ -114,7 +114,7 @@ internal static class GateText
             .Append("- spot lines confirmed / contradicted / not machine-checkable: ").Append(c.SpotsConfirmed.ToString(CultureInfo.InvariantCulture)).Append(" / ").Append(c.SpotsContradicted.ToString(CultureInfo.InvariantCulture)).Append(" / ").Append(c.SpotsNotCheckable.ToString(CultureInfo.InvariantCulture)).Append('\n');
         Section(text, "Defects (engine or rules; a minimal repro per row)", decision.Defects);
         Section(text, "Data repair needed (instrument and day)", decision.Repairs);
-        Section(text, "Rerun needed (no second source)", decision.Reruns);
+        Section(text, "Rerun needed (no second source) or hand check needed (history not machine-checkable)", decision.Reruns);
         Section(text, "Data findings (open data-quality findings, not P3 blockers)", decision.DataFindings);
         text.Append("\n## Spot checks\n\n");
         if (decision.Spots.Count == 0)

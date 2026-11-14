@@ -88,7 +88,7 @@ public sealed class MultiSessionAssistTests
     {
         public ValueTask<StoredDay> GetAsync(string symbol, DateOnly date, CancellationToken cancellationToken) => ValueTask.FromResult(new StoredDay(0.05m, sessions.FirstOrDefault(s => s.Date == date)?.Bars ?? []));
 
-        public ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        public ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, DateOnly lastUsed, DateOnly? admittedSeam, CancellationToken cancellationToken) =>
             ValueTask.FromResult(new StoredRange(0.05m, [.. sessions.Where(s => s.Date >= from && s.Date <= to)], caveat));
     }
 
@@ -210,7 +210,7 @@ public sealed class MultiSessionAssistTests
     public async Task A_missing_or_misspelled_parameter_refuses_the_pack_with_exit_2_and_nothing_is_read(string strategy, string parameters, string lacking)
     {
         var all = BreakoutSeries();
-        var folder = PackOf(strategy, parameters, Key(strategy, all[79].Date), all[80].Date, BreakoutReading(all));
+        var folder = PackOf(strategy, parameters, Key(strategy, strategy == "BASE_BREAKOUT" ? all[79].Date : all[80].Date), all[80].Date, BreakoutReading(all));
         var second = SecondOf([all[79], all[80]]);
 
         var outcome = await AssistRunner.RunAsync(folder, second, new Stored(all), TestContext.Current.CancellationToken);
@@ -221,24 +221,87 @@ public sealed class MultiSessionAssistTests
         folder.Ops.ShouldNotContain(o => o.StartsWith("write ", StringComparison.Ordinal));
     }
 
+    private const string Caveat = "a corporate action (ex-date 2026-02-20) lies inside the history";
+
     [Fact]
-    public async Task A_difference_on_a_row_whose_history_holds_a_corporate_action_is_a_data_finding_not_a_defect_and_never_a_pass()
+    public async Task A_caveated_row_that_agrees_is_a_data_finding()
+    {
+        var prior = VwapPrefix();
+        var day = VwapDay();
+        var folder = PackOf("VWAP_PULLBACK", VwapParameters, Key("VWAP_PULLBACK", VwapDate), VwapDate, VwapReading(prior, day));
+
+        var outcome = await GateRunner.RunAsync(folder, SecondOf([day]), new Stored([.. prior, day], Caveat), TestContext.Current.CancellationToken);
+
+        outcome.Status.ShouldBe(GateStatus.PassWithDataFindings);
+        outcome.Exit.ShouldBe(0);
+        Encoding.UTF8.GetString(folder.Files[GateRunner.JsonName]).ShouldContain("history not machine-checkable");
+    }
+
+    [Fact]
+    public async Task A_caveated_row_that_differs_needs_a_hand_check_exit_10_and_without_the_caveat_it_is_a_defect()
     {
         var prior = VwapPrefix();
         var day = VwapDay();
         Action<Dictionary<string, string>> wrongExit = c => c["exit_price"] = "100";
         var plain = PackOf("VWAP_PULLBACK", VwapParameters, Key("VWAP_PULLBACK", VwapDate), VwapDate, VwapReading(prior, day), wrongExit);
-        var caveat = PackOf("VWAP_PULLBACK", VwapParameters, Key("VWAP_PULLBACK", VwapDate), VwapDate, VwapReading(prior, day), wrongExit);
-        var agreeing = PackOf("VWAP_PULLBACK", VwapParameters, Key("VWAP_PULLBACK", VwapDate), VwapDate, VwapReading(prior, day));
+        var caveated = PackOf("VWAP_PULLBACK", VwapParameters, Key("VWAP_PULLBACK", VwapDate), VwapDate, VwapReading(prior, day), wrongExit);
 
         var blocked = await GateRunner.RunAsync(plain, SecondOf([day]), new Stored([.. prior, day]), TestContext.Current.CancellationToken);
-        var finding = await GateRunner.RunAsync(caveat, SecondOf([day]), new Stored([.. prior, day], "a corporate action (ex-date 2026-02-20) lies inside the history"), TestContext.Current.CancellationToken);
-        var agreeingFinding = await GateRunner.RunAsync(agreeing, SecondOf([day]), new Stored([.. prior, day], "the backfill seam (2026-02-20) lies inside the history"), TestContext.Current.CancellationToken);
+        var hand = await GateRunner.RunAsync(caveated, SecondOf([day]), new Stored([.. prior, day], Caveat), TestContext.Current.CancellationToken);
 
         blocked.Status.ShouldBe(GateStatus.BlockedDefect);
-        finding.Status.ShouldBe(GateStatus.PassWithDataFindings);
-        finding.Exit.ShouldBe(0);
-        agreeingFinding.Status.ShouldBe(GateStatus.PassWithDataFindings);
-        Encoding.UTF8.GetString(caveat.Files[GateRunner.JsonName]).ShouldContain("history not machine-checkable");
+        hand.Status.ShouldBe(GateStatus.RerunNeeded);
+        hand.Exit.ShouldBe(10);
+        var markdown = Encoding.UTF8.GetString(caveated.Files[GateRunner.MarkdownName]);
+        markdown.ShouldContain("not machine-checkable: hand check needed");
+        markdown.ShouldContain("Hand check needed:");
+        markdown.ShouldNotContain("Reconnect the second source");
+    }
+
+    [Fact]
+    public async Task A_caveated_row_where_the_reader_finds_no_trade_needs_a_hand_check_too()
+    {
+        var prior = VwapPrefix();
+        var day = VwapDay();
+        var folder = PackOf("VWAP_PULLBACK", VwapParameters, Key("VWAP_PULLBACK", VwapDate), VwapDate, VwapReading(prior, day));
+        var flat = Session(VwapDate, 1m, (0, 110.5m, 110.5m, 110.5m, 110.5m)); // the stored day shows no pattern: the reader reads no trade
+
+        var outcome = await GateRunner.RunAsync(folder, SecondOf([flat]), new Stored([.. prior, flat], Caveat), TestContext.Current.CancellationToken);
+
+        outcome.Status.ShouldBe(GateStatus.RerunNeeded);
+        outcome.Exit.ShouldBe(10);
+    }
+
+    [Theory]
+    [InlineData("VWAP_PULLBACK|NSE:AAA|Buy|not-a-date", "2026-03-02", "does not end in a yyyy-MM-dd decision date")]
+    [InlineData("VWAP_PULLBACK|NSE:AAA|Buy|2026-02-27", "2026-03-02", "intraday trade whose decision date 2026-02-27 is not its date 2026-03-02")]
+    [InlineData("BASE_BREAKOUT|NSE:AAA|Buy|2026-03-02", "2026-03-02", "swing trade whose decision date 2026-03-02 is not before its entry date 2026-03-02")]
+    public async Task A_trade_key_whose_date_does_not_fit_the_strategy_refuses_the_pack_naming_the_row_and_the_key(string key, string date, string text)
+    {
+        var strategy = key[..key.IndexOf('|', StringComparison.Ordinal)];
+        var prior = VwapPrefix();
+        var folder = PackOf(strategy, strategy == "VWAP_PULLBACK" ? VwapParameters : BreakoutParameters, key, DateOnly.Parse(date, CultureInfo.InvariantCulture), VwapReading(prior, VwapDay()));
+        var second = SecondOf([VwapDay()]);
+
+        var outcome = await AssistRunner.RunAsync(folder, second, new Stored([.. prior, VwapDay()]), TestContext.Current.CancellationToken);
+
+        outcome.Exit.ShouldBe(2);
+        outcome.Lines.ShouldContain(l => l.Contains("pack row 1 (trade key '" + key + "')", StringComparison.Ordinal) && l.Contains(text, StringComparison.Ordinal));
+        second.Calls.ShouldBeEmpty();
+        folder.Ops.ShouldNotContain(o => o.StartsWith("write ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_second_source_day_with_no_bars_is_source_unavailable_and_never_an_empty_session_in_the_splice()
+    {
+        var all = BreakoutSeries();
+        var folder = PackOf("BASE_BREAKOUT", BreakoutParameters, Key("BASE_BREAKOUT", all[79].Date), all[80].Date, BreakoutReading(all));
+        var empty = new Dictionary<DateOnly, IReadOnlyList<ReaderBar>> { [all[79].Date] = all[79].Bars, [all[80].Date] = [] };
+
+        var outcome = await AssistRunner.RunAsync(folder, new DatedSecond(empty), new Stored(all), TestContext.Current.CancellationToken);
+
+        var verdict = outcome.Details!.Verdicts.Single();
+        verdict.Verdict.ShouldBe(Verdicts.SourceUnavailable);
+        verdict.Row.Unavailable.ShouldNotBeNull().ShouldContain("no bars");
     }
 }

@@ -26,10 +26,10 @@ internal sealed class StoredDays(
         return new StoredDay(tick, read, fallback);
     }
 
-    public async ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    public async ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, DateOnly lastUsed, DateOnly? admittedSeam, CancellationToken cancellationToken)
     {
         var (tick, _, read) = await ReadAsync(symbol, from, to, cancellationToken);
-        var caveat = _known.GetValueOrDefault(symbol) is { } instrument ? await CaveatAsync(instrument.Id, from, to, cancellationToken) : null;
+        var caveat = _known.GetValueOrDefault(symbol) is { } instrument ? await CaveatAsync(factors, instrument.Id, from, to, lastUsed, admittedSeam, cancellationToken) : null;
         return new StoredRange(tick, Sessions(read), caveat);
     }
 
@@ -40,22 +40,23 @@ internal sealed class StoredDays(
             .OrderBy(g => g.Key)
             .Select(g => new ReaderSession(g.Key, [.. g]))];
 
-    /// <summary>The raw stored bars of a range are not the engine's when a corporate action's ex-date or the seam lies inside it: the engine adjusts the older side and may read across the seam. The multi-session readers do neither (ADR 0291).</summary>
-    private async Task<string?> CaveatAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    /// <summary>
+    /// The raw stored bars of a range are not the engine's when an applied corporate action's ex-date lies after <paramref name="from"/> and up to <paramref name="lastUsed"/> (the engine adjusts the older side; the factor at the first date differs from the one at the last used date),
+    /// or when the run admitted pre-seam bars (<paramref name="admittedSeam"/>, from the run record) from a seam inside the range. With admission off the engine and the reader see the same cut bars, so a seam alone is no caveat. The multi-session readers adjust nothing (ADR 0291).
+    /// shortcut: an action after <paramref name="lastUsed"/> scales every bar of the range evenly and is not flagged (the same gap as ORB's adjusted_instrument); the ratios the readers use are unchanged by it.
+    /// </summary>
+    internal static async Task<string?> CaveatAsync(XDrishti.Application.Market.Actions.IAdjustmentFactors factors, Guid instrumentId, DateOnly from, DateOnly to, DateOnly lastUsed, DateOnly? admittedSeam, CancellationToken cancellationToken)
     {
         var applied = await factors.GetAsync(instrumentId, cancellationToken);
-        if (applied.Actions.FirstOrDefault(a => a.ExDate >= from && a.ExDate <= to) is { } action)
+        if (applied.FactorAt(from) != applied.FactorAt(lastUsed))
         {
+            var action = applied.ActionsAfter(from).First(a => a.ExDate <= lastUsed);
             return "a corporate action (ex-date " + action.ExDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ") lies inside the history the reader used, which is raw and unadjusted";
         }
 
-        if (await seams.SeamOfAsync(instrumentId, cancellationToken) is { } seam)
+        if (admittedSeam is { } seam && seam >= from && seam <= to)
         {
-            var seamDate = DateOnly.FromDateTime(seam.ToOffset(India).DateTime);
-            if (seamDate >= from && seamDate <= to)
-            {
-                return "the backfill seam (" + seamDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ") lies inside the history the reader used: bars before it are cut here, and the engine may admit them";
-            }
+            return "the run admitted pre-seam bars from the seam (" + seam.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ") inside the history the reader used, which is raw and not source-aware";
         }
 
         return null;
