@@ -153,7 +153,7 @@ public sealed class LearnedSettingsApiTests(ApiFactory factory) : DataTestBase(f
     public async Task The_essentials_show_who_and_when_and_reset_needs_the_password()
     {
         var before = await SendAsync(HttpMethod.Get, "/api/settings/essentials");
-        before.Body.GetProperty("items").GetArrayLength().ShouldBe(5);
+        before.Body.GetProperty("items").GetArrayLength().ShouldBe(4); // the charge-sheet switch was dropped (ADR 0292)
         before.Body.GetProperty("items").EnumerateArray().Single(i => i.GetProperty("key").GetString() == "notices.failure").GetProperty("isDefault").GetBoolean().ShouldBeTrue();
 
         var noPassword = await SendAsync(HttpMethod.Put, "/api/settings/essentials/notices.failure", new { on = false });

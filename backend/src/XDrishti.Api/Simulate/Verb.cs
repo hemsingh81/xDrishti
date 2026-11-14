@@ -9,7 +9,7 @@ internal enum Verb
     /// <summary>The <c>simulate</c> verb: first argument <c>simulate</c>, nothing else selects it.</summary>
     Simulate,
 
-    /// <summary>The <c>cost-sheet</c> verb (spec P3-03f): first argument <c>cost-sheet</c>, nothing else selects it.</summary>
+    /// <summary>The dropped <c>cost-sheet</c> verb (spec P3-03f, ADR 0292): first argument <c>cost-sheet</c>, nothing else selects it; it only refuses, so its arguments never select another step.</summary>
     CostSheet,
 
     /// <summary>The <c>verify-pack</c> verb (spec P3-09): first argument <c>verify-pack</c>, nothing else selects it.</summary>

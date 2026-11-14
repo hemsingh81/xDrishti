@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
-using Microsoft.Extensions.Logging;
 using NetArchTest.Rules;
 using ArchResult = NetArchTest.Rules.TestResult;
 
@@ -13,8 +12,6 @@ namespace XDrishti.Architecture.Tests;
 /// </summary>
 public sealed partial class CostSheetArchitectureTests
 {
-    private const string VerbNamespace = "XDrishti.Api.CostSheets";
-
     private static readonly Assembly Application = typeof(XDrishti.Application.DependencyInjection).Assembly;
 
     private static readonly Assembly Infrastructure = typeof(XDrishti.Infrastructure.DependencyInjection).Assembly;
@@ -42,42 +39,8 @@ public sealed partial class CostSheetArchitectureTests
         Application.GetTypes().ShouldNotContain(t => t.Name == "CostSheetStore", "Application holds the port, never the adapter");
         Types.InAssembly(Application).That().HaveName("RunSimulationHandler").ShouldNot().HaveDependencyOnAny(Persistence).GetResult().IsSuccessful.ShouldBeTrue();
         Types.InAssembly(Infrastructure).That().HaveName("CostSheetStore").ShouldNot().HaveDependencyOnAny("Microsoft.EntityFrameworkCore").GetResult().IsSuccessful.ShouldBeFalse("the adapter does use the context: the scan sees it");
-        Types.InAssembly(Application).That().ResideInNamespace("XDrishti.Application.Research.CostSheets").Or().HaveName("RunSimulationHandler").ShouldNot().HaveDependencyOnAny("XDrishti.Infrastructure", "XDrishti.Simulation", "XDrishti.Strategies", "XDrishti.Indicators", "XDrishti.Api")
+        Types.InAssembly(Application).That().HaveName("RunSimulationHandler").ShouldNot().HaveDependencyOnAny("XDrishti.Infrastructure", "XDrishti.Simulation", "XDrishti.Strategies", "XDrishti.Indicators", "XDrishti.Api")
             .GetResult().IsSuccessful.ShouldBeTrue();
-    }
-
-    [Fact]
-    public void The_three_handlers_are_internal_and_sealed_and_their_messages_are_public()
-    {
-        string[] handlers = ["LoadCostSheetHandler", "ShowCostSheetHandler", "CheckCostSheetHandler", "DeriveCostSheetHandler"];
-
-        foreach (var name in handlers)
-        {
-            var type = Application.GetType("XDrishti.Application.Research.CostSheets." + name).ShouldNotBeNull();
-            (type.IsNotPublic && type.IsSealed).ShouldBeTrue(name + " is internal sealed");
-        }
-
-        ShouldHaveNone(Types.InAssembly(Application).That().ResideInNamespace("XDrishti.Application.Research.CostSheets").And().HaveNameEndingWith("Handler").Should().NotBePublic().And().BeSealed().GetResult());
-        Types.InAssembly(Application).That().HaveName("CostChoice").Should().NotBePublic().GetResult().IsSuccessful.ShouldBeFalse("the cost choice is public: the request names it");
-    }
-
-    [Fact]
-    public void The_verb_is_in_the_api_only_internal_and_adds_no_public_type()
-    {
-        Api.GetTypes().Count(t => t.Namespace == VerbNamespace).ShouldBeGreaterThanOrEqualTo(4, "the scan does see the verb's types");
-
-        Api.GetExportedTypes().Where(t => t.Namespace == VerbNamespace).ShouldBeEmpty();
-        foreach (var other in new[] { Application, Infrastructure })
-        {
-            other.GetTypes().Where(t => t.Name is "CostSheetCommand" or "CostSheetProgram" or "CostSheetOptions" or "CostSheetLog" or "CostCheckText" or "CostDeriveText").ShouldBeEmpty("the verb is host code");
-        }
-    }
-
-    [Fact]
-    public void The_verb_names_neither_infrastructure_nor_the_driver_and_the_shared_host_does()
-    {
-        ShouldHaveNone(Types.InAssembly(Api).That().ResideInNamespace(VerbNamespace).ShouldNot().HaveDependencyOnAny(Persistence).GetResult());
-        Types.InAssembly(Api).That().ResideInNamespace("XDrishti.Api.Simulate").And().HaveName("SimulateHost").ShouldNot().HaveDependencyOnAny(Persistence).GetResult().IsSuccessful.ShouldBeFalse("the shared host builds the container");
     }
 
     [Fact]
@@ -94,22 +57,11 @@ public sealed partial class CostSheetArchitectureTests
     }
 
     [Fact]
-    public void The_verb_logs_with_the_ids_4412_to_4414_and_4497_and_no_other()
-    {
-        var ids = Api.GetType(VerbNamespace + ".CostSheetLog").ShouldNotBeNull()
-            .GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
-            .SelectMany(m => m.GetCustomAttributes<LoggerMessageAttribute>().Select(a => a.EventId)).Order().ToList();
-
-        ids.ShouldBe([4412, 4413, 4414, 4497], "4497 is derive (CS-01)");
-    }
-
-    [Fact]
     public void The_reader_extension_adds_no_public_type_and_the_row_stays_internal()
     {
         Application.GetType("XDrishti.Application.Portfolio.Reports.GtrLines").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
         Application.GetType("XDrishti.Application.Portfolio.Reports.GtrRow").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
         Application.GetExportedTypes().Where(t => t.Name.StartsWith("Gtr", StringComparison.Ordinal)).ShouldBeEmpty();
-        Application.GetExportedTypes().ShouldContain(t => t.Name == "CostCheckReport", "the scan does see the public check types (the report carries no identifier)");
     }
 
     [Fact]
@@ -129,13 +81,10 @@ public sealed partial class CostSheetArchitectureTests
     }
 
     [Fact]
-    public void The_fixture_sheet_is_in_the_test_projects_only_and_the_script_holds_no_secret()
+    public void The_fixture_sheet_is_in_the_test_projects_only_and_the_dropped_script_is_gone()
     {
         File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "tests", "Shared", "FixtureSheet.cs")).ShouldContain("fixture-a");
         Application.GetTypes().Concat(Infrastructure.GetTypes()).Concat(Api.GetTypes()).Where(t => t.Name is "FixtureSheet" or "TestCostSheet").ShouldBeEmpty();
-        var script = File.ReadAllText(RepositoryFiles.RepositoryFile("scripts", "cost-sheet.sh"));
-        script.ShouldNotContain("vault-key");
-        script.ShouldNotContain("set -x");
-        File.ReadAllText(RepositoryFiles.RepositoryFile("scripts", "dev-api.sh")).ShouldContain("vault-key", Case.Sensitive, "the scan does see a vault key read where there is one");
+        File.Exists(Path.Combine(Path.GetDirectoryName(RepositoryFiles.RepositoryFile("scripts", "dev-api.sh"))!, "cost-sheet.sh")).ShouldBeFalse("the cost-sheet verb and its script were dropped (ADR 0292)");
     }
 }

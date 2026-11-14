@@ -24,7 +24,7 @@ namespace XDrishti.Application.Replay.Job;
 /// The job reads stored bars and writes only the three replay tables and one trial-ledger row at the start; it places and references no order.
 /// </para>
 /// </summary>
-public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOptions options, TimeProvider time, ILogger<ReplayRunner> logger, HoldOut.HoldOutRunActivity? holdOut = null)
+public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOptions options, TimeProvider time, ILogger<ReplayRunner> logger)
 {
     /// <summary>The recovery class of the job (AU-01, ADR 0240): it is convergent, since running it again closes whatever a stop left open (a run goes on from its cursor). Pinned in <c>RecoveryClassTableTests</c>.</summary>
     public const RecoveryClass Recovery = RecoveryClass.Convergent;
@@ -77,12 +77,8 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
         }
     }
 
-    /// <summary>Lets go of the run in hand and of the gate the hold-out loop shares with the job (SR-03).</summary>
-    private void Release()
-    {
-        _active = null;
-        holdOut?.ExitReplay();
-    }
+    /// <summary>Lets go of the run in hand.</summary>
+    private void Release() => _active = null;
 
     /// <summary>After a stop: a run left running goes back to queued (it resumes at the next session), a run left cancelling is cancelled. Call once before the first tick.</summary>
     public async Task RecoverAsync(CancellationToken cancellationToken)
@@ -107,11 +103,6 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
 
         if (_active is null)
         {
-            if (holdOut is not null && !holdOut.TryEnterReplay())
-            {
-                return; // a hold-out system replay holds the gate (SR-03): two heavy replays never share the memory budget
-            }
-
             var scope = scopes.CreateAsyncScope();
             ReplayRunRow? claimed = null;
             try
@@ -134,7 +125,6 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
                 if (claimed is null)
                 {
                     await scope.DisposeAsync();
-                    holdOut?.ExitReplay(); // nothing in hand: the gate goes back
                 }
             }
 

@@ -191,7 +191,7 @@ public sealed class HoldOutSealTests
 
         var said = await Step(time: later).RunAsync(Ct);
 
-        said.ShouldBe("block 1 is the owner's");
+        said.ShouldBe("block 1 waits for SR-04 (ADR 0292)");
         await _runs.DidNotReceive().InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>());
     }
 

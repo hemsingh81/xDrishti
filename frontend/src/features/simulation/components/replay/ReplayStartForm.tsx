@@ -19,7 +19,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { BaselineToggle } from './BaselineToggle';
 import { useBasketNames } from '@/features/reports';
-import { replayChargeSheetQuery, replayProfilesQuery, useStartReplay } from '../../api/replayApi';
+import { replayProfilesQuery, useStartReplay } from '../../api/replayApi';
 import { formProblem, initialForm, refusalText, toBody, type ReplayForm, type ReplayModes } from '../../lib/replayForm';
 
 const grid = {
@@ -33,13 +33,11 @@ export function ReplayStartForm({ onStarted }: { onStarted: (runId: string) => v
   const [form, setForm] = useState<ReplayForm>(initialForm);
   const baskets = useBasketNames();
   const profiles = useQuery(replayProfilesQuery);
-  const sheet = useQuery(replayChargeSheetQuery);
   const start = useStartReplay();
   const set = (patch: Partial<ReplayForm>) => {
     setForm((current) => ({ ...current, ...patch }));
   };
   const problem = formProblem(form);
-  const sheetId = sheet.data?.sheet?.id;
   return (
     <Box
       component="form"
@@ -154,11 +152,6 @@ export function ReplayStartForm({ onStarted }: { onStarted: (runId: string) => v
           <MenuItem value="gross" sx={{ minHeight: 44 }}>
             Gross (before costs)
           </MenuItem>
-          {sheetId && (
-            <MenuItem value={sheetId} sx={{ minHeight: 44 }}>
-              {`Charge sheet ${sheet.data?.sheet?.label ?? sheetId}`}
-            </MenuItem>
-          )}
         </TextField>
         <TextField
           select

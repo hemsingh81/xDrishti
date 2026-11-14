@@ -64,14 +64,13 @@ internal sealed class ReplayFacts(
 
     private static readonly TimeSpan IndiaOffset = TimeSpan.FromHours(5.5);
 
-    private ClampedBars _bars = new(holdOut, holdOutOptions, minuteBars, seams, dayBars, options.ReadAheadSessions);
+    private readonly ClampedBars _bars = new(holdOut, holdOutOptions, minuteBars, seams, dayBars, options.ReadAheadSessions);
     private readonly Dictionary<string, StoredVersion?> _startVersions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<StoredVersion>> _allVersions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<ChangelogEntry>> _histories = new(StringComparer.Ordinal);
     private readonly Dictionary<DateOnly, IReadOnlyList<StoredCellStats>> _learned = [];
     private readonly Dictionary<Guid, string?> _symbols = [];
     private bool _versionsFixed;
-    private bool _freezeBeforeStart;
     private bool _learningFixed;
     private string? _learningSources;
     private readonly Dictionary<DateOnly, IReadOnlyList<StoredCellStats>> _frozenByDate = [];
@@ -79,13 +78,6 @@ internal sealed class ReplayFacts(
     private IReadOnlyList<CellInput>? _learningInputs;
     private ReplaySettingsSnapshot? _settings;
     private TradingCalendar? _calendar;
-
-    /// <summary>SR-03: reads through the reader of a claimed hold-out block (up to its end) instead of the training clamp. Only the system-replay runner calls it, after the claim; call before <see cref="BeginRun"/>.</summary>
-    internal void UseBlock(HoldOut.HoldOutBlockReader reader)
-    {
-        _bars = ClampedBars.ForBlock(holdOut, holdOutOptions, minuteBars, seams, dayBars, options.ReadAheadSessions, reader);
-        _freezeBeforeStart = true;
-    }
 
     public ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken) => _bars.LastReadableAsync(cancellationToken);
 
@@ -245,8 +237,7 @@ internal sealed class ReplayFacts(
     public async ValueTask<ReplayCells> CellsAsync(ReplayParams parameters, DateOnly cut, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(parameters);
-        // a run over a claimed hold-out block (SR-03) freezes on the snapshot as of before the block's first session: the snapshot as of that session is written on its evening and may hold the block's own trades
-        var freezeDate = _freezeBeforeStart ? parameters.From : NextSession(await CalendarAsync(cancellationToken), parameters.From);
+        var freezeDate = NextSession(await CalendarAsync(cancellationToken), parameters.From);
         return await CellsCoreAsync(parameters, cut, freezeDate, cancellationToken);
     }
 

@@ -1,7 +1,6 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
-using XDrishti.Application.Abstractions.ChargeSheet;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.SettingsCatalog;
@@ -9,11 +8,10 @@ using XDrishti.Application.AutoSwitch;
 using XDrishti.Application.Planning;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
-using XDrishti.Domain.Reporting;
 
 namespace XDrishti.Application.SettingsCatalog;
 
-/// <summary>The five Essential settings with who changed each and when, and whether it can be reset here (AU-10, AU-09 criterion 3 and 4).</summary>
+/// <summary>The four Essential settings (the charge-sheet switch was dropped, ADR 0292) with who changed each and when, and whether it can be reset here (AU-10, AU-09 criterion 3 and 4).</summary>
 public sealed record GetEssentialSettingsQuery : IQuery<EssentialSettingsView>;
 
 public sealed record EssentialSettingsView(IReadOnlyList<EssentialSettingView> Items);
@@ -36,8 +34,6 @@ internal static class EssentialKeys
 
     public const string Risk = "risk.profile";
 
-    public const string Gate = "chargesheet.gate";
-
     public const string Failure = "notices.failure";
 
     /// <summary>The stored (app_settings) keys with their defaults.</summary>
@@ -49,12 +45,10 @@ internal static class EssentialKeys
 
     public const string ScopeNote = "The scope is set with PUT /api/auto/scope (baskets and stocks, at least one); there is no reset to default, set another scope.";
 
-    public const string GateNote = "The charge-sheet switch is changed on the Charge sheet screen only; its default is Off.";
-
     public const string RiskNote = "Risk profiles belong to accounts and have no single default; change them on the Risk profiles screen.";
 }
 
-internal sealed class GetEssentialSettingsHandler(IEssentialSettingStore store, IChargeSheetLog chargeSheet, IAutoScopeStore scopes) : IQueryHandler<GetEssentialSettingsQuery, EssentialSettingsView>
+internal sealed class GetEssentialSettingsHandler(IEssentialSettingStore store, IAutoScopeStore scopes) : IQueryHandler<GetEssentialSettingsQuery, EssentialSettingsView>
 {
     public async ValueTask<EssentialSettingsView> HandleAsync(GetEssentialSettingsQuery query, CancellationToken cancellationToken)
     {
@@ -71,12 +65,6 @@ internal sealed class GetEssentialSettingsHandler(IEssentialSettingStore store, 
                 var scope = await scopes.LatestAsync(cancellationToken);
                 var view = AutoScopeViews.Of(scope);
                 items.Add(new EssentialSettingView(d.Key, d.Label, view.Summary, AutoScopeViews.NoScope, !view.IsSet, view.ChangedBy, view.ChangedAt, false, EssentialKeys.ScopeNote));
-            }
-            else if (d.Key == EssentialKeys.Gate)
-            {
-                var ledger = await chargeSheet.ReadAsync(200, cancellationToken);
-                var last = ledger.History.FirstOrDefault(e => e.Kind is ChargeSheetActKind.GateOn or ChargeSheetActKind.GateOff);
-                items.Add(new EssentialSettingView(d.Key, d.Label, ledger.CapabilityOn ? "true" : "false", "false", !ledger.CapabilityOn, last?.Actor, last?.At, false, EssentialKeys.GateNote));
             }
             else
             {
@@ -159,12 +147,6 @@ internal sealed class ResetEssentialSettingHandler(IEssentialSettingStore store,
         if (command.Key == EssentialKeys.Scope)
         {
             return Result.Failure<EssentialSettingView>(Error.Conflict("settings.reset_elsewhere", EssentialKeys.ScopeNote));
-        }
-
-        if (command.Key == EssentialKeys.Gate)
-        {
-            // the charge-sheet confirmation is switched only by its own owner act (an architecture test pins that nothing else names it): Reset to default there is Off
-            return Result.Failure<EssentialSettingView>(Error.Conflict("settings.reset_elsewhere", EssentialKeys.GateNote));
         }
 
         return Result.Failure<EssentialSettingView>(Error.Conflict("settings.reset_not_single", EssentialKeys.RiskNote));

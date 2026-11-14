@@ -200,11 +200,11 @@ public sealed partial class SettingsCatalogTests(ApiFactory factory)
     }
 
     [Fact]
-    public void The_essential_tier_is_the_five_and_never_more_than_eight()
+    public void The_essential_tier_is_the_four_and_never_more_than_eight()
     {
         var all = ConfidenceSettingDescriptors.All.Concat(SettingsRegistry.All).ToList();
 
-        all.Count(d => d.Tier == SettingTier.Essential).ShouldBe(5);
+        all.Count(d => d.Tier == SettingTier.Essential).ShouldBe(4);
         all.Count(d => d.Tier == SettingTier.Essential).ShouldBeLessThanOrEqualTo(SettingsRegistry.MaxEssential);
         all.Select(d => d.Key).Distinct(StringComparer.Ordinal).Count().ShouldBe(all.Count);
     }
@@ -226,7 +226,7 @@ public sealed partial class SettingsCatalogTests(ApiFactory factory)
         var response = await signedIn.Client.GetFromJsonAsync<SettingsCatalogResponse>("/api/settings/catalog", TestContext.Current.CancellationToken);
 
         response.ShouldNotBeNull();
-        response.Items.Count(i => i.Tier == "Essential").ShouldBe(5);
+        response.Items.Count(i => i.Tier == "Essential").ShouldBe(4);
         response.Items.ShouldContain(i => i.Key == "Confidence:Kill:StressMultiplier" && i.Safer == "higher" && i.Source == "default" && i.Range!.Max == 3);
         response.Items.Where(i => SecretLooking().IsMatch(i.Key)).ShouldBeEmpty();
         response.Items.Where(i => i.Source is "stored" or "section").ShouldAllBe(i => i.Value == null);

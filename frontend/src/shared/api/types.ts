@@ -225,7 +225,6 @@ export type LongTermLot = Schemas['LongTermLot'];
 export type ActionThresholds = Schemas['ActionThresholds'];
 export type ActionThresholdsInput = Schemas['ActionThresholdsInput'];
 export type ActionThresholdsView = Schemas['ActionThresholdsView'];
-export type ChargeSheetStatusView = Schemas['ChargeSheetStatusView'];
 export type EssentialSettingView = Schemas['EssentialSettingView'];
 export type LearnedChangeView = Schemas['LearnedChangeView'];
 export type LearnedChangesView = Schemas['LearnedChangesView'];

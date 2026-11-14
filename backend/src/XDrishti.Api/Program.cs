@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using XDrishti.Api.Auth;
 using XDrishti.Api.Cli;
-using XDrishti.Api.CostSheets;
 using XDrishti.Api.Infrastructure;
 using XDrishti.Api.Simulate;
 using XDrishti.Application;
@@ -16,10 +15,11 @@ if (verb == Verb.Simulate)
     return await SimulateProgram.RunProcessAsync(args[1..]);
 }
 
-// The cost-sheet verb (spec P3-03f) is chosen the same way: `cost-sheet load migrate` or a file named owner-reset never selects another step.
+// The cost-sheet verb (spec P3-03f) was dropped (ADR 0292: costs are gross forever). It is still chosen first, so `cost-sheet load migrate` or a file named owner-reset never selects another step; it only refuses.
 if (verb == Verb.CostSheet)
 {
-    return await CostSheetProgram.RunProcessAsync(args[1..]);
+    await Console.Error.WriteLineAsync("The cost-sheet verb was removed: costs are gross (ADR 0292). Nothing was done.");
+    return 2;
 }
 
 // The verify-pack verb (spec P3-09) is chosen the same way, by the first argument alone.

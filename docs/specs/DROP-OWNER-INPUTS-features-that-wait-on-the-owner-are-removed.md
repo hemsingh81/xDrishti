@@ -47,8 +47,10 @@ Architecture tests (no context references; no charge-sheet check path per Q2), m
 
 ## Build state (2026-11-14)
 - R1 and R2 (the market context and the CSV inbox) are built and merged-ready on `feature/drop-owner-inputs`: migration `DropMarketContext`, the removal test (`DropMarketContextMigrationTests`), the architecture pin (`ContextDroppedArchitectureTests`), the validate test (`A_removed_market_context_name_is_refused_as_an_unknown_name_that_is_quoted`).
-- R3 (the charge sheet, Q2) and R4 (SR-03, Q3) are decided and **not built**: about 180 source files and their tests, two more migrations; see the build handover in the ADR 0292 thread.
-- R5 (owner to-dos) is open for the Q1 items and R3/R4.
+- R4 (SR-03) is built (2026-11-15): migration `DropReplayHoldOutRegistrations` (reversible Down) and its test `DropReplayHoldOutRegistrationsMigrationTests`.
+- R3 (the charge sheet) is built for the owner's check (2026-11-15): no screen, verb or endpoint asks for it, every figure reads gross; pin `ChargeSheetDroppedArchitectureTests`. Open: removing `CostChoice` and the dead net paths, which needs an owner decision on the evidence gates that refuse gross R (see ADR 0292, *Open*).
+- Q1 is built (2026-11-15): the eval baseline is re-accepted automatically when no set regresses (`ai.eval.auto_accept`, default ON, `auto:xd`, migration `AllowAutoEvalBaseline`); the block 1 look is left to SR-04.
+- R5 (owner to-dos) is done for SR-03, ISS-25 and the Q1 items in `docs/design/18-roadmap.md`.
 
 ## Done when
 - [ ] All acceptance criteria have evidence

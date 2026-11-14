@@ -92,16 +92,10 @@ export const replayPairQuery = (pairId: string) =>
     refetchInterval: (query) => pairInterval(query.state.data),
   });
 
-/** What the start form offers: the stored risk profiles and the stored charge sheet, if any. */
+/** What the start form offers: the stored risk profiles (costs are always gross, ADR 0292). */
 export const replayProfilesQuery = queryOptions({
   queryKey: [...root, 'profiles'],
   queryFn: async ({ signal }) => unwrap(await api.GET('/api/risk-profiles', { signal })),
-});
-
-export const replayChargeSheetQuery = queryOptions({
-  queryKey: [...root, 'charge-sheet'],
-  queryFn: async ({ signal }) => unwrap(await api.GET('/api/charge-sheet/confirmation', { signal })),
-  retry: false,
 });
 
 /** Start a replay: 202 with the run ids; a refusal (422, 409) is shown as its message. */

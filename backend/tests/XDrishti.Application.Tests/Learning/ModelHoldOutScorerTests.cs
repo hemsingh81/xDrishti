@@ -397,7 +397,7 @@ public sealed class ModelHoldOutScorerTests
         var one = new MemoryHoldOutStore();
         one.Blocks.Add(new HoldOutBlock(One, new DateOnly(2024, 10, 1), OneEnd, 6, Hash, DateTimeOffset.UnixEpoch));
         var step = new ModelAutoLookStep(new HoldOutEpochs(one, new FixedCalendar(), _time), new ModelHoldOutCandidates(_registry, one, _scores), Scorer(), _switches);
-        (await step.RunAsync(Ct)).ShouldBe("block 1 is the owner's");
+        (await step.RunAsync(Ct)).ShouldBe("block 1 waits for SR-04 (ADR 0292)");
 
         var filling = new FakeTimeProvider(new DateTimeOffset(2026, 12, 1, 6, 0, 0, TimeSpan.Zero));
         var fill = new MemoryHoldOutStore();

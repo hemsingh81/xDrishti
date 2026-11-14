@@ -5,8 +5,7 @@ import { RiskProfilesView, RoleMatrixView } from '@/features/accounts';
 import { LazyBoundary, LoadingState, ReloadAlert } from '@/shared/ui';
 import { ActionThresholdsCard } from './ActionThresholdsCard';
 
-// The owner's confirmation of the charge sheet loads on demand: the first load of Settings does not carry it.
-const ChargeSheetCard = lazy(() => import('./ChargeSheetCard'));
+// The heavier tabs load on demand: the first load of Settings does not carry them.
 // The event-risk filter's switch card (P15-11) loads on demand too.
 const EventFilterCard = lazy(() => import('./EventFilterCard'));
 // The limit settings (sizing, basket budgets, basket settings, the loosening banner; BK-10b) load on demand too.
@@ -18,7 +17,6 @@ const settingsTabs = [
   { key: 'profiles', label: 'Risk profiles' },
   { key: 'roles', label: 'Account roles' },
   { key: 'actions', label: 'Action center' },
-  { key: 'charge-sheet', label: 'Charge sheet' },
   { key: 'selection', label: 'Selection' },
   { key: 'limits', label: 'Limits' },
   { key: 'learned', label: 'Learned changes' },
@@ -29,7 +27,7 @@ type SettingsTab = (typeof settingsTabs)[number]['key'];
 const parseTab = (value: string | null): SettingsTab =>
   settingsTabs.find((tab) => tab.key === value)?.key ?? 'profiles';
 
-/** The existing settings tabs, one step under `Advanced settings`: risk profiles, account roles, Action center thresholds, the charge sheet's confirmation and the event filter. The open tab lives in the URL. */
+/** The existing settings tabs, one step under `Advanced settings`: risk profiles, account roles, Action center thresholds and the event filter. The open tab lives in the URL. */
 export function AdvancedSettings() {
   const [params, setParams] = useSearchParams();
   const tab = parseTab(params.get('tab'));
@@ -69,14 +67,6 @@ export function AdvancedSettings() {
           </LazyBoundary>
         )}
         {tab === 'actions' && <ActionThresholdsCard />}
-        {tab === 'charge-sheet' && (
-          <LazyBoundary
-            pending={<LoadingState label="Loading the confirmation" />}
-            failed={<ReloadAlert label="The confirmation" />}
-          >
-            <ChargeSheetCard />
-          </LazyBoundary>
-        )}
         {tab === 'selection' && (
           <LazyBoundary
             pending={<LoadingState label="Loading the event filter" />}

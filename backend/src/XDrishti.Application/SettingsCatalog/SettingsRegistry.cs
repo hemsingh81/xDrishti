@@ -32,13 +32,12 @@ public static class SettingsRegistry
     private static SettingDescriptor Section(string key) =>
         new(key, key.Replace(':', ' '), SettingTier.Internal, SettingKind.Section, null, null, null, SettingSafer.None, false);
 
-    /// <summary>The Essential five and the stored owner switches. <c>risk.profile</c> and <c>chargesheet.gate</c> are read and changed through their existing screens (AU-09 links to them); the catalog shows no value for any stored setting. Every switch is OFF until the owner turns it on.</summary>
+    /// <summary>The Essential four and the stored owner switches. <c>risk.profile</c> is read and changed through its existing screen (AU-09 links to them); the catalog shows no value for any stored setting. Every switch is OFF until the owner turns it on, except a researched default ON (ADR 0282: <c>ai.eval.auto_accept</c>, ADR 0292).</summary>
     public static IReadOnlyList<SettingDescriptor> StoredSettings { get; } =
     [
         Stored("auto.enabled", "Auto", SettingTier.Essential, "false"),
         Stored("suggest.scope", "What to suggest", SettingTier.Essential, "eligible"),
         Stored("risk.profile", "Risk profile", SettingTier.Essential, null),
-        Stored("chargesheet.gate", "Charge sheet", SettingTier.Essential, "false"),
         Stored("notices.failure", "Failure notices", SettingTier.Essential, "true"),
         Stored("autonomy.auto_approve_tickets", "Approve paper tickets automatically", SettingTier.Advanced, "false"),
         Stored("autonomy.promote_from_reserve", "Promote from the reserve", SettingTier.Advanced, "false"),
@@ -65,6 +64,7 @@ public static class SettingsRegistry
         Stored("learning.universe_registered_baskets", "Baskets a strategy x basket comparison may use, by name (owner only, password every change)", SettingTier.Advanced, "Nifty 50,Nifty 100,Nifty Midcap 150,F&O stocks,Most liquid,Low volatility,Momentum,Nifty 500"),
         Stored("learning.universe_link.auto_propose", "Propose each stable liquidity-tier observation as a hypothesis automatically, as the actor auto; off means nothing is proposed automatically (owner only, password every change)", SettingTier.Advanced, "false"),
         Stored("reports.basket_benchmark_instrument", "Index the basket profile and ranking compare with, an instrument id (unset: Nifty 500) (owner may change, no password: it loosens nothing)", SettingTier.Advanced, "Nifty 500"),
+        Stored("ai.eval.auto_accept", "Accept an eval run as the baseline automatically when no set regresses (owner, xd eval auto-accept on|off)", SettingTier.Advanced, "true"),
         Stored("options.backfill_stocks", "Frozen share order of the options backfill", SettingTier.Internal, null),
     ];
 

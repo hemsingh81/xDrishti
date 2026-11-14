@@ -44,6 +44,7 @@ internal static class EvalCommand
                 "compare" => await CompareAsync(options, sp, console, cancellationToken),
                 "accept" => await AcceptAsync(options, sp, console, cancellationToken),
                 "show" => await ShowAsync(options, sp, console, cancellationToken),
+                "auto-accept" => await SetAutoAcceptAsync(options, sp, console, cancellationToken),
                 _ => await SeedAsync(sp, console, cancellationToken),
             };
         }
@@ -67,7 +68,29 @@ internal static class EvalCommand
     private static async Task<int> RunEvalAsync(EvalCliOptions o, IServiceProvider sp, SimulateConsole console, CancellationToken ct)
     {
         var result = await sp.GetRequiredService<ICommandHandler<RunEvalCommand, EvalRunView>>().HandleAsync(new RunEvalCommand(o.Sets, o.Repeats, o.Target, EvalErrors.CliActor), ct);
-        return await PrintRunAsync(result, console);
+        var exit = await PrintRunAsync(result, console);
+        return result.IsSuccess ? await AutoAcceptAsync(result.Value.Id, exit, sp, console, ct) : exit;
+    }
+
+    /// <summary>The auto option of the baseline (ADR 0292): after a stored run, accepted as <c>auto:xd</c> only when the setting is on and no set regressed; it never changes the exit code.</summary>
+    private static async Task<int> AutoAcceptAsync(Guid run, int exit, IServiceProvider sp, SimulateConsole console, CancellationToken ct)
+    {
+        var auto = await sp.GetRequiredService<ICommandHandler<AutoAcceptEvalCommand, EvalAutoAcceptOutcome>>().HandleAsync(new AutoAcceptEvalCommand(run), ct);
+        await console.Out.WriteLineAsync(auto.IsSuccess ? $"auto-accept: {auto.Value.State} ({SimulateOptions.Show(auto.Value.Detail)})" : "auto-accept: " + SimulateOptions.Show(auto.Error.Code));
+        return exit;
+    }
+
+    private static async Task<int> SetAutoAcceptAsync(EvalCliOptions o, IServiceProvider sp, SimulateConsole console, CancellationToken ct)
+    {
+        var result = await sp.GetRequiredService<ICommandHandler<SetEvalAutoAcceptCommand, EvalAutoAcceptOutcome>>().HandleAsync(new SetEvalAutoAcceptCommand(o.AutoAccept!.Value, EvalErrors.CliActor), ct);
+        if (result.IsFailure)
+        {
+            await console.Error.WriteLineAsync(SimulateOptions.Show(result.Error.Code + ": " + result.Error.Message));
+            return XdCommand.Refused;
+        }
+
+        await console.Out.WriteLineAsync("auto-accept: " + result.Value.Detail);
+        return XdCommand.Done;
     }
 
     private static async Task<int> GradeAsync(EvalCliOptions o, IServiceProvider sp, SimulateConsole console, CancellationToken ct)
@@ -84,7 +107,8 @@ internal static class EvalCommand
         }
 
         var result = await sp.GetRequiredService<ICommandHandler<GradeEvalAnswersCommand, EvalRunView>>().HandleAsync(new GradeEvalAnswersCommand(text, o.Target, EvalErrors.CliActor), ct);
-        return await PrintRunAsync(result, console);
+        var exit = await PrintRunAsync(result, console);
+        return result.IsSuccess ? await AutoAcceptAsync(result.Value.Id, exit, sp, console, ct) : exit;
     }
 
     private static async Task<int> PrintRunAsync(Result<EvalRunView> result, SimulateConsole console)

@@ -8,7 +8,7 @@ internal sealed class AiEvalBaselineRecordConfiguration : IEntityTypeConfigurati
 {
     public void Configure(EntityTypeBuilder<AiEvalBaselineRecord> builder)
     {
-        builder.ToTable("eval_baselines", Schemas.Ai, t => t.HasCheckConstraint("ck_ai_eval_baselines_actor", "accepted_by = 'cli:xd'"));
+        builder.ToTable("eval_baselines", Schemas.Ai, t => t.HasCheckConstraint("ck_ai_eval_baselines_actor", "accepted_by = 'cli:xd' OR (accepted_by = 'auto:xd' AND COALESCE(reason, '') LIKE 'auto: %')"));
         builder.HasKey(x => x.Id).HasName("pk_eval_baselines");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
         builder.Property(x => x.AcceptedBy).HasMaxLength(64).IsRequired();

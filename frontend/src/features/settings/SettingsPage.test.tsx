@@ -11,12 +11,12 @@ function renderSettings(path = '/settings') {
 }
 
 describe('Settings page', () => {
-  it('opens on the five essential settings with no advanced control', async () => {
+  it('opens on the four essential settings with no advanced control', async () => {
     renderSettings();
 
     const list = await screen.findByRole('list', { name: 'Essential settings' });
-    expect(within(list).getAllByRole('listitem')).toHaveLength(5);
-    for (const name of ['Auto', 'What to suggest', 'Risk profile', 'Charge sheet', 'Failure notices']) {
+    expect(within(list).getAllByRole('listitem')).toHaveLength(4);
+    for (const name of ['Auto', 'What to suggest', 'Risk profile', 'Failure notices']) {
       expect(within(list).getByRole('heading', { name })).toBeInTheDocument();
     }
     expect(screen.queryByText('Promote models automatically')).not.toBeInTheDocument();
@@ -28,10 +28,6 @@ describe('Settings page', () => {
     expect(within(list).getByRole('link', { name: 'Open risk profiles' })).toHaveAttribute(
       'href',
       '/settings?tab=profiles',
-    );
-    expect(within(list).getByRole('link', { name: 'Open the charge sheet' })).toHaveAttribute(
-      'href',
-      '/settings?tab=charge-sheet',
     );
     expect(within(list).getAllByText(/Not changeable here yet/)).toHaveLength(2);
     expect(
@@ -45,10 +41,10 @@ describe('Settings page', () => {
   it('opens the matching tab from an essential link', async () => {
     const { router } = renderSettings();
 
-    await userEvent.click(await screen.findByRole('link', { name: 'Open the charge sheet' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Open risk profiles' }));
 
-    expect(router.state.location.search).toBe('?tab=charge-sheet');
-    expect(await screen.findByRole('tab', { name: 'Charge sheet', selected: true })).toBeInTheDocument();
+    expect(router.state.location.search).toBe('?tab=profiles');
+    expect(await screen.findByRole('tab', { name: 'Risk profiles', selected: true })).toBeInTheDocument();
   });
 
   it('keeps Advanced settings usable when the catalog cannot be read', async () => {

@@ -12,7 +12,7 @@ public static class HoldOutHorizon
     /// <summary>The stored reason of a look whose subject was not frozen before the horizon.</summary>
     public const string NotPredated = "not_predated";
 
-    /// <summary>The kind of a look of the whole system (SR-03).</summary>
+    /// <summary>The kind of a look of the whole system; SR-03 that took it was dropped (ADR 0292), so the kind has no subject and no slot.</summary>
     public const string SystemKind = "system";
 
     /// <summary>Whether a subject of <paramref name="kind"/>, frozen at <paramref name="subjectFrozenAt"/>, may take the block's fresh look.</summary>

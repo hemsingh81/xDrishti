@@ -156,7 +156,6 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, TicketAlertsEndpoints>(); // price-crossing alerts and prompts on the plan screen (P7-20); preferences only, no order
         services.AddSingleton<IEndpointModule, ReportsEndpoints>();
         services.AddSingleton<IEndpointModule, ReplayEndpoints>(); // the system replay (SR-01 part C, ADR 0272): start, read while running, cancel; research only, no order
-        services.AddSingleton<IEndpointModule, HoldOutRegistrationEndpoints>(); // the pre-registered system replay over a hold-out block (SR-03, ADR 0284): owner session, research only, no order
         services.AddSingleton<IEndpointModule, BasketBenchmarkEndpoints>(); // the owner's basket benchmark (BK-06c)
         services.AddSingleton<IEndpointModule, MarketStrengthEndpoints>(); // the stored relative-strength rows (BK-09): one GET, read only
         services.AddSingleton<IEndpointModule, ReportsPhaseCheckEndpoints>(); // the P8 phase check (P8-17): one GET, computed on read
@@ -180,7 +179,6 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, CalendarEndpoints>(); // the results meetings known at an instant and the instruments without an entry (P15-04): one GET, no file content, no estimate
         services.AddSingleton<IEndpointModule, OpeningBarsEndpoints>(); // the owner's opening-minute recorder switch (BK-03b): fresh password per change, insert-only; no bar is readable
         services.AddSingleton<IEndpointModule, LiveTradingEndpoints>(); // the compliance record of the small live phase (P11-05): fresh password, gate Live:Writes:Enabled (OFF), insert-only; no broker call
-        services.AddSingleton<IEndpointModule, ChargeSheetEndpoints>(); // the owner's confirmation of the charge sheet (P8-23, ADR 0127)
         services.AddSingleton<SwitchOnLimiter>();
         services.AddSingleton<IEndpointModule, CapabilitiesEndpoints>(); // the owner's capability switches of the owner-act slices (P8-18 Part A, ADR 0128)
         services.AddSingleton<IEndpointModule, AssistantProposalEndpoints>(); // the assistant's proposals: the owner reads them, accepts with a fresh password or rejects (P9-08)
@@ -307,7 +305,6 @@ internal static class ApiSetup
         services.AddHostedService<SimAllService>();
         services.AddReplayRunner(); // the system replay job (SR-01 part B, ADR 0272): its own hosted loop, never beside a simulate-everything chunk
         services.AddHostedService<XDrishti.Api.Lab.ReplayService>();
-        services.AddHostedService<XDrishti.Api.Lab.HoldOutSystemRunService>(); // runs the claimed system replays over a hold-out block (SR-03)
     }
 
     /// <summary>

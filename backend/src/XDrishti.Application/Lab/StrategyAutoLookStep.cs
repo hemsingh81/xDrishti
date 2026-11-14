@@ -7,7 +7,7 @@ namespace XDrishti.Application.Lab;
 
 /// <summary>
 /// The strategy auto look of the seal service (HO-01 D10): with <c>Confidence:HoldOut:AutoUnlock</c> on and the block in force sealed with its strategy slot free, queues the existing <c>holdout</c> Lab job, recorded as <c>auto</c>, for the best candidate
-/// (<see cref="HoldOutStrategyCandidates"/>). Never at block 1 (its look stays the owner's act) and never at a filling block. The job runs the look as the Lab dispatcher does for the owner's; this step only claims it.
+/// (<see cref="HoldOutStrategyCandidates"/>). Never at block 1 (its look is taken automatically by SR-04, ADR 0292; it is no owner to-do) and never at a filling block. The job runs the look as the Lab dispatcher does for the owner's; this step only claims it.
 /// </summary>
 internal sealed class StrategyAutoLookStep(HoldOutEpochs epochs, HoldOutStrategyCandidates candidates, HoldOutUnlocker unlocker, IHoldOutStore store, ILabRunStore runs, HoldOutOptions options, TimeProvider time, ILogger<StrategyAutoLookStep> logger) : IHoldOutSealStep
 {
@@ -36,7 +36,7 @@ internal sealed class StrategyAutoLookStep(HoldOutEpochs epochs, HoldOutStrategy
 
         if (current.Block.PrevStart is null)
         {
-            return "block 1 is the owner's";
+            return "block 1 waits for SR-04 (ADR 0292)";
         }
 
         if (await store.HasFreshLookAsync(current.Block.Start, HoldOutUnlocker.StrategyKind, cancellationToken))

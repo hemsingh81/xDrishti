@@ -25,7 +25,6 @@ export const buildEssentials = (): { items: Essential[] } => ({
       label: 'Risk profile',
       resetNote: 'Risk profile has no single default; pick a profile.',
     }),
-    buildEssential({ key: 'chargesheet.gate', label: 'Charge sheet', value: 'false', default: 'false' }),
     buildEssential({ key: 'notices.failure', label: 'Failure notices', value: 'true', default: 'true' }),
   ],
 });

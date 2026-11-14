@@ -1,6 +1,6 @@
 # P8-23 — Charge-sheet confirmation writer (the owner's act that makes a figure "net")
 
-- **Status:** Approved by the owner on 2026-10-26 (the owner approved building this SAFETY slice; the decisions below were researched when it was written and are the owner's to revert).
+- **Status:** **Dropped (ADR 0292)**, 2026-11-15: the confirmation writer, its endpoints, the settings card and the `chargesheet.gate` switch are removed; costs are gross forever and no confirmation is ever read. Was: Approved by the owner on 2026-10-26 (the owner approved building this SAFETY slice; the decisions below were researched when it was written and are the owner's to revert).
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-23 (the "confirmation writer" that [ADR 0100](../adr/0100-the-report-endpoints-read-the-stored-runs-through-one-query-model-with-an-evidence-block-and-net-only-by-the-owners-stored-confirmation.md) decision 6 and ISS-25 left to a separate slice, and that [P10-04](P10-04-backtest-vs-paper-report.md) and [P10-06](P10-06-paper-phase-check.md) wait for).
 - **Design refs:** docs/design/04-accounts-access-and-operations.md §4.1 ("Only you"), §2 (step-up, lockout) · 16-configuration.md (`costs`) · 19-risks-and-compliance.md (cost blindness) · ADR 0044 (the stored charge sheet), 0099 and 0100 (net only by the owner's confirmation), 0122 and 0123 (the paper comparison and phase check read the fact), 0091 (the owner-act pattern of the autonomy switches).
 - **Size:** 3 agent-days.
