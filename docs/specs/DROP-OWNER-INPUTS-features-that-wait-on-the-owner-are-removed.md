@@ -2,7 +2,7 @@
 
 - **Status:** Approved (owner, 2026-11-14, in chat: "Drop every owner-input feature"; Q1 both automatic, Q2 gross forever, Q3 SR-03 removed)
 - **Phase / roadmap row:** cleanup, next to DROP-P13 (ADR 0288) and DROP-BASIS (ADR 0289)
-- **Decisions:** ADR 0290 (to be written at build)
+- **Decisions:** ADR 0291 (to be written at build)
 - **Design refs:** docs/design/05-data-and-brokers.md (market context), 08-exits-and-risk.md (costs), 09-learning-engine.md (hold-out), 11-strategy-lab.md; specs P3-01c, P3-01d, P3-lift, P3-03c, P3-03f, P8-23, SR-03, P9-09
 
 ## Goal
@@ -18,7 +18,7 @@ Nothing in xDrishti waits on data or checks the owner has to supply. The owner h
 
 | # | Item | Waits on | Removed | Kept |
 |---|---|---|---|---|
-| R1 | NSE CSV inbox loader for NIFTY 50 / INDIA VIX | owner CSV files | planned slice cancelled (never built) | — |
+| R1 | NSE CSV context inbox for NIFTY 50 / INDIA VIX (P3-01d fallback D, ADR 0290, merged c60209d6 on 2026-11-14 before this decision reached it) | owner CSV files | the inbox loader, its settings, folder, log events and tests; ADR 0290 marked superseded | — |
 | R2 | Market context: NIFTY 50 / INDIA VIX daily (P3-01c context part, P3-01d job, P3-lift) | owner's live Dhan probe | `context_daily` table (NEW down migration), context data job, `IContextFigures`, `ContextOptions`, the ten context features in Indicators, regime basis `index_and_vix`/`index_only`, `data_context_stale` notice, context API, AI reader tool | weekly/monthly timeframes and calendar features (P3-01c); basket context (BK-06) |
 | R3 | Charge-sheet confirmation (ISS-25, P3-03f stored sheet, P8-23 writer) | owner marks the sheet `checked` against a contract note | see Q2 | see Q2 |
 | R4 | SR-03 pre-registered replay over a hold-out block | R3 (`checked` sheet) | see Q3 | — |
@@ -32,7 +32,7 @@ Strategies, cells or plans that read a removed context feature: none can have fi
 3. **Same results.** A golden run of the P3 pack and one SR-01 replay give the same result hash before and after the change (the context was never ready).
 4. **Validate.** A strategy naming a removed context feature answers 422 with the feature named; no seed strategy names one.
 5. **Costs (per Q2).** Every run, report and replay labels its cost basis; no screen or verb asks the owner to check a sheet.
-6. **Docs.** Design docs, the specs listed above and the roadmap mark the dropped parts `Dropped (ADR 0290)`; `docs/site` is not regenerated.
+6. **Docs.** Design docs, the specs listed above and the roadmap mark the dropped parts `Dropped (ADR 0291)`; `docs/site` is not regenerated.
 7. `scripts/check.sh` green; `scripts/gen-api.sh` run; Opus reviewer has no blockers.
 
 ## Test plan
@@ -49,4 +49,4 @@ Architecture tests (no context references; no charge-sheet check path per Q2), m
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`); migration added
-- [ ] ADR 0290 written; design docs and roadmap updated
+- [ ] ADR 0291 written; design docs and roadmap updated

@@ -3,7 +3,7 @@
 - **Status:** Approved (owner, 2026-11-14, in chat: answers Q1–Q6 below and open questions 1–2; 3–4 as recommended)
 - **Phase / roadmap row:** SR — System replay, row SR-04 (new)
 - **Needs:** SR-01 (built: `ReplayDriver.PrepareAsync` / `StepAsync`, `ReplaySessionRunner`, `ReplayBook`, `PaperLedger`), SR-02, the stored 1m bars
-- **Decisions:** ADR 0291 (to be written at build)
+- **Decisions:** ADR 0292 (to be written at build)
 - **Design refs:** docs/design/11-strategy-lab.md, 13-reports-and-ui.md, 09-learning-engine.md (hold-out); spec SR-01; reference UX: XDhan Simulate tab (owner's repo `hemsingh81/XDhan`, `docs/CLAUDE/simulation-environment-trade-lab-simulate.md`)
 
 ## Goal
@@ -85,4 +85,4 @@ Unit: cursor and calendar stepping, phase machine, tape slicing to the clock min
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`); migration added
-- [ ] ADR 0291 written; design docs (11, 13, roadmap) updated
+- [ ] ADR 0292 written; design docs (11, 13, roadmap) updated
