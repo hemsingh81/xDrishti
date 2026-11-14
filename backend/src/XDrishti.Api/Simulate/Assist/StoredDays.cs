@@ -21,6 +21,23 @@ internal sealed class StoredDays(
 
     public async ValueTask<StoredDay> GetAsync(string symbol, DateOnly date, CancellationToken cancellationToken)
     {
+        var (tick, fallback, read) = await ReadAsync(symbol, date, date, cancellationToken);
+        return new StoredDay(tick, read, fallback);
+    }
+
+    public async ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        var (tick, _, read) = await ReadAsync(symbol, from, to, cancellationToken);
+        var sessions = read
+            .GroupBy(b => DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(b.EpochSeconds).ToOffset(India).DateTime))
+            .OrderBy(g => g.Key)
+            .Select(g => new ReaderSession(g.Key, [.. g]))
+            .ToList();
+        return new StoredRange(tick, sessions);
+    }
+
+    private async Task<(decimal Tick, bool Fallback, IReadOnlyList<ReaderBar> Bars)> ReadAsync(string symbol, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
+    {
         if (!_known.TryGetValue(symbol, out var known))
         {
             known = await FindAsync(symbol, cancellationToken);
@@ -29,14 +46,14 @@ internal sealed class StoredDays(
 
         if (known is not { } instrument)
         {
-            return new StoredDay(TickSpec.FallbackSize, [], true);
+            return (TickSpec.FallbackSize, true, []);
         }
 
         // The database accepts only offset 0, so the India-time bounds are passed as UTC.
-        var from = new DateTimeOffset(date.ToDateTime(new TimeOnly(9, 0)), India).ToUniversalTime();
-        var to = new DateTimeOffset(date.ToDateTime(new TimeOnly(15, 45)), India).ToUniversalTime();
+        var from = new DateTimeOffset(fromDate.ToDateTime(new TimeOnly(9, 0)), India).ToUniversalTime();
+        var to = new DateTimeOffset(toDate.ToDateTime(new TimeOnly(15, 45)), India).ToUniversalTime();
         var stored = await XDrishti.Application.Market.History.SeamAwareBars.ReadAsync(bars, seams, instrument.Id, from, to, cancellationToken);
-        return new StoredDay(instrument.Tick, [.. stored.Select(b => new ReaderBar(b.EpochSeconds, (decimal)Math.Round(b.Open, 4), (decimal)Math.Round(b.High, 4), (decimal)Math.Round(b.Low, 4), (decimal)Math.Round(b.Close, 4), b.Volume))], instrument.Fallback);
+        return (instrument.Tick, instrument.Fallback, [.. stored.Select(b => new ReaderBar(b.EpochSeconds, (decimal)Math.Round(b.Open, 4), (decimal)Math.Round(b.High, 4), (decimal)Math.Round(b.Low, 4), (decimal)Math.Round(b.Close, 4), b.Volume))]);
     }
 
     private async Task<(Guid, decimal, bool)?> FindAsync(string symbol, CancellationToken cancellationToken)

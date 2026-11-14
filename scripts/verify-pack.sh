@@ -7,7 +7,7 @@
 #   scripts/verify-pack.sh --assist data/exports/verify/<pack-id> [--second-source-folder <dir>]   # an automatic second read of the pack (P3-09c): NOT a signed check; writes assist-*.csv/html next to the pack and never touches check-log.csv
 #     Without --second-source-folder the second source is Dhan's charts/intraday (the Data account's token from the vault; about one request per distinct symbol and day, throttled). Folder files: <TICKER>_<yyyy-MM-dd>.csv with time,open,high,low,close[,volume].
 #   scripts/verify-pack.sh --gate data/exports/verify/<pack-id> [--second-source-folder <dir>]   # the automated gate (P3-09d, ADR 0048): the assisted read, then fixed rules; writes gate-decision.json and .md; never touches check-log.csv
-#     Exit: 0 PASS or PASS_WITH_DATA_FINDINGS (the P3 exit), 10 RERUN_NEEDED, 11 DATA_REPAIR_NEEDED, 12 BLOCKED_DEFECT, 2 unusable input. Same second-source and secret rules as --assist.
+#     Exit: 0 PASS or PASS_WITH_DATA_FINDINGS (the P3 exit), 10 RERUN_NEEDED, 11 DATA_REPAIR_NEEDED, 12 BLOCKED_DEFECT, 2 unusable input or a strategy without an independent reader (readers: ORB, VWAP_PULLBACK, BASE_BREAKOUT; ADR 0291). Same second-source and secret rules as --assist.
 # The SEED IS YOURS: write it down before the first draw (letters, digits, '.', '_' and '-', at most 40); it has no default. Use the next name (p3-check-2, ...) after any fix.
 # The cost choice is required: --gross (no charges, labelled 'costs: none') or --costs <sheet-id> [--capital N] [--profile standard|conservative] [--max-cost-r X].
 # Exit codes: 0 done (check: complete), 1 refused or incomplete (nothing written), 2 wrong command line, configuration or unreadable input, 3 failure, 130 cancelled.

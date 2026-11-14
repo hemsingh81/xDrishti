@@ -21,6 +21,16 @@ internal sealed record AssistDetails(string PackId, string Seed, IReadOnlyList<R
 internal static class AssistRunner
 {
     private const string Orb = "ORB";
+    private const string VwapPullback = "VWAP_PULLBACK";
+    private const string BaseBreakout = "BASE_BREAKOUT";
+
+    /// <summary>The strategies the gate has an independent reader for (ADR 0048 amended, ADR 0291). Any other strategy is refused before a bar is read.</summary>
+    internal static readonly IReadOnlyList<string> SupportedStrategies = [Orb, VwapPullback, BaseBreakout];
+
+    /// <summary>How far back the history of the VWAP_PULLBACK and BASE_BREAKOUT readers goes, in calendar days (about 90 sessions: the 50-session averages and the weekly average converge), and how far forward the hold of a swing trade can reach.</summary>
+    private const int HistoryDays = 130;
+
+    private const int HoldDays = 14;
 
     public static async Task<AssistOutcome> RunAsync(IPackFolder folder, ISecondSource source, IStoredDays stored, CancellationToken cancellationToken)
     {
@@ -32,6 +42,11 @@ internal static class AssistRunner
         if (pack is null)
         {
             return Refused("pack.json is missing or is not the pack.json of a verification pack");
+        }
+
+        if (pack.Rows.Select(r => r.Strategy).Distinct(StringComparer.Ordinal).Where(n => !SupportedStrategies.Contains(n, StringComparer.Ordinal)).Order(StringComparer.Ordinal).ToList() is { Count: > 0 } unsupported)
+        {
+            return Refused("unsupported strategy: the gate has no independent reader for " + string.Join(", ", unsupported) + " (it reads " + string.Join(", ", SupportedStrategies) + "); write the reader first, nothing was read or written");
         }
 
         // the cache is never invalidated: a day already in it is used whatever source this run names (move the file away to fetch again)
@@ -116,19 +131,14 @@ internal static class AssistRunner
         }
 
         label = "auto:" + second.Source;
-        if (!string.Equals(row.Strategy, Orb, StringComparison.Ordinal))
-        {
-            return new AssistRow(row, null, label, null, storedDay.Tick, []);
-        }
-
-        var strategy = ReaderStrategy.OrbV1(storedDay.Tick) with { OrMinutes = row.OrMinutes, RewardRisk = row.RewardRisk };
+        var (read, opening, evaluation) = await ReaderFor(row, storedDay.Tick, stored, cancellationToken);
 
         // the same reader on the stored bars (the data the engine used): a difference there is about the rules, not the data
         ReaderReading? storedReading = null;
         string? storedNote = null;
         try
         {
-            storedReading = ChartReader.Read(storedDay.Bars, strategy, row.Side);
+            storedReading = read(storedDay.Bars);
         }
         catch (ArgumentException)
         {
@@ -141,7 +151,7 @@ internal static class AssistRunner
         string? secondNote = null;
         try
         {
-            reading = ChartReader.Read(second.Bars, strategy, row.Side);
+            reading = read(second.Bars);
         }
         catch (ArgumentException)
         {
@@ -149,15 +159,15 @@ internal static class AssistRunner
         }
 
         var open = new DateTimeOffset(row.Date.ToDateTime(new TimeOnly(9, 15)), TimeSpan.FromMinutes(330)).ToUnixTimeSeconds();
-        var outcome = BarComparison.Analyse(storedDay.Bars, second.Bars, BarComparison.Minutes(open, strategy, reading), storedDay.Tick);
+        var outcome = BarComparison.Analyse(storedDay.Bars, second.Bars, Cited(open, opening, evaluation, row, reading), storedDay.Tick);
         if (outcome.Ratio is { } ratio)
         {
             // adjusted history against as-traded prices: the reader reads the second source at the stored price level, so that a constant offset is not mistaken for a different trade
             var scaled = second.Bars.Select(b => b with { Open = b.Open * ratio, High = b.High * ratio, Low = b.Low * ratio, Close = b.Close * ratio }).ToList();
             try
             {
-                reading = ChartReader.Read(scaled, strategy, row.Side);
-                outcome = BarComparison.Analyse(storedDay.Bars, second.Bars, BarComparison.Minutes(open, strategy, reading), storedDay.Tick);
+                reading = read(scaled);
+                outcome = BarComparison.Analyse(storedDay.Bars, second.Bars, Cited(open, opening, evaluation, row, reading), storedDay.Tick);
             }
             catch (ArgumentException)
             {
@@ -190,6 +200,37 @@ internal static class AssistRunner
         var second = row.Reading is null ? [row.SecondNote ?? "no trade on the second source"] : FieldComparison.Differences(row.Reading, values, row.Tick);
         var verdict = stored.Count > 0 ? Verdicts.ReaderDiffers : row.Bars.Any(b => b.Gross) ? Verdicts.BarsDiffer : second.Count > 0 ? Verdicts.DataSensitive : Verdicts.AgreeAll;
         return new RowVerdict(row, verdict, stored, second);
+    }
+
+    /// <summary>
+    /// The reader of one row as a function of the day's bars (the stored day or the second source's), the minutes from the open that the bar comparison cites before the trigger, and the trigger bar's length.
+    /// VWAP_PULLBACK reads the stored sessions before the day (the trend setup and the ATR need them) and BASE_BREAKOUT the stored sessions around it; the second source replaces only the row's own date, the context is always stored (ADR 0291).
+    /// </summary>
+    private static async Task<(Func<IReadOnlyList<ReaderBar>, ReaderReading?> Read, int Opening, int Evaluation)> ReaderFor(PackedTrade row, decimal tick, IStoredDays stored, CancellationToken cancellationToken)
+    {
+        var from = row.Date.AddDays(-HistoryDays);
+        switch (row.Strategy)
+        {
+            case VwapPullback:
+                var prior = (await stored.GetRangeAsync(row.Symbol, from, row.Date.AddDays(-1), cancellationToken)).Sessions;
+                var vwap = new VwapPullbackStrategy(row.Parameter("pull_atr", 0.5m), row.RewardRisk, tick);
+                return (bars => VwapPullbackReader.Read(prior, bars, vwap, row.Side), 0, 15);
+            case BaseBreakout:
+                var around = (await stored.GetRangeAsync(row.Symbol, from, row.Date.AddDays(HoldDays), cancellationToken)).Sessions;
+                var swing = new BaseBreakoutStrategy((int)row.Parameter("base_len", 20m), row.Parameter("base_pct", 8m), row.Parameter("vol_x", 1.5m), row.RewardRisk, tick);
+                return (bars => BaseBreakoutReader.Read([.. around.Where(a => a.Date != row.Date), new ReaderSession(row.Date, bars)], row.Date, swing), 0, 0);
+            default:
+                var orb = ReaderStrategy.OrbV1(tick) with { OrMinutes = row.OrMinutes, RewardRisk = row.RewardRisk };
+                return (bars => ChartReader.Read(bars, orb, row.Side), row.OrMinutes, orb.EvaluationMinutes);
+        }
+    }
+
+    /// <summary>The minutes the comparison cites for a reading. VWAP_PULLBACK: every minute from the open to the trigger bar (the VWAP depends on them). BASE_BREAKOUT: only minutes of the signal date, the one day the second source gives.</summary>
+    private static IReadOnlyCollection<long> Cited(long open, int opening, int evaluation, PackedTrade row, ReaderReading? reading)
+    {
+        var from = row.Strategy == VwapPullback && reading is not null ? Math.Max(opening, (int)((reading.TriggerBarStartEpoch - open) / 60)) : opening;
+        var minutes = BarComparison.Minutes(open, from, evaluation, reading);
+        return row.Strategy == BaseBreakout ? [.. minutes.Where(m => m >= open && m < open + (375 * 60L))] : minutes;
     }
 
     private static string Manifest(string packId, params (string Name, byte[] Bytes)[] files)
@@ -265,7 +306,9 @@ internal static class AssistRunner
                         DateOnly.ParseExact(r.GetProperty("date").GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture),
                         strategy,
                         orMin,
-                        rr));
+                        rr,
+                        parameters.EnumerateObject().Where(o => o.Value.ValueKind == JsonValueKind.String && decimal.TryParse(o.Value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                            .ToDictionary(o => o.Name, o => decimal.Parse(o.Value.GetString()!, NumberStyles.Float, CultureInfo.InvariantCulture), StringComparer.Ordinal)));
                 }
 
                 return new Pack(root.GetProperty("pack_id").GetString()!, root.GetProperty("seed").GetString()!, rows);

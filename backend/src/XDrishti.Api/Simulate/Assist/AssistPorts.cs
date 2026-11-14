@@ -11,9 +11,15 @@ internal sealed record SecondDay(IReadOnlyList<ReaderBar>? Bars, string? Unavail
     public static SecondDay Missing(string reason) => new(null, reason);
 }
 
+/// <summary>The stored sessions of one instrument over a range of dates (a session per India date that has bars, ascending), with the master tick in rupees.</summary>
+internal sealed record StoredRange(decimal Tick, IReadOnlyList<ReaderSession> Sessions);
+
 /// <summary>The stored bars (read from the database by the host; a fake in tests).</summary>
 internal interface IStoredDays
 {
+    /// <summary>The sessions from <paramref name="from"/> to <paramref name="to"/>, both included: the history the VWAP_PULLBACK and BASE_BREAKOUT readers need.</summary>
+    ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, CancellationToken cancellationToken);
+
     ValueTask<StoredDay> GetAsync(string symbol, DateOnly date, CancellationToken cancellationToken);
 }
 

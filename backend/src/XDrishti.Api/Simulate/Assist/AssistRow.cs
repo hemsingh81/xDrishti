@@ -3,7 +3,11 @@ using XDrishti.SimReader;
 namespace XDrishti.Api.Simulate.Assist;
 
 /// <summary>A trade row of <c>pack.json</c> with the strategy definition the reader needs.</summary>
-internal sealed record PackedTrade(int Seq, string TradeKey, string Symbol, ReaderSide Side, DateOnly Date, string Strategy, int OrMinutes, decimal RewardRisk);
+internal sealed record PackedTrade(int Seq, string TradeKey, string Symbol, ReaderSide Side, DateOnly Date, string Strategy, int OrMinutes, decimal RewardRisk, IReadOnlyDictionary<string, decimal>? Parameters = null)
+{
+    /// <summary>A parameter of the run as recorded in the pack, or <paramref name="fallback"/> when the pack does not name it.</summary>
+    public decimal Parameter(string name, decimal fallback) => Parameters is not null && Parameters.TryGetValue(name, out var value) ? value : fallback;
+}
 
 /// <summary>
 /// What the machine read for one row before the engine's value was seen: <see cref="Unavailable"/> is the reason the second source had no day, otherwise <see cref="Reading"/> is the reader's trade on the SECOND-source bars (null: no trade found)

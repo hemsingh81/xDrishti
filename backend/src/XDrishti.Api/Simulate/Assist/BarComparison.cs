@@ -167,17 +167,20 @@ internal static class BarComparison
     }
 
     /// <summary>The minutes that matter for a reading: the opening range, the trigger bar, the entry and the exit minute, each with the minute before and after.</summary>
-    public static IReadOnlyCollection<long> Minutes(long dayOpenEpoch, ReaderStrategy strategy, ReaderReading? reading)
+    public static IReadOnlyCollection<long> Minutes(long dayOpenEpoch, ReaderStrategy strategy, ReaderReading? reading) => Minutes(dayOpenEpoch, strategy.OrMinutes, strategy.EvaluationMinutes, reading);
+
+    /// <summary>The same for any strategy: <paramref name="openingMinutes"/> minutes from the open, then the trigger bar of <paramref name="evaluationMinutes"/>, the entry and the exit.</summary>
+    public static IReadOnlyCollection<long> Minutes(long dayOpenEpoch, int openingMinutes, int evaluationMinutes, ReaderReading? reading)
     {
         var epochs = new SortedSet<long>();
-        for (var i = 0; i < strategy.OrMinutes; i++)
+        for (var i = 0; i < openingMinutes; i++)
         {
             epochs.Add(dayOpenEpoch + (i * 60L));
         }
 
         if (reading is not null)
         {
-            for (var i = -1; i <= strategy.EvaluationMinutes; i++)
+            for (var i = -1; i <= evaluationMinutes; i++)
             {
                 epochs.Add(reading.TriggerBarStartEpoch + (i * 60L));
             }
