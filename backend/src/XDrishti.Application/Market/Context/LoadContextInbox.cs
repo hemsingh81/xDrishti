@@ -103,6 +103,7 @@ internal sealed class LoadContextInboxHandler(
             verdicts.Add((name, held > 0 ? null : accepted > 0));
         }
 
+        // shortcut: a conflict is detected between the files of one run only; a day already stored (from an earlier run, from the bars or from an earlier CSV) is not compared with the CSV value, first write wins (ADR 0290).
         var stored = (await store.ListDatesAsync(cancellationToken)).ToHashSet();
         var fresh = index.Values.Where(r => !stored.Contains(r.Date)).OrderBy(r => r.Date)
             .Select(r => new ContextDayRecord(r.Date, r.High!.Value, r.Low!.Value, r.Close, null, 1, null)).ToList();

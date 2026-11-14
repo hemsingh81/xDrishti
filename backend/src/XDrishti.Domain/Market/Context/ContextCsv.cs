@@ -39,14 +39,21 @@ public static partial class ContextCsv
         }
 
         var indexName = header.IndexOf("indexname");
-        var vixShaped = header.Contains("prevclose") || header.Contains("change") || (fileName?.Contains("vix", StringComparison.OrdinalIgnoreCase) ?? false);
+        var nameSaysVix = fileName?.Contains("vix", StringComparison.OrdinalIgnoreCase) ?? false;
+        var vixShaped = header.Contains("prevclose") || header.Contains("change") || nameSaysVix;
         var kind = vixShaped ? ContextCsvKind.Vix : ContextCsvKind.Index;
+
+        // A VIX-shaped file (an equity export has the same columns) is taken only when its Index Name column (checked row by row) or its file name says VIX.
+        if (kind == ContextCsvKind.Vix && indexName < 0 && !nameSaysVix)
+        {
+            return Failed(kind, ContextCsvCodes.UnknownIndex);
+        }
         if (kind == ContextCsvKind.Index && (high < 0 || low < 0))
         {
             return Failed(kind, ContextCsvCodes.MissingColumn);
         }
 
-        // A file with no Index Name column must say NIFTY 50 in its name: the table cannot be corrected once written, so another index is never taken on trust.
+        // A file with no Index Name column must be named for NIFTY 50 itself (not NIFTY 500, NIFTY 50 Equal Weight or NIFTY50 Value 20): the table cannot be corrected once written, so another index is never taken on trust.
         if (kind == ContextCsvKind.Index && indexName < 0 && !(fileName is not null && Nifty50Name().IsMatch(fileName)))
         {
             return Failed(kind, ContextCsvCodes.UnknownIndex);
@@ -118,7 +125,7 @@ public static partial class ContextCsv
         return new ContextCsvParsed(kind, rows, rejects, rows.Count == 0 && rejects.Count == 0 ? ContextCsvCodes.Empty : null);
     }
 
-    [GeneratedRegex(@"nifty[ _-]?50", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^nifty[ _-]?50(?=[_.\-]|$)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex Nifty50Name();
 
     [GeneratedRegex(@"^\d{1,4}[-/]\d{1,2}[-/]\d{1,4}$", RegexOptions.CultureInvariant)]

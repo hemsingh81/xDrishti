@@ -84,6 +84,7 @@ internal sealed class ContextDayStore(NpgsqlDataSource dataSource, TimeProvider 
         var inserted = 0;
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        // shortcut: one INSERT per row in one transaction (a CSV history is about 4,000 rows at most, loaded once); a batch or COPY is not worth it here.
         foreach (var record in records)
         {
             await using var command = new NpgsqlCommand(

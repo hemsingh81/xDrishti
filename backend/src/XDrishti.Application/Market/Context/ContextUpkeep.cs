@@ -89,7 +89,7 @@ internal sealed class ContextUpkeep(
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            ContextLog.UpkeepCrashed(logger, ex);
+            ContextLog.InboxStepFailed(logger, ex);
             await reporter.WarnAsync(InboxCrashed, cancellationToken);
         }
     }

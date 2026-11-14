@@ -33,7 +33,7 @@ internal sealed record ContextOptions(ContextAction Action, DateOnly? From = nul
         ArgumentNullException.ThrowIfNull(args);
         if (args.Count == 0)
         {
-            return (null, ["name an action: refresh, coverage or rebuild-breadth"]);
+            return (null, ["name an action: refresh, import, coverage or rebuild-breadth"]);
         }
 
         if (args[0] == "rebuild-breadth")
@@ -51,7 +51,7 @@ internal sealed record ContextOptions(ContextAction Action, DateOnly? From = nul
             "refresh" => (new ContextOptions(ContextAction.Refresh), []),
             "import" => (new ContextOptions(ContextAction.Import), []),
             "coverage" => (new ContextOptions(ContextAction.Coverage), []),
-            _ => (null, ["unknown action: use refresh, coverage or rebuild-breadth"]),
+            _ => (null, ["unknown action: use refresh, import, coverage or rebuild-breadth"]),
         };
     }
 

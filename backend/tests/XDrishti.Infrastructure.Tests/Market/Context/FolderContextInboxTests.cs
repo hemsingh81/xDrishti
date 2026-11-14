@@ -56,4 +56,40 @@ public sealed class FolderContextInboxTests : IDisposable
         File.Exists(Path.Combine(_folder, "failed", "20260309T100000_b.csv")).ShouldBeTrue();
         (await Inbox().ListAsync(Ct)).ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task A_symlinked_csv_is_skipped_and_a_symlinked_folder_is_not_read()
+    {
+        var outside = Path.Combine(Path.GetTempPath(), "xd-ctx-out-" + Guid.NewGuid().ToString("N") + ".csv");
+        await File.WriteAllTextAsync(outside, "x", Ct);
+        await File.WriteAllTextAsync(Path.Combine(_folder, "real.csv"), "x", Ct);
+        File.CreateSymbolicLink(Path.Combine(_folder, "link.csv"), outside);
+        var linkedFolder = Path.Combine(Path.GetTempPath(), "xd-ctx-lnk-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateSymbolicLink(linkedFolder, _folder);
+
+        try
+        {
+            (await Inbox().ListAsync(Ct)).ShouldBe(["real.csv"]);
+            (await Inbox(linkedFolder).ListAsync(Ct)).ShouldBeEmpty();
+        }
+        finally
+        {
+            File.Delete(outside);
+            Directory.Delete(linkedFolder);
+        }
+    }
+
+    [Fact]
+    public async Task A_move_onto_an_existing_name_gets_a_counter_and_never_fails_silently()
+    {
+        Directory.CreateDirectory(Path.Combine(_folder, "done"));
+        await File.WriteAllTextAsync(Path.Combine(_folder, "done", "20260309T100000_a.csv"), "old", Ct);
+        await File.WriteAllTextAsync(Path.Combine(_folder, "a.csv"), "new", Ct);
+
+        await Inbox().MoveAsync("a.csv", processed: true, Ct);
+
+        (await File.ReadAllTextAsync(Path.Combine(_folder, "done", "20260309T100000_1_a.csv"), Ct)).ShouldBe("new");
+        (await File.ReadAllTextAsync(Path.Combine(_folder, "done", "20260309T100000_a.csv"), Ct)).ShouldBe("old");
+        (await Inbox().ListAsync(Ct)).ShouldBeEmpty();
+    }
 }

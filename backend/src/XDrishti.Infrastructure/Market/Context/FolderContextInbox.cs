@@ -26,8 +26,9 @@ internal sealed class FolderContextInbox(IOptions<DataOptions> options, TimeProv
         try
         {
             var folder = new DirectoryInfo(Folder);
-            if (!folder.Exists)
+            if (!folder.Exists || folder.LinkTarget is not null || folder.Attributes.HasFlag(FileAttributes.ReparsePoint))
             {
+                // Missing, or a link or reparse point (the folder could point anywhere): nothing is read.
                 return ValueTask.FromResult<IReadOnlyList<string>>([]);
             }
 
@@ -75,6 +76,11 @@ internal sealed class FolderContextInbox(IOptions<DataOptions> options, TimeProv
         {
             var target = Directory.CreateDirectory(Path.Combine(Folder, processed ? "done" : "failed"));
             var destination = Path.Combine(target.FullName, stamp + "_" + name);
+            for (var n = 1; File.Exists(destination); n++)
+            {
+                destination = Path.Combine(target.FullName, stamp + "_" + n.ToString(CultureInfo.InvariantCulture) + "_" + name);
+            }
+
             File.Move(PathOf(name), destination, overwrite: false);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

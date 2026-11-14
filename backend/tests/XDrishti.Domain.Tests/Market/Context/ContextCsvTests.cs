@@ -33,7 +33,7 @@ public sealed class ContextCsvTests
     [Fact]
     public void An_india_vix_export_with_trailing_spaces_in_headers_reads_as_vix_by_its_header()
     {
-        var parsed = ContextCsv.Parse(Vix, "hist.csv");
+        var parsed = ContextCsv.Parse(Vix, "india_vix_hist.csv");
 
         parsed.Kind.ShouldBe(ContextCsvKind.Vix);
         parsed.Rejects.ShouldBeEmpty();
@@ -95,7 +95,7 @@ public sealed class ContextCsvTests
     [Fact]
     public void An_implausible_vix_is_refused()
     {
-        var parsed = ContextCsv.Parse("Date,Open,High,Low,Close,Prev. Close,Change,% Change\n07-Nov-2025,1,2,1,500,1,1,1\n", null);
+        var parsed = ContextCsv.Parse("Date,Open,High,Low,Close,Prev. Close,Change,% Change\n07-Nov-2025,1,2,1,500,1,1,1\n", "india_vix.csv");
 
         parsed.Rows.ShouldBeEmpty();
         parsed.Rejects.Single().Code.ShouldBe(ContextCsvCodes.BadRange);
@@ -113,6 +113,9 @@ public sealed class ContextCsvTests
 
     [Theory]
     [InlineData("NIFTY BANK_Historical.csv")]
+    [InlineData("NIFTY 500_Historical_PR.csv")]
+    [InlineData("NIFTY 50 Equal Weight_Historical.csv")]
+    [InlineData("NIFTY50 Value 20.csv")]
     [InlineData(null)]
     public void An_index_file_without_an_index_name_column_must_say_nifty_50_in_its_file_name(string? fileName)
     {
@@ -138,6 +141,16 @@ public sealed class ContextCsvTests
         var parsed = ContextCsv.Parse("Date,Open,High,Low,Close\n07-11-2025,1,110,90,100\n11-13-2025,1,110,90,100\n", "nifty50.csv");
 
         parsed.FileReject.ShouldBe(ContextCsvCodes.MixedDates);
+        parsed.Rows.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_vix_shaped_file_with_a_neutral_name_and_no_index_name_is_refused()
+    {
+        // An equity export has the same Prev. Close / Change columns.
+        var parsed = ContextCsv.Parse("Date,Open,High,Low,Close,Prev. Close,Change,% Change\n07-Nov-2025,1,2,1,1.5,1,0.5,50\n", "RELIANCE_history.csv");
+
+        parsed.FileReject.ShouldBe(ContextCsvCodes.UnknownIndex);
         parsed.Rows.ShouldBeEmpty();
     }
 }

@@ -120,8 +120,8 @@ public sealed class LoadContextInboxHandlerTests
     {
         var inbox = new FakeInbox(new()
         {
-            ["a_nifty50.csv"] = "Date,Open,High,Low,Close\n02-Mar-2026,1,110,90,100\n",
-            ["b_nifty50.csv"] = "Date,Open,High,Low,Close\n02-Mar-2026,1,120,90,105\n",
+            ["nifty50_a.csv"] = "Date,Open,High,Low,Close\n02-Mar-2026,1,110,90,100\n",
+            ["nifty50_b.csv"] = "Date,Open,High,Low,Close\n02-Mar-2026,1,120,90,105\n",
         });
 
         var done = (await Handler(inbox).HandleAsync(new LoadContextInboxCommand(), Ct)).Value;
