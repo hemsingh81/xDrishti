@@ -3,7 +3,7 @@ namespace XDrishti.Indicators.Tests;
 /// <summary>
 /// <see cref="IndicatorInfo.RequiresExpiryDays"/> (P3-02, item 0): the catalog says which names need expiry dates, so that the rules language does
 /// not have to know. The one name that reads the expiry dates is written out here, independently of the catalog's own code, and pinned for all names; the frame must agree
-/// with the flags for every name. The market-context names were dropped (ADR 0291).
+/// with the flags for every name. The market-context names were dropped (ADR 0292).
 /// </summary>
 public sealed class IndicatorInfoRequirementsTests
 {

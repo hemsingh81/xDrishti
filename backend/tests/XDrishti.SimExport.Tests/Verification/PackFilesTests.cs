@@ -59,6 +59,19 @@ public sealed partial class PackFilesTests
     }
 
     [Fact]
+    public void The_pack_json_names_the_seam_only_of_an_instrument_whose_pre_seam_bars_the_run_admitted()
+    {
+        var (run, _, plan) = Standard();
+        var admitted = run with { Instruments = [.. run.Instruments.Select(i => i with { PreSeam = new PreSeamRecord(new DateOnly(2024, 4, 2), new string('b', 64)) })] };
+
+        using var plain = JsonDocument.Parse(Json(plan, new PackRun(run, RunLabels.Of(run, FillRules.Default))));
+        using var seamed = JsonDocument.Parse(Json(plan, new PackRun(admitted, RunLabels.Of(admitted, FillRules.Default))));
+
+        plain.RootElement.GetProperty("instruments").EnumerateArray().Select(i => i.TryGetProperty("pre_seam", out var seam) ? seam.GetString() : null).ShouldAllBe(v => v == null);
+        seamed.RootElement.GetProperty("instruments").EnumerateArray().ShouldAllBe(i => i.GetProperty("pre_seam").GetString() == "2024-04-02");
+    }
+
+    [Fact]
     public void The_pack_json_says_when_the_session_notes_of_an_instrument_were_cut_so_a_kind_of_spot_check_may_be_unseen()
     {
         var (run, _, plan) = Standard();

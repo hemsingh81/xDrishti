@@ -12,7 +12,7 @@ namespace XDrishti.Simulation.Scanning;
 /// decision instant. The loop stops at the last decision of the timeframe, so a bar after it is never touched: no feature can see the future by construction (and a property test cuts the bars to prove it). Pure calculation: no I/O, no clock.
 /// <para>
 /// The bars are every stored bar of the instrument from its first one, adjusted with the applied corporate actions as the replay does; sessions the replay left out (a halt, a discontinuity) are fed here, so a warm-up can differ slightly from what the scanner saw
-/// (stated limit). The eight market-context slots of catalog tf-1 (<c>index_trend</c> to <c>regime</c>) are retired: always NaN (ADR 0291).
+/// (stated limit). The eight market-context slots of catalog tf-1 (<c>index_trend</c> to <c>regime</c>) are retired: always NaN (ADR 0292).
 /// </para>
 /// </summary>
 public static class TradeFeatureExtractor
@@ -75,7 +75,7 @@ public static class TradeFeatureExtractor
             H("rsi", Period), H("atr", Period), H("adx", Period), H("plus_di", Period), H("minus_di", Period), H("ema", 20), H("ema", 50), H("macd_hist", 12, 26, 9), H("bb_width", 20, 2), H("bb_upper", 20, 2), H("bb_lower", 20, 2),
             H("roc", 10), H("rel_volume", 20), H("vwap"), H("highest", 20), H("lowest", 20), H("supertrend_dir", 10, 3), H("gap_pct"), H("prev_day_close"), H("today_low"), H("today_high"), H("prev_day_high"), H("prev_day_low"), H("today_open"),
         };
-        // the eight slots of the market context in catalog tf-1 are retired (ADR 0291): the layout stays so that stored rows and models keep their meaning, and they are always unknown
+        // the eight slots of the market context in catalog tf-1 are retired (ADR 0292): the layout stays so that stored rows and models keep their meaning, and they are always unknown
         var date = new[] { H("is_expiry_day", frameTf: Timeframe.M1, needsExpiry: true), -1, -1, -1, -1, -1, -1, -1, -1 };
 
         // Shortcut: each timeframe re-walks every stored bar of the instrument with its own frame (time and memory grow with timeframes x bars); fine for one instrument at a time, share one pass if it shows in a profile.

@@ -3,7 +3,7 @@ using System.Reflection;
 namespace XDrishti.Architecture.Tests;
 
 /// <summary>
-/// ADR 0291: the NIFTY 50 / INDIA VIX market context (P3-01c context part, P3-01d, P3-lift, the CSV inbox of ADR 0290) is dropped. No assembly names one of its types, and the shared breadth kernel of the baskets is all that is left in the
+/// ADR 0292: the NIFTY 50 / INDIA VIX market context (P3-01c context part, P3-01d, P3-lift, the CSV inbox of ADR 0290) is dropped. No assembly names one of its types, and the shared breadth kernel of the baskets is all that is left in the
 /// Domain <c>Market.Context</c> namespace.
 /// </summary>
 public sealed class ContextDroppedArchitectureTests

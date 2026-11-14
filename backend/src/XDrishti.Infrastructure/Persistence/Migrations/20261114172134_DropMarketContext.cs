@@ -11,7 +11,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // ADR 0291: the NIFTY 50 / INDIA VIX market context is dropped (the table never held a row), with the VIX side table of the CSV inbox.
+            // ADR 0292: the NIFTY 50 / INDIA VIX market context is dropped (the table never held a row), with the VIX side table of the CSV inbox.
             migrationBuilder.DropTable(
                 name: "context_daily",
                 schema: "market");
@@ -24,7 +24,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            // Recreates the two empty tables in their last shape (AddContextDaily + AddContextBreadth, AddContextVixCsv) with their grants, so the migration chain stays reversible (the earlier migrations' Down steps drop these tables). The rows are not restored: there were none (ADR 0291).
+            // Recreates the two empty tables in their last shape (AddContextDaily + AddContextBreadth, AddContextVixCsv) with their grants, so the migration chain stays reversible (the earlier migrations' Down steps drop these tables). The rows are not restored: there were none (ADR 0292).
             migrationBuilder.CreateTable(
                 name: "context_daily",
                 schema: "market",

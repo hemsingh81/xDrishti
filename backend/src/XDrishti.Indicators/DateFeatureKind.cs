@@ -1,6 +1,6 @@
 namespace XDrishti.Indicators;
 
-/// <summary>Which date-driven feature a <see cref="DateFeature"/> reports (P3-01c): the calendar features, which need no data but the date of the step, the results-event features and the relative-strength features. The NIFTY 50 / INDIA VIX context features were dropped (ADR 0291).</summary>
+/// <summary>Which date-driven feature a <see cref="DateFeature"/> reports (P3-01c): the calendar features, which need no data but the date of the step, the results-event features and the relative-strength features. The NIFTY 50 / INDIA VIX context features were dropped (ADR 0292).</summary>
 public enum DateFeatureKind
 {
     /// <summary>The ISO weekday of the India date of the step: Monday 1 … Sunday 7.</summary>

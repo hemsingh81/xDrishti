@@ -7,7 +7,7 @@ using XDrishti.Infrastructure.Persistence;
 
 namespace XDrishti.Api.IntegrationTests.Research;
 
-/// <summary>ADR 0291: after all migrations the NIFTY 50 / INDIA VIX context tables are gone, while the basket context and relative-strength tables stay.</summary>
+/// <summary>ADR 0292: after all migrations the NIFTY 50 / INDIA VIX context tables are gone, while the basket context and relative-strength tables stay.</summary>
 [Collection(ApiTestSuite.Name)]
 public sealed class DropMarketContextMigrationTests(ApiFactory factory)
 {

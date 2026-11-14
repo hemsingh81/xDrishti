@@ -118,7 +118,7 @@ internal sealed class StoredPlanContextSource(
 
     /// <summary>
     /// The market gate input (BK-08, criterion 9): only when the owner chose a basket as the gate's breadth source, the breadth of the basket's newest stored row before the planned day. A missing, stale or insufficient row is no breadth (unavailable, never a pass) and never the tracked set's figure.
-    /// The note names the basket, either way. With no basket chosen, or no store, there is no gate (the NIFTY 50 / INDIA VIX context that fed the VIX and the tracked-set breadth was dropped, ADR 0291). The VIX and events figures have no source and stay unknown.
+    /// The note names the basket, either way. With no basket chosen, or no store, there is no gate (the NIFTY 50 / INDIA VIX context that fed the VIX and the tracked-set breadth was dropped, ADR 0292). The VIX and events figures have no source and stay unknown.
     /// </summary>
     private async ValueTask<(MarketGateInput? Gate, string? Note)> GateAsync(DateOnly forDate, CancellationToken cancellationToken)
     {

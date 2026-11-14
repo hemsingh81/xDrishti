@@ -12,6 +12,9 @@ namespace XDrishti.Api.Simulate.Gate;
 /// </summary>
 internal static class GateRules
 {
+    /// <summary>The lead of a rerun row that is a hand check, not a missing second source.</summary>
+    internal const string HandCheck = "not machine-checkable: hand check needed: ";
+
     public static GateDecision Decide(IReadOnlyList<RowVerdict> verdicts, IReadOnlyList<SpotResult> spots, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> engine, IReadOnlyList<string>? integrity = null)
     {
         ArgumentNullException.ThrowIfNull(verdicts);
@@ -37,7 +40,23 @@ internal static class GateRules
                 continue;
             }
 
-            if (v.Verdict == Verdicts.CannotRead || v.Fields.Count > 0)
+            var parts = new List<string>();
+            if (row.HistoryCaveat is not null)
+            {
+                // the multi-session reader used raw history that may differ from the engine's, so a difference cannot be judged by the machine (ADR 0291). Agreeing: a data finding. Differing, or no trade read: a row for a hand check
+                // (RERUN_NEEDED, exit 10), never a pass and never BLOCKED_DEFECT (ADR 0048)
+                var agrees = v.Verdict != Verdicts.CannotRead && v.Fields.Count == 0;
+                var text = "history not machine-checkable: " + row.HistoryCaveat + "; reader on the stored bars " + (v.Verdict == Verdicts.CannotRead ? "read no trade or the engine row is absent" : v.Fields.Count > 0 ? "differs from the engine on " + string.Join(", ", v.Fields) : "agrees with the engine");
+                if (agrees)
+                {
+                    parts.Add(text);
+                }
+                else
+                {
+                    reruns.Add(Finding(row, HandCheck + text));
+                }
+            }
+            else if (v.Verdict == Verdicts.CannotRead || v.Fields.Count > 0)
             {
                 defects.Add(Finding(row, Repro(v, engine)));
             }
@@ -48,13 +67,12 @@ internal static class GateRules
                 repairs.Add(Finding(row, string.Join("; ", gross.Where(b => !IsHole(b)).Select(b => b.Minute + " " + b.Words))));
             }
 
-            var parts = new List<string>();
             if (gross.Any(IsHole))
             {
                 parts.Add("missing minutes: " + string.Join(", ", gross.Where(IsHole).Select(b => b.Minute + " " + b.Words + Between(row, b.Minute))));
             }
 
-            if (v.Fields.Count == 0 && v.SecondFields.Count > 0)
+            if (row.HistoryCaveat is null && v.Fields.Count == 0 && v.SecondFields.Count > 0)
             {
                 parts.Add("the reader on the second source differs from the engine on: " + string.Join(", ", v.SecondFields) + "; " + Gap(row));
             }
@@ -78,7 +96,7 @@ internal static class GateRules
             : reruns.Count > 0 ? GateStatus.RerunNeeded
             : data.Count > 0 ? GateStatus.PassWithDataFindings
             : GateStatus.Pass;
-        return new GateDecision(status, counts, defects, repairs, reruns, data, spots, Actions(status, counts, repairs));
+        return new GateDecision(status, counts, defects, repairs, reruns, data, spots, Actions(status, counts, repairs, reruns));
     }
 
     /// <summary>A minute missing on a side: a hole in the data, a data finding and not evidence against the engine (ADR 0048).</summary>
@@ -127,7 +145,7 @@ internal static class GateRules
         return head + (v.Fields.Count > 0 ? "differs on " + string.Join(", ", v.Fields) + "; " : string.Empty) + readerSide + "; " + engineSide;
     }
 
-    private static List<string> Actions(GateStatus status, GateCounts counts, IReadOnlyList<GateFinding> repairs)
+    private static List<string> Actions(GateStatus status, GateCounts counts, IReadOnlyList<GateFinding> repairs, List<GateFinding> reruns)
     {
         var days = string.Join(", ", repairs.Select(r => r.Symbol + " " + r.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
         List<string> actions = status switch
@@ -144,11 +162,7 @@ internal static class GateRules
                 "Where the gap is in the second source and not in the stored bars, move second-source-bars.csv away (or fix the folder file) so that the day is fetched again.",
                 "Re-run the gate: scripts/verify-pack.sh --gate <pack-folder>. A change of the stored bars changes the trades, so if the engine's trades change, draw a new pack.",
             ],
-            GateStatus.RerunNeeded =>
-            [
-                "Reconnect the second source (the Dhan token in the vault, or the network) or put the missing files in the second-source folder (<TICKER>_<yyyy-MM-dd>.csv); the rows and reasons are listed.",
-                "Re-run the gate: scripts/verify-pack.sh --gate <pack-folder> [--second-source-folder <dir>]. The days already fetched are kept in second-source-bars.csv.",
-            ],
+            GateStatus.RerunNeeded => RerunActions(reruns),
             GateStatus.PassWithDataFindings =>
             [
                 "Record each data finding as an open data-quality finding (the rows, fields and missing minutes are listed); they are not P3 blockers. A hole inside the backfill lookback can be closed with the gap backfill; a hole older than the lookback cannot be reached by it and stays open for a later repair command (the stored history is not edited for the gate).",
@@ -172,6 +186,25 @@ internal static class GateRules
             AddCount(open, counts.Reruns, "rerun rows");
             AddCount(open, counts.DataFindings, "data findings");
             actions.Add("Counts are independent, none is masked by the status: " + string.Join(", ", open.DefaultIfEmpty("none")) + ".");
+        }
+
+        return actions;
+    }
+
+    /// <summary>The next actions of RERUN_NEEDED: those of the rows that need a hand check and those of the rows with no second source, both when both kinds are listed.</summary>
+    private static List<string> RerunActions(List<GateFinding> reruns)
+    {
+        var actions = new List<string>();
+        if (reruns.Any(r => r.Detail.StartsWith(HandCheck, StringComparison.Ordinal)))
+        {
+            actions.Add("Hand check needed: each row marked so used raw stored history that a corporate action or the backfill seam may make different from the engine's, so the machine cannot say whether the engine or the reader is right. Compare the engine's trade with the adjusted history or a chart by hand; this is neither an engine defect nor a pass.");
+            actions.Add("Record the outcome of the hand check next to the pack; the gate does not pass these rows by itself. Any change of the engine or of the data voids the pack.");
+        }
+
+        if (reruns.Any(r => !r.Detail.StartsWith(HandCheck, StringComparison.Ordinal)))
+        {
+            actions.Add("Reconnect the second source (the Dhan token in the vault, or the network) or put the missing files in the second-source folder (<TICKER>_<yyyy-MM-dd>.csv); the rows and reasons are listed.");
+            actions.Add("Re-run the gate: scripts/verify-pack.sh --gate <pack-folder> [--second-source-folder <dir>]. The days already fetched are kept in second-source-bars.csv.");
         }
 
         return actions;

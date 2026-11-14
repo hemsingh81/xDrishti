@@ -1,4 +1,4 @@
-# 0291 — Features that wait on the owner are removed: the market context, the charge sheet and the pre-registered hold-out replay
+# 0292 — Features that wait on the owner are removed: the market context, the charge sheet and the pre-registered hold-out replay
 
 - **Status:** Accepted (owner, 2026-11-14, in chat: "Drop every owner-input feature"; Q1 both automatic, Q2 gross forever, Q3 SR-03 removed). Spec: [DROP-OWNER-INPUTS](../specs/DROP-OWNER-INPUTS-features-that-wait-on-the-owner-are-removed.md).
 - **Date:** 2026-11-14.

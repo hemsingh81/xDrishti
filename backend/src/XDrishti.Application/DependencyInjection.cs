@@ -541,7 +541,7 @@ public static class DependencyInjection
         services.AddScoped<ObservedCalendarRunner>();
         services.AddScoped<ICalendarUpkeep, CalendarUpkeep>();
 
-        // The basket upkeep after a data job (BK-08, BK-09): the gate basket's context and the relative strength. The NIFTY 50 / INDIA VIX market context was dropped (ADR 0291).
+        // The basket upkeep after a data job (BK-08, BK-09): the gate basket's context and the relative strength. The NIFTY 50 / INDIA VIX market context was dropped (ADR 0292).
         services.AddScoped<IBasketUpkeep, BasketUpkeep>();
         services.AddScoped<ICommandHandler<ComputeRelativeStrengthCommand, RelativeStrengthComputed>, ComputeRelativeStrengthHandler>(); // the relative strength of the missing sessions, insert-once, OFF by default (BK-09, ADR 0263)
         services.AddScoped<IRelativeStrengthRunSource, RelativeStrengthRunReader>(); // what a Lab run reads of the stored rows (BK-09)

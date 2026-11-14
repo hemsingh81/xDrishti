@@ -121,24 +121,26 @@ Not trades, so spot checks: a special session (the replay excludes it, so no tra
 
 One block per pack. **No price, no R value and no count of a group.** The trade keys come from `engine-values.csv` (source and categories) and the log; findings are listed with their class and the commit or ADR that closed them.
 
-| Field | Pack 1 |
-|---|---|
-| Seed (written before the draw) | `p3-check-1` |
-| Date of the draw | 2026-10-19 |
-| Pack id | `p3-check-1-ea89b084629b` |
-| Window (`--from`, `--to`), hold-out decision | 2024-04-01 to 2025-10-31; later months held out |
-| Strategies, cost choice (`--gross` or the sheet id) | ORB, `--gross`; all 214 stored symbols given, 4 skipped as `tick_size_invalid` (BOSCHLTD, PAGEIND, POWERINDIA, SHREECEM) |
-| Run key per strategy | |
-| Engine version | |
-| Data range (first and last bar) | |
-| Bar-stream hash per instrument that has a row | |
-| Trade keys with source and categories | |
-| External chart, history depth and why these rows | |
-| Rows against an external chart | |
-| Spot checks done, skipped (with reason) | |
-| Findings (id, class, trade key, closing reference) | |
-| Open model or implementation defects | |
-| Owner's statement and date | |
+| Field | Pack 1 | Pack 2 (Round B) |
+|---|---| --- |
+| Seed (written before the draw) | `p3-check-1` | `p3-roundb-1` |
+| Date of the draw | 2026-10-19 | 2026-11-14 |
+| Pack id | `p3-check-1-ea89b084629b` | `p3-roundb-1-6590ca9c0fd3` |
+| Window (`--from`, `--to`), hold-out decision | 2024-04-01 to 2025-10-31; later months held out | 2024-04-01 to 2025-10-31; later months held out |
+| Strategies, cost choice (`--gross` or the sheet id) | ORB, `--gross`; all 214 stored symbols given, 4 skipped as `tick_size_invalid` (BOSCHLTD, PAGEIND, POWERINDIA, SHREECEM) | VWAP_PULLBACK and BASE_BREAKOUT, `--gross`; the same 214 stored symbols |
+| Run key per strategy | | VWAP_PULLBACK `2902b83f9b96…`, BASE_BREAKOUT `3072887948a4…` (full keys in `pack.json`) |
+| Engine version | | |
+| Data range (first and last bar) | | |
+| Bar-stream hash per instrument that has a row | | |
+| Trade keys with source and categories | | |
+| External chart, history depth and why these rows | | |
+| Rows against an external chart | | |
+| Spot checks done, skipped (with reason) | | |
+| Findings (id, class, trade key, closing reference) | | |
+| Open model or implementation defects | | |
+| Owner's statement and date | | |
+| Automated gate (P3-09d, rules `gate-1`) | `PASS_WITH_DATA_FINDINGS` (2026-10-21) | `PASS_WITH_DATA_FINDINGS`, exit 0 (2026-11-15, after P3-09e, ADR 0291): rows 25, defects 0, data repairs 0, reruns 0, data findings 12 (all second-source differences or one stored-bar hole; the stored-bar reader agrees with the engine on every row), spots 2 confirmed / 0 contradicted / 2 not machine-checkable |
+| Gate input SHA-256 | in its `gate-decision.json` | pack.json `7284997c…`, engine-values.csv `e98fdf76…`, assist-log.csv `45375bcf…`, second-source-bars.csv `f1b3bea3…`, manifest.json `9ee8cf76…` (full hashes in `gate-decision.json`) |
 
 Seeds used so far (all of them, including abandoned ones): `p3-check-1`; `p3-roundb-1` (Round B: `VWAP_PULLBACK`, `BASE_BREAKOUT`, written 2026-11-14 before its draw by the coordinator under the owner's instruction of 2026-11-14 in chat; same window 2024-04-01 to 2025-10-31, `--gross`, the same 214 stored symbols).
 

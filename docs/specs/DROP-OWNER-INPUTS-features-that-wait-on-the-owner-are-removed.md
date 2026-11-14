@@ -2,7 +2,7 @@
 
 - **Status:** Approved (owner, 2026-11-14, in chat: "Drop every owner-input feature"; Q1 both automatic, Q2 gross forever, Q3 SR-03 removed)
 - **Phase / roadmap row:** cleanup, next to DROP-P13 (ADR 0288) and DROP-BASIS (ADR 0289)
-- **Decisions:** ADR 0291 (to be written at build)
+- **Decisions:** ADR 0292 (to be written at build)
 - **Design refs:** docs/design/05-data-and-brokers.md (market context), 08-exits-and-risk.md (costs), 09-learning-engine.md (hold-out), 11-strategy-lab.md; specs P3-01c, P3-01d, P3-lift, P3-03c, P3-03f, P8-23, SR-03, P9-09
 
 ## Goal
@@ -32,7 +32,7 @@ Strategies, cells or plans that read a removed context feature: none can have fi
 3. **Same results.** A golden run of the P3 pack and one SR-01 replay give the same result hash before and after the change (the context was never ready).
 4. **Validate.** A strategy naming a removed context feature answers 422 with the feature named; no seed strategy names one.
 5. **Costs (per Q2).** Every run, report and replay labels its cost basis; no screen or verb asks the owner to check a sheet.
-6. **Docs.** Design docs, the specs listed above and the roadmap mark the dropped parts `Dropped (ADR 0291)`; `docs/site` is not regenerated.
+6. **Docs.** Design docs, the specs listed above and the roadmap mark the dropped parts `Dropped (ADR 0292)`; `docs/site` is not regenerated.
 7. `scripts/check.sh` green; `scripts/gen-api.sh` run; Opus reviewer has no blockers.
 
 ## Test plan
@@ -47,11 +47,11 @@ Architecture tests (no context references; no charge-sheet check path per Q2), m
 
 ## Build state (2026-11-14)
 - R1 and R2 (the market context and the CSV inbox) are built and merged-ready on `feature/drop-owner-inputs`: migration `DropMarketContext`, the removal test (`DropMarketContextMigrationTests`), the architecture pin (`ContextDroppedArchitectureTests`), the validate test (`A_removed_market_context_name_is_refused_as_an_unknown_name_that_is_quoted`).
-- R3 (the charge sheet, Q2) and R4 (SR-03, Q3) are decided and **not built**: about 180 source files and their tests, two more migrations; see the build handover in the ADR 0291 thread.
+- R3 (the charge sheet, Q2) and R4 (SR-03, Q3) are decided and **not built**: about 180 source files and their tests, two more migrations; see the build handover in the ADR 0292 thread.
 - R5 (owner to-dos) is open for the Q1 items and R3/R4.
 
 ## Done when
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`); migration added
-- [ ] ADR 0291 written; design docs and roadmap updated
+- [ ] ADR 0292 written; design docs and roadmap updated

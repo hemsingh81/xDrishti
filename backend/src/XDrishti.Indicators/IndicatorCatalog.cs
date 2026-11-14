@@ -194,7 +194,7 @@ public static class IndicatorCatalog
         }
     }
 
-    /// <summary>The calendar, results-event and relative-strength features (P3-01c, P15, BK-09): names asked for on 1m only that change at most once per India date. They do not read bars: the frame refreshes them at the first accepted step of each date. The NIFTY 50 / INDIA VIX context features were dropped (ADR 0291).</summary>
+    /// <summary>The calendar, results-event and relative-strength features (P3-01c, P15, BK-09): names asked for on 1m only that change at most once per India date. They do not read bars: the frame refreshes them at the first accepted step of each date. The NIFTY 50 / INDIA VIX context features were dropped (ADR 0292).</summary>
     private static void AddDateFeatures(List<IndicatorInfo> list)
     {
         foreach (var (name, kind, text) in new[]

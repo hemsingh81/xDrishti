@@ -5,7 +5,7 @@ namespace XDrishti.Indicators.Tests;
 
 /// <summary>
 /// The indicator behind the date-driven features on its own (<see cref="DateFeature"/>, P3-01c): fed closed bars like any <see cref="IIndicator"/>, it takes a value at the first bar of each India date and
-/// holds it for the date. The NIFTY 50 / INDIA VIX context kinds were dropped (ADR 0291).
+/// holds it for the date. The NIFTY 50 / INDIA VIX context kinds were dropped (ADR 0292).
 /// </summary>
 public sealed class FrameDateFeatureTests
 {

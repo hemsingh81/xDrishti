@@ -5,7 +5,7 @@ namespace XDrishti.Indicators;
 /// <summary>
 /// One date-driven feature (P3-01c): a number that changes at most once per India date, read as an indicator so that the frame can treat it like the others. It is fed a closed 1-minute bar at a time, but only the
 /// <b>first bar of each India date</b> matters: a bar of the date it already holds changes nothing, so the value stays the same for the whole date. <see cref="FeatureFrame"/> feeds its date lane only at the first accepted
-/// step of each date, which is also when it writes the feature's history (one entry per date). The NIFTY 50 / INDIA VIX context features were dropped (ADR 0291).
+/// step of each date, which is also when it writes the feature's history (one entry per date). The NIFTY 50 / INDIA VIX context features were dropped (ADR 0292).
 /// <para>
 /// <see cref="DateFeatureKind.Weekday"/> is ready from the first bar; <see cref="DateFeatureKind.ExpiryDay"/> from the first bar once it has been given a set of dates (an empty set is a valid set: always 0). A date outside
 /// the range of <see cref="DateOnly"/> (a garbage epoch) has no expiry day and no stored number: those values are not ready, and the weekday is still computed from the day number.

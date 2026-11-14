@@ -5,7 +5,7 @@ using XDrishti.Application.Market.Strength;
 
 namespace XDrishti.Application.Market.Context;
 
-/// <summary>After a data job that aggregated, writes the context of the gate basket (BK-08) and the relative strength of the sessions that have none (BK-09). Never fails the job: whatever goes wrong is a warning of the job. The NIFTY 50 / INDIA VIX context that this step also ran was dropped (ADR 0291).</summary>
+/// <summary>After a data job that aggregated, writes the context of the gate basket (BK-08) and the relative strength of the sessions that have none (BK-09). Never fails the job: whatever goes wrong is a warning of the job. The NIFTY 50 / INDIA VIX context that this step also ran was dropped (ADR 0292).</summary>
 internal sealed class BasketUpkeep(
     ILogger<BasketUpkeep> logger,
     ICommandHandler<ComputeBasketContextCommand, BasketContextComputed>? basketContext = null,
