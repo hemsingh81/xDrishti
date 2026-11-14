@@ -3,7 +3,7 @@ using XDrishti.Domain.Common;
 namespace XDrishti.Domain.Assistant.Evaluation;
 
 /// <summary>
-/// The rules of accepting a run as the baseline (spec P9-09 AC 11, D6): only a gating run with the verdict PASS; a set whose primary pass count is lower than the current baseline's needs a stated reason. There is no auto option. Pure.
+/// The rules of accepting a run as the baseline (spec P9-09 AC 11, D6): only a gating run with the verdict PASS; a set whose primary pass count is lower than the current baseline's needs a stated reason. The auto option (ADR 0292) accepts only a run no set of which regressed. Pure.
 /// </summary>
 public static class EvalAcceptance
 {
@@ -31,6 +31,13 @@ public static class EvalAcceptance
         }
 
         return worse;
+    }
+
+    /// <summary>Whether the auto option may accept the run (ADR 0292, ADR 0282): a gating PASS on which no set got worse than the baseline's. Never a run that would need a reason.</summary>
+    public static bool AutoEligible(RunSummary run, RunSummary? baseline)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        return !run.NonGating && run.Verdict == EvalVerdict.Pass && Worse(run, baseline).Count == 0;
     }
 
     public static Result Check(RunSummary run, RunSummary? baseline, string? reason)

@@ -1177,7 +1177,9 @@ public static class DependencyInjection
         services.AddScoped<AnnouncementSetRunner>(); // set D's classifier run over the labelled rows (P15-08)
         services.AddScoped<ICommandHandler<RunEvalCommand, EvalRunView>, RunEvalHandler>(); // started by the owner's verb only: never by an endpoint, service or job
         services.AddScoped<ICommandHandler<GradeEvalAnswersCommand, EvalRunView>, GradeEvalAnswersHandler>();
-        services.AddScoped<ICommandHandler<AcceptEvalCommand, EvalRunView>, AcceptEvalHandler>(); // the baseline: the owner's verb, a gating PASS, no auto option
+        services.AddScoped<ICommandHandler<AcceptEvalCommand, EvalRunView>, AcceptEvalHandler>(); // the baseline: the owner's verb, a gating PASS
+        services.AddScoped<ICommandHandler<AutoAcceptEvalCommand, EvalAutoAcceptOutcome>, AutoAcceptEvalHandler>(); // the auto option after a run: only when no set regressed (ADR 0292)
+        services.AddScoped<ICommandHandler<SetEvalAutoAcceptCommand, EvalAutoAcceptOutcome>, SetEvalAutoAcceptHandler>();
         services.AddScoped<IQueryHandler<CompareEvalsQuery, Result<EvalComparisonView>>, CompareEvalsHandler>();
         services.AddScoped<IQueryHandler<GetEvalQuery, Result<EvalDetailView>>, GetEvalHandler>();
         services.AddScoped<IQueryHandler<ListEvalsQuery, Result<IReadOnlyList<EvalRunView>>>, ListEvalsHandler>();

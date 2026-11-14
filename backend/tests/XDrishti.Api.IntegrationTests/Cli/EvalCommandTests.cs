@@ -62,8 +62,19 @@ public sealed class EvalCommandTests
         new(RunId, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, "builtin", "main", ["data"], 3, gating, "m", new string('a', 64), "b1", new string('f', 64), status, verdict, "cli:xd", false,
             new RunSummary(verdict, !gating, [new SetSummary("data", SetOutcome.Of("data", verdict == "PASS" ? SetState.Pass : SetState.Fail, verdict == "PASS" ? [] : ["data pass 20 of 30 is below 27"]), [RateLine.Of("pass", 28, 30)], 30, 3, 0.9, null, null)], "30 cases cannot separate 27 from 24 correct"));
 
-    private sealed class Handlers(Result<EvalRunView> result) : ICommandHandler<RunEvalCommand, EvalRunView>, ICommandHandler<AcceptEvalCommand, EvalRunView>
+    private sealed class Handlers(Result<EvalRunView> result) : ICommandHandler<RunEvalCommand, EvalRunView>, ICommandHandler<AcceptEvalCommand, EvalRunView>, ICommandHandler<AutoAcceptEvalCommand, EvalAutoAcceptOutcome>, ICommandHandler<SetEvalAutoAcceptCommand, EvalAutoAcceptOutcome>
     {
+        public SetEvalAutoAcceptCommand? Switched { get; private set; }
+
+        public ValueTask<Result<EvalAutoAcceptOutcome>> HandleAsync(AutoAcceptEvalCommand command, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(Result.Success(new EvalAutoAcceptOutcome("accepted", "ai.eval.auto_accept=true (default, ADR 0292)")));
+
+        public ValueTask<Result<EvalAutoAcceptOutcome>> HandleAsync(SetEvalAutoAcceptCommand command, CancellationToken cancellationToken)
+        {
+            Switched = command;
+            return ValueTask.FromResult(Result.Success(new EvalAutoAcceptOutcome(command.On ? "on" : "off", "ai.eval.auto_accept=" + (command.On ? "true" : "false"))));
+        }
+
         public RunEvalCommand? Sent { get; private set; }
 
         public ValueTask<Result<EvalRunView>> HandleAsync(RunEvalCommand command, CancellationToken cancellationToken)
@@ -82,6 +93,8 @@ public sealed class EvalCommandTests
         var services = new ServiceCollection();
         services.AddSingleton<ICommandHandler<RunEvalCommand, EvalRunView>>(handlers);
         services.AddSingleton<ICommandHandler<AcceptEvalCommand, EvalRunView>>(handlers);
+        services.AddSingleton<ICommandHandler<AutoAcceptEvalCommand, EvalAutoAcceptOutcome>>(handlers);
+        services.AddSingleton<ICommandHandler<SetEvalAutoAcceptCommand, EvalAutoAcceptOutcome>>(handlers);
         await using var provider = services.BuildServiceProvider();
         using var output = new StringWriter();
         using var error = new StringWriter();
@@ -116,6 +129,27 @@ public sealed class EvalCommandTests
         refused.Code.ShouldBe(1);
         refused.Error.ShouldContain("eval.wrong_database");
         (await RunAsync(["run", "--bogus"], Result.Success(View("PASS", true)))).Code.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_stored_run_is_offered_to_the_auto_option_and_its_outcome_is_printed_without_changing_the_exit_code()
+    {
+        var (code, output, _, _) = await RunAsync(["run"], Result.Success(View("FAIL", true)));
+
+        code.ShouldBe(4);
+        output.ShouldContain("auto-accept: accepted (ai.eval.auto_accept=true (default, ADR 0292))");
+    }
+
+    [Theory]
+    [InlineData("on", "ai.eval.auto_accept=true")]
+    [InlineData("off", "ai.eval.auto_accept=false")]
+    public async Task The_owner_switches_the_auto_option_with_his_verb(string value, string printed)
+    {
+        var (code, output, _, _) = await RunAsync(["auto-accept", value], Result.Success(View("PASS", true)));
+
+        code.ShouldBe(0);
+        output.ShouldContain(printed);
+        (await RunAsync(["auto-accept", "maybe"], Result.Success(View("PASS", true)))).Code.ShouldBe(2);
     }
 
     [Fact]

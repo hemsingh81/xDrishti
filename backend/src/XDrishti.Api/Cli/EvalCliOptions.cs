@@ -3,7 +3,7 @@ using XDrishti.Api.Simulate;
 namespace XDrishti.Api.Cli;
 
 /// <summary>The parsed command line of <c>xd eval</c> (spec P9-09 Contract). Nothing here reads a file or the database (the answers file is read by the command).</summary>
-internal sealed record EvalCliOptions(string Verb, IReadOnlyList<string> Sets, int Repeats, string Target, string? AnswersFile, Guid? Run, Guid? Baseline, string? Reason, string Format)
+internal sealed record EvalCliOptions(string Verb, IReadOnlyList<string> Sets, int Repeats, string Target, string? AnswersFile, Guid? Run, Guid? Baseline, string? Reason, string Format, bool? AutoAccept = null)
 {
     public const string Usage = """
         usage:
@@ -15,6 +15,7 @@ internal sealed record EvalCliOptions(string Verb, IReadOnlyList<string> Sets, i
             grades the data answers of another assistant from a file ({set, case_id, repeat, answer, session_id, started_at, finished_at}); no model is called
           xd eval compare RUN [--baseline RUN]    paired comparison with the accepted baseline (or the named run): counts, discordant pairs, the exact sign-test p
           xd eval accept RUN [--reason "TEXT"]    accepts a gating PASS run as the baseline (the owner's act); a set that got worse than the current baseline needs --reason
+          xd eval auto-accept on|off              the auto option (default on, ADR 0292): after a run or a grade, a gating PASS on which no set got worse is accepted as auto:xd
           xd eval show RUN [--json|--md|--answers]  prints the report of a run (the three files of data/eval/RUN/)
           xd eval announcements sample|import|show  the announcement set D (P15-07): draw the labelling sample, import the owner's labels, show the state (xd eval announcements for its own usage)
           xd eval seed                              seeds the fixture into the database named by Eval__SeedConnection (a developer step of scripts/eval-db.sh; refuses anything but xdrishti_eval and an empty database)
@@ -27,9 +28,16 @@ internal sealed record EvalCliOptions(string Verb, IReadOnlyList<string> Sets, i
     {
         ArgumentNullException.ThrowIfNull(args);
         var errors = new List<string>();
-        if (args.Count == 0 || args[0] is not ("run" or "grade" or "compare" or "accept" or "show" or "seed"))
+        if (args.Count == 0 || args[0] is not ("run" or "grade" or "compare" or "accept" or "auto-accept" or "show" or "seed"))
         {
-            return (null, ["name a verb: run, grade, compare, accept, show or seed"]);
+            return (null, ["name a verb: run, grade, compare, accept, auto-accept, show or seed"]);
+        }
+
+        if (args[0] == "auto-accept")
+        {
+            return args.Count == 2 && args[1] is "on" or "off"
+                ? (new EvalCliOptions("auto-accept", [], 0, "builtin", null, null, null, null, "text", args[1] == "on"), errors)
+                : (null, ["auto-accept takes on or off"]);
         }
 
         var verb = args[0];

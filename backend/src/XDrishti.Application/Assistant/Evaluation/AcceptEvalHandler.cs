@@ -8,7 +8,7 @@ namespace XDrishti.Application.Assistant.Evaluation;
 
 /// <summary>
 /// The owner accepts a run as the baseline (spec P9-09 AC 11, ADR 0143). Refused unless the run is a gating PASS; a set that got worse than the current baseline needs a stated reason, which is stored. At most one baseline row per run; the newest row is the current one.
-/// There is no auto option: nothing is applied by it, and an automatic "passed" would defeat the purpose. The actor is the owner's verb, never a model or a job.
+/// The actor is the owner's verb, never a model or a job; the auto option (<see cref="AutoAcceptEvalHandler"/>, ADR 0292) accepts only a run no set of which regressed and is recorded as <c>auto:xd</c>.
 /// </summary>
 internal sealed class AcceptEvalHandler(IEvalStore store, TimeProvider time, ILogger<AcceptEvalHandler> logger) : ICommandHandler<AcceptEvalCommand, EvalRunView>
 {

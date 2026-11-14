@@ -7173,7 +7173,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("eval_baselines", "ai", t =>
                         {
-                            t.HasCheckConstraint("ck_ai_eval_baselines_actor", "accepted_by = 'cli:xd'");
+                            t.HasCheckConstraint("ck_ai_eval_baselines_actor", "accepted_by = 'cli:xd' OR (accepted_by = 'auto:xd' AND COALESCE(reason, '') LIKE 'auto: %')");
                         });
                 });
 

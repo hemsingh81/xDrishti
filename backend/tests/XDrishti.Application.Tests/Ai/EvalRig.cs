@@ -99,6 +99,8 @@ internal sealed class EvalRig
 
     public AcceptEvalHandler Accept() => new(Store, Time, NullLogger<AcceptEvalHandler>.Instance);
 
+    public AutoAcceptEvalHandler AutoAccept(XDrishti.Application.Abstractions.SettingsCatalog.IEssentialSettingStore settings) => new(Store, settings, Time, NullLogger<AutoAcceptEvalHandler>.Instance);
+
     public GetEvalStatusHandler Status() => new(new DiskEvalFiles(), Store, new FakePrompts(this), new FakeEnvironment(this));
 
     public sealed class FakeProbe(EvalRig rig) : IEvalFixtureProbe

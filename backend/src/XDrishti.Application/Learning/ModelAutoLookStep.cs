@@ -33,7 +33,7 @@ internal sealed class ModelAutoLookStep(HoldOutEpochs epochs, ModelHoldOutCandid
 
         if (current.Block.PrevStart is null)
         {
-            return "block 1 is the owner's";
+            return "block 1 waits for SR-04 (ADR 0292)";
         }
 
         var found = await candidates.FindAsync(current.Block, cancellationToken);

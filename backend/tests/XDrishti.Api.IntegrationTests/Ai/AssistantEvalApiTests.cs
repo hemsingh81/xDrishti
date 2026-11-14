@@ -86,6 +86,18 @@ public sealed class AssistantEvalApiTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task An_auto_baseline_needs_the_auto_actor_and_its_setting_snapshot_and_no_other_actor_is_stored()
+    {
+        await CleanAsync();
+        var first = await StoreRunAsync();
+        var second = await StoreRunAsync();
+
+        (await ExecuteAsync($"INSERT INTO ai.eval_baselines (run_id, accepted_by, reason) VALUES ('{first}', 'auto:xd', 'auto: ai.eval.auto_accept=true (default, ADR 0292)')")).ShouldBe(1);
+        (await Should.ThrowAsync<Npgsql.PostgresException>(() => ExecuteAsync($"INSERT INTO ai.eval_baselines (run_id, accepted_by) VALUES ('{second}', 'auto:xd')"))).SqlState.ShouldBe("23514", "an auto row carries the setting snapshot");
+        (await Should.ThrowAsync<Npgsql.PostgresException>(() => ExecuteAsync($"INSERT INTO ai.eval_baselines (run_id, accepted_by, reason) VALUES ('{second}', 'model', 'auto: x')"))).SqlState.ShouldBe("23514");
+    }
+
+    [Fact]
     public async Task A_stored_run_reads_back_with_its_cases_and_an_accepted_one_whose_fingerprint_differs_is_stale_with_the_reasons()
     {
         await CleanAsync();
