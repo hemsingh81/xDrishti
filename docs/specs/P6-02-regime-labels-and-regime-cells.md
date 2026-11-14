@@ -1,6 +1,7 @@
 # P6-02 — Regime labels per day, regime tags on trades, and regime cells
 
 - **Status:** Approved (owner's standing run instruction; the owner asked for this row to be built next, with the agent deciding the gaps). Decisions D1 to D12 are the agent's and are recorded in [ADR 0146](../adr/0146-a-regime-label-exists-only-where-the-stored-context-is-ready-it-is-read-before-the-decision-day-and-a-regime-cell-never-mixes-the-two-bases.md).
+- **Dropped (ADR 0291, 2026-11-14):** the NIFTY 50 / INDIA VIX market context this spec built was removed (table, job, features, readers); nothing in it is current. The text below is history. See [ADR 0291](../adr/0291-features-that-wait-on-the-owner-are-removed-the-market-context-the-charge-sheet-and-the-pre-registered-hold-out-replay.md).
 - **Phase / roadmap row:** P6 — row P6-02 ("Regime labels and regime cells", was blocked on P3-01d).
 - **Design refs:** docs/design/09-learning-engine.md §3 layer 1 (cell statistics) · docs/design/07-strategies.md §6 (market regime) · docs/design/11-strategy-lab.md §2 (market context), §5 (robustness, `by_regime`) · P6-00 (row P6-02, acceptance 9, risk 3) · P6-01 (cells) · P5-05 (`by_regime`, ADR 0062) · ADR 0033 (regime, Amendments 1, 2, 13, 14) · ADR 0064 (cell statistics) · P3-01d D2 (the basis obligation).
 - **Needs (built):** P3-01d (`market.context_daily`, `IContextFigures`, `ContextFigures.Basis`), P3-01e, P6-01 (`CellStatsCalculator`, `research.cell_stats`, `learn cells`), P5-05 (`LabRobustness`).

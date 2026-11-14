@@ -12,7 +12,6 @@ import { InsidePanel } from './InsidePanel';
 import { MemberTable } from './MemberTable';
 import { ProfileHeader } from './ProfileHeader';
 import { RebasedChart } from './RebasedChart';
-import { RegimePanel } from './RegimePanel';
 import { RelativeStrengthPanel } from './RelativeStrengthPanel';
 import { RiskTable } from './RiskTable';
 import { RollingBetaChart } from './RollingBetaChart';
@@ -61,7 +60,6 @@ function Panels({ tab, profile }: { tab: Tab; profile: BasketProfile }) {
     case 'liquidity':
       return (
         <Box sx={grid}>
-          <RegimePanel profile={profile} />
           <TurnoverCapacityPanel profile={profile} />
         </Box>
       );

@@ -81,6 +81,26 @@ public sealed class NameResolutionTests
         OnlyError("MON() == 1").Code.ShouldBe(LintCodes.BadArguments);
     }
 
+    [Theory]
+    [InlineData("vix > 20", "vix")]
+    [InlineData("vix_pct > 50", "vix_pct")]
+    [InlineData("vix_chg < 1", "vix_chg")]
+    [InlineData("breadth > 50", "breadth")]
+    [InlineData("index_trend == 1", "index_trend")]
+    [InlineData("index_adx > 20", "index_adx")]
+    [InlineData("index_vol_pct < 50", "index_vol_pct")]
+    [InlineData("regime_trend > 0", "regime_trend")]
+    [InlineData("regime_vol > 0", "regime_vol")]
+    [InlineData("regime() == 1", "regime")]
+    [InlineData("index.trend == 1", "index")]
+    public void A_removed_market_context_name_is_refused_as_an_unknown_name_that_is_quoted(string source, string name)
+    {
+        var error = OnlyError(source);
+
+        error.Code.ShouldBe(LintCodes.UnknownName);
+        error.Message.ShouldContain("`" + name + "`", Case.Sensitive);
+    }
+
     [Fact]
     public void The_resolution_order_is_parameter_then_function_then_feature()
     {

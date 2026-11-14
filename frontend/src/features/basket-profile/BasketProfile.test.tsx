@@ -282,25 +282,6 @@ describe('the panels', () => {
     expect(within(table).queryByText('S149')).not.toBeInTheDocument();
   });
 
-  it('shows a regime with too few days as a state, with the minimum, and a table that scrolls inside its card', async () => {
-    show(buildRichProfile(), '?tab=liquidity');
-
-    const table = await screen.findByRole('table', { name: 'Index by market regime' });
-
-    expect(within(table).getAllByText('n 9 of at least 30').length).toBeGreaterThan(0);
-    expect(screen.getByRole('region', { name: 'Index by market regime, scrolls sideways' })).toHaveAttribute(
-      'tabindex',
-      '0',
-    );
-  });
-
-  it('gives the reason when no regime is recorded', async () => {
-    show(buildProfile(), '?tab=liquidity');
-
-    expect(await screen.findByText('no regime code is recorded for the window')).toBeInTheDocument();
-    expect(screen.queryByRole('table', { name: 'Index by market regime' })).not.toBeInTheDocument();
-  });
-
   it('shows the strategy row, the median split, a link into Reports with the basket and the disabled regime panel with the server reason', async () => {
     const user = userEvent.setup();
     const cell = {

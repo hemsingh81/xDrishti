@@ -4919,74 +4919,6 @@
         }
       }
     },
-    "/api/data/context": {
-      "get": {
-        "tags": [
-          "Data"
-        ],
-        "summary": "The coverage of the market context (P3-01d): days stored, first and last date, the first readable date of index_trend, regime and vix_pct, the VIX days and the calendar span of their window, the first date the regime has both parts, how many sessions the newest day is behind (stale when more than one), the skipped days with reasons (first 50 and the total), and the missing prerequisite (index_not_tracked, vix_not_tracked, disabled) with its fix. Read only; derived from 1-minute bars",
-        "operationId": "GetDataContext",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ContextCoverageView"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/data/regimes": {
-      "get": {
-        "tags": [
-          "Data"
-        ],
-        "summary": "The regime label of each session (P6-02): from..to (yyyy-MM-dd, default the 90 days up to the last closed session, at most 400 sessions) the regime read from the context day before the session, its basis (index_and_vix or index_only) or the reason there is none (no_context, before_history, stale, context_invalid, regime_not_ready); the count per regime and basis, the sessions without a label by reason, and the first date any label exists and the first with both parts. 400 data.invalid",
-        "operationId": "GetDataRegimes",
-        "parameters": [
-          {
-            "name": "from",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "to",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegimeLabelsView"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/data/calendar": {
       "get": {
         "tags": [
@@ -11260,56 +11192,6 @@
         ],
         "summary": "The cell statistics of the newest snapshot: per cell and window (all, 250d, 60d) the trades, the Beta-shrunk win rate with its credible bounds, recency-weighted expectancy and profit factor, drawdown and MAE/MFE quantiles, each with its basis, knobs and limits. Filter by strategy and window; empty before the first computation. 422 learning.invalid",
         "operationId": "ListCells",
-        "parameters": [
-          {
-            "name": "strategy",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "window",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/CellStatsView"
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/cells/regimes": {
-      "get": {
-        "tags": [
-          "Learning"
-        ],
-        "summary": "The regime cells (P6-02): the cells of the newest snapshot that was computed with the regime split, per regime part and window, each with its trades, its Beta-shrunk win rate, the enough-evidence flag and the basis of its regime (index_and_vix or index_only; a cell never mixes the two). A regime below the minimum of trades says so. Filter by strategy and window; empty before a computation with --by-regime. 422 learning.invalid",
-        "operationId": "ListRegimeCells",
         "parameters": [
           {
             "name": "strategy",
@@ -28667,7 +28549,6 @@
           "dispersion",
           "correlation",
           "contribution",
-          "regime",
           "turnover",
           "capacity",
           "holdOut",
@@ -28740,10 +28621,6 @@
           "contribution": {
             "description": "Who made the return.",
             "$ref": "#/components/schemas/ProfileContributionView"
-          },
-          "regime": {
-            "description": "The index by regime.",
-            "$ref": "#/components/schemas/ProfileRegimeView"
           },
           "turnover": {
             "description": "Member turnover.",
@@ -31566,20 +31443,6 @@
             ],
             "description": "CF-01 `IndependentN`: trades after same-session and serial correction; null when not computed. Three different numbers: double CellStatsView.EffectiveN is the recency-weight sum, `shrinkage.nUsed` (CF-02) is the smaller of this and the Kish weight n (sum w)^2 / sum w^2.",
             "format": "double"
-          },
-          "regimeName": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "The regime name of a regime cell (P6-02), null for a `*` cell."
-          },
-          "regimeBasis": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "What the regime of the cell was built from: `index_and_vix` or `index_only`, or `all` for a `*` cell. A cell never mixes the two."
           }
         },
         "description": "One row of the cell statistics as the API shows it (P6-01), with the facts a reader needs to judge it (spec honest limits: the basis, the knobs, the evidence flag and the limits text)."
@@ -33484,300 +33347,6 @@
           }
         },
         "description": "The account's connection to Dhan. Status is \"not_connected\", \"connected\", \"expired\" (the expiry has passed — derived when read,\nno broker call needed). ExpiresAt is when the token stops working (as Dhan states, otherwise 24 hours after sign-in).\nBrokerUserName and BrokerUserId (masked like the client id) are what Dhan reported for the token. LastError is a short safe text (at most\nDhan's error code). The token itself is never returned."
-      },
-      "ContextBreadthView": {
-        "required": [
-          "latestDate",
-          "latest",
-          "state",
-          "voters",
-          "universe",
-          "excluded",
-          "computedDays",
-          "pendingDays",
-          "insufficientDays",
-          "insufficientDates",
-          "label"
-        ],
-        "type": "object",
-        "properties": {
-          "latestDate": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "latest": {
-            "type": [
-              "null",
-              "number"
-            ],
-            "format": "double"
-          },
-          "state": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "voters": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
-          },
-          "universe": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
-          },
-          "excluded": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
-          },
-          "computedDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "pendingDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "insufficientDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "insufficientDates": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          "label": {
-            "type": "string"
-          }
-        },
-        "description": "The breadth of the owner's tracked shares (P3-01e): `Latest` is the percent (0 to 100) of the latest day that has one, null when that day was `insufficient`; `State` is `value` or `insufficient` (null when no day has any);\n`Voters`, `Universe` and `Excluded` are that day's counts; `PendingDays` are stored days still without a breadth (the last closed session can still gain bars); `InsufficientDates` names the thin days. The `Label` says what it is."
-      },
-      "ContextCoverageView": {
-        "required": [
-          "enabled",
-          "missing",
-          "fix",
-          "indexSymbol",
-          "vixSymbol",
-          "days",
-          "firstDate",
-          "lastDate",
-          "ageSessions",
-          "stale",
-          "indexTrendReadableFrom",
-          "regimeReadableFrom",
-          "vixPctReadableFrom",
-          "regimeWithVixReadableFrom",
-          "vixDays",
-          "vixMissingDays",
-          "vixWindowSpanDays",
-          "vixWindowTooWide",
-          "gapSessions",
-          "skippedTotal",
-          "skipped",
-          "source",
-          "breadth",
-          "csv"
-        ],
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
-          "missing": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "fix": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "indexSymbol": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "vixSymbol": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "days": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "firstDate": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "lastDate": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "ageSessions": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
-          },
-          "stale": {
-            "type": "boolean"
-          },
-          "indexTrendReadableFrom": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "regimeReadableFrom": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "vixPctReadableFrom": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "regimeWithVixReadableFrom": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "vixDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "vixMissingDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "vixWindowSpanDays": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
-          },
-          "vixWindowTooWide": {
-            "type": "boolean"
-          },
-          "gapSessions": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "skippedTotal": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "skipped": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ContextSkippedView"
-            }
-          },
-          "source": {
-            "type": "string"
-          },
-          "breadth": {
-            "$ref": "#/components/schemas/ContextBreadthView"
-          },
-          "csv": {
-            "$ref": "#/components/schemas/ContextCsvView"
-          }
-        },
-        "description": "What the stored market context makes readable (`GET /api/data/context`, criterion 7). `Missing` names an unmet prerequisite (`index_not_tracked`, `vix_not_tracked`, `disabled`) with its `Fix`. `AgeSessions` is the number of\ntrading sessions the newest day is behind the last closed one; `Stale` is more than one."
-      },
-      "ContextCsvView": {
-        "required": [
-          "indexDays",
-          "vixDays",
-          "firstDate",
-          "lastDate"
-        ],
-        "type": "object",
-        "properties": {
-          "indexDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "vixDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "firstDate": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "lastDate": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          }
-        },
-        "description": "Days that came from owner-dropped NSE CSVs (fallback D, source `nse_csv`): index days, VIX closes held in the side table, and the first and last index day."
-      },
-      "ContextSkippedView": {
-        "required": [
-          "date",
-          "reason",
-          "bars"
-        ],
-        "type": "object",
-        "properties": {
-          "date": {
-            "type": "string",
-            "format": "date"
-          },
-          "reason": {
-            "type": "string"
-          },
-          "bars": {
-            "type": "integer",
-            "format": "int32"
-          }
-        },
-        "description": "One day (or VIX leg) the derivation did not use, with the reason code and the bars it had."
       },
       "ContributionRowView": {
         "required": [
@@ -61647,35 +61216,6 @@
         },
         "description": "Instruments in the basket in the window (`Total`), the ones the figures rest on (`Counted`) and every one left out with its reason (no_bars, starts_late, ends_early, discontinuity, bad_price, too_few_bars)."
       },
-      "ProfileRegimeView": {
-        "required": [
-          "status",
-          "unknown",
-          "minDays",
-          "rows"
-        ],
-        "type": "object",
-        "properties": {
-          "status": {
-            "$ref": "#/components/schemas/MetricView"
-          },
-          "unknown": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "minDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "rows": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RegimeRowView"
-            }
-          }
-        },
-        "description": "The regime panel: `Status` is a value when a regime was recorded, else why not; `Unknown` days sit in no row."
-      },
       "ProfileRiskView": {
         "required": [
           "vol20",
@@ -64503,259 +64043,6 @@
           }
         },
         "description": "Where the master list stands: the refresh in progress (if any), the last finished one, the automatic schedule and how many instruments are active."
-      },
-      "RegimeBucketView": {
-        "required": [
-          "regime",
-          "basis",
-          "trades",
-          "meanR",
-          "totalR",
-          "enough"
-        ],
-        "type": "object",
-        "properties": {
-          "regime": {
-            "type": "string"
-          },
-          "basis": {
-            "type": "string"
-          },
-          "trades": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "meanR": {
-            "type": "number",
-            "format": "double"
-          },
-          "totalR": {
-            "type": "number",
-            "format": "double"
-          },
-          "enough": {
-            "type": "boolean"
-          }
-        },
-        "description": "One regime part of the out-of-sample trades (P6-02): the regime and its basis are one bucket; below 30 trades it is shown but is not evidence."
-      },
-      "RegimeCountView": {
-        "required": [
-          "regime",
-          "code",
-          "indexAndVixDays",
-          "indexOnlyDays"
-        ],
-        "type": "object",
-        "properties": {
-          "regime": {
-            "type": "string"
-          },
-          "code": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "indexAndVixDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "indexOnlyDays": {
-            "type": "integer",
-            "format": "int32"
-          }
-        },
-        "description": "How many sessions of the range fall in one regime, by basis; a regime with no session shows 0 (nothing is hidden)."
-      },
-      "RegimeDayView": {
-        "required": [
-          "date",
-          "regime",
-          "code",
-          "basis",
-          "contextAsOf",
-          "unavailable"
-        ],
-        "type": "object",
-        "properties": {
-          "date": {
-            "type": "string",
-            "format": "date"
-          },
-          "regime": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "code": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
-          },
-          "basis": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "contextAsOf": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "unavailable": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        },
-        "description": "The regime label of one session (P6-02): the regime read from the context day before it, or why there is none."
-      },
-      "RegimeLabelsView": {
-        "required": [
-          "from",
-          "to",
-          "sessions",
-          "days",
-          "counts",
-          "unavailable",
-          "contextDays",
-          "firstLabel",
-          "firstIndexAndVix",
-          "note"
-        ],
-        "type": "object",
-        "properties": {
-          "from": {
-            "type": "string",
-            "format": "date"
-          },
-          "to": {
-            "type": "string",
-            "format": "date"
-          },
-          "sessions": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "days": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RegimeDayView"
-            }
-          },
-          "counts": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RegimeCountView"
-            }
-          },
-          "unavailable": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RegimeUnavailableView"
-            }
-          },
-          "contextDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "firstLabel": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "firstIndexAndVix": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "note": {
-            "type": "string"
-          }
-        },
-        "description": "The regime labels per session (`GET /api/data/regimes`, P6-02, ADR 0146): `Days` for the range asked, the counts per regime and basis and the sessions without a label by reason over the same range, and what the whole stored history makes readable\n(`FirstLabel`, `FirstIndexAndVix`). The label of a session reads only data before it; the index is the regime index of the context (NIFTY 50 by default)."
-      },
-      "RegimeMissingView": {
-        "required": [
-          "reason",
-          "trades"
-        ],
-        "type": "object",
-        "properties": {
-          "reason": {
-            "type": "string"
-          },
-          "trades": {
-            "type": "integer",
-            "format": "int32"
-          }
-        },
-        "description": "Out-of-sample trades with no regime label, by reason (P6-02)."
-      },
-      "RegimeRowView": {
-        "required": [
-          "code",
-          "label",
-          "days",
-          "meanReturn",
-          "vol",
-          "hitRate",
-          "state"
-        ],
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "label": {
-            "type": "string"
-          },
-          "days": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "meanReturn": {
-            "$ref": "#/components/schemas/MetricView"
-          },
-          "vol": {
-            "$ref": "#/components/schemas/MetricView"
-          },
-          "hitRate": {
-            "$ref": "#/components/schemas/MetricView"
-          },
-          "state": {
-            "type": "string"
-          }
-        },
-        "description": "The index on days that followed one regime of the previous session."
-      },
-      "RegimeUnavailableView": {
-        "required": [
-          "reason",
-          "days"
-        ],
-        "type": "object",
-        "properties": {
-          "reason": {
-            "type": "string"
-          },
-          "days": {
-            "type": "integer",
-            "format": "int32"
-          }
-        },
-        "description": "Sessions with no label, by reason."
       },
       "RegisteredHoldOut": {
         "required": [
@@ -69119,7 +68406,6 @@
           "monteCarlo",
           "byYear",
           "signFlipBaseline",
-          "byRegime",
           "limits"
         ],
         "type": "object",
@@ -69153,31 +68439,10 @@
               }
             ]
           },
-          "byRegime": {
-            "type": "string"
-          },
           "limits": {
             "type": "array",
             "items": {
               "type": "string"
-            }
-          },
-          "byRegimeBuckets": {
-            "type": [
-              "null",
-              "array"
-            ],
-            "items": {
-              "$ref": "#/components/schemas/RegimeBucketView"
-            }
-          },
-          "byRegimeUnavailable": {
-            "type": [
-              "null",
-              "array"
-            ],
-            "items": {
-              "$ref": "#/components/schemas/RegimeMissingView"
             }
           },
           "monteCarloBlock": {
@@ -69227,7 +68492,7 @@
             ]
           }
         },
-        "description": "The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it). Since SC-S1 (ADR 0222) `ByQuarter` (the quarters with a trade) and `MaxInstrumentShare` (the largest instrument's share of the total R, 1.0 when the total is not above 0) feed the readiness scorecard's row 10; both are null in a result stored before it, and nothing here changes the verdict. Since CF-03 part B (ADR 0228) `Pbo` (the probability of backtest overfitting of the sweep) and `VariantSeries` (the daily series it came from) are null in a result stored before it or with the PBO mode Off; they change the outcome only in the owner's Gate mode."
+        "description": "The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. The regime split of P6-02 was dropped with the market context (ADR 0291); an old stored result may still carry its fields, which are ignored. Since SC-S1 (ADR 0222) `ByQuarter` (the quarters with a trade) and `MaxInstrumentShare` (the largest instrument's share of the total R, 1.0 when the total is not above 0) feed the readiness scorecard's row 10; both are null in a result stored before it, and nothing here changes the verdict. Since CF-03 part B (ADR 0228) `Pbo` (the probability of backtest overfitting of the sweep) and `VariantSeries` (the daily series it came from) are null in a result stored before it or with the PBO mode Off; they change the outcome only in the owner's Gate mode."
       },
       "RoleToggleInput": {
         "required": [

@@ -1,6 +1,6 @@
 # 0290 — The context inbox: NIFTY 50 and INDIA VIX daily history from owner-dropped NSE CSVs (P3-01d fallback D)
 
-- **Status:** Accepted (owner, 2026-11-14: build it now as the fallback; the Dhan route stays first; no allow-list change).
+- **Status:** Accepted (owner, 2026-11-14: build it now as the fallback; the Dhan route stays first; no allow-list change). Superseded by [0291](0291-features-that-wait-on-the-owner-are-removed-the-market-context-the-charge-sheet-and-the-pre-registered-hold-out-replay.md) (the inbox and the market context it fed were removed on 2026-11-14).
 - **Date:** 2026-11-14.
 - **Relation to other ADRs:** Builds on [0033](0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md) (the context table), 0179 (the filings folder-drop, whose "local files only, no network" shape this copies) and 0282 (default ON where no evidence is lost and no risk is widened). Spec: P3-01d, fallback D (D8 outcome O2, D12).
 

@@ -1,6 +1,7 @@
 # P3-01e — Breadth of the owner's tracked shares, point-in-time, and the market gate's VIX and breadth
 
 - **Status:** Built 2026-10-27 (owner approved the plan; see *Build notes and deviations* at the end; [ADR 0134](../adr/0134-breadth-of-the-owners-tracked-shares-is-set-once-per-day-from-closes-up-to-that-day-and-the-market-gate-reads-it-in-fractions.md))
+- **Dropped (ADR 0291, 2026-11-14):** the NIFTY 50 / INDIA VIX market context this spec built was removed (table, job, features, readers); nothing in it is current. The text below is history. See [ADR 0291](../adr/0291-features-that-wait-on-the-owner-are-removed-the-market-context-the-charge-sheet-and-the-pre-registered-hold-out-replay.md).
 - **Phase / roadmap row:** P3 — row P3-01e (Later, "before P7"); feeds the `breadth` context feature (P3-01c) and the market gate of P7-06.
 - **Design refs:** docs/design/09-learning-engine.md §14 (market gate) · docs/design/11-strategy-lab.md §2 (market context, "Not yet built") · docs/design/05-data-and-brokers.md §4, §9 · docs/design/16-configuration.md (`smart_rules.market_gate`) · docs/design/18-roadmap.md (P3-01e row, ISS-22) · ADR 0033 (decision 4, "Known risk")
 - **Needs:** [P3-01d](P3-01d-context-data-job-index-and-vix.md) (the table `market.context_daily`, `ContextUpkeep`, `IContextFigures`); built: `market.bars_agg` 1D rows, `IDailySeries`, `ICorporateActionQueries`, the smart rules (P7-06) and `StoredPlanContextSource` (P7-09).
