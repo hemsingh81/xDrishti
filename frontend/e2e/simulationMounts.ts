@@ -83,7 +83,6 @@ const mountReplay = (withRun: boolean) => () => {
   server.use(
     http.get('/api/baskets', () => HttpResponse.json([])),
     http.get('/api/risk-profiles', () => HttpResponse.json([])),
-    http.get('/api/charge-sheet/confirmation', () => HttpResponse.json({}, { status: 404 })),
     http.get('/api/replay/runs', () =>
       HttpResponse.json(
         withRun

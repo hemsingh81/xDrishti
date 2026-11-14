@@ -19,7 +19,6 @@ function form() {
   server.use(
     http.get('/api/baskets', () => HttpResponse.json([buildBasket()])),
     http.get('/api/risk-profiles', () => HttpResponse.json(buildRiskProfiles())),
-    http.get('/api/charge-sheet/confirmation', () => problemResponse({ title: 'No sheet.' }, 404)),
     http.post('/api/replay/sweeps', async ({ request }) => {
       posts.push(await request.json());
       return HttpResponse.json({ runIds: [RUN, BASE], pairId: null, trialNumber: 1, sweepId: SWEEP }, { status: 202 });

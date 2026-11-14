@@ -2,7 +2,7 @@ import { Alert, Box, Button, MenuItem, Stack, TextField, Typography } from '@mui
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { formatDate } from '@/shared/lib/format';
-import { replayChargeSheetQuery, replayProfilesQuery, useStartSweep } from '../../api/replayApi';
+import { replayProfilesQuery, useStartSweep } from '../../api/replayApi';
 import {
   initialSweepForm,
   maxSweepStarts,
@@ -27,14 +27,12 @@ const grid = {
 export function SweepStartForm({ onStarted }: { onStarted: (sweepId: string) => void }) {
   const [form, setForm] = useState<SweepForm>(initialSweepForm);
   const profiles = useQuery(replayProfilesQuery);
-  const sheet = useQuery(replayChargeSheetQuery);
   const start = useStartSweep();
   const set = (patch: Partial<SweepForm>) => {
     setForm((current) => ({ ...current, ...patch }));
   };
   const problem = sweepProblem(form);
   const starts = problem ? [] : sweepStarts(form);
-  const sheetId = sheet.data?.sheet?.id;
   return (
     <Box
       component="form"
@@ -162,11 +160,6 @@ export function SweepStartForm({ onStarted }: { onStarted: (sweepId: string) => 
           <MenuItem value="gross" sx={{ minHeight: 44 }}>
             Gross (before costs)
           </MenuItem>
-          {sheetId && (
-            <MenuItem value={sheetId} sx={{ minHeight: 44 }}>
-              {`Charge sheet ${sheet.data?.sheet?.label ?? sheetId}`}
-            </MenuItem>
-          )}
         </TextField>
       </Box>
       {starts.length > 0 && (

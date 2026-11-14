@@ -33,7 +33,6 @@ using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
 using XDrishti.Application.Capabilities;
-using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Confidence;
 using XDrishti.Application.Execution;
 using XDrishti.Application.Filings;
@@ -91,7 +90,6 @@ using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Application.Reporting;
 using XDrishti.Application.Research;
-using XDrishti.Application.Research.CostSheets;
 using XDrishti.Application.Selection;
 using XDrishti.Application.Shadow;
 using XDrishti.Application.SimAll;
@@ -855,10 +853,6 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, RunSimulationHandler>(); // the random-entry walk of the Lab's chance test (CF-07, ADR 0208)
         services.AddScoped<IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>, RunSimulationHandler>(); // the placebo walk of the Lab's chance tests (CF-07 part B, ADR 0209)
         services.AddScoped<IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>, BuildTradeCardsHandler>();
-        services.AddScoped<ICommandHandler<LoadCostSheetCommand, LoadedCostSheet>, LoadCostSheetHandler>();
-        services.AddScoped<IQueryHandler<ShowCostSheetQuery, Result<ShownCostSheet>>, ShowCostSheetHandler>();
-        services.AddScoped<IQueryHandler<CheckCostSheetQuery, Result<CostCheckReport>>, CheckCostSheetHandler>();
-        services.AddScoped<IQueryHandler<DeriveCostSheetQuery, Result<CostDerivation>>, DeriveCostSheetHandler>();
         services.AddScoped<ICommandHandler<StoreRunCommand, StoreOutcome>, StoreRunHandler>(); // the result store (P3-10)
         services.AddScoped<ICommandHandler<StoreComparisonCommand, StoreOutcome>, StoreComparisonHandler>(); // a comparison of exits (P4-05)
         services.AddScoped<ICommandHandler<StoreExitSelectionCommand, StoreOutcome>, StoreExitSelectionHandler>(); // an exit choice (P4-06)
@@ -1167,9 +1161,6 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetDisciplineQuery, Result<DisciplineView>>, GetDisciplineHandler>();
         services.AddScoped<BacktestReferenceReader>(); // the point-in-time backtest reference of the paper comparison (P10-04)
         services.TryAddSingleton<ICostConfirmationFact, NotConfirmed>(); // the default and the test default: no sheet is confirmed. The Infrastructure registration replaces it with the stored owner confirmation (P8-23, ADR 0127)
-        services.AddScoped<ChargeSheetStatusBuilder>(); // the charge-sheet confirmation: status, and the owner's one writer (P8-23, ADR 0127)
-        services.AddScoped<IQueryHandler<GetChargeSheetStatusQuery, Result<ChargeSheetStatusView>>, GetChargeSheetStatusHandler>();
-        services.AddScoped<ICommandHandler<RecordChargeSheetActCommand, ChargeSheetActOutcome>, RecordChargeSheetActHandler>();
         services.AddScoped<ICapabilityGate, CapabilityGate>(); // the generic owner-act capability gate: reads the log, switches nothing (P8-18 Part A, ADR 0128)
         services.AddScoped<IOwnerActRunner, OwnerActRunner>(); // the gate again and the audit row of the web owner acts that existing handlers perform (P8-19, ADR 0130)
         services.AddScoped<CapabilityViews>();

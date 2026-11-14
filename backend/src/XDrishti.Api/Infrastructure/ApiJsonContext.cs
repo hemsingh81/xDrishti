@@ -22,7 +22,6 @@ using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
 using XDrishti.Application.Capabilities;
-using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Confidence;
 using XDrishti.Application.Execution;
 using XDrishti.Application.Filings;
@@ -257,11 +256,6 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ChangeLiveSettingsRequest))]
 [JsonSerializable(typeof(AutonomySettingsView))]
 [JsonSerializable(typeof(ChangeAutonomyRequest))]
-[JsonSerializable(typeof(ChargeSheetStatusView))]
-[JsonSerializable(typeof(ChargeSheetActOutcome))]
-[JsonSerializable(typeof(ConfirmChargeSheetRequest))]
-[JsonSerializable(typeof(RevokeChargeSheetRequest))]
-[JsonSerializable(typeof(ChangeChargeSheetCapabilityRequest))]
 [JsonSerializable(typeof(CapabilitiesView))]
 [JsonSerializable(typeof(LlmStatusView))]
 [JsonSerializable(typeof(AssistantStatusView))]

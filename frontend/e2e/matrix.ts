@@ -5,7 +5,6 @@ import { buildCounterfactual, buildJourney, journeyOf, mountJourney } from '../s
 import { createCapabilitiesFake } from '../src/test/capabilitiesFake';
 import { buildJob, jobId, mountExperiments } from '../src/test/experimentsFake';
 import { mountOwnerMoves } from '../src/test/ownerMovesFake';
-import { createChargeSheetFake } from '../src/test/chargeSheetFake';
 import { lossTags, rule, smart } from '../src/test/evidenceFixtures';
 import { mountPaper } from '../src/test/paperFixtures';
 import { buildDiscipline, buildReview, mountReview } from '../src/test/paperReviewFixtures';
@@ -172,15 +171,6 @@ export const screens: Screen[] = [
     },
   },
   ...laterScreens,
-  {
-    id: 'settings-charge-sheet',
-    route: '/settings?tab=charge-sheet',
-    mounts: {
-      full: () => {
-        server.use(...createChargeSheetFake().handlers);
-      },
-    },
-  },
   {
     id: 'P8-11-cell',
     route: '/reports/cell?strategy=ORB&timeframe=15m&cell=ORB%20%C2%B7%2015m',

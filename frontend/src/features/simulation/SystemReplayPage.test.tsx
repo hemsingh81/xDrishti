@@ -133,7 +133,6 @@ function setup(options: Options = {}) {
   server.use(
     http.get('/api/baskets', () => HttpResponse.json([buildBasket()])),
     http.get('/api/risk-profiles', () => HttpResponse.json(buildRiskProfiles())),
-    http.get('/api/charge-sheet/confirmation', () => problemResponse({ title: 'No sheet.' }, 404)),
     http.get('/api/replay/runs', () => HttpResponse.json(options.runs ?? [item()])),
     http.get('/api/replay/runs/:id', () => {
       counts.run += 1;

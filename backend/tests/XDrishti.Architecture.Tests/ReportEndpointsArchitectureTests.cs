@@ -99,14 +99,14 @@ public sealed partial class ReportEndpointsArchitectureTests
         comparisons.IsPublic.ShouldBeFalse();
         comparisons.IsSealed.ShouldBeTrue();
         comparisons.GetInterfaces().ShouldContain(typeof(IReportComparisonSource));
-        Infrastructure.GetType("XDrishti.Infrastructure.Reporting.ChargeSheetConfirmationStore")!.GetInterfaces().ShouldContain(typeof(IChargeSheetConfirmationSource));
+        Infrastructure.GetType("XDrishti.Infrastructure.Ai.ReadOnly.NoChargeSheetConfirmation")!.GetInterfaces().ShouldContain(typeof(IChargeSheetConfirmationSource));
     }
 
     [Fact]
     public void The_report_source_never_writes()
     {
         var source = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Research", "ReportTradeSource.cs"));
-        var confirmation = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Reporting", "ChargeSheetConfirmationStore.cs"));
+        var confirmation = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Ai", "ReadOnly", "NoChargeSheetConfirmation.cs"));
         var comparisons = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Research", "ReportComparisonSource.cs"));
 
         foreach (var text in new[] { Code(source), Code(confirmation), Code(comparisons) })

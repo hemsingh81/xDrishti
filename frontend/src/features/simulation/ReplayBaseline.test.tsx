@@ -6,7 +6,7 @@ import { buildBasket, buildRiskProfiles } from '@/test/fixtures';
 import { pinClock } from '@/test/pinClock';
 import { renderWithProviders } from '@/test/render';
 import { armComparison, baselinePair, BASE, COSTS, PAIR, RUN, runItem } from '@/test/replaySr02Fixtures';
-import { problemResponse, server } from '@/test/server';
+import { server } from '@/test/server';
 import { pairInterval, replayPollMs } from './api/replayApi';
 import { PairCard } from './components/replay/PairCard';
 import { ReplayCharts } from './components/replay/ReplayCharts';
@@ -21,7 +21,6 @@ describe('the no-selection baseline', () => {
       server.use(
         http.get('/api/baskets', () => HttpResponse.json([buildBasket()])),
         http.get('/api/risk-profiles', () => HttpResponse.json(buildRiskProfiles())),
-        http.get('/api/charge-sheet/confirmation', () => problemResponse({ title: 'No sheet.' }, 404)),
         http.post('/api/replay/runs', async ({ request }) => {
           posts.push(await request.json());
           return HttpResponse.json({ runIds: [RUN, BASE], pairId: PAIR, trialNumber: 1 }, { status: 202 });

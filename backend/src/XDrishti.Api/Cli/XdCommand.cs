@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text;
-using XDrishti.Api.CostSheets;
 using XDrishti.Api.Simulate;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Messaging;
@@ -192,11 +191,6 @@ internal static class XdCommand
         if (args.Count >= 2 && args[0] == "live" && args[1] == "phase-check")
         {
             return await LivePhaseCheckCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
-        }
-
-        if (args.Count >= 2 && args[0] == "charge-sheet")
-        {
-            return await ChargeSheetCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
         }
 
         if (args.Count >= 2 && args[0] == "plan" && args[1] == "run")
@@ -396,7 +390,7 @@ internal static class XdCommand
 
     private static async Task<(string? Text, int? Exit)> ReadAsync(XdOptions options, SimulateConsole console, CancellationToken cancellationToken)
     {
-        var read = await CostSheetCommand.ReadBoundedAsync(options.File!, LabErrors.MaxTextBytes, "the strategy file", cancellationToken);
+        var read = await BoundedFile.ReadAsync(options.File!, LabErrors.MaxTextBytes, "the strategy file", cancellationToken);
         if (read.Problem is not null)
         {
             await console.Error.WriteLineAsync(SimulateOptions.Show(read.Problem));

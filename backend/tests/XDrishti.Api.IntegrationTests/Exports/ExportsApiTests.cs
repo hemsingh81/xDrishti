@@ -10,12 +10,6 @@ using XDrishti.Api.Exports;
 using XDrishti.Api.IntegrationTests.Data;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Api.IntegrationTests.Research;
-using XDrishti.Api.Simulate;
-using XDrishti.Application.Abstractions.Messaging;
-using XDrishti.Application.Abstractions.Platform;
-using XDrishti.Application.Abstractions.Research;
-using XDrishti.Application.Research;
-using XDrishti.Tests.Shared;
 
 namespace XDrishti.Api.IntegrationTests.Exports;
 
@@ -295,27 +289,6 @@ public sealed class ExportsApiTests(ApiFactory factory) : DataTestBase(factory)
         }
 
         checkedStates.ShouldContain("value");
-    }
-
-    [Fact]
-    public async Task A_net_file_says_net_and_what_the_owner_confirmed_and_a_gross_one_says_gross()
-    {
-        await OnAsync();
-        var run = StoredRunFixtures.Run(costed: true, to: RunStoreRoundTripTests.NextTo(), strategy: "RPTNET", fixtureEdges: false);
-        using (var scope = Factory.Services.CreateScope())
-        {
-            await scope.ServiceProvider.GetRequiredService<ICostSheetStore>().SaveAsync(FixtureSheet.Sheet, "test", DateTimeOffset.UnixEpoch, Ct);
-            (await scope.ServiceProvider.GetRequiredService<IPlatformUnitOfWork>().TrySaveAsync(Ct)).ShouldBeTrue();
-            (await scope.ServiceProvider.GetRequiredService<ICommandHandler<StoreRunCommand, StoreOutcome>>().HandleAsync(new StoreRunCommand(run, StoreKit.Record(run), SimulateStore.Actor), Ct)).IsSuccess.ShouldBeTrue();
-        }
-
-        await ExecuteSqlAsync($"INSERT INTO workflow.charge_sheet_events (kind, actor, reason) VALUES ('gate_on', 'owner:test@example.com', 'test'); INSERT INTO workflow.charge_sheet_events (kind, sheet_id, rates_sha256, actor, reason) VALUES ('confirm', 'fixture-a', '{FixtureSheet.Sheet.RatesSha256}', 'owner:test@example.com', 'test')");
-        var net = await CsvAsync("report-trades", new { runs = run.RunKey, basis = "net" });
-        var gross = await CsvAsync("report-trades", new { runs = run.RunKey });
-
-        net.ShouldContain("# basis: net R after charges; charge sheet confirmed by the owner: charge sheet 'fixture-a' with rates " + FixtureSheet.Sheet.RatesSha256[..12]);
-        gross.ShouldContain("# basis: gross R; before charges");
-        net.ShouldNotBe(gross);
     }
 
     [Fact]

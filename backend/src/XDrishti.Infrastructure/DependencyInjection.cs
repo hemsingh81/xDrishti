@@ -10,7 +10,6 @@ using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Auth;
 using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Capabilities;
-using XDrishti.Application.Abstractions.ChargeSheet;
 using XDrishti.Application.Abstractions.Confidence;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
@@ -69,7 +68,6 @@ using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Planning;
 using XDrishti.Infrastructure.Platform;
 using XDrishti.Infrastructure.Portfolio;
-using XDrishti.Infrastructure.Reporting;
 using XDrishti.Infrastructure.Research;
 
 namespace XDrishti.Infrastructure;
@@ -167,10 +165,7 @@ public static class DependencyInjection
         services.AddScoped<IRunStore, RunStore>(); // the result store of the simulation runs (spec P3-10)
         services.AddScoped<IReportComparisonSource, ReportComparisonSource>(); // stored exit comparisons and walk-forward exit choices, read only (P8-10 part b, ADR 0114)
         services.AddScoped<IReportTradeSource, ReportTradeSource>(); // the read side of the reports over the stored runs, a streamed projection (P8-06, ADR 0100)
-        services.AddScoped<IChargeSheetConfirmationSource, ChargeSheetConfirmationStore>(); // the owner's stored confirmation of the charge sheet; the only source of one (P8-06)
-        services.AddScoped<ChargeSheetEventStore>(); // the owner's acts on the confirmation, insert-only (P8-23, ADR 0127)
-        services.AddScoped<IChargeSheetLog>(sp => sp.GetRequiredService<ChargeSheetEventStore>());
-        services.AddScoped<IChargeSheetLogWriter>(sp => sp.GetRequiredService<ChargeSheetEventStore>());
+        services.AddSingleton<IChargeSheetConfirmationSource, XDrishti.Infrastructure.Ai.ReadOnly.NoChargeSheetConfirmation>(); // costs are gross forever (ADR 0292): no charge sheet is ever confirmed, so every report is gross
         services.AddScoped<CapabilityLogStore>(); // the owner's switches of the capabilities, insert-only (P8-18 Part A, ADR 0128)
         services.AddScoped<ICapabilityLog>(sp => sp.GetRequiredService<CapabilityLogStore>());
         services.AddScoped<ICapabilityLogWriter>(sp => sp.GetRequiredService<CapabilityLogStore>());
@@ -185,7 +180,6 @@ public static class DependencyInjection
         services.AddScoped<IExperimentJobStore, ExperimentJobStore>(); // the replay jobs the owner started: table is the queue (P8-18 Part B, ADR 0129)
         services.AddScoped<IHeavyJobProbe, LabHeavyJobProbe>();
         services.AddScoped<IReplayStrategySource, StoredReplayStrategySource>();
-        services.Replace(ServiceDescriptor.Scoped<ICostConfirmationFact, StoredCostConfirmation>()); // the paper statistics read the same stored confirmation; the Application default (NotConfirmed) stays the test default (P8-23)
         services.AddScoped<IExitSelectionStore, ExitSelectionStore>(); // the exit choices (spec P4-06)
         services.AddScoped<IStrategyStore, StrategyStore>(); // the stored strategies of the lab schema (spec P3-02d)
         services.AddScoped<ILabResultStore, LabResultStore>(); // the results of full tests (spec P5-04)

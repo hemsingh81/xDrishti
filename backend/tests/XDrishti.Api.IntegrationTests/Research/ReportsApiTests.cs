@@ -302,7 +302,7 @@ public sealed class ReportsApiTests(ApiFactory factory) : DataTestBase(factory)
     }
 
     [Fact]
-    public async Task With_the_stored_confirmation_a_net_report_over_runs_costed_with_that_sheet_is_made_and_prints_what_was_confirmed()
+    public async Task A_confirm_row_in_the_old_log_never_makes_a_report_net_because_costs_are_gross_forever()
     {
         var run = StoredRunFixtures.Run(costed: true, to: RunStoreRoundTripTests.NextTo(), strategy: "RPTNET", fixtureEdges: false);
         using (var scope = Factory.Services.CreateScope())
@@ -312,45 +312,16 @@ public sealed class ReportsApiTests(ApiFactory factory) : DataTestBase(factory)
             (await scope.ServiceProvider.GetRequiredService<ICommandHandler<StoreRunCommand, StoreOutcome>>().HandleAsync(new StoreRunCommand(run, StoreKit.Record(run), SimulateStore.Actor), Ct)).IsSuccess.ShouldBeTrue();
         }
 
-        var before = await GetProblemAsync($"/api/reports/summary?runs={run.RunKey}&basis=net");
         var on = await ConfirmAsync("fixture-a");
-        var net = await GetOkAsync($"/api/reports/summary?runs={run.RunKey}&basis=net");
+        var net = await GetProblemAsync($"/api/reports/summary?runs={run.RunKey}&basis=net");
         var gross = await GetOkAsync($"/api/reports/summary?runs={run.RunKey}");
         var runs = await GetOkAsync("/api/reports/runs");
 
-        before.ShouldBe((HttpStatusCode.UnprocessableEntity, "reports.net_not_confirmed"));
-        net.GetProperty("evidence").GetProperty("basis").GetString().ShouldBe("net");
-        net.GetProperty("evidence").GetProperty("netBasisConfirmation").GetString().ShouldBe($"charge sheet 'fixture-a' with rates {FixtureSheet.Sheet.RatesSha256[..12]} confirmed by the owner on {on}");
-        Number(net.GetProperty("all").GetProperty("totalR")).ShouldBe(run.Trades.Sum(t => t.Trade.Costing!.RNet), 1e-9);
+        on.ShouldNotBeNull("the row is stored: the old log is kept as audit history");
+        net.ShouldBe((HttpStatusCode.UnprocessableEntity, "reports.net_not_confirmed"), "ADR 0292: no confirmation is ever read");
+        gross.GetProperty("evidence").GetProperty("basis").GetString().ShouldBe("gross");
         Number(gross.GetProperty("all").GetProperty("totalR")).ShouldBe(run.Trades.Sum(t => t.Trade.RFilled), 1e-9);
-        net.GetProperty("all").GetProperty("n").GetInt32().ShouldBe(run.Trades.Count);
-        runs.GetProperty("net").GetProperty("state").GetString().ShouldBe("value");
-        runs.GetProperty("runs").EnumerateArray().Single(r => r.GetProperty("runKey").GetString() == run.RunKey).GetProperty("netPossible").GetBoolean().ShouldBeTrue();
-        runs.GetProperty("runs").EnumerateArray().Single(r => r.GetProperty("runKey").GetString() == ReportFixture.RunA.RunKey).GetProperty("netPossible").GetBoolean().ShouldBeFalse();
-    }
-
-    [Fact]
-    public async Task A_net_report_over_a_gross_run_is_refused_even_with_the_confirmation()
-    {
-        await StoreCostedRunAsync("RPTNETG");
-        await ConfirmAsync("fixture-a");
-
-        var problem = await GetProblemAsync($"/api/reports/summary?runs={ReportFixture.RunA.RunKey}&basis=net");
-
-        problem.Status.ShouldBe(HttpStatusCode.UnprocessableEntity);
-        problem.Code.ShouldBe("reports.net_unavailable");
-    }
-
-    [Fact]
-    public async Task A_confirmation_that_names_no_stored_sheet_counts_as_not_confirmed()
-    {
-        await ConfirmAsync("no-such-sheet");
-
-        var runs = await GetOkAsync("/api/reports/runs");
-        var problem = await GetProblemAsync($"/api/reports/summary?runs={Both}&basis=net");
-
         runs.GetProperty("net").GetProperty("state").GetString().ShouldBe("unavailable");
-        problem.ShouldBe((HttpStatusCode.UnprocessableEntity, "reports.net_not_confirmed"));
     }
 
     [Fact]
@@ -364,59 +335,6 @@ public sealed class ReportsApiTests(ApiFactory factory) : DataTestBase(factory)
 
         problem.ShouldBe((HttpStatusCode.UnprocessableEntity, "reports.net_not_confirmed"));
         runs.GetProperty("net").GetProperty("state").GetString().ShouldBe("unavailable");
-    }
-
-    [Fact]
-    public async Task A_confirmation_made_through_the_owners_endpoint_is_what_makes_a_report_net_and_a_revoke_makes_it_gross_again()
-    {
-        var run = await StoreCostedRunAsync("RPTNETE");
-        var net = $"/api/reports/summary?runs={run.RunKey}&basis=net";
-        (await GetProblemAsync(net)).ShouldBe((HttpStatusCode.UnprocessableEntity, "reports.net_not_confirmed"));
-
-        using var on = await Client.PutAsJsonAsync(new Uri("/api/charge-sheet/capability", UriKind.Relative), new { on = true, reason = "I will confirm my sheet", password = Factory.OwnerPassword }, Ct);
-        using var confirm = await Client.PostAsJsonAsync(new Uri("/api/charge-sheet/confirmation", UriKind.Relative), new { sheetId = "fixture-a", ratesSha256 = FixtureSheet.Sheet.RatesSha256, reason = "checked against my contract notes", password = Factory.OwnerPassword }, Ct);
-        on.StatusCode.ShouldBe(HttpStatusCode.OK);
-        confirm.StatusCode.ShouldBe(HttpStatusCode.OK);
-
-        (await GetOkAsync(net)).GetProperty("evidence").GetProperty("basis").GetString().ShouldBe("net");
-        using var revoke = await Client.PostAsJsonAsync(new Uri("/api/charge-sheet/confirmation/revoke", UriKind.Relative), new { reason = "changed my mind", password = Factory.OwnerPassword }, Ct);
-        revoke.StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await GetProblemAsync(net)).ShouldBe((HttpStatusCode.UnprocessableEntity, "reports.net_not_confirmed"));
-    }
-
-    [Fact]
-    public async Task A_revoked_confirmation_makes_every_report_gross_again()
-    {
-        var run = await StoreCostedRunAsync("RPTNETR");
-        await ConfirmAsync("fixture-a");
-        (await GetOkAsync($"/api/reports/summary?runs={run.RunKey}&basis=net")).GetProperty("evidence").GetProperty("basis").GetString().ShouldBe("net");
-
-        await ExecuteSqlAsync($"INSERT INTO workflow.charge_sheet_events (kind, sheet_id, rates_sha256, actor, reason) VALUES ('revoke', 'fixture-a', '{FixtureSheet.Sheet.RatesSha256}', 'owner:test@example.com', 'test')");
-        var problem = await GetProblemAsync($"/api/reports/summary?runs={run.RunKey}&basis=net");
-
-        problem.ShouldBe((HttpStatusCode.UnprocessableEntity, "reports.net_not_confirmed"));
-    }
-
-    [Fact]
-    public async Task A_stored_confirmation_stays_what_it_is_whatever_sheet_the_request_names()
-    {
-        var run = await StoreCostedRunAsync("RPTNET2");
-        var on = await ConfirmAsync("fixture-a");
-
-        var net = await GetOkAsync($"/api/reports/summary?runs={run.RunKey}&basis=net&sheet_id=other-sheet&sheet=other&rates_sha256={new string('0', 64)}&confirmed_on=2020-01-01");
-
-        net.GetProperty("evidence").GetProperty("netBasisConfirmation").GetString().ShouldBe($"charge sheet 'fixture-a' with rates {FixtureSheet.Sheet.RatesSha256[..12]} confirmed by the owner on {on}");
-    }
-
-    [Fact]
-    public async Task A_confirmation_of_rates_the_stored_sheet_no_longer_has_is_not_a_confirmation()
-    {
-        var run = await StoreCostedRunAsync("RPTNET3");
-        await ConfirmAsync("fixture-a", new string('1', 64));
-
-        var problem = await GetProblemAsync($"/api/reports/summary?runs={run.RunKey}&basis=net");
-
-        problem.ShouldBe((HttpStatusCode.UnprocessableEntity, "reports.net_not_confirmed"));
     }
 
     private async Task<XDrishti.Domain.Research.SimulationRun> StoreCostedRunAsync(string strategy)

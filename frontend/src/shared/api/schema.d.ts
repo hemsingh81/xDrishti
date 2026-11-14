@@ -6435,58 +6435,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/charge-sheet/confirmation': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** What stands about the owner's confirmation of the charge sheet (not_confirmed, confirmed, stale, sheet_missing, revoked), whether confirming is switched on (off by default), a preview of the stored sheet (the one named by sheetId, else the one in force) with the rates hash a confirmation must carry, and the history. 400 chargesheet.sheet_invalid */
-    get: operations['GetChargeSheetConfirmation'];
-    put?: never;
-    /** Confirm ONE stored charge sheet as the owner, at the SHA-256 of its rates as shown; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY request. 401 auth.invalid_credentials, 423 auth.locked, 403 chargesheet.capability_off or chargesheet.owner_only, 404 chargesheet.sheet_not_found, 400 chargesheet.sheet_invalid, chargesheet.rates_invalid or chargesheet.reason_invalid, 409 chargesheet.rates_changed, 429 auth.rate_limited. Repeating the same confirmation writes nothing and answers changed=false */
-    post: operations['ConfirmChargeSheet'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/charge-sheet/confirmation/revoke': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Withdraw the confirmation in force as the owner; appends an audited row (a revoke never edits the confirmation it withdraws). Works also while confirming is switched off. Revoking when nothing is confirmed writes nothing and answers changed=false. Needs a session, the CSRF token and the password in the body, checked on EVERY request. 401 auth.invalid_credentials, 423 auth.locked, 400 chargesheet.reason_invalid, 429 auth.rate_limited */
-    post: operations['RevokeChargeSheetConfirmation'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/charge-sheet/capability': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    /** Switch on or off the capability to confirm a charge sheet (off by default; no setting confirms anything by itself). Appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY request. 401 auth.invalid_credentials, 423 auth.locked, 400 chargesheet.reason_invalid, 429 auth.rate_limited */
-    put: operations['ChangeChargeSheetCapability'];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/capabilities': {
     parameters: {
       query?: never;
@@ -9335,15 +9283,6 @@ export interface components {
       /** @description The owner's password, re-entered for THIS switch. Needed to switch ON and checked on every request (an earlier step-up window does not count and is not used up); not needed to switch OFF. */
       password: null | string;
     };
-    /** @description The body of the switch that allows confirming (off until the owner switches it on). */
-    ChangeChargeSheetCapabilityRequest: {
-      /** @description True to allow the owner to confirm a sheet, false to stop allowing it. Switching it off does not revoke a confirmation. */
-      on: boolean;
-      /** @description Why, 1 to 500 characters. */
-      reason: null | string;
-      /** @description The owner's password, re-entered for THIS act. */
-      password: null | string;
-    };
     /** @description The body of a change to the Failure notices setting: on or off, and the password (needed to turn it OFF). */
     ChangeEssentialRequest: {
       on: boolean;
@@ -9426,100 +9365,6 @@ export interface components {
       from: string;
       /** @description The state after. */
       to: string;
-    };
-    /** @description What the act did, and what stands afterwards. */
-    ChargeSheetActOutcome: {
-      /** @description True when a row was written; false when the log already said the same. */
-      changed: boolean;
-      /** @description The status after the act. */
-      status: components['schemas']['ChargeSheetStatusView'];
-    };
-    /** @description One act in the history. */
-    ChargeSheetHistoryView: {
-      /**
-       * Format: int64
-       * @description The row.
-       */
-      id: number;
-      /** @description `confirm`, `revoke`, `gate_on` or `gate_off`. */
-      kind: string;
-      /** @description The sheet, for a confirmation or revoke. */
-      sheetId: null | string;
-      /** @description Its rates hash, for a confirmation or revoke. */
-      ratesSha256: null | string;
-      /** @description Who. */
-      actor: string;
-      /** @description Why. */
-      reason: string;
-      /**
-       * Format: date-time
-       * @description When.
-       */
-      at: string;
-    };
-    /** @description The confirmation that is the newest act on the confirmation. */
-    ChargeSheetInForceView: {
-      /** @description The sheet. */
-      sheetId: string;
-      /** @description The hash of its rates as confirmed. */
-      ratesSha256: string;
-      /**
-       * Format: date
-       * @description India date of the confirmation.
-       */
-      confirmedOn: string;
-      /** @description Who. */
-      actor: string;
-      /**
-       * Format: date-time
-       * @description When.
-       */
-      at: string;
-    };
-    /** @description A stored sheet as the owner is asked to confirm it. */
-    ChargeSheetPreviewView: {
-      /** @description The id. */
-      id: string;
-      /** @description Its label. */
-      label: string;
-      /** @description Where its figures came from. */
-      source: string;
-      /** @description What it was checked against; null means unchecked. */
-      checked: null | string;
-      /**
-       * Format: int32
-       * @description How many dated schedules it has.
-       */
-      schedules: number;
-      /**
-       * Format: date
-       * @description The first schedule's start.
-       */
-      firstEffective: string;
-      /**
-       * Format: date
-       * @description The last schedule's start.
-       */
-      lastEffective: string;
-      /** @description The SHA-256 of its rates now: what a confirmation must carry. */
-      ratesSha256: string;
-    };
-    /** @description What stands about the confirmation now (spec P8-23). */
-    ChargeSheetStatusView: {
-      /** @description Whether the owner switched the capability to confirm on. OFF by default; nothing confirms while it is off. */
-      capabilityOn: boolean;
-      /** @description `not_confirmed`, `confirmed`, `stale` (the stored sheet has other rates now), `sheet_missing` or `revoked`. */
-      state: string;
-      /** @description One sentence of what stands, as the reports will print it. */
-      text: string;
-      inForce: null | components['schemas']['ChargeSheetInForceView'];
-      sheet: null | components['schemas']['ChargeSheetPreviewView'];
-      /** @description Why there is no sheet to show, or null. */
-      sheetNote: null | string;
-      /** @description What confirming means, and what it does not. */
-      meaning: string;
-      /** @description The acts, newest first (the latest 20). */
-      history: components['schemas']['ChargeSheetHistoryView'][];
     };
     /** @description The owner's "approve despite" for one account: the check codes named and why. The ticket's own symbol is bound by the server; the owner is never part of any body. */
     CheckConfirmationRequest: {
@@ -9883,17 +9728,6 @@ export interface components {
       blockers: components['schemas']['BlockerView'][];
       /** @description Groups that could not be read. */
       unreadable: string[];
-    };
-    /** @description The body of a confirmation of one stored charge sheet. The owner is never part of it: the actor comes from the signed-in session. There is no flag that says "confirmed": the body names the sheet and the rates hash the owner was shown. */
-    ConfirmChargeSheetRequest: {
-      /** @description The stored sheet the owner confirms. */
-      sheetId: null | string;
-      /** @description The SHA-256 of its rates as the screen showed it; if the stored sheet has other rates now the answer is 409 `chargesheet.rates_changed`. */
-      ratesSha256: null | string;
-      /** @description Why, 1 to 500 characters (for example what the sheet was checked against). */
-      reason: null | string;
-      /** @description The owner's password, re-entered for THIS act and checked on every request. */
-      password: null | string;
     };
     /**
      * @description The body of `POST /api/assistant/strategy-drafts/{id}/confirm` (spec P9-07 AC 7): the owner's edited text (absent: the stored draft's), the universe of the quick test (a basket or symbols; the owner picks), whether to run it, and the owner's password for THIS confirm.
@@ -22540,13 +22374,6 @@ export interface components {
       confirmedDespite: null | string;
       /** @description The checklist per account. */
       accounts: components['schemas']['ReviewAccountView'][];
-    };
-    /** @description The body of a revocation: it withdraws the confirmation in force, whatever sheet that is. */
-    RevokeChargeSheetRequest: {
-      /** @description Why, 1 to 500 characters. */
-      reason: null | string;
-      /** @description The owner's password, re-entered for THIS act. */
-      password: null | string;
     };
     /** @description The values of a risk profile to create or to replace an existing one with. Every value is required. */
     RiskProfileInput: {
@@ -42037,154 +41864,6 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
-        };
-      };
-    };
-  };
-  GetChargeSheetConfirmation: {
-    parameters: {
-      query?: {
-        sheetId?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChargeSheetStatusView'];
-        };
-      };
-      /** @description Bad Request */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
-        };
-      };
-    };
-  };
-  ConfirmChargeSheet: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ConfirmChargeSheetRequest'];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChargeSheetActOutcome'];
-        };
-      };
-      /** @description Bad Request */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
-        };
-      };
-      /** @description Not Found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ProblemDetails'];
-        };
-      };
-      /** @description Conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ProblemDetails'];
-        };
-      };
-    };
-  };
-  RevokeChargeSheetConfirmation: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['RevokeChargeSheetRequest'];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChargeSheetActOutcome'];
-        };
-      };
-      /** @description Bad Request */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
-        };
-      };
-    };
-  };
-  ChangeChargeSheetCapability: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ChangeChargeSheetCapabilityRequest'];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChargeSheetActOutcome'];
-        };
-      };
-      /** @description Bad Request */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
         };
       };
     };
