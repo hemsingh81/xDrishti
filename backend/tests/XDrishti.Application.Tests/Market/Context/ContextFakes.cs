@@ -70,6 +70,41 @@ internal sealed class FakeContextDayStore : IContextDayStore
         return ValueTask.FromResult(inserted);
     }
 
+    public List<ContextVixDay> VixCsv { get; } = [];
+
+    public Dictionary<DateOnly, string> Sources { get; } = [];
+
+    public ValueTask<int> InsertAsync(Guid indexInstrumentId, IReadOnlyList<ContextDayRecord> records, string source, CancellationToken cancellationToken)
+    {
+        var inserted = 0;
+        foreach (var record in records.Where(r => Rows.All(x => x.Date != r.Date)))
+        {
+            Rows.Add(record);
+            Sources[record.Date] = source;
+            inserted++;
+        }
+
+        return ValueTask.FromResult(inserted);
+    }
+
+    public ValueTask<int> InsertVixAsync(IReadOnlyList<ContextVixDay> days, CancellationToken cancellationToken)
+    {
+        var inserted = 0;
+        foreach (var day in days.Where(d => VixCsv.All(x => x.Date != d.Date) && Rows.All(r => r.Date != d.Date || r.VixClose is null)))
+        {
+            VixCsv.Add(day);
+            inserted++;
+        }
+
+        return ValueTask.FromResult(inserted);
+    }
+
+    public ValueTask<ContextCsvCounts> CsvCountsAsync(CancellationToken cancellationToken)
+    {
+        var csv = Sources.Where(s => s.Value == "nse_csv").Select(s => s.Key).Order().ToList();
+        return ValueTask.FromResult(new ContextCsvCounts(csv.Count, VixCsv.Count, csv.Count == 0 ? null : csv[0], csv.Count == 0 ? null : csv[^1]));
+    }
+
     /// <summary>The breadth of each day that has one, with the same once-only rule as the table.</summary>
     public Dictionary<DateOnly, StoredBreadth> Breadth { get; } = [];
 

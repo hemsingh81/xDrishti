@@ -26,6 +26,12 @@ public sealed class ContextFiguresAdapterTests
             return ValueTask.FromResult<IReadOnlyList<ContextDayRecord>>([.. Rows]);
         }
 
+        public ValueTask<int> InsertAsync(Guid indexInstrumentId, IReadOnlyList<ContextDayRecord> records, string source, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<int> InsertVixAsync(IReadOnlyList<ContextVixDay> days, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<ContextCsvCounts> CsvCountsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public ValueTask<int> InsertAsync(Guid indexInstrumentId, IReadOnlyList<ContextDayRecord> records, CancellationToken cancellationToken)
         {
             Rows.AddRange(records);

@@ -699,6 +699,7 @@ public static class DependencyInjection
         services.AddSingleton<ContextFiguresAdapter.Cache>();
         services.AddScoped<IContextBarSource, ContextBarSource>();
         services.AddScoped<IContextDayStore, ContextDayStore>();
+        services.AddSingleton<IContextInbox, FolderContextInbox>(); // the owner's CSV drop folder for NIFTY 50 and INDIA VIX (P3-01d fallback D)
         services.AddScoped<IBreadthSource, BreadthSource>();
         services.AddOptions<RelativeStrengthSettings>().Bind(configuration.GetSection(RelativeStrengthSettings.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the relative-strength step: OFF by default, the catch-up and the minimum samples (spec BK-09, ADR 0263)
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<RelativeStrengthSettings>>().Value);

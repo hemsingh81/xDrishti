@@ -11,8 +11,11 @@ internal sealed class ContextUpkeep(
     ICommandHandler<ComputeBreadthCommand, BreadthComputed> breadth,
     ILogger<ContextUpkeep> logger,
     ICommandHandler<ComputeBasketContextCommand, BasketContextComputed>? basketContext = null,
-    ICommandHandler<ComputeRelativeStrengthCommand, RelativeStrengthComputed>? strength = null) : IContextUpkeep
+    ICommandHandler<ComputeRelativeStrengthCommand, RelativeStrengthComputed>? strength = null,
+    ICommandHandler<LoadContextInboxCommand, ContextInboxLoaded>? inboxLoad = null) : IContextUpkeep
 {
+    private const string InboxCrashed = "The context inbox could not be read. See the API log.";
+
     private const string Crashed = "The market context could not be updated. See the API log.";
 
     public async ValueTask RunAsync(JobReporter reporter, CancellationToken cancellationToken)
@@ -24,6 +27,12 @@ internal sealed class ContextUpkeep(
             if (result.IsFailure)
             {
                 await reporter.WarnAsync("Market context: " + result.Error.Message, cancellationToken);
+            }
+
+            // The owner-dropped NSE CSVs (P3-01d fallback D): after the derivation, so a day the bars gave is never taken from a CSV; a failure is a warning of its own.
+            if (inboxLoad is not null)
+            {
+                await RunInboxAsync(inboxLoad, reporter, cancellationToken);
             }
 
             // The breadth of the days just written (and of any day still without one); a failure here is a warning of its own, the index figures are already stored.
@@ -59,6 +68,29 @@ internal sealed class ContextUpkeep(
         {
             ContextLog.UpkeepCrashed(logger, ex);
             await reporter.WarnAsync(Crashed, cancellationToken);
+        }
+    }
+
+    /// <summary>The inbox step on its own: whatever goes wrong in it is a warning, and the breadth, the basket context and the strength still run.</summary>
+    private async ValueTask RunInboxAsync(ICommandHandler<LoadContextInboxCommand, ContextInboxLoaded> inboxLoad, JobReporter reporter, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (await inboxLoad.HandleAsync(new LoadContextInboxCommand(), cancellationToken) is { IsFailure: true } loaded)
+            {
+                await reporter.WarnAsync("Context inbox: " + loaded.Error.Message, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+#pragma warning disable CA1031 // a drop folder that cannot be read must not stop the rest of the upkeep: it is a warning of the job
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            ContextLog.InboxStepFailed(logger, ex);
+            await reporter.WarnAsync(InboxCrashed, cancellationToken);
         }
     }
 }

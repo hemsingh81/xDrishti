@@ -10,10 +10,13 @@ internal sealed class ContextDayStore(NpgsqlDataSource dataSource, TimeProvider 
     /// <summary>The <c>source</c> of a row derived from the stored 1-minute bars.</summary>
     public const string DerivedSource = "derived_1m";
 
+    /// <summary>The <c>source</c> of a row read from an owner-dropped NSE CSV (P3-01d fallback D).</summary>
+    public const string CsvSource = "nse_csv";
+
     public async ValueTask<ContextStamp> StampAsync(CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(
-            "SELECT count(*)::integer, max(date), count(breadth_state)::integer, max(breadth_computed_at), coalesce(sum(breadth), 0)::double precision FROM market.context_daily");
+            "SELECT count(*)::integer, max(date), count(breadth_state)::integer, max(breadth_computed_at), coalesce(sum(breadth), 0)::double precision, (SELECT count(*)::integer FROM market.context_vix_csv) FROM market.context_daily");
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         await reader.ReadAsync(cancellationToken);
         return new ContextStamp(
@@ -21,7 +24,8 @@ internal sealed class ContextDayStore(NpgsqlDataSource dataSource, TimeProvider 
             reader.IsDBNull(1) ? null : reader.GetFieldValue<DateOnly>(1),
             reader.GetInt32(2),
             reader.IsDBNull(3) ? null : reader.GetFieldValue<DateTimeOffset>(3),
-            reader.GetDouble(4));
+            reader.GetDouble(4),
+            reader.GetInt32(5));
     }
 
     public async ValueTask<IReadOnlyList<DateOnly>> ListDatesAsync(CancellationToken cancellationToken)
@@ -40,7 +44,11 @@ internal sealed class ContextDayStore(NpgsqlDataSource dataSource, TimeProvider 
     public async ValueTask<IReadOnlyList<ContextDayRecord>> ListAsync(CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(
-            "SELECT date, index_high, index_low, index_close, vix_close, index_bars, vix_bars, breadth, breadth_universe FROM market.context_daily ORDER BY date");
+            """
+            SELECT c.date, c.index_high, c.index_low, c.index_close, coalesce(c.vix_close, v.vix_close), c.index_bars,
+                   CASE WHEN c.vix_close IS NOT NULL THEN c.vix_bars WHEN v.vix_close IS NOT NULL THEN 1::smallint END, c.breadth, c.breadth_universe
+            FROM market.context_daily c LEFT JOIN market.context_vix_csv v ON v.date = c.date ORDER BY c.date
+            """);
         var rows = new List<ContextDayRecord>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
@@ -60,8 +68,12 @@ internal sealed class ContextDayStore(NpgsqlDataSource dataSource, TimeProvider 
         return rows;
     }
 
-    public async ValueTask<int> InsertAsync(Guid indexInstrumentId, IReadOnlyList<ContextDayRecord> records, CancellationToken cancellationToken)
+    public ValueTask<int> InsertAsync(Guid indexInstrumentId, IReadOnlyList<ContextDayRecord> records, CancellationToken cancellationToken) =>
+        InsertAsync(indexInstrumentId, records, DerivedSource, cancellationToken);
+
+    public async ValueTask<int> InsertAsync(Guid indexInstrumentId, IReadOnlyList<ContextDayRecord> records, string source, CancellationToken cancellationToken)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
         ArgumentNullException.ThrowIfNull(records);
         if (records.Count == 0)
         {
@@ -72,6 +84,7 @@ internal sealed class ContextDayStore(NpgsqlDataSource dataSource, TimeProvider 
         var inserted = 0;
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        // shortcut: one INSERT per row in one transaction (a CSV history is about 4,000 rows at most, loaded once); a batch or COPY is not worth it here.
         foreach (var record in records)
         {
             await using var command = new NpgsqlCommand(
@@ -90,13 +103,56 @@ internal sealed class ContextDayStore(NpgsqlDataSource dataSource, TimeProvider 
             command.Parameters.Add(new NpgsqlParameter<double?>("vix", record.VixClose));
             command.Parameters.AddWithValue("indexBars", (short)record.IndexBars);
             command.Parameters.Add(new NpgsqlParameter<short?>("vixBars", record.VixBars is { } vb ? (short)vb : null));
-            command.Parameters.AddWithValue("source", DerivedSource);
+            command.Parameters.AddWithValue("source", source);
             command.Parameters.AddWithValue("now", now);
             inserted += await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);
         return inserted;
+    }
+
+    public async ValueTask<int> InsertVixAsync(IReadOnlyList<ContextVixDay> days, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(days);
+        var now = clock.GetUtcNow();
+        var inserted = 0;
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        foreach (var day in days)
+        {
+            await using var command = new NpgsqlCommand(
+                """
+                INSERT INTO market.context_vix_csv (date, vix_close, source, written_at)
+                SELECT @date, @close, @source, @now
+                WHERE NOT EXISTS (SELECT 1 FROM market.context_daily WHERE date = @date AND vix_close IS NOT NULL)
+                ON CONFLICT (date) DO NOTHING
+                """,
+                connection,
+                transaction);
+            command.Parameters.AddWithValue("date", day.Date);
+            command.Parameters.AddWithValue("close", day.Close);
+            command.Parameters.AddWithValue("source", CsvSource);
+            command.Parameters.AddWithValue("now", now);
+            inserted += await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return inserted;
+    }
+
+    public async ValueTask<ContextCsvCounts> CsvCountsAsync(CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(
+            "SELECT count(*)::integer, min(date), max(date), (SELECT count(*)::integer FROM market.context_vix_csv) FROM market.context_daily WHERE source = @source");
+        command.Parameters.AddWithValue("source", CsvSource);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        await reader.ReadAsync(cancellationToken);
+        return new ContextCsvCounts(
+            reader.GetInt32(0),
+            reader.GetInt32(3),
+            reader.IsDBNull(1) ? null : reader.GetFieldValue<DateOnly>(1),
+            reader.IsDBNull(2) ? null : reader.GetFieldValue<DateOnly>(2));
     }
 
     public async ValueTask<IReadOnlyList<StoredBreadth>> ListBreadthAsync(CancellationToken cancellationToken)

@@ -50,6 +50,7 @@ internal sealed class GetContextCoverageHandler(
             }
         }
 
+        var csv = await store.CsvCountsAsync(cancellationToken);
         var breadth = Breadth(await store.ListBreadthAsync(cancellationToken));
         return new ContextCoverageView(
             settings.Enabled,
@@ -73,8 +74,9 @@ internal sealed class GetContextCoverageHandler(
             health?.GapSessions ?? 0,
             skipped.Count,
             [.. skipped.Take(MaxSkippedListed).Select(s => new ContextSkippedView(s.Date, s.Reason.ToCode(), s.Bars))],
-            SourceNote,
-            breadth);
+            csv.IndexDays > 0 ? SourceNote + "; " + csv.IndexDays.ToString(System.Globalization.CultureInfo.InvariantCulture) + " days are the official figures from NSE CSV files (source nse_csv)" : SourceNote,
+            breadth,
+            new ContextCsvView(csv.IndexDays, csv.VixDays, csv.First, csv.Last));
     }
 
     private static ContextBreadthView Breadth(IReadOnlyList<StoredBreadth> rows)

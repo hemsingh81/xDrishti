@@ -553,6 +553,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ContextCoverageView))]
 [JsonSerializable(typeof(RegimeLabelsView))]
 [JsonSerializable(typeof(ContextBreadthView))]
+[JsonSerializable(typeof(ContextCsvView))]
 [JsonSerializable(typeof(InstrumentBars))]
 [JsonSerializable(typeof(StartQualityRunRequest))]
 [JsonSerializable(typeof(QualityOverview))]
