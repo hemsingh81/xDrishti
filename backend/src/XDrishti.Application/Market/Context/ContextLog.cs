@@ -14,6 +14,12 @@ internal static partial class ContextLog
     [LoggerMessage(EventId = 3393, Level = LogLevel.Error, Message = "Market context upkeep after a data job failed")]
     public static partial void UpkeepCrashed(ILogger logger, Exception exception);
 
+    [LoggerMessage(EventId = 3396, Level = LogLevel.Information, Message = "Context inbox: {Files} files, {Failed} failed, {IndexWritten} index days and {VixWritten} VIX closes written, {AlreadyStored} already stored, refused {Rejected}")]
+    public static partial void InboxLoaded(ILogger logger, int files, int failed, int indexWritten, int vixWritten, int alreadyStored, string rejected);
+
+    [LoggerMessage(EventId = 3397, Level = LogLevel.Error, Message = "Context inbox step failed")]
+    public static partial void InboxStepFailed(ILogger logger, Exception exception);
+
     [LoggerMessage(EventId = 3394, Level = LogLevel.Information, Message = "Breadth computed: {Days} days, {InsufficientDays} insufficient, {PendingDays} waiting, {Ms} ms")]
     public static partial void BreadthComputed(ILogger logger, int days, int insufficientDays, int pendingDays, long ms);
 

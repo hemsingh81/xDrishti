@@ -25,3 +25,6 @@
 | Last 1-minute close vs published daily close (10 dates) | pending | pending |
 
 **Outcome:** pending. Decided fallbacks, from the spec: O2 (VIX missing) gets a null VIX and `regime_vol` from the index alone; O3 (neither served) needs the owner's decision on the daily-history endpoint (a security act, separate slice) or a CSV loader; O4 (shallow) builds and the coverage prints when each feature becomes readable; O5 (many thin days) revisits `Data:Context:MinDayFraction` with the numbers.
+
+## Fallback D: how to use it (built 2026-11-14, ADR 0290)
+If the probe gives O2 (VIX missing or short) or O3, or you want the official daily figures to fill gaps: download the **NIFTY 50** history CSV from niftyindices.com and the **INDIA VIX** history CSV from nseindia.com by hand (NSE limits one download to about a year; drop several files), and drop them into `data/inbox/context/` (create the folder 0700; `deploy/xd-up.sh` does). The next data job that aggregates loads them, or run `scripts/context.sh import`. Handled files move to `done/` or `failed/` inside the folder; `scripts/context.sh coverage` shows how many days came from CSV. A CSV fills only days that are missing; it never overwrites a Dhan-derived day. Whether your use of the NSE downloads fits the NSE terms of use is your reading, not the system's.

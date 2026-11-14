@@ -37,6 +37,7 @@ internal static class ContextCommand
             return options.Action switch
             {
                 ContextAction.Refresh => await RefreshAsync(scope.ServiceProvider, console, logger, cancellationToken),
+                ContextAction.Import => await ImportAsync(scope.ServiceProvider, console, cancellationToken),
                 ContextAction.RebuildBreadth => await RebuildBreadthAsync(options, scope.ServiceProvider, console, cancellationToken),
                 _ => await CoverageAsync(scope.ServiceProvider, console, logger, cancellationToken),
             };
@@ -73,6 +74,32 @@ internal static class ContextCommand
         if (done.Missing is not null)
         {
             output.Append("missing: ").Append(done.Missing).Append(" - ").Append(done.Fix).Append('\n');
+        }
+
+        await console.Out.WriteAsync(output.ToString());
+        return SimulateCommand.Done;
+    }
+
+    private static async Task<int> ImportAsync(IServiceProvider provider, SimulateConsole console, CancellationToken cancellationToken)
+    {
+        var handler = provider.GetRequiredService<ICommandHandler<LoadContextInboxCommand, ContextInboxLoaded>>();
+        var result = await handler.HandleAsync(new LoadContextInboxCommand(), cancellationToken);
+        if (result.IsFailure)
+        {
+            await console.Error.WriteLineAsync(result.Error.Code + ": " + result.Error.Message);
+            return SimulateCommand.Refused;
+        }
+
+        var done = result.Value;
+        var output = new StringBuilder();
+        Line(output, "files", done.Files);
+        Line(output, "files moved to failed/", done.FilesFailed);
+        Line(output, "index days written", done.IndexWritten);
+        Line(output, "VIX closes written", done.VixWritten);
+        Line(output, "already stored", done.AlreadyStored);
+        foreach (var (code, count) in done.Rejected.OrderBy(r => r.Key, StringComparer.Ordinal))
+        {
+            Line(output, "refused " + code, count);
         }
 
         await console.Out.WriteAsync(output.ToString());
@@ -151,6 +178,8 @@ internal static class ContextCommand
         Date(output, "vix_pct readable from", v.VixPctReadableFrom);
         Date(output, "regime with both parts from", v.RegimeWithVixReadableFrom);
         Line(output, "vix days", v.VixDays);
+        Line(output, "days from NSE csv", v.Csv.IndexDays);
+        Line(output, "vix closes from NSE csv", v.Csv.VixDays);
         Line(output, "days without a vix", v.VixMissingDays);
         output.Append("vix window span (calendar days): ").Append(v.VixWindowSpanDays?.ToString(CultureInfo.InvariantCulture) ?? "n/a").Append(v.VixWindowTooWide ? " (wider than 400: a gap)" : string.Empty).Append('\n');
         Line(output, "sessions without a record inside the range", v.GapSessions);

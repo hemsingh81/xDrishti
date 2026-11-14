@@ -24,6 +24,12 @@ public sealed class RegimeLabelReadTests
             return ValueTask.FromResult<IReadOnlyList<ContextDayRecord>>([.. rows]);
         }
 
+        public ValueTask<int> InsertAsync(Guid indexInstrumentId, IReadOnlyList<ContextDayRecord> records, string source, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<int> InsertVixAsync(IReadOnlyList<ContextVixDay> days, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<ContextCsvCounts> CsvCountsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public ValueTask<int> InsertAsync(Guid indexInstrumentId, IReadOnlyList<ContextDayRecord> records, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public ValueTask<IReadOnlyList<StoredBreadth>> ListBreadthAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<StoredBreadth>>([]);

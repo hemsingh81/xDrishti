@@ -33591,7 +33591,8 @@
           "skippedTotal",
           "skipped",
           "source",
-          "breadth"
+          "breadth",
+          "csv"
         ],
         "type": "object",
         "properties": {
@@ -33715,9 +33716,46 @@
           },
           "breadth": {
             "$ref": "#/components/schemas/ContextBreadthView"
+          },
+          "csv": {
+            "$ref": "#/components/schemas/ContextCsvView"
           }
         },
         "description": "What the stored market context makes readable (`GET /api/data/context`, criterion 7). `Missing` names an unmet prerequisite (`index_not_tracked`, `vix_not_tracked`, `disabled`) with its `Fix`. `AgeSessions` is the number of\ntrading sessions the newest day is behind the last closed one; `Stale` is more than one."
+      },
+      "ContextCsvView": {
+        "required": [
+          "indexDays",
+          "vixDays",
+          "firstDate",
+          "lastDate"
+        ],
+        "type": "object",
+        "properties": {
+          "indexDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "vixDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "lastDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "Days that came from owner-dropped NSE CSVs (fallback D, source `nse_csv`): index days, VIX closes held in the side table, and the first and last index day."
       },
       "ContextSkippedView": {
         "required": [

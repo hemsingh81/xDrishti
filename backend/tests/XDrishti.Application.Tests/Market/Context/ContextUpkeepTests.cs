@@ -61,6 +61,23 @@ public sealed class ContextUpkeepTests
         job.Warnings.ShouldBe(["The market context could not be updated. See the API log."]);
     }
 
+    private sealed class ThrowingInbox : ICommandHandler<LoadContextInboxCommand, ContextInboxLoaded>
+    {
+        public ValueTask<Result<ContextInboxLoaded>> HandleAsync(LoadContextInboxCommand command, CancellationToken cancellationToken) => throw new IOException("disk gone");
+    }
+
+    [Fact]
+    public async Task A_crash_of_the_inbox_step_is_a_warning_of_its_own_and_the_breadth_step_still_runs()
+    {
+        var (reporter, job) = Reporter();
+        var breadth = new FixedBreadth();
+
+        await new ContextUpkeep(new OkRefresh(), breadth, NullLogger<ContextUpkeep>.Instance, inboxLoad: new ThrowingInbox()).RunAsync(reporter, Ct);
+
+        breadth.Runs.ShouldBe(1);
+        job.Warnings.ShouldBe(["The context inbox could not be read. See the API log."]);
+    }
+
     [Fact]
     public async Task A_failed_result_is_a_warning_with_the_message()
     {

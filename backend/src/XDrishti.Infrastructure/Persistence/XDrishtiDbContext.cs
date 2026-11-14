@@ -269,6 +269,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<ContextDailyRecord> ContextDaily => Set<ContextDailyRecord>();
 
+    internal DbSet<ContextVixCsvRecord> ContextVixCsv => Set<ContextVixCsvRecord>();
+
     internal DbSet<ChargeSheetEventRecord> ChargeSheetEvents => Set<ChargeSheetEventRecord>();
     internal DbSet<CapabilityChangeRecord> CapabilityChanges => Set<CapabilityChangeRecord>();
     internal DbSet<ExperimentJobRecord> ExperimentJobs => Set<ExperimentJobRecord>();

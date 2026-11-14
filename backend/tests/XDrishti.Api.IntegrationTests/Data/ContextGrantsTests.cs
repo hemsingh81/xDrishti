@@ -53,6 +53,17 @@ public sealed class ContextGrantsTests(ResearchGrantsTests.DedicatedServer serve
     }
 
     [Fact]
+    public async Task The_csv_vix_side_table_is_insert_only_for_the_runtime_role()
+    {
+        const string InsertVix = "INSERT INTO market.context_vix_csv (date, vix_close, source, written_at) VALUES ('2026-03-02', 15, 'nse_csv', now())";
+
+        (await SqlStateAsync(server.App, InsertVix)).ShouldBeNull();
+        (await SqlStateAsync(server.App, "UPDATE market.context_vix_csv SET vix_close = 1")).ShouldBe("42501");
+        (await SqlStateAsync(server.App, "DELETE FROM market.context_vix_csv")).ShouldBe("42501");
+        (await SqlStateAsync(server.App, InsertVix.Replace("'2026-03-02', 15", "'2026-03-03', -1"))).ShouldBe("23514");
+    }
+
+    [Fact]
     public async Task The_runtime_role_may_update_the_six_breadth_columns_and_no_other_column_and_the_checks_hold()
     {
         await using var connection = new NpgsqlConnection(server.Owner);

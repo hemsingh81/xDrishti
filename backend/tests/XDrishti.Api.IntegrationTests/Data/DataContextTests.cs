@@ -109,6 +109,28 @@ public sealed class DataContextTests(ApiFactory factory) : DataTestBase(factory)
     }
 
     [Fact]
+    public async Task Csv_days_fill_only_missing_days_and_csv_vix_fills_only_a_missing_vix_and_the_coverage_counts_them()
+    {
+        await InsertContextRowAsync(Sessions[0], close: 22_000, vix: 15);
+        await InsertContextRowAsync(Sessions[1], close: 22_100, vix: null);
+        using var scope = Factory.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IContextDayStore>();
+
+        var days = await store.InsertAsync(Guid.Empty, [new ContextDayRecord(Sessions[0], 99_999, 99_000, 99_500, null, 1, null), new ContextDayRecord(LastSession, 22_300, 22_100, 22_200, null, 1, null)], "nse_csv", Ct);
+        var vix = await store.InsertVixAsync([new ContextVixDay(Sessions[0], 40), new ContextVixDay(Sessions[1], 13.5), new ContextVixDay(LastSession, 14.5), new ContextVixDay(LastSession.AddDays(3), 9)], Ct);
+        var again = await store.InsertVixAsync([new ContextVixDay(Sessions[1], 13.5)], Ct);
+
+        (days, vix, again).ShouldBe((1, 3, 0), "Sessions[0] has a VIX of its own so the CSV one is skipped; the last date has no index row yet but is kept for when it arrives");
+        var rows = (await store.ListAsync(Ct)).ToDictionary(r => r.Date);
+        (rows[Sessions[0]].IndexClose, rows[Sessions[0]].VixClose).ShouldBe((22_000, 15d));
+        rows[Sessions[1]].VixClose.ShouldBe(13.5);
+        (rows[LastSession].IndexClose, rows[LastSession].VixClose).ShouldBe((22_200, 14.5));
+        (await ScalarAsync<string>("SELECT source FROM market.context_daily WHERE date = @d", ("d", LastSession))).ShouldBe("nse_csv");
+        var csv = (await CoverageAsync()).Csv;
+        (csv.IndexDays, csv.VixDays, csv.FirstDate, csv.LastDate).ShouldBe((1, 3, LastSession, LastSession));
+    }
+
+    [Fact]
     public async Task A_thin_index_day_is_skipped_with_its_bars_and_the_job_does_not_fail()
     {
         await LoadIndicesAsync(niftyBars: 300);

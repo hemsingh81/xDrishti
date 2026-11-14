@@ -5123,6 +5123,35 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.Context.ContextVixCsvRecord", b =>
+                {
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source");
+
+                    b.Property<double>("VixClose")
+                        .HasColumnType("double precision")
+                        .HasColumnName("vix_close");
+
+                    b.Property<DateTimeOffset>("WrittenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("written_at");
+
+                    b.HasKey("Date")
+                        .HasName("pk_context_vix_csv");
+
+                    b.ToTable("context_vix_csv", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_context_vix_csv_close", "vix_close > 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Market.DerivedBaskets.BasketMemberScoreRecord", b =>
                 {
                     b.Property<Guid>("VersionId")
