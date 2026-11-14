@@ -81,7 +81,7 @@ internal static class ReplayRequestResolver
         return Result.Success(new ResolvedReplay(to, scope, profile, rule));
     }
 
-    private static ReplayRiskProfile From(XDrishti.Domain.Accounts.RiskProfile p) =>
+    public static ReplayRiskProfile From(XDrishti.Domain.Accounts.RiskProfile p) =>
         new((double)p.RiskPerTradePct, (double)p.MaxCapitalPerTradePct, (double)p.MaxTotalRiskPct, p.MaxPerSector, (double)p.DailyLossPct);
 
     private static bool TryRule(string? text, out ReplayVersionRule rule)

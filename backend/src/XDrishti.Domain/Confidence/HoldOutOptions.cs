@@ -6,7 +6,7 @@ namespace XDrishti.Domain.Confidence;
 /// The <c>Confidence:HoldOut</c> settings of CF-06 (ADR 0207); every number is a proposal of the spec (D4, D5), a setting and not a constant.
 /// </summary>
 /// <param name="Enforce">The owner's switch (default true since HO-01b, ADR 0282 and 0283). The block is fixed at the first Lab post and a default window always ends before it. Off, an explicit window may reach the hold-out and a missing hold-out caps nothing; on, such a window is refused, and a full or robust PASS without a kept hold-out is capped at MARGINAL.</param>
-/// <param name="AutoUnlock">The auto option (default true, ADR 0282): on, the unlock runs once by itself when every development row is a pass; recorded as auto, never as an owner approval. It never claims block 1 of the chain (HO-01): that look stays the owner's act.</param>
+/// <param name="AutoUnlock">The auto option (default true, ADR 0282): on, the unlock runs once by itself when every development row is a pass; recorded as auto, never as an owner approval. The evening seal never claims block 1 of the chain (HO-01); the SR-04 simulation takes block 1's look automatically under this same option (ADR 0292, 0293).</param>
 /// <param name="MinMonths">Shortest hold-out in months (default 6; 1..60).</param>
 /// <param name="SharePercent">Share of the stored history kept (default 20; 5..50).</param>
 /// <param name="MinTrades">Fewest hold-out trades for a statement (default 30; 5..1000).</param>

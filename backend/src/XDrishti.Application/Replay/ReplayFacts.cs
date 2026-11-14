@@ -64,6 +64,8 @@ internal sealed class ReplayFacts(
 
     private static readonly TimeSpan IndiaOffset = TimeSpan.FromHours(5.5);
 
+    private bool _readInside;
+
     private readonly ClampedBars _bars = new(holdOut, holdOutOptions, minuteBars, seams, dayBars, options.ReadAheadSessions);
     private readonly Dictionary<string, StoredVersion?> _startVersions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<StoredVersion>> _allVersions = new(StringComparer.Ordinal);
@@ -81,7 +83,14 @@ internal sealed class ReplayFacts(
 
     public ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken) => _bars.LastReadableAsync(cancellationToken);
 
-    public ValueTask<IReadOnlyList<(DateOnly Start, DateOnly End)>> ReleasedHoldOutAsync(CancellationToken cancellationToken) => holdOut.ReleasedAsync(cancellationToken);
+    public async ValueTask<IReadOnlyList<(DateOnly Start, DateOnly End)>> ReleasedHoldOutAsync(CancellationToken cancellationToken) =>
+        _readInside && await holdOut.CurrentAsync(cancellationToken) is { } inside ? [.. await holdOut.ReleasedAsync(cancellationToken), (inside.Start, inside.HistoryLast)] : await holdOut.ReleasedAsync(cancellationToken);
+
+    public void ReadInsideHoldOut(DateOnly through)
+    {
+        _bars.Widen(through);
+        _readInside = true;
+    }
 
     public async ValueTask<IReadOnlyList<(DateOnly Session, double Close)>> DayClosesAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
         [.. (await _bars.DaysAsync(instrumentId, from, to, cancellationToken)).Select(b => (XDrishti.Domain.Market.IndiaTime.Today(b.Ts), b.Close))];

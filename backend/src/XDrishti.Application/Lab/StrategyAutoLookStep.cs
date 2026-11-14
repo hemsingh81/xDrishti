@@ -7,7 +7,7 @@ namespace XDrishti.Application.Lab;
 
 /// <summary>
 /// The strategy auto look of the seal service (HO-01 D10): with <c>Confidence:HoldOut:AutoUnlock</c> on and the block in force sealed with its strategy slot free, queues the existing <c>holdout</c> Lab job, recorded as <c>auto</c>, for the best candidate
-/// (<see cref="HoldOutStrategyCandidates"/>). Never at block 1 (its look is taken automatically by SR-04, ADR 0292; it is no owner to-do) and never at a filling block. The job runs the look as the Lab dispatcher does for the owner's; this step only claims it.
+/// (<see cref="HoldOutStrategyCandidates"/>). Never at block 1 from the evening seal (its look is taken automatically by the SR-04 simulation through <see cref="ClaimAsync"/>, ADR 0292 and 0293; it is no owner to-do) and never at a filling block. The job runs the look as the Lab dispatcher does for the owner's; this step only claims it.
 /// </summary>
 internal sealed class StrategyAutoLookStep(HoldOutEpochs epochs, HoldOutStrategyCandidates candidates, HoldOutUnlocker unlocker, IHoldOutStore store, ILabRunStore runs, HoldOutOptions options, TimeProvider time, ILogger<StrategyAutoLookStep> logger) : IHoldOutSealStep
 {
@@ -44,7 +44,16 @@ internal sealed class StrategyAutoLookStep(HoldOutEpochs epochs, HoldOutStrategy
             return "slot used";
         }
 
-        foreach (var candidate in await candidates.FindAsync(current.Block, cancellationToken))
+        return await ClaimAsync(current.Block, Actor, cancellationToken) ?? "no candidate";
+    }
+
+    /// <summary>
+    /// Queues the existing <c>holdout</c> Lab job, recorded as auto under <paramref name="actor"/>, for the best candidate of <paramref name="block"/>: the claim this step makes for a later block and SR-04 makes for block 1 (ADR 0293). Returns what was done, or null when no version can take the look.
+    /// The checks of the block (in force, sealed, slot free, the auto option) are the caller's.
+    /// </summary>
+    internal async ValueTask<string?> ClaimAsync(HoldOutBlock block, string actor, CancellationToken cancellationToken)
+    {
+        foreach (var candidate in await candidates.FindAsync(block, cancellationToken))
         {
             // the same cheap checks as the owner's unlock; a refusal moves to the next candidate
             var plan = await unlocker.CheckAsync(candidate.Run.Id, cancellationToken);
@@ -54,7 +63,7 @@ internal sealed class StrategyAutoLookStep(HoldOutEpochs epochs, HoldOutStrategy
             }
 
             var run = plan.Value.Run;
-            var labels = new[] { HoldOutJob.Label(run.Id, Actor), "Hold-out look (auto): the frozen plan of this run's version, run once over the block in force; recorded as auto." };
+            var labels = new[] { HoldOutJob.Label(run.Id, actor), "Hold-out look (auto): the frozen plan of this run's version, run once over the block in force; recorded as auto." };
             var queued = await runs.InsertOrGetAsync(
                 new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(run.Id, plan.Value.Block.Start), run.StrategyId, run.Version, run.StrategyHash, run.Universe, run.From, run.To, HoldOutJob.Method, HoldOutJob.ConfigHash, run.EngineVersion, labels, time.GetUtcNow()),
                 cancellationToken);
@@ -68,6 +77,6 @@ internal sealed class StrategyAutoLookStep(HoldOutEpochs epochs, HoldOutStrategy
             return $"look queued for {run.StrategyId} v{run.Version}";
         }
 
-        return "no candidate";
+        return null;
     }
 }

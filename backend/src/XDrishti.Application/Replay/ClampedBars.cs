@@ -24,6 +24,16 @@ internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options,
     private readonly Dictionary<Guid, Window> _windows = [];
     private DateOnly? _last;
     private DateOnly? _horizon;
+    private DateOnly? _widened;
+
+    /// <summary>
+    /// Lets this reader go past the cut up to <paramref name="through"/> (SR-04 only, ADR 0293): the day-by-day simulation runs inside hold-out block 1 once that block's strategy look is stored. Call before the first read; the clamp still throws past <paramref name="through"/>.
+    /// </summary>
+    public void Widen(DateOnly through)
+    {
+        _widened = through;
+        _last = null;
+    }
 
     /// <summary>The last session that may be read.</summary>
     public async ValueTask<DateOnly> LastReadableAsync(CancellationToken cancellationToken)
@@ -34,7 +44,8 @@ internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options,
         }
 
         var current = await holdOut.CurrentAsync(cancellationToken) ?? throw new ReplayHoldOutException();
-        _last = HoldOutOptions.TrainingCut(current.Start, options.TrainingEmbargoDays); // the one shared cut formula; it moves forward only when the block in force is released (HO-01)
+        var cut = HoldOutOptions.TrainingCut(current.Start, options.TrainingEmbargoDays); // the one shared cut formula; it moves forward only when the block in force is released (HO-01)
+        _last = _widened is { } through && through > cut ? through : cut;
         return _last.Value;
     }
 
