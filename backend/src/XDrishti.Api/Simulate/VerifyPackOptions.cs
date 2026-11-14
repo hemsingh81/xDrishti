@@ -37,7 +37,7 @@ internal sealed record VerifyPackOptions(
         + "              [--exit <POLICY[:name=value,...]>] [--time-stop min_progress_rr=<n>,(intraday_bars|swing_sessions)=<n>]   (one exit in place of each strategy's own, for the hand check of a policy; one candidate only: compare candidates with simulate)\n"
         + "  verify-pack --check <path-to-check-log.csv>\n"
         + "  verify-pack --assist <pack-folder> [--second-source-folder <dir>]   (an automatic second read of a pack; not a signed check)\n"
-        + "  verify-pack --gate <pack-folder> [--second-source-folder <dir>]   (the automated gate: the assisted read, then the rules; writes gate-decision.json and .md; exit 0 PASS or PASS_WITH_DATA_FINDINGS, 10 RERUN_NEEDED, 11 DATA_REPAIR_NEEDED, 12 BLOCKED_DEFECT)\n"
+        + "  verify-pack --gate <pack-folder> [--second-source-folder <dir>]   (the automated gate: the assisted read, then the rules; writes gate-decision.json and .md; exit 0 PASS or PASS_WITH_DATA_FINDINGS, 10 RERUN_NEEDED, 11 DATA_REPAIR_NEEDED, 12 BLOCKED_DEFECT, 2 unusable input or a strategy without a reader)\n"
         + "The seed is a text of letters, digits, '.', '_' and '-' (at most 40) that you write down before the first draw; it has no default.\n"
         + "Quote a symbol list in the shell: --symbols 'M&M,RELIANCE'\n";
 

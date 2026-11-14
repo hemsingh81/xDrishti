@@ -8,6 +8,7 @@ public static class ReaderExitReasonText
         ReaderExitReason.Stop => "stop",
         ReaderExitReason.Target => "target",
         ReaderExitReason.SquareOff => "square_off",
+        ReaderExitReason.MaxHold => "max_hold",
         ReaderExitReason.EndOfData => "end_of_data",
         _ => throw new ArgumentOutOfRangeException(nameof(reason)),
     };

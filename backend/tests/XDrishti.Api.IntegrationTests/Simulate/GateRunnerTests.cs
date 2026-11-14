@@ -19,6 +19,8 @@ public sealed class GateRunnerTests
     private sealed class DatedStored(Func<DateOnly, IReadOnlyList<ReaderBar>> bars) : IStoredDays
     {
         public ValueTask<StoredDay> GetAsync(string symbol, DateOnly date, CancellationToken cancellationToken) => ValueTask.FromResult(new StoredDay(0.05m, bars(date)));
+
+        public ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, DateOnly lastUsed, DateOnly? admittedSeam, CancellationToken cancellationToken) => ValueTask.FromResult(new StoredRange(0.05m, []));
     }
 
     private static AssistSupport.MemoryFolder WithSpots(AssistSupport.MemoryFolder folder, params (string Key, string Date)[] spots)
@@ -68,6 +70,29 @@ public sealed class GateRunnerTests
         folder.Ops.ShouldNotContain(o => o.EndsWith(PackFiles.CheckLogName, StringComparison.Ordinal));
         folder.Files[PackFiles.CheckLogName].ShouldBe(log);
         Encoding.UTF8.GetString(folder.Files[DiskPackFolder.LogName]).Split('\n', StringSplitOptions.RemoveEmptyEntries).Skip(1).ShouldAllBe(l => l.Split(',')[16] == string.Empty);
+    }
+
+    [Fact]
+    public async Task A_strategy_without_a_reader_is_refused_with_exit_2_before_anything_is_read_or_written()
+    {
+        var folder = Fixture();
+        folder.Files[PackFiles.PackJsonName] = AssistSupport.PackJsonOf("FUTURE_STRATEGY", Symbol);
+        var second = new FakeSecond(_ => new SecondDay(BuyDay(), null));
+
+        var outcome = await GateRunner.RunAsync(folder, second, new FakeStored(BuyDay()), TestContext.Current.CancellationToken);
+
+        outcome.Exit.ShouldBe(2);
+        outcome.Status.ShouldBeNull();
+        outcome.Lines.ShouldContain(l => l.Contains("unsupported strategy", StringComparison.Ordinal) && l.Contains("FUTURE_STRATEGY", StringComparison.Ordinal));
+        second.Calls.ShouldBeEmpty();
+        folder.Ops.ShouldNotContain(o => o.StartsWith("write ", StringComparison.Ordinal));
+        folder.Files.ContainsKey(GateRunner.JsonName).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_supported_strategies_are_the_three_with_a_reader()
+    {
+        AssistRunner.SupportedStrategies.ShouldBe(["ORB", "VWAP_PULLBACK", "BASE_BREAKOUT"]);
     }
 
     [Fact]

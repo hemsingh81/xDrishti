@@ -11,9 +11,21 @@ internal sealed record SecondDay(IReadOnlyList<ReaderBar>? Bars, string? Unavail
     public static SecondDay Missing(string reason) => new(null, reason);
 }
 
+/// <summary>The stored sessions of one instrument over a range of dates (a session per India date that has bars, ascending), with the master tick in rupees.</summary>
+/// <param name="Tick">The master tick in rupees.</param>
+/// <param name="Sessions">One session per date that has bars.</param>
+/// <param name="Caveat">Why the raw stored bars of the range may differ from the engine's (a corporate action ex-date or the seam cut inside it), or null.</param>
+internal sealed record StoredRange(decimal Tick, IReadOnlyList<ReaderSession> Sessions, string? Caveat = null);
+
 /// <summary>The stored bars (read from the database by the host; a fake in tests).</summary>
 internal interface IStoredDays
 {
+    /// <summary>
+    /// The sessions from <paramref name="from"/> to <paramref name="to"/>, both included: the history the VWAP_PULLBACK and BASE_BREAKOUT readers need. <paramref name="lastUsed"/> is the last date the reader uses (the trade day for VWAP_PULLBACK, <paramref name="to"/> for BASE_BREAKOUT)
+    /// and <paramref name="admittedSeam"/> the seam date the RUN admitted pre-seam bars from (the run record's seam line, carried in the pack), null when it admitted none: they decide the caveat of the result.
+    /// </summary>
+    ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, DateOnly lastUsed, DateOnly? admittedSeam, CancellationToken cancellationToken);
+
     ValueTask<StoredDay> GetAsync(string symbol, DateOnly date, CancellationToken cancellationToken);
 }
 

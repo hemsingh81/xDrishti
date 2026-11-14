@@ -13,7 +13,7 @@
 2. `GateRules` (pure), `SpotRules` (pure), `GateText` (files), `GateRunner` (the order), in `XDrishti.Api/Simulate/Gate/`.
 3. The documents: roadmap exit criterion and rows, `docs/research/p3-hand-check.md` section 12, ADR 0048 (amends item 15 of ADR 0046), `scripts/build-docs.sh`.
 
-**Out:** running the live verb (it needs the owner's token and database); a third data source; changing the engine, the reader, the comparison or the pack; writing `check-log.csv` or any owner verdict (never); a new strategy round (the gate reads what the reader can read, today ORB; another strategy's rows come out `cannot_read` and block, which is honest: the machine cannot check them).
+**Out:** running the live verb (it needs the owner's token and database); a third data source; changing the engine, the reader, the comparison or the pack; writing `check-log.csv` or any owner verdict (never); a new strategy round (the gate reads what the reader can read: ORB, and since P3-09e VWAP_PULLBACK and BASE_BREAKOUT, [ADR 0291](../adr/0291-the-gate-reads-vwap-pullback-and-base-breakout-and-refuses-a-strategy-it-has-no-reader-for.md); a strategy with no reader is refused with exit 2 and a clear "unsupported strategy" text, never reported as a defect).
 
 ## Definitions
 **D1. Inputs.** The verdicts of the assisted read (per row: the reader on the stored bars, the reader on the second source, the bar comparison, the engine's values), the `spots` of `pack.json`, and the stored bars of the spot days.

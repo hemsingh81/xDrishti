@@ -43,12 +43,22 @@ internal static class AssistSupport
 
     public static string TradeKey(string symbol = Symbol) => "ORB|" + symbol + "|Buy|2026-03-02";
 
-    public static byte[] PackJson(params string[] symbols)
+    public static byte[] PackJson(params string[] symbols) => PackJsonOf("ORB", symbols);
+
+    public static byte[] PackJsonOf(string strategy, params string[] symbols)
     {
         var rows = symbols.Select((s, i) => $"{{\"seq\":{i + 1},\"trade_key\":\"{TradeKey(s)}\",\"symbol\":\"{s}\",\"side\":\"Buy\",\"date\":\"2026-03-02\",\"run_key\":\"rk\"}}");
         return Encoding.UTF8.GetBytes(
-            "{\"format\":\"" + PackFiles.Format + "\",\"pack_id\":\"t-1\",\"pack_key\":\"" + PackKey + "\",\"count\":" + symbols.Length + ",\"seed\":\"seed-1\",\"runs\":[{\"strategy\":\"ORB\",\"parameters\":{\"or_min\":\"15\",\"rr\":\"2\"},\"run_key\":\"rk\"}],\"rows\":[" + string.Join(',', rows) + "],\"spots\":[]}");
+            "{\"format\":\"" + PackFiles.Format + "\",\"pack_id\":\"t-1\",\"pack_key\":\"" + PackKey + "\",\"count\":" + symbols.Length + ",\"seed\":\"seed-1\",\"runs\":[{\"strategy\":\"" + strategy + "\",\"parameters\":{\"or_min\":\"15\",\"rr\":\"2\"},\"run_key\":\"rk\"}],\"rows\":[" + string.Join(',', rows) + "],\"spots\":[]}");
     }
+
+    /// <summary>The engine's side for one row of any strategy, equal to the reading unless <paramref name="change"/> alters a column.</summary>
+    public static byte[] EngineValuesFor(string tradeKey, ReaderReading reading, Action<Dictionary<string, string>>? change = null) =>
+        EngineValues(reading, [Symbol], cells =>
+        {
+            cells["trade_key"] = tradeKey;
+            change?.Invoke(cells);
+        });
 
     /// <summary>The engine's side for the rows, equal to the reading unless <paramref name="change"/> alters a column.</summary>
     public static byte[] EngineValues(ReaderReading reading, string[] symbols, Action<Dictionary<string, string>>? change = null)
@@ -135,6 +145,8 @@ internal static class AssistSupport
     internal sealed class FakeStored(IReadOnlyList<ReaderBar> bars) : IStoredDays
     {
         public ValueTask<StoredDay> GetAsync(string symbol, DateOnly date, CancellationToken cancellationToken) => ValueTask.FromResult(new StoredDay(0.05m, bars));
+
+        public ValueTask<StoredRange> GetRangeAsync(string symbol, DateOnly from, DateOnly to, DateOnly lastUsed, DateOnly? admittedSeam, CancellationToken cancellationToken) => ValueTask.FromResult(new StoredRange(0.05m, []));
     }
 
     internal sealed class FakeSecond(Func<string, SecondDay> answer, string name = "fake") : ISecondSource
