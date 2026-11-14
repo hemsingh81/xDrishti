@@ -65,7 +65,6 @@ public sealed class StrategyWarmupTests
         sides.Count(s => s.Setup is not null).ShouldBeGreaterThan(0);
         sides.Count(s => s.Invalidate is not null).ShouldBeGreaterThan(0);
         sides.SelectMany(s => s.Filters).Distinct().Order().ToArray().ShouldBe(FilterNames.All.Order().ToArray());
-        sides.ShouldContain(s => s.NeedsContext);
         sides.ShouldContain(s => s.NeedsExpiryDays);
         sides.SelectMany(s => s.Warnings).ShouldNotBeEmpty();
     }

@@ -21,8 +21,6 @@ public sealed class NameResolutionTests
         ["today.open"] = "today_open",
         ["today.high"] = "today_high",
         ["today.low"] = "today_low",
-        ["index.trend"] = "index_trend",
-        ["index.adx"] = "index_adx",
     };
 
     public static TheoryData<string> DottedNames { get; } = [.. Dotted.Keys];
@@ -30,7 +28,7 @@ public sealed class NameResolutionTests
     public static TheoryData<string> OtherDottedPairs { get; } =
     [
         "prev_day.gap_pct", "prev_day.vwap", "prev_day.close_", "prev_day.rsi", "prev_day.day_of_week", "today.volume", "today.close", "today.gap_pct", "today.vwap", "today.prev_day",
-        "index.vol_pct", "index.regime", "index.high", "index.close", "index.trend_", "regime.trend", "vix.pct", "close.high", "tf.close", "time.hour", "MON.x", "foo.bar", "rsi.n",
+        "index.trend", "index.adx", "index.high", "index.close", "close.high", "tf.close", "time.hour", "MON.x", "foo.bar", "rsi.n",
     ];
 
     [Theory]
@@ -79,20 +77,28 @@ public sealed class NameResolutionTests
         Condition("close() > 1").Features.ShouldHaveSingleItem();
         OnlyError("abs > 1").Code.ShouldBe(LintCodes.BadArguments);
         OnlyError("rsi > 1").Code.ShouldBe(LintCodes.BadArguments);
-        OnlyError("regime == 1").Code.ShouldBe(LintCodes.BadArguments);
         OnlyError("time() > 1").Code.ShouldBe(LintCodes.BadArguments);
         OnlyError("MON() == 1").Code.ShouldBe(LintCodes.BadArguments);
     }
 
-    [Fact]
-    public void The_regime_is_written_with_parentheses_and_is_the_catalog_feature_of_that_name()
+    [Theory]
+    [InlineData("vix > 20", "vix")]
+    [InlineData("vix_pct > 50", "vix_pct")]
+    [InlineData("vix_chg < 1", "vix_chg")]
+    [InlineData("breadth > 50", "breadth")]
+    [InlineData("index_trend == 1", "index_trend")]
+    [InlineData("index_adx > 20", "index_adx")]
+    [InlineData("index_vol_pct < 50", "index_vol_pct")]
+    [InlineData("regime_trend > 0", "regime_trend")]
+    [InlineData("regime_vol > 0", "regime_vol")]
+    [InlineData("regime() == 1", "regime")]
+    [InlineData("index.trend == 1", "index")]
+    public void A_removed_market_context_name_is_refused_as_an_unknown_name_that_is_quoted(string source, string name)
     {
-        var plan = Condition("regime() == 4");
+        var error = OnlyError(source);
 
-        plan.Features.ShouldBe([Specs.Of("regime", Timeframe.M1)]);
-        var compare = plan.Tree.ShouldBeOfType<BoundCompare>();
-        compare.Left.ShouldBeOfType<BoundFeature>().Type.ShouldBe(BoundType.Regime);
-        plan.NeedsContext.ShouldBeTrue();
+        error.Code.ShouldBe(LintCodes.UnknownName);
+        error.Message.ShouldContain("`" + name + "`", Case.Sensitive);
     }
 
     [Fact]
@@ -135,7 +141,7 @@ public sealed class NameResolutionTests
     [Fact]
     public void Names_are_case_sensitive_everywhere()
     {
-        foreach (var source in new[] { "Close > 1", "CLOSE > 1", "RSI(14) > 1", "Rsi() > 1", "day_of_week == tue", "day_of_week == Tue", "TIME >= \"09:45\"", "True", "regime() == \"Up_Low_Vol\"", "tf(\"1H\").close > 1" })
+        foreach (var source in new[] { "Close > 1", "CLOSE > 1", "RSI(14) > 1", "Rsi() > 1", "day_of_week == tue", "day_of_week == Tue", "TIME >= \"09:45\"", "True", "tf(\"1H\").close > 1" })
         {
             var errors = Of(source, Timeframe.M15).Errors.ToList();
 
@@ -147,11 +153,10 @@ public sealed class NameResolutionTests
     public void A_condition_may_use_every_kind_of_name_together()
     {
         var plan = Condition(
-            "day_of_week != SAT and time >= \"09:45\" and crosses_above(close, vwap) and rsi(rsi_len) > level and tf(\"1h\").ema(20) > tf(\"1h\").ema(50) and prev_day.high < today.open and regime() == \"UP_LOW_VOL\"",
+            "day_of_week != SAT and time >= \"09:45\" and crosses_above(close, vwap) and rsi(rsi_len) > level and tf(\"1h\").ema(20) > tf(\"1h\").ema(50) and prev_day.high < today.open",
             parameters: Params(("rsi_len", 14), ("level", 55)));
 
-        plan.Features.Count.ShouldBe(9);
-        plan.NeedsContext.ShouldBeTrue();
+        plan.Features.Count.ShouldBe(8);
         plan.HistoryDepth.ShouldBe(2);
     }
 }

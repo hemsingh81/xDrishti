@@ -7,7 +7,6 @@ using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Portfolio;
@@ -24,7 +23,6 @@ using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
-using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Replay;
 using XDrishti.Domain.Research;
 using XDrishti.Domain.Selection;
@@ -93,8 +91,6 @@ public sealed class ReplayBenchmarks
         });
         var calendar = Substitute.For<ITradingCalendar>();
         calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new TradingCalendar());
-        var context = Substitute.For<IContextFigures>();
-        context.AsOfAsync(Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(new ContextRead(null, ContextRead.NoContext));
         var classifications = Substitute.For<IHoldingClassifications>();
         classifications.SectorsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns(call => ValueTask.FromResult<IReadOnlyDictionary<Guid, string>>(call.Arg<IReadOnlyCollection<Guid>>().ToDictionary(id => id, id => "Sector" + (id.GetHashCode() % 10))));
         classifications.BasketsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns(call => ValueTask.FromResult<IReadOnlyDictionary<Guid, IReadOnlyList<BasketRef>>>(call.Arg<IReadOnlyCollection<Guid>>().ToDictionary(id => id, id => (IReadOnlyList<BasketRef>)[new BasketRef(basket, "B")])));
@@ -105,7 +101,7 @@ public sealed class ReplayBenchmarks
         sizing.BudgetsAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyDictionary<Guid, double>>(new Dictionary<Guid, double>()));
 
         var facts = new ReplayFacts(
-            holdOut, new HoldOutOptions(TrainingEmbargoDays: 30), baskets, Substitute.For<IInstrumentQueries>(), strategies, cellStats, changelog, Substitute.For<IRunStore>(), minutes, Substitute.For<IBackfillSeams>(), days, calendar, context, classifications,
+            holdOut, new HoldOutOptions(TrainingEmbargoDays: 30), baskets, Substitute.For<IInstrumentQueries>(), strategies, cellStats, changelog, Substitute.For<IRunStore>(), minutes, Substitute.For<IBackfillSeams>(), days, calendar, classifications,
             Substitute.For<ICostSheetStore>(), basketSettings, sizing, new SystemReplayOptions(), rules: new SelectionRules(OptionalFilters: [FilterCodes.Cost, FilterCodes.Event, FilterCodes.FnoBan, FilterCodes.Surveillance]));
         var simulation = Substitute.For<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>();
         simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Arg.Any<CancellationToken>()).Returns(call =>

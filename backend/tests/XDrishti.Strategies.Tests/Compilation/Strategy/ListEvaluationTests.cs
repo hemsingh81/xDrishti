@@ -100,7 +100,7 @@ public sealed class ListEvaluationTests
         {
             var evaluation = Evaluations[seed % Evaluations.Length];
             var mode = seed % 2 == 0 ? ListMode.All : ListMode.Any;
-            var generator = new ModelGenerator(seed, evaluation, false, false);
+            var generator = new ModelGenerator(seed, evaluation, false);
             var count = 2 + seed % 5;
             var items = Enumerable.Range(0, count).Select(_ => Printer.Print(generator.Next())).ToList();
             var joinedText = string.Join(mode == ListMode.All ? " and " : " or ", items.Select(i => "(" + i + ")"));

@@ -107,7 +107,6 @@ public sealed class PeadStrategyTests
         prepared.ReadsResultsDays.ShouldBeTrue();
         prepared.ReadsSurprise.ShouldBeTrue();
         prepared.ReadsEvents.ShouldBeFalse();
-        prepared.ReadsContext.ShouldBeFalse();
         prepared.Record.Sides.ShouldBe([Side.Buy]);
         prepared.Record.EvaluationTimeframe.ShouldBe(Timeframe.D1);
     }
@@ -141,7 +140,7 @@ public sealed class PeadStrategyTests
     private static SimulationResult Run(double measure, double buckets, ResultsDayInputs inputs, double hold = 5)
     {
         var simulator = Simulator.Create(PeadV1.Create(measure, hold, buckets), Timeframe.D1, Cand.NoSlippage).Simulator.ShouldNotBeNull();
-        var result = simulator.Run(Scan.Instrument, Fixture(), Sim.Tick, DefaultWeek(), null, null, null, inputs);
+        var result = simulator.Run(Scan.Instrument, Fixture(), Sim.Tick, DefaultWeek(), null, null, inputs);
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Code + ": " + result.Error.Message : string.Empty);
         return result.Value;
     }

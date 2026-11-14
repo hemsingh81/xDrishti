@@ -8,9 +8,6 @@ public sealed record BasketProfileOptions
     /// <summary>Fewest voters for a breadth or dispersion figure.</summary>
     public int MinVoters { get; init; } = 5;
 
-    /// <summary>Fewest days for a regime row to be a number.</summary>
-    public int MinDaysPerRegime { get; init; } = 30;
-
     /// <summary>Fewest members for a day return, a hold return and a contribution.</summary>
     public int MinMembersForReturn { get; init; } = 3;
 

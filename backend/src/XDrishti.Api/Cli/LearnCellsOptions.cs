@@ -6,13 +6,12 @@ using XDrishti.Domain.Learning;
 namespace XDrishti.Api.Cli;
 
 /// <summary>The parsed command line of <c>xd learn cells</c> (spec P6-01). Nothing here reads a file or the database.</summary>
-internal sealed record LearnCellsOptions(DateOnly AsOf, IReadOnlyList<CellSource> Sources, CellStatsOptions Options, bool ByRegime = false, bool ByUniverse = false)
+internal sealed record LearnCellsOptions(DateOnly AsOf, IReadOnlyList<CellSource> Sources, CellStatsOptions Options, bool ByUniverse = false)
 {
     public const string Usage = """
         usage:
-          xd learn cells --as-of YYYY-MM-DD --run RUNKEY:STYLE:EXIT [--run ...] [--half-life-days N] [--prior-strength N] [--min-trades N] [--by-regime] [--by-universe]
+          xd learn cells --as-of YYYY-MM-DD --run RUNKEY:STYLE:EXIT [--run ...] [--half-life-days N] [--prior-strength N] [--min-trades N] [--by-universe]
             RUNKEY is the 64-hex key of a stored run, STYLE is intraday or swing, EXIT labels the exit policy the run used (no '|')
-            --by-regime also splits every cell by the regime of its trades' entry day (read before the day; trades with no regime are counted, not guessed)
             --by-universe also splits every cell by the liquidity tier (high, mid, low third) of its trades' instrument on the decision date, from daily bars before that date (trades with no tier are counted, not guessed); with the owner's setting learning.universe_link.auto_propose ON (off by default) each new stable observation is also proposed as a hypothesis by the actor auto, nothing is applied
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
@@ -27,21 +26,11 @@ internal sealed record LearnCellsOptions(DateOnly AsOf, IReadOnlyList<CellSource
         var errors = new List<string>();
         var runs = new List<CellSource>();
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
-        var byRegime = false;
         var byUniverse = false;
         for (var i = 0; i < args.Count; i++)
         {
             var arg = args[i];
-            if (arg == "--by-regime")
-            {
-                if (byRegime)
-                {
-                    errors.Add("'--by-regime' is given twice");
-                }
-
-                byRegime = true;
-            }
-            else if (arg == "--by-universe")
+            if (arg == "--by-universe")
             {
                 if (byUniverse)
                 {
@@ -96,7 +85,7 @@ internal sealed record LearnCellsOptions(DateOnly AsOf, IReadOnlyList<CellSource
             errors.Add("--min-trades must be a whole number");
         }
 
-        return errors.Count > 0 ? (null, errors) : (new LearnCellsOptions(asOf, runs, new CellStatsOptions(half, strength, min), byRegime, byUniverse), errors);
+        return errors.Count > 0 ? (null, errors) : (new LearnCellsOptions(asOf, runs, new CellStatsOptions(half, strength, min), byUniverse), errors);
     }
 
     private static double Number(Dictionary<string, string> values, string key, double fallback, List<string> errors)

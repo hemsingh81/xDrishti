@@ -47,7 +47,7 @@ public static class LintCodes
 
     /// <summary>
     /// A <c>crosses_above/below</c>, <c>rising</c> or <c>falling</c> whose features are not all on one timeframe, so that "the previous value" of each side would be a different time. The span is the call; the message
-    /// names the timeframes and, when one side is a plain reference, the explicit form that says what is meant (the suggestion). A feature of the date (calendar and context features) is a clock of its own, on any strategy timeframe;
+    /// names the timeframes and, when one side is a plain reference, the explicit form that says what is meant (the suggestion). A feature of the date (calendar features) is a clock of its own, on any strategy timeframe;
     /// when it is one of the clocks and there is no explicit form, the message says that such a feature changes once a date, so it is compared without a lag or only the bar side is lagged by hand. Error.
     /// </summary>
     public const string MixedTimeframesInLag = "strategy.lint.mixed_timeframes_in_lag";
@@ -69,7 +69,7 @@ public static class LintCodes
 
     /// <summary>
     /// A value of the wrong type for its place: an operator or builtin given the wrong type (<c>and</c> of a number, <c>+</c> of a true/false value), a comparison between types that cannot be compared (a number with
-    /// <c>time</c>, <c>regime()</c> with a number outside 1 to 9, two <c>regime()</c>), a condition that is not true/false, a text anywhere but next to <c>time</c> or <c>regime()</c>, or a parameter that is not a
+    /// <c>time</c>), a condition that is not true/false, a text anywhere but next to <c>time</c>, or a parameter that is not a
     /// finite number. The message names both sides of a comparison. The span is the whole comparison, otherwise the operand. Error.
     /// </summary>
     public const string TypeMismatch = "strategy.lint.type_mismatch";
@@ -87,9 +87,6 @@ public static class LintCodes
 
     /// <summary><c>tf("15m")</c> on a feature when the strategy already runs on 15m. The span is the whole feature; the suggestion is the feature without <c>tf(…)</c>. Warning.</summary>
     public const string RedundantTimeframe = "strategy.lint.redundant_timeframe";
-
-    /// <summary>The condition reads a feature of the daily market context, so the frame must be created with <see cref="Indicators.FrameOptions.Context"/>. The span is the first such feature. Information, reported only when the condition has no error (a condition that cannot be used needs nothing).</summary>
-    public const string NeedsContext = "strategy.lint.needs_context";
 
     /// <summary>The condition reads <c>is_expiry_day</c>, so the frame must be created with <see cref="Indicators.FrameOptions.ExpiryDays"/>. The span is the first such feature. Information, reported only when the condition has no error.</summary>
     public const string NeedsExpiryDays = "strategy.lint.needs_expiry_days";

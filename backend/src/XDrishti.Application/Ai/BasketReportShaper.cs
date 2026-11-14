@@ -42,11 +42,10 @@ internal static class BasketReportShaper
         var notes = ProfileSummary(view);
         if (data.ToJsonString().Length > DataBudgetChars)
         {
-            // still over after the smallest step: drop the two optional panels and say so; if it is still too long the runner answers tool.too_large (fails closed)
-            data.Remove("regime");
+            // still over after the smallest step: drop the optional panel and say so; if it is still too long the runner answers tool.too_large (fails closed)
             data.Remove("capacity");
             data["truncated"] = true;
-            notes.Add("the answer was cut to fit: the regime and capacity panels were left out; they are on the basket screen");
+            notes.Add("the answer was cut to fit: the capacity panel was left out; it is on the basket screen");
         }
 
         return AiToolData.OfData(data, Evidence(view.Evidence, $"basket profile ({view.Basket.Kind} basket), price returns of its members"), notes);

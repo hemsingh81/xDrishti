@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market.Calendar;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.OptionIv;
 using XDrishti.Application.Abstractions.Research;
@@ -22,7 +21,6 @@ internal sealed class ExtractExtensionFeaturesHandler(
     ITradingCalendar calendars,
     IEventCalendarSnapshots snapshots,
     IResultsFilingTimes filingTimes,
-    IContextDayStore contextDays,
     IFilingSettings settings,
     ExtensionFeatureExtractor extractor,
     IIvFeatureExtractor ivExtractor,
@@ -108,14 +106,7 @@ internal sealed class ExtractExtensionFeaturesHandler(
         else
         {
             var filings = (await filingTimes.ReadAsync(ids, cancellationToken)).GroupBy(f => f.InstrumentId).ToDictionary(g => g.Key, g => (IReadOnlyList<ResultsFilingTime>)g.ToList());
-            IReadOnlyDictionary<DateOnly, double>? index = null;
-            if (group.Version == EventFeatureCatalog.Version)
-            {
-                var days = await contextDays.ListAsync(cancellationToken);
-                index = days.Count == 0 ? null : days.ToDictionary(d => d.Date, d => d.IndexClose);
-            }
-
-            var sources = new ExtensionSources(await calendars.GetAsync(cancellationToken), TimeSpan.FromMinutes(settings.LagMinutes), snapshot.Value, filings, index);
+            var sources = new ExtensionSources(await calendars.GetAsync(cancellationToken), TimeSpan.FromMinutes(settings.LagMinutes), snapshot.Value, filings, null);
             foreach (var instrument in trades.GroupBy(t => t.Instrument).OrderBy(g => g.Key))
             {
                 var decisions = instrument.Select(t => t.Decision).ToList();

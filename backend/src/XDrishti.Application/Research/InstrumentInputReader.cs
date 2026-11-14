@@ -6,7 +6,6 @@ using XDrishti.Domain.Filings;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
-using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Research;
@@ -48,8 +47,6 @@ internal sealed class InstrumentInputReader(IBarStore bars, IBarQueries barQueri
         DateOnly from,
         DateOnly to,
         CostContext? costs,
-        IReadOnlyList<ContextDayRecord>? contextDays = null,
-        string? contextNote = null,
         EventCalendarSnapshot? events = null,
         ResultsDayInputs? resultsDays = null,
         Func<DateOnly, LiquidityTier>? tierOn = null,
@@ -80,8 +77,6 @@ internal sealed class InstrumentInputReader(IBarStore bars, IBarQueries barQueri
             preset,
             detail,
             costs,
-            contextDays,
-            contextNote,
             events,
             resultsDays,
             tierOn,

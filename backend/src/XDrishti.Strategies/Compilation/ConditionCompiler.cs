@@ -53,7 +53,7 @@ public static class ConditionCompiler
         }
 
         var warnings = problems.Where(p => p.Severity == ProblemSeverity.Warning).ToList().AsReadOnly();
-        var condition = new CompiledCondition(source, context.EvaluationTimeframe, facts.Features, facts.HistoryDepth, facts.NeedsContext, facts.NeedsExpiryDays, warnings, tree);
+        var condition = new CompiledCondition(source, context.EvaluationTimeframe, facts.Features, facts.HistoryDepth, facts.NeedsExpiryDays, warnings, tree);
         return new CompileResult(condition, problems);
     }
 }

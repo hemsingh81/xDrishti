@@ -27,12 +27,10 @@ namespace XDrishti.Indicators;
 /// refused on 1W and 1M (see <see cref="IndicatorInfo.Supports"/>).
 /// </para>
 /// <para>
-/// <b>The calendar and the market context (ADR 0033).</b> The twelve date-driven features (<c>day_of_week</c>, <c>is_expiry_day</c> and the ten that read <see cref="FrameOptions.Context"/>: <c>index_trend</c>,
-/// <c>index_adx</c>, <c>index_vol_pct</c>, <c>vix</c>, <c>vix_pct</c>, <c>vix_chg</c>, <c>breadth</c>, <c>regime_trend</c>, <c>regime_vol</c>, <c>regime</c>) are asked for on 1m and live in a <i>date lane</i> of their own.
-/// At the <b>first accepted step of each India date</b> <i>D</i> the lane refreshes them all: the weekday and the expiry flag from <i>D</i> itself, the context features from the latest context day <b>strictly before</b>
-/// <i>D</i> (a day record dated <i>D</i> is in the context but is never read on <i>D</i>, so the value at 09:15 and at 15:29 is the same and a strategy never sees today's close). Every other step of the date changes nothing.
+/// <b>The calendar and the market context (ADR 0033).</b> The date-driven features (<c>day_of_week</c>, <c>is_expiry_day</c>, the results and relative-strength features) are asked for on 1m and live in a <i>date lane</i> of their own.
+/// At the <b>first accepted step of each India date</b> <i>D</i> the lane refreshes them all: the weekday and the expiry flag from <i>D</i> itself (the value at 09:15 and at 15:29 is the same). Every other step of the date changes nothing.
 /// The history of these features is written once per date, so <see cref="At"/>(h, 1) is the value the previous date of the frame had; a bar the ordering guard skips does not refresh the lane. The lane adds no
-/// allocation, also at the step that changes the date, and a <see cref="FrameOptions.Context"/> shared by many frames is only read. A frame with such a feature has a 1m lane even if no other feature is on 1m, so
+/// allocation, also at the step that changes the date. A frame with such a feature has a 1m lane even if no other feature is on 1m, so
 /// <see cref="BarClosed"/>(M1) works for it.
 /// </para>
 /// <para>
@@ -132,11 +130,11 @@ public sealed class FeatureFrame
     /// Validates the options and the specs before any bar is fed and builds the frame. An unknown indicator, a parameter outside its range or in a bad combination (<c>fast ≥ slow</c>), a timeframe other than
     /// 1m, 5m, 10m, 15m, 30m, 1h, 1D, 1W or 1M, an indicator that cannot run on the timeframe (<see cref="IndicatorInfo.Supports"/>: its message names the feature and the timeframe), a history depth outside 1 to 256 — each is
     /// reported with its field (<c>specs[2].p1</c>, <c>specs[2].timeframe</c>, <c>options.historyDepth</c>) in a validation error; nothing is thrown. A date-driven feature on another timeframe than 1m is refused on
-    /// <c>specs[i].timeframe</c>; a context feature without <see cref="FrameOptions.Context"/> on <c>options.context</c> and <c>is_expiry_day</c> without <see cref="FrameOptions.ExpiryDays"/> on <c>options.expiryDays</c>
+    /// <c>specs[i].timeframe</c>; <c>is_expiry_day</c> without <see cref="FrameOptions.ExpiryDays"/> on <c>options.expiryDays</c>
     /// (each reported once, naming the features).
     /// </summary>
     /// <param name="specs">The features to compute; the handle of a spec is its index.</param>
-    /// <param name="options">The trading calendar, the history depth, the market context and the expiry dates; the defaults (no calendar, depth 8, no context, no expiry dates) when null.</param>
+    /// <param name="options">The trading calendar, the history depth and the expiry dates; the defaults (no calendar, depth 8, no expiry dates) when null.</param>
     public static Result<FeatureFrame> Create(IReadOnlyList<FeatureSpec> specs, FrameOptions? options = null)
     {
         options ??= new FrameOptions();
@@ -152,7 +150,6 @@ public sealed class FeatureFrame
         }
 
         var infos = new IndicatorInfo?[specs.Count];
-        List<string>? needContext = null;
         List<string>? needExpiryDays = null;
         List<string>? needResultsDays = null;
         List<string>? needRelativeStrength = null;
@@ -168,11 +165,6 @@ public sealed class FeatureFrame
 
             infos[i] = info;
             info.Validate(spec, path, errors);
-            if (info.RequiresContext && options.Context is null)
-            {
-                Note(ref needContext, info.Name);
-            }
-
             if (info.RequiresExpiryDays && options.ExpiryDays is null)
             {
                 Note(ref needExpiryDays, info.Name);
@@ -187,11 +179,6 @@ public sealed class FeatureFrame
             {
                 Note(ref needRelativeStrength, info.Name);
             }
-        }
-
-        if (needContext is not null)
-        {
-            errors.Add("options.context", "The market context is needed by " + NamesText(needContext) + "; give FrameOptions.Context.");
         }
 
         if (needExpiryDays is not null)
@@ -245,7 +232,7 @@ public sealed class FeatureFrame
                 }
 
                 placed = (canonical.Timeframe, list.Count);
-                list.Add(info.CreateWith(canonical, options.Context, expiryDays, options.ResultsDays, options.RelativeStrength));
+                list.Add(info.CreateWith(canonical, expiryDays, options.ResultsDays, options.RelativeStrength));
                 shared.Add(canonical, placed);
                 if (!info.DateDriven && info.RestartsEachSession(canonical))
                 {

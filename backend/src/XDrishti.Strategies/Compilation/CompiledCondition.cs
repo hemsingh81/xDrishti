@@ -28,7 +28,6 @@ public sealed class CompiledCondition
         Timeframe evaluationTimeframe,
         IReadOnlyList<FeatureSpec> features,
         int historyDepth,
-        bool needsContext,
         bool needsExpiryDays,
         IReadOnlyList<Problem> warnings,
         IBoundExpression tree)
@@ -37,7 +36,6 @@ public sealed class CompiledCondition
         EvaluationTimeframe = evaluationTimeframe;
         Features = features;
         HistoryDepth = historyDepth;
-        NeedsContext = needsContext;
         NeedsExpiryDays = needsExpiryDays;
         Warnings = warnings;
         _tree = tree;
@@ -54,9 +52,6 @@ public sealed class CompiledCondition
 
     /// <summary>The history the frame must keep: the largest lag the condition reads plus 1, at least 1 and at most <see cref="FrameOptions.MaxHistoryDepth"/>.</summary>
     public int HistoryDepth { get; }
-
-    /// <summary>Whether the frame must be created with <see cref="FrameOptions.Context"/>.</summary>
-    public bool NeedsContext { get; }
 
     /// <summary>Whether the frame must be created with <see cref="FrameOptions.ExpiryDays"/>.</summary>
     public bool NeedsExpiryDays { get; }

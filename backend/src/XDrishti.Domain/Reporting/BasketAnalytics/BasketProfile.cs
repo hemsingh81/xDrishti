@@ -15,7 +15,6 @@ namespace XDrishti.Domain.Reporting;
 /// <param name="Turnover">Member turnover (m13).</param>
 /// <param name="Capacity">Liquidity and capacity (m14).</param>
 /// <param name="Contribution">Contribution to the buy-and-hold return (m15).</param>
-/// <param name="Regime">The index by regime (m16).</param>
 /// <param name="HoldReturnPct">The basket's buy-and-hold price return in percent (m1, P8-07).</param>
 /// <param name="IndexReturnPct">The benchmark's price return over the same window in percent.</param>
 /// <param name="DifferenceToIndex">HoldReturnPct minus IndexReturnPct, both passive over the same dates (Decision 6); never called alpha.</param>
@@ -34,7 +33,6 @@ public sealed record BasketProfile(
     TurnoverResult Turnover,
     BasketCapacityResult Capacity,
     ContributionResult Contribution,
-    RegimeResult Regime,
     Metric HoldReturnPct,
     Metric IndexReturnPct,
     Metric DifferenceToIndex,

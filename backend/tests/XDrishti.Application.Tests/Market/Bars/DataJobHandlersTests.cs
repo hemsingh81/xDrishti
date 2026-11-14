@@ -40,7 +40,7 @@ public sealed class DataJobHandlersTests
     private readonly FakeAggregates _aggregates = new();
     private readonly FakeDataSettings _settings = new();
     private readonly FakeCalendarUpkeep _calendar = new();
-    private readonly FakeContextUpkeep _context = new();
+    private readonly FakeBasketUpkeep _context = new();
     private readonly FakeQualityData _qualityData = new();
     private readonly FakeQualityRuns _qualityRuns = new();
 

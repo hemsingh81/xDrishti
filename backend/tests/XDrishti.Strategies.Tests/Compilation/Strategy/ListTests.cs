@@ -120,13 +120,13 @@ public sealed class ListTests
     [Fact]
     public void The_warnings_and_notes_of_an_item_are_listed_with_its_path_and_the_warnings_are_on_the_compiled_side()
     {
-        var definition = Basic().WithBuy(b => b with { Trigger = Defs.All("tf(\"15m\").close > 1", "regime() == \"UP_LOW_VOL\"") });
+        var definition = Basic().WithBuy(b => b with { Trigger = Defs.All("tf(\"15m\").close > 1", "is_expiry_day == 0") });
 
         var result = Located.Compile(definition);
 
         result.IsSuccess.ShouldBeTrue(Located.Show(result));
         result.ShouldHave(LintCodes.RedundantTimeframe, "buy.trigger[0]", ProblemSeverity.Warning);
-        result.ShouldHave(LintCodes.NeedsContext, "buy.trigger[1]", ProblemSeverity.Information);
+        result.ShouldHave(LintCodes.NeedsExpiryDays, "buy.trigger[1]", ProblemSeverity.Information);
         result.Compiled!.Warnings.Select(w => w.Problem.Code).ShouldBe([LintCodes.RedundantTimeframe], "the note is a problem, not a warning");
     }
 

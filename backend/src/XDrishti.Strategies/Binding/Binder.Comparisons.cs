@@ -1,15 +1,14 @@
 using XDrishti.Domain.Market.Bars;
-using XDrishti.Indicators;
 using XDrishti.Strategies.Lint;
 using XDrishti.Strategies.Syntax;
 
 namespace XDrishti.Strategies.Binding;
 
-/// <summary>Comparisons: two numbers, two true/false values (equal and not equal), <c>time</c> against a <c>"HH:MM"</c> text, and <c>regime()</c> against a regime name or a code (equal and not equal).</summary>
+/// <summary>Comparisons: two numbers, two true/false values (equal and not equal), <c>time</c> against a <c>"HH:MM"</c> text.</summary>
 internal sealed partial class Binder
 {
     private const string ComparisonRule =
-        " A comparison takes two numbers, two true/false values (only == and !=), `time` and a \"HH:MM\" text, or `regime()` and a regime name or a code from 1 to 9 (only == and !=).";
+        " A comparison takes two numbers, two true/false values (only == and !=) or `time` and a \"HH:MM\" text.";
 
     private IBoundExpression BindComparison(Binary binary)
     {
@@ -23,11 +22,6 @@ internal sealed partial class Binder
         if (left.Type == BoundType.Time || right.Type == BoundType.Time)
         {
             return BindTimeComparison(binary, left, right);
-        }
-
-        if (left.Type == BoundType.Regime || right.Type == BoundType.Regime)
-        {
-            return BindRegimeComparison(binary, left, right);
         }
 
         var equality = binary.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual;
@@ -124,61 +118,5 @@ internal sealed partial class Binder
 
         minute = hours * 60 + minutes;
         return true;
-    }
-
-    /// <summary><c>regime()</c> with a regime name or a constant code 1 to 9, equal or not equal only; the result is a comparison of the feature with the code.</summary>
-    private IBoundExpression BindRegimeComparison(Binary binary, IBoundExpression left, IBoundExpression right)
-    {
-        var regimeOnLeft = left.Type == BoundType.Regime;
-        var regime = regimeOnLeft ? left : right;
-        var other = regimeOnLeft ? right : left;
-        if (other.Type == BoundType.Regime || binary.Operator is not (BinaryOperator.Equal or BinaryOperator.NotEqual))
-        {
-            return Mismatch(binary, left, right);
-        }
-
-        int code;
-        if (other is BoundText name)
-        {
-            var parsed = Regime.Code(name.Value);
-            if (parsed.IsFailure)
-            {
-                ReportUnknownRegime(name);
-                return new BoundInvalid(binary.Span, [left, right]);
-            }
-
-            code = parsed.Value;
-        }
-        else if (other.Type == BoundType.Number && ConstantFolder.TryFold(other, out var number))
-        {
-            if (number != Math.Floor(number) || number is < 1 or > 9)
-            {
-                scope.Error(
-                    LintCodes.TypeMismatch,
-                    scope.Quoted(other.Span) + " is not a regime code: `regime()` is compared with a regime name or a code from 1 (" + Regime.Name(1) + ") to 9 (" + Regime.Name(9) + ").",
-                    binary.Span);
-                return new BoundInvalid(binary.Span, [left, right]);
-            }
-
-            code = (int)number;
-        }
-        else
-        {
-            return Mismatch(binary, left, right);
-        }
-
-        return new BoundCompare(binary.Operator, regime, new BoundNumber(code, other.Span), binary.Span);
-    }
-
-    private void ReportUnknownRegime(BoundText name)
-    {
-        var names = Enumerable.Range(1, 9).Select(Regime.Name).ToList();
-        var close = Suggestions.Closest(name.Value, names);
-        scope.Error(
-            LintCodes.UnknownName,
-            scope.Quoted(name.Span) + " is not a market regime; the names are " + string.Join(", ", names.Take(8)) + " and " + names[8] + "."
-                + (close.Count > 0 ? " Did you mean `\"" + close[0] + "\"`?" : string.Empty),
-            name.Span,
-            close.Count > 0 ? "\"" + close[0] + "\"" : null);
     }
 }

@@ -29,7 +29,6 @@ public sealed class EvaluationAllocationTests
 
         plan.Features.Count.ShouldBe(20);
         plan.Features.Select(f => f.Timeframe).Distinct().Order().ShouldBe([Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.H1, Timeframe.D1]);
-        plan.NeedsContext.ShouldBeTrue();
         plan.Conditions.Count.ShouldBe(10);
     }
 

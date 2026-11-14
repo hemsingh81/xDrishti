@@ -28,7 +28,7 @@ internal static class LearnCellsCommand
         {
             await using var scope = services.CreateAsyncScope();
             var result = await scope.ServiceProvider.GetRequiredService<ICommandHandler<ComputeCellStatsCommand, CellStatsOutcome>>()
-                .HandleAsync(new ComputeCellStatsCommand(options.AsOf, options.Sources, options.Options, "cli:xd", options.ByRegime, options.ByUniverse), cancellationToken);
+                .HandleAsync(new ComputeCellStatsCommand(options.AsOf, options.Sources, options.Options, "cli:xd", options.ByUniverse), cancellationToken);
             if (result.IsFailure)
             {
                 await console.Error.WriteLineAsync(SimulateOptions.Show(result.Error.Code + ": " + result.Error.Message));
@@ -37,12 +37,6 @@ internal static class LearnCellsCommand
 
             var o = result.Value;
             await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"cell statistics as of {options.AsOf:yyyy-MM-dd}: {o.Cells} cells, {o.Rows} rows from {o.Trades} trades, snapshot {o.SnapshotKey[..12]} ({(o.AlreadyStored ? "already stored" : "stored")})"));
-            if (o.Regime is { } regime)
-            {
-                var reasons = regime.UnavailableByReason.Count == 0 ? "none" : string.Join(", ", regime.UnavailableByReason.Select(r => $"{r.Key} {r.Value}"));
-                await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"regime split: {o.RegimeCells} regime cells; {regime.Labelled} of {regime.Total} trades have a regime ({regime.IndexAndVix} from the index and the VIX, {regime.IndexOnly} from the index alone); no regime: {reasons}"));
-            }
-
             if (o.Universe is { } universe)
             {
                 await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"universe split: {universe.TierCells} tier cells; {universe.Tiered} trades in a tier, {universe.Unknown} with no tier (too few bars or no dated set), {universe.Unavailable} dated when too few shares could be ranked"));

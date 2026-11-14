@@ -63,7 +63,7 @@ internal sealed partial class Binder
         return UnknownName(name, false);
     }
 
-    /// <summary><c>prev_day.high</c>, <c>today.open</c>, <c>index.trend</c>: the DSL spellings of the flat catalog names. Every other pair is an error.</summary>
+    /// <summary><c>prev_day.high</c>, <c>today.open</c>: the DSL spellings of the flat catalog names. Every other pair is an error.</summary>
     private IBoundExpression BindDotted(Reference reference)
     {
         var scopeName = reference.Scope!.Text;
@@ -73,7 +73,7 @@ internal sealed partial class Binder
             var close = Suggestions.Closest(scopeName, Vocabulary.ScopeNames);
             scope.Error(
                 LintCodes.UnknownName,
-                scope.Quoted(reference.Scope.Span) + " is not a scope; the dotted names are prev_day.open|high|low|close|volume, today.open|high|low and index.trend|adx."
+                scope.Quoted(reference.Scope.Span) + " is not a scope; the dotted names are prev_day.open|high|low|close|volume, today.open|high|low."
                     + (close.Count > 0 ? " Did you mean " + Suggestions.Listed(close) + "?" : string.Empty),
                 reference.Scope.Span,
                 close.Count > 0 ? close[0] : null);

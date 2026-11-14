@@ -28,7 +28,7 @@ public sealed class OracleSharingTests
         var compiled = new List<CompiledCondition>();
         for (var i = 0; i < evaluations.Length; i++)
         {
-            var generator = new ModelGenerator(8_000 + block * 10 + i, evaluations[i], allowContext: true, allowExpiryDays: true);
+            var generator = new ModelGenerator(8_000 + block * 10 + i, evaluations[i], allowExpiryDays: true);
             for (var j = 0; j < 4; j++)
             {
                 var model = generator.Next();
@@ -42,9 +42,8 @@ public sealed class OracleSharingTests
         var facts = models.Select(ModelFacts.Of).ToList();
         var plan = ConditionSet.Merge(compiled);
         var bars = Series.Sessions(600 + block, 2);
-        var context = OracleContext.For(block, bars);
         var specs = facts.SelectMany(f => f.Features).Concat(evaluations.Select(Specs.Close)).Distinct().ToList();
-        var created = FeatureFrame.Create(specs, new FrameOptions(null, facts.Max(f => f.HistoryDepth), context, OracleContext.ExpiryDays(block)));
+        var created = FeatureFrame.Create(specs, new FrameOptions(null, facts.Max(f => f.HistoryDepth), OracleExpiry.ExpiryDays(block)));
         created.IsSuccess.ShouldBeTrue(created.IsFailure ? created.Error.Message : string.Empty);
         var frame = created.Value;
         var bound = plan.BindAll(frame);
@@ -73,16 +72,15 @@ public sealed class OracleSharingTests
     [Fact]
     public void One_bound_condition_serves_two_frames_of_the_same_layout_run_side_by_side_over_different_series()
     {
-        var generator = new ModelGenerator(8_500, Timeframe.M15, allowContext: true, allowExpiryDays: true);
+        var generator = new ModelGenerator(8_500, Timeframe.M15, allowExpiryDays: true);
         var models = Enumerable.Range(0, 10).Select(_ => generator.Next()).ToList();
         var sources = models.Select((m, i) => Printer.Print(m, i % 2 == 0 ? Parens.Always : Parens.Minimal)).ToList();
         var facts = models.Select(ModelFacts.Of).ToList();
         var plan = ConditionSet.Merge([.. sources.Select(s => Compiling.Condition(s, Timeframe.M15, ModelGenerator.Parameters))]);
         var barsA = Series.Sessions(701, 2);
         var barsB = Series.Sessions(702, 2);
-        var context = OracleContext.For(8_500, barsA);
         var specs = facts.SelectMany(f => f.Features).Append(Specs.Close(Timeframe.M15)).Distinct().ToList();
-        var options = new FrameOptions(null, facts.Max(f => f.HistoryDepth), context, OracleContext.ExpiryDays(8_500));
+        var options = new FrameOptions(null, facts.Max(f => f.HistoryDepth), OracleExpiry.ExpiryDays(8_500));
         var frameA = FeatureFrame.Create(specs, options).Value;
         var frameB = FeatureFrame.Create(specs, options).Value;
         var bound = plan.BindAll(frameA);

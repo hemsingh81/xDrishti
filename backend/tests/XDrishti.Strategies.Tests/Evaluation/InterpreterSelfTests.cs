@@ -264,70 +264,16 @@ public sealed class InterpreterSelfTests
     }
 
     [Fact]
-    public void The_regime_names_are_the_nine_of_doc_07_in_the_order_of_their_codes()
-    {
-        RegimeNames.All.ShouldBe(
-        [
-            "UP_LOW_VOL", "UP_NORMAL_VOL", "UP_HIGH_VOL",
-            "RANGE_LOW_VOL", "RANGE_NORMAL_VOL", "RANGE_HIGH_VOL",
-            "DOWN_LOW_VOL", "DOWN_NORMAL_VOL", "DOWN_HIGH_VOL",
-        ]);
-        RegimeNames.CodeOf("UP_LOW_VOL").ShouldBe(1);
-        RegimeNames.CodeOf("RANGE_NORMAL_VOL").ShouldBe(5);
-        RegimeNames.CodeOf("DOWN_HIGH_VOL").ShouldBe(9);
-        for (var code = 1; code <= 9; code++)
-        {
-            Regime.Name(code).ShouldBe(RegimeNames.All[code - 1]);
-        }
-    }
-
-    [Fact]
-    public void A_regime_comparison_is_unknown_until_the_context_gives_a_regime_and_then_equal_only_to_its_own_code()
-    {
-        var bars = Series.Sparse(4, 60);
-        var context = Contexts.Covering(DateOnly.FromDateTime(bars[0].Start.UtcDateTime), DateOnly.FromDateTime(bars[^1].Start.UtcDateTime), 4, daysBefore: 10);
-        var frame = Frames.Of(new FrameOptions { HistoryDepth = 4, Context = context }, new FeatureSpec("regime"), new FeatureSpec("close"));
-        var interpreter = new Interpreter(frame);
-        var regime = Read("regime()", "regime()", false, new FeatureSpec("regime"));
-        var sawUnknown = false;
-        var sawReady = false;
-
-        foreach (var bar in bars)
-        {
-            frame.Step(bar);
-            var equalsOne = interpreter.Evaluate(new RegimeCmp(true, 1, "UP_LOW_VOL", false, regime));
-            if (!frame.IsReady(0))
-            {
-                equalsOne.ShouldBe(Tri.Unknown);
-                interpreter.Evaluate(new RegimeCmp(false, 1, null, false, regime)).ShouldBe(Tri.Unknown);
-                sawUnknown = true;
-                continue;
-            }
-
-            sawReady = true;
-            var code = (int)frame[0];
-            interpreter.Evaluate(new RegimeCmp(true, code, RegimeNames.All[code - 1], false, regime)).ShouldBe(Tri.True);
-            interpreter.Evaluate(new RegimeCmp(false, code, RegimeNames.All[code - 1], true, regime)).ShouldBe(Tri.False);
-            interpreter.Evaluate(new RegimeCmp(true, code % 9 + 1, null, false, regime)).ShouldBe(Tri.False);
-            interpreter.Evaluate(new RegimeCmp(false, code % 9 + 1, null, false, regime)).ShouldBe(Tri.True);
-        }
-
-        sawUnknown.ShouldBeTrue("the regime was ready from the first bar");
-        sawReady.ShouldBeTrue("the regime was never ready");
-    }
-
-    [Fact]
     public void The_facts_of_a_model_are_its_features_its_deepest_lag_plus_one_and_what_the_frame_needs()
     {
         var lagged = Read("close[3]", "close", true, new FeatureSpec("close"), lag: 3);
-        var vix = new Leaf(new Feature("vix", "vix", true, new FeatureSpec("vix", Timeframe.M1), ReadsContext: true), Timeframe.M1, false, 0);
+        var expiry = new Leaf(new Feature("is_expiry_day", "is_expiry_day", true, new FeatureSpec("is_expiry_day", Timeframe.M1), true), Timeframe.M1, false, 0);
 
-        var facts = ModelFacts.Of(new Logic(true, new Crosses(true, lagged, vix), new Streak(false, Open, 5)));
+        var facts = ModelFacts.Of(new Logic(true, new Crosses(true, lagged, expiry), new Streak(false, Open, 5)));
 
         facts.Features.Count.ShouldBe(3);
         facts.HistoryDepth.ShouldBe(6);
-        facts.NeedsContext.ShouldBeTrue();
-        facts.NeedsExpiryDays.ShouldBeFalse();
+        facts.NeedsExpiryDays.ShouldBeTrue();
         facts.UsesTime.ShouldBeFalse();
         ModelFacts.Of(new TimeCmp(">", 600, "10:00", false)).UsesTime.ShouldBeTrue();
         ModelFacts.Of(new Cmp("<", L("1"), L("2"))).HistoryDepth.ShouldBe(1);

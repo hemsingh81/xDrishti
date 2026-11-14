@@ -14,7 +14,7 @@ public sealed class FrameContextCalendarTests
     [Fact]
     public void The_weekday_equals_the_independent_weekday_for_every_day_of_2026_to_2030()
     {
-        var frame = FrameContextFixtures.Frame(["day_of_week"], null);
+        var frame = FrameContextFixtures.Frame(["day_of_week"]);
         var dates = FrameContextFixtures.Dates(new DateOnly(2026, 1, 1), new DateOnly(2030, 12, 31));
         var random = new Random(2026);
         var previous = double.NaN;
@@ -39,7 +39,7 @@ public sealed class FrameContextCalendarTests
     [Fact]
     public void The_weekday_is_ready_at_the_very_first_step_and_not_before()
     {
-        var frame = FrameContextFixtures.Frame(["day_of_week"], null);
+        var frame = FrameContextFixtures.Frame(["day_of_week"]);
 
         frame.IsReady(0).ShouldBeFalse();
         frame[0].ShouldBeNaN();
@@ -59,7 +59,7 @@ public sealed class FrameContextCalendarTests
         foreach (var seed in new[] { 3, 7, 11, 19, 23 })
         {
             var bars = SeriesGenerator.Random(seed, 10_000, 14_000, specialSessions: true);
-            var frame = FrameContextFixtures.Frame(["day_of_week"], null);
+            var frame = FrameContextFixtures.Frame(["day_of_week"]);
 
             foreach (var bar in bars)
             {
@@ -94,7 +94,7 @@ public sealed class FrameContextCalendarTests
             (tuesday, Minutes.At(23, 59), 2),
             (tuesday.AddDays(1), Minutes.At(0, 0), 3),
         };
-        var frame = FrameContextFixtures.Frame(["day_of_week"], null);
+        var frame = FrameContextFixtures.Frame(["day_of_week"]);
 
         foreach (var (date, minute, expected) in steps)
         {
@@ -112,7 +112,7 @@ public sealed class FrameContextCalendarTests
     [Fact]
     public void The_weekday_of_a_garbage_epoch_beyond_the_range_of_dates_is_still_a_weekday_and_the_expiry_day_is_not_ready()
     {
-        var frame = FrameContextFixtures.Frame(["day_of_week", "is_expiry_day", "vix"], FrameContextFixtures.Build(FrameContextFixtures.Consecutive(1, 30), FrameContextFixtures.Small), new HashSet<DateOnly>());
+        var frame = FrameContextFixtures.Frame(["day_of_week", "is_expiry_day"], new HashSet<DateOnly>());
 
         frame.Step(new Bar(400_000_000_000L, 1, 1, 1, 1, 1));
         frame.Step(new Bar(-400_000_000_000L - 1, 1, 1, 1, 1, 1));
@@ -121,9 +121,8 @@ public sealed class FrameContextCalendarTests
         frame.IsReady(0).ShouldBeTrue();
         frame[0].ShouldBeInRange(1.0, 7.0);
         frame.IsReady(1).ShouldBeFalse("no date, no expiry day");
-        frame.IsReady(2).ShouldBeFalse();
 
-        var early = FrameContextFixtures.Frame(["day_of_week", "is_expiry_day"], null, new HashSet<DateOnly>());
+        var early = FrameContextFixtures.Frame(["day_of_week", "is_expiry_day"], new HashSet<DateOnly>());
         early.Step(new Bar(-400_000_000_000L, 1, 1, 1, 1, 1));
         early.IsReady(0).ShouldBeTrue();
         early.IsReady(1).ShouldBeFalse();
@@ -139,7 +138,7 @@ public sealed class FrameContextCalendarTests
         var saturdayWithoutBars = new DateOnly(2026, 3, 14);
         var mondayWithoutBars = new DateOnly(2026, 3, 16);
         var expiry = new HashSet<DateOnly> { tuesday, thursdayBeforeHoliday, wednesday, saturdayWithoutBars, mondayWithoutBars };
-        var frame = FrameContextFixtures.Frame(["is_expiry_day"], null, expiry);
+        var frame = FrameContextFixtures.Frame(["is_expiry_day"], expiry);
         var datesWithBars = FrameContextFixtures.Dates(Monday, new DateOnly(2026, 4, 30)).Where(d => d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday) && d != mondayWithoutBars).ToList();
         var ones = new List<DateOnly>();
 
@@ -165,7 +164,7 @@ public sealed class FrameContextCalendarTests
     [Fact]
     public void An_empty_set_gives_zero_on_every_date_and_the_expiry_day_is_ready_from_the_first_step()
     {
-        var frame = FrameContextFixtures.Frame(["is_expiry_day"], null, new HashSet<DateOnly>());
+        var frame = FrameContextFixtures.Frame(["is_expiry_day"], new HashSet<DateOnly>());
 
         frame.IsReady(0).ShouldBeFalse();
         foreach (var bar in FrameContextFixtures.OnDates(FrameContextFixtures.Dates(Monday, Monday.AddDays(20)), Minutes.Open))
@@ -183,7 +182,7 @@ public sealed class FrameContextCalendarTests
     public void The_expiry_day_is_taken_once_per_date_and_its_history_is_the_previous_dates()
     {
         var expiry = new HashSet<DateOnly> { Monday.AddDays(1), Monday.AddDays(4) };
-        var frame = FrameContextFixtures.Frame(["is_expiry_day"], null, expiry);
+        var frame = FrameContextFixtures.Frame(["is_expiry_day"], expiry);
         var dates = Enumerable.Range(0, 7).Select(Monday.AddDays).ToList();
         var seen = new List<double>();
 
@@ -205,28 +204,11 @@ public sealed class FrameContextCalendarTests
     }
 
     [Fact]
-    public void The_calendar_features_do_not_need_a_context_and_a_context_does_not_change_them()
-    {
-        var expiry = new HashSet<DateOnly> { Monday.AddDays(2) };
-        var withContext = FrameContextFixtures.Frame(["day_of_week", "is_expiry_day"], FrameContextFixtures.Build(FrameContextFixtures.Consecutive(5, 40), FrameContextFixtures.Small), expiry);
-        var without = FrameContextFixtures.Frame(["day_of_week", "is_expiry_day"], null, expiry);
-
-        foreach (var bar in FrameContextFixtures.OnDates(FrameContextFixtures.Dates(Monday, Monday.AddDays(30)), Minutes.Open, Minutes.At(15, 29)))
-        {
-            withContext.Step(bar);
-            without.Step(bar);
-
-            FrameContextFixtures.Bits(withContext).ShouldBe(FrameContextFixtures.Bits(without));
-        }
-    }
-
-    [Fact]
     public void A_standalone_instance_made_by_the_catalog_has_a_weekday_but_no_expiry_dates_and_no_context()
     {
         IndicatorCatalog.TryGet("day_of_week", out var weekday).ShouldBeTrue();
         IndicatorCatalog.TryGet("is_expiry_day", out var expiry).ShouldBeTrue();
-        IndicatorCatalog.TryGet("regime", out var regime).ShouldBeTrue();
-        var instances = new[] { weekday.Create(weekday.DefaultSpec()), expiry.Create(expiry.DefaultSpec()), regime.Create(regime.DefaultSpec()) };
+        var instances = new[] { weekday.Create(weekday.DefaultSpec()), expiry.Create(expiry.DefaultSpec()) };
         var bar = Minutes.Close(new DateOnly(2026, 3, 6), Minutes.Open, 100);
 
         foreach (var instance in instances)
@@ -237,6 +219,5 @@ public sealed class FrameContextCalendarTests
 
         instances[0].Value.ShouldBe(5.0, "2026-03-06 is a Friday");
         instances[1].IsReady.ShouldBeFalse();
-        instances[2].IsReady.ShouldBeFalse();
     }
 }

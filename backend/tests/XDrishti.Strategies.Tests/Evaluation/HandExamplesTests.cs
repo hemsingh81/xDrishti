@@ -1,7 +1,5 @@
 using XDrishti.Domain.Market.Bars;
-using XDrishti.Indicators;
 using XDrishti.Strategies.Compilation;
-using XDrishti.Strategies.Lint;
 using XDrishti.Strategies.Tests.Support;
 
 namespace XDrishti.Strategies.Tests.Evaluation;
@@ -176,87 +174,6 @@ public sealed class HandExamplesTests
         var bars = new[] { Clock.Close(Clock.Mon, Clock.Open, 100), Clock.Close(Clock.Mon, Clock.Open + 1, 100), Clock.Close(Clock.Tue, Clock.Open, 100), Clock.Close(Clock.Tue, Clock.Open + 1, 100) };
 
         Rig.Of(Timeframe.M1, "day_of_week[1] == MON").Run(bars).ShouldBe("UUTT");
-    }
-
-    /// <summary>A context of two days: the VIX closed at 50 on Monday and at 30 on Tuesday. A frame reads the day before its date, so <c>vix</c> is 50 all day on Tuesday and 30 all day on Wednesday.</summary>
-    private static MarketContext TwoDayVixContext() =>
-        MarketContext.Create([new ContextDay(Clock.Mon, 100, 90, 95, 50), new ContextDay(Clock.Tue, 100, 90, 95, 30)], Contexts.Small).Value;
-
-    /// <summary>Two bars on Tuesday (close 25) and three on Wednesday (close 40, above the VIX of 30 from the first minute of the day).</summary>
-    private static Bar[] TuesdayAndWednesdayBars() =>
-        [Clock.Close(Clock.Tue, Clock.Open, 25), Clock.Close(Clock.Tue, Clock.Open + 1, 25), Clock.Close(Clock.Wed, Clock.Open, 40), Clock.Close(Clock.Wed, Clock.Open + 1, 40), Clock.Close(Clock.Wed, Clock.Open + 2, 40)];
-
-    [Fact]
-    public void The_lag_of_a_feature_of_the_date_is_the_previous_date_and_not_the_previous_minute()
-    {
-        // vix is 50 on Tuesday (Monday's close) and 30 on Wednesday (Tuesday's close). vix[1] is the value of the previous date: not ready on the first date, 50 all day on the second.
-        Rig.Of(Timeframe.M1, "vix[1] == 50", TwoDayVixContext()).Run(TuesdayAndWednesdayBars()).ShouldBe("UUTTT");
-        Rig.Of(Timeframe.M1, "vix == 30", TwoDayVixContext()).Run(TuesdayAndWednesdayBars()).ShouldBe("FFTTT");
-    }
-
-    [Fact]
-    public void A_crossing_of_a_bar_feature_with_the_context_is_refused_because_its_previous_value_would_be_the_previous_date_and_the_explicit_form_crosses_once()
-    {
-        // close was 25 on Tuesday and is 40 on Wednesday, vix is 30 on Wednesday: the close crosses above the vix once, at 09:15 on Wednesday, and then stays above it.
-        // The explicit form says so: 09:15 Wed: 40 > 30 and the previous close 25 <= 30 yes; 09:16 and 09:17: the previous close 40 <= 30 no. On Tuesday the close is below the vix of 50.
-        Rig.Of(Timeframe.M1, "close > vix and close[1] <= vix", TwoDayVixContext()).Run(TuesdayAndWednesdayBars()).ShouldBe("FFTFF");
-
-        // crosses_above(close, vix) would have meant close > vix and close[1] <= vix[1] and vix[1] on Wednesday is Tuesday's 50 all day: 40 <= 50 at 09:16 and 09:17 as well, so the "crossing" would fire
-        // at every minute of the date although the close never crossed anything again. This is the wrong answer the lint exists to refuse.
-        Rig.Of(Timeframe.M1, "close > vix and close[1] <= vix[1]", TwoDayVixContext()).Run(TuesdayAndWednesdayBars()).ShouldBe("FFTTT");
-        var refused = Compiling.Of("crosses_above(close, vix)", Timeframe.M1);
-
-        refused.IsSuccess.ShouldBeFalse();
-        var error = refused.Errors.ShouldHaveSingleItem();
-        error.Code.ShouldBe(LintCodes.MixedTimeframesInLag);
-        error.Suggestion.ShouldBe("close > vix and close[1] <= vix");
-    }
-
-    [Fact]
-    public void A_crossing_of_the_context_with_a_number_is_a_crossing_of_the_date_and_holds_for_the_whole_date()
-    {
-        // vix falls from 50 (Tuesday) to 30 (Wednesday). crosses_below(vix, 40) is vix < 40 and vix[1] >= 40 with the previous value of the previous date, so it holds on every minute of Wednesday: it is the
-        // date that crossed, and the value of a date does not change within it. On Tuesday there is no previous date: unknown.
-        Rig.Of(Timeframe.M1, "crosses_below(vix, 40)", TwoDayVixContext()).Run(TuesdayAndWednesdayBars()).ShouldBe("UUTTT");
-    }
-
-    /// <summary>
-    /// Ten days of an index, close 100 102 104 103 101 102 105 105 99 98 (high and low one point away), with options that make every regime worked out by hand: the average is of 2 days, the slope over 1 day, the ADX
-    /// of 1 day with a minimum of 0 (any ADX passes once it exists), the ATR of 1 day and a percentile window of 1 value, whose rank is always the middle (50), so the volatility is always normal. The trend of a day is
-    /// then up when the close is above the previous close and above the close two days earlier, down for the mirror image, else range: day 3 (104) up, day 4 (103) range, day 5 (101) down, day 6 (102) range, day 7 (105) up,
-    /// day 8 (105) range, day 9 (99) down, day 10 (98) down. The regime is <c>(1 - trend) * 3 + volatility + 1</c> with volatility 1: up 2 (UP_NORMAL_VOL), range 5 (RANGE_NORMAL_VOL), down 8 (DOWN_NORMAL_VOL).
-    /// Days 1 and 2 have no trend yet.
-    /// </summary>
-    private static MarketContext TenDayRegimeContext()
-    {
-        double[] closes = [100, 102, 104, 103, 101, 102, 105, 105, 99, 98];
-        var options = new ContextOptions(TrendSmaPeriod: 2, TrendSlopeDays: 1, AdxPeriod: 1, AdxMin: 0, AtrPeriod: 1, PercentileWindow: 1);
-        var days = closes.Select((close, i) => new ContextDay(WeekdayOf(i), close + 1, close - 1, close)).ToList();
-
-        return MarketContext.Create(days, options).Value;
-    }
-
-    /// <summary>The weekdays from Monday 2 March 2026: day 0 is that Monday and day 5 the Monday after the Friday 6 March.</summary>
-    private static DateOnly WeekdayOf(int index) => Mon.AddDays((index / 5 * 7) + (index % 5));
-
-    [Fact]
-    public void The_regime_is_compared_with_its_name_or_its_code_and_is_the_value_of_the_day_before()
-    {
-        // One bar on each of eleven weekdays: the first is the date of the first context day, the eleventh the date after the last. A frame at a date reads the day before it:
-        // date:    1  2  3  4  5  6  7  8  9  10 11
-        // reads:   -  d1 d2 d3 d4 d5 d6 d7 d8 d9 d10
-        // regime:  U  U  U  2  5  8  5  2  5  8  8      (no day before; days 1 and 2 have no trend yet; then the codes worked out above)
-        var bars = Enumerable.Range(0, 11).Select(i => Clock.Close(WeekdayOf(i), Clock.Open, 100)).ToList();
-        var context = TenDayRegimeContext();
-
-        Rig.Of(Timeframe.M1, "regime() == \"UP_NORMAL_VOL\"", context).Run(bars).ShouldBe("UUUTFFFTFFF");
-        Rig.Of(Timeframe.M1, "regime() == 2", context).Run(bars).ShouldBe("UUUTFFFTFFF");
-        Rig.Of(Timeframe.M1, "\"UP_NORMAL_VOL\" == regime()", context).Run(bars).ShouldBe("UUUTFFFTFFF");
-        Rig.Of(Timeframe.M1, "regime() == \"RANGE_NORMAL_VOL\"", context).Run(bars).ShouldBe("UUUFTFTFTFF");
-        Rig.Of(Timeframe.M1, "regime() == \"DOWN_NORMAL_VOL\"", context).Run(bars).ShouldBe("UUUFFTFFFTT");
-        Rig.Of(Timeframe.M1, "regime() != \"UP_NORMAL_VOL\"", context).Run(bars).ShouldBe("UUUFTTTFTTT");
-        Rig.Of(Timeframe.M1, "regime() != 8", context).Run(bars).ShouldBe("UUUTTFTTTFF");
-        Rig.Of(Timeframe.M1, "regime() == \"UP_LOW_VOL\"", context).Run(bars).ShouldBe("UUUFFFFFFFF");
     }
 
     // ---- time ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

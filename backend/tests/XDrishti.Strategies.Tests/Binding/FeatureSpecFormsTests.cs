@@ -30,12 +30,9 @@ public sealed class FeatureSpecFormsTests
     [InlineData("rsi(14) > 0", "rsi(14, source=close) > 0")]
     [InlineData("prev_day.high > 0", "prev_day_high > 0")]
     [InlineData("today.open > 0", "today_open > 0")]
-    [InlineData("index.trend == 1", "index_trend == 1")]
-    [InlineData("index.trend == 1", "tf(\"1m\").index_trend == 1")]
     [InlineData("close > 0", "tf(\"15m\").close > 0")]
     [InlineData("close > 0", "close() > 0")]
     [InlineData("atr() > 0", "atr(14) > 0")]
-    [InlineData("regime() == 1", "regime() == \"UP_LOW_VOL\"")]
     [InlineData("bb_upper() > 0", "bb_upper(20, 2) > 0")]
     [InlineData("macd_line() > 0", "macd_line(12, 26, 9, source=close) > 0")]
     public void Two_spellings_of_one_feature_give_equal_specs(string first, string second)

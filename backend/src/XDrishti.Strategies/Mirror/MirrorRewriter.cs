@@ -86,7 +86,7 @@ internal sealed partial class MirrorRewriter(IReadOnlySet<string> parameters)
     }
 
     private Typed? ContextName(Expression node) =>
-        Fail(node, MirrorCodes.ContextName, Quote(node) + " reads the market context or the calendar; whether the SELL wants the same filter or the opposite one is a trading judgment.");
+        Fail(node, MirrorCodes.ContextName, Quote(node) + " reads the calendar, the results events or the relative strength; whether the SELL wants the same filter or the opposite one is a trading judgment.");
 
     private Typed? Visit(Expression expression) => expression switch
     {
@@ -119,7 +119,7 @@ internal sealed partial class MirrorRewriter(IReadOnlySet<string> parameters)
         }
 
         var flat = scope is null ? name : scope + "_" + name;
-        if (scope == "index" || MirrorTable.IsRefused(flat))
+        if (MirrorTable.IsRefused(flat))
         {
             return ContextName(reference);
         }

@@ -21,7 +21,7 @@ internal sealed class ExecuteDataJobHandler(
     AggregatePhaseRunner aggregate,
     QualityPhaseRunner quality,
     ICalendarUpkeep calendar,
-    IContextUpkeep context,
+    IBasketUpkeep basket,
     TimeProvider clock,
     ILogger<ExecuteDataJobHandler> logger) : ICommandHandler<ExecuteDataJobCommand>
 {
@@ -114,10 +114,10 @@ internal sealed class ExecuteDataJobHandler(
             }
         }
 
-        // The days that became final are written to the market context (P3-01d); only ever warnings.
+        // The basket context and the relative strength of the days that became final (BK-08, BK-09); only ever warnings.
         if (job.InstrumentId is null && job.Steps.Contains(DataSteps.Aggregate))
         {
-            await context.RunAsync(reporter, cancellationToken);
+            await basket.RunAsync(reporter, cancellationToken);
             if (reporter.Ended)
             {
                 DataLog.JobEndedElsewhere(logger, job.Id);

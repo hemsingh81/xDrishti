@@ -9,10 +9,8 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Application.AutoSwitch;
-using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Evidence;
 using XDrishti.Application.Lab;
-using XDrishti.Application.Market.Context;
 using XDrishti.Application.Market.History;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Replay;
@@ -30,8 +28,6 @@ public sealed class GetEvidencePreflightHandlerTests
 
     private readonly IQueryHandler<GetSystemStatusQuery, SystemStatusResponse> _status = Substitute.For<IQueryHandler<GetSystemStatusQuery, SystemStatusResponse>>();
     private readonly IEvidencePreflightHost _host = Substitute.For<IEvidencePreflightHost>();
-    private readonly IQueryHandler<GetChargeSheetStatusQuery, Result<ChargeSheetStatusView>> _sheet = Substitute.For<IQueryHandler<GetChargeSheetStatusQuery, Result<ChargeSheetStatusView>>>();
-    private readonly IQueryHandler<GetContextCoverageQuery, ContextCoverageView> _context = Substitute.For<IQueryHandler<GetContextCoverageQuery, ContextCoverageView>>();
     private readonly IQueryHandler<GetHoldOutQuery, Result<HoldOutView>> _holdOut = Substitute.For<IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>>();
     private readonly ICellStatsStore _cells = Substitute.For<ICellStatsStore>();
     private readonly ITradingCalendar _calendar = Substitute.For<ITradingCalendar>();
@@ -56,8 +52,6 @@ public sealed class GetEvidencePreflightHandlerTests
         _host.ComposePath().Returns("/repo/deploy/compose.yaml");
         _gate.IncompleteReasonAsync(Arg.Any<CancellationToken>()).Returns((string?)null);
         _backfill.AdmitVerified.Returns(true);
-        _sheet.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(Result.Success(Sheet("confirmed")));
-        _context.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(Context());
         _holdOut.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(Result.Success(new HoldOutView(true, false, new HoldOutBlockView(new DateOnly(2026, 5, 1), new DateOnly(2016, 1, 1), new DateOnly(2026, 11, 11), 6, "h", DateTimeOffset.UnixEpoch), null, [])));
         _cells.NewestAsOfAsync(Arg.Any<CancellationToken>()).ReturnsForAnyArgs(new DateOnly(2026, 11, 9));
         _calendar.GetAsync(Arg.Any<CancellationToken>()).ReturnsForAnyArgs(new TradingCalendar());
@@ -73,7 +67,7 @@ public sealed class GetEvidencePreflightHandlerTests
     {
         var view = await RunAsync();
 
-        view.Items.Count.ShouldBe(12);
+        view.Items.Count.ShouldBe(10);
         view.Items.ShouldAllBe(i => i.State == GetEvidencePreflightHandler.Met);
     }
 
@@ -95,44 +89,6 @@ public sealed class GetEvidencePreflightHandlerTests
         _status.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(new SystemStatusResponse(null!, new DatabaseStatus(false, null, null, null, 0, 1, "NpgsqlException"), [], false, DateTimeOffset.UnixEpoch));
 
         Item(await RunAsync(), GetEvidencePreflightHandler.DeployedVersion).State.ShouldBe(GetEvidencePreflightHandler.Unavailable);
-    }
-
-    [Theory]
-    [InlineData("stale")]
-    [InlineData("not_confirmed")]
-    [InlineData("revoked")]
-    public async Task A_charge_sheet_that_is_not_confirmed_at_the_current_rates_is_not_met(string state)
-    {
-        _sheet.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(Result.Success(Sheet(state)));
-
-        Item(await RunAsync(), GetEvidencePreflightHandler.ChargeSheetItem).State.ShouldBe(GetEvidencePreflightHandler.NotMet);
-    }
-
-    [Fact]
-    public async Task A_stale_confirmation_says_the_rates_hash_differs()
-    {
-        _sheet.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(Result.Success(Sheet("stale")));
-
-        Item(await RunAsync(), GetEvidencePreflightHandler.ChargeSheetItem).Reason.ShouldContain("another rates hash");
-    }
-
-    [Fact]
-    public async Task The_context_is_not_met_while_the_regime_is_not_readable()
-    {
-        _context.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(Context() with { RegimeReadableFrom = null });
-
-        Item(await RunAsync(), GetEvidencePreflightHandler.ContextItem).State.ShouldBe(GetEvidencePreflightHandler.NotMet);
-    }
-
-    [Fact]
-    public async Task The_context_is_not_met_when_a_prerequisite_is_missing()
-    {
-        _context.HandleAsync(null!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(Context() with { Missing = "INDIA VIX is not tracked" });
-
-        var item = Item(await RunAsync(), GetEvidencePreflightHandler.ContextItem);
-
-        item.State.ShouldBe(GetEvidencePreflightHandler.NotMet);
-        item.Reason.ShouldContain("INDIA VIX");
     }
 
     [Fact]
@@ -304,8 +260,6 @@ public sealed class GetEvidencePreflightHandlerTests
 
     [Theory]
     [InlineData(GetEvidencePreflightHandler.DeployedVersion)]
-    [InlineData(GetEvidencePreflightHandler.ChargeSheetItem)]
-    [InlineData(GetEvidencePreflightHandler.ContextItem)]
     [InlineData(GetEvidencePreflightHandler.HoldOutItem)]
     [InlineData(GetEvidencePreflightHandler.CellsItem)]
     [InlineData(GetEvidencePreflightHandler.ChampionItem)]
@@ -322,8 +276,6 @@ public sealed class GetEvidencePreflightHandlerTests
         switch (item)
         {
             case GetEvidencePreflightHandler.DeployedVersion: _status.HandleAsync(null!, Arg.Any<CancellationToken>()).ThrowsAsyncForAnyArgs(boom); break;
-            case GetEvidencePreflightHandler.ChargeSheetItem: _sheet.HandleAsync(null!, Arg.Any<CancellationToken>()).ThrowsAsyncForAnyArgs(boom); break;
-            case GetEvidencePreflightHandler.ContextItem: _context.HandleAsync(null!, Arg.Any<CancellationToken>()).ThrowsAsyncForAnyArgs(boom); break;
             case GetEvidencePreflightHandler.HoldOutItem: _holdOut.HandleAsync(null!, Arg.Any<CancellationToken>()).ThrowsAsyncForAnyArgs(boom); break;
             case GetEvidencePreflightHandler.CellsItem: _cells.NewestAsOfAsync(Arg.Any<CancellationToken>()).ThrowsAsyncForAnyArgs(boom); break;
             case GetEvidencePreflightHandler.ChampionItem: _models.ListAsync(null, 0, Arg.Any<CancellationToken>()).ThrowsAsyncForAnyArgs(boom); break;
@@ -362,13 +314,8 @@ public sealed class GetEvidencePreflightHandlerTests
     {
         // 12 Nov 2026 12:00 UTC is 17:30 India time: the 12th session has closed, so the last closed session is the 12th.
         var clock = new FakeTimeProvider(new DateTimeOffset(Today.Year, Today.Month, Today.Day, 12, 0, 0, TimeSpan.Zero));
-        return new GetEvidencePreflightHandler(_status, _host, _sheet, _context, _holdOut, _cells, _calendar, _models, _shadow, _evidenceSet, _schedules, _auto, _history, _backfill, _gate, _replay, clock);
+        return new GetEvidencePreflightHandler(_status, _host, _holdOut, _cells, _calendar, _models, _shadow, _evidenceSet, _schedules, _auto, _history, _backfill, _gate, _replay, clock);
     }
-
-    private static ChargeSheetStatusView Sheet(string state) => new(true, state, "text", null, null, null, "meaning", []);
-
-    private static ContextCoverageView Context() => new(
-        true, null, null, "NIFTY 50", "INDIA VIX", 100, new DateOnly(2026, 1, 1), Today, 0, false, new DateOnly(2026, 2, 1), new DateOnly(2026, 3, 1), new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 1), 90, 0, 10, false, 0, 0, [], "src", null!, new ContextCsvView(0, 0, null, null));
 
     private static ShadowSummaryView Shadow(bool enabled) => new(enabled, false, null, "s", "c", null!, null!, [], null!, null!, null!);
 

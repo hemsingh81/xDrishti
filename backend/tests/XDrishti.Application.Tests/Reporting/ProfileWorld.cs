@@ -6,7 +6,6 @@ using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Baskets;
 using XDrishti.Application.Abstractions.Market.Calendar;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Market.Bars;
@@ -14,7 +13,6 @@ using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Market.Search;
 using XDrishti.Application.Reporting;
 using XDrishti.Domain.Market.Bars;
-using XDrishti.Domain.Market.Context;
 
 namespace XDrishti.Application.Tests.Reporting;
 
@@ -40,7 +38,6 @@ internal sealed class ProfileWorld
 
     public IDerivedVersionStore Derived { get; } = Substitute.For<IDerivedVersionStore>();
 
-    public IContextFigures Context { get; } = Substitute.For<IContextFigures>();
 
     public ReportWorld Runs { get; } = new();
 
@@ -73,8 +70,6 @@ internal sealed class ProfileWorld
         Calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new ValueTask<XDrishti.Domain.Market.Calendar.TradingCalendar>(new XDrishti.Domain.Market.Calendar.TradingCalendar()));
         Benchmark.GetAsync(Arg.Any<CancellationToken>()).Returns(new ValueTask<ConfiguredBenchmark?>((ConfiguredBenchmark?)null));
         BasketBenchmark.GetAsync(Arg.Any<CancellationToken>()).Returns(new ValueTask<BasketBenchmark>(new BasketBenchmark(null, true, "Nifty 500", "Nifty 500 is not in the instrument master")));
-        Context.AsOfManyAsync(Arg.Any<IReadOnlyCollection<DateOnly>>(), Arg.Any<CancellationToken>()).Returns(call =>
-            new ValueTask<IReadOnlyDictionary<DateOnly, ContextRead>>(call.ArgAt<IReadOnlyCollection<DateOnly>>(0).ToDictionary(d => d, _ => ContextRead.Not(ContextRead.NoContext))));
         Portfolio.ExistsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(new ValueTask<bool>(false));
         Derived.ListVersionsAsync(Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new ValueTask<BasketVersionPage?>((BasketVersionPage?)null));
         Bars.ReadDailyBarsAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(call =>
@@ -197,7 +192,7 @@ internal sealed class ProfileWorld
 
     public BasketMembershipLoader Memberships() => new(Baskets, Portfolio, Derived, Runs, Settings, Time);
 
-    public GetBasketProfileHandler Profile() => new(Resolver(), Memberships(), Bars, Context, Runs.Loader, Runs, Cache, Settings, Limits, Cost, Time, NullLogger<GetBasketProfileHandler>.Instance);
+    public GetBasketProfileHandler Profile() => new(Resolver(), Memberships(), Bars, Runs.Loader, Runs, Cache, Settings, Limits, Cost, Time, NullLogger<GetBasketProfileHandler>.Instance);
 
     public GetBasketRankingHandler Ranking() => new(Resolver(), Memberships(), Bars, Settings, Limits, Cost, Time, NullLogger<GetBasketRankingHandler>.Instance);
 }

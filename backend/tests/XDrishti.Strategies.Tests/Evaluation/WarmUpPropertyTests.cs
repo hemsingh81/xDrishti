@@ -96,7 +96,7 @@ public sealed class WarmUpPropertyTests
         const string KnownFalse = "tf(\"1m\").close < 0";
 
         // P is true when the feature is ready and unknown when it is not; N is false when it is ready and unknown when it is not
-        var (p, n) = name == "regime" ? ("(regime() == 1 or regime() != 1)", "(regime() == 1 and regime() != 1)") : ($"({form} > -1e18)", $"({form} < -1e18)");
+        var (p, n) = ($"({form} > -1e18)", $"({form} < -1e18)");
         List<Check> checks =
         [
             new(p, s => s.R0 ? Truth.True : Truth.Unknown),
@@ -116,14 +116,6 @@ public sealed class WarmUpPropertyTests
             new($"{p} == ({KnownTrue})", s => s.R0 ? Truth.True : Truth.Unknown),
             new($"{p} != ({KnownTrue})", s => s.R0 ? Truth.False : Truth.Unknown),
         ];
-
-        if (name == "regime")
-        {
-            checks.Add(new("regime() == 1", s => s.R0 ? Of(s.V0 == 1) : Truth.Unknown));
-            checks.Add(new("not (regime() == 1)", s => s.R0 ? Of(s.V0 != 1) : Truth.Unknown));
-            checks.Add(new("regime() != 1", s => s.R0 ? Of(s.V0 != 1) : Truth.Unknown));
-            return checks;
-        }
 
         checks.AddRange(
         [
@@ -152,9 +144,8 @@ public sealed class WarmUpPropertyTests
         var form = ShortForms[name];
         var checks = ChecksFor(name, form);
         var bars = BarsFor(timeframe, info.DateDriven, HashCode(name, timeframe));
-        var context = Contexts.Covering(Clock.Mon, DateOnly.FromDateTime(bars[^1].Start.UtcDateTime), 3, daysBefore: 12);
         var expiry = new HashSet<DateOnly>(Enumerable.Range(0, 400).Select(i => Clock.Mon.AddDays(i)).Where(d => d.DayOfWeek == DayOfWeek.Tuesday));
-        var rig = Rig.Of(timeframe, [.. checks.Select(c => c.Source)], context, expiry, minimumDepth: 3, resultsDays: ResultsDays);
+        var rig = Rig.Of(timeframe, [.. checks.Select(c => c.Source)], expiry, minimumDepth: 3, resultsDays: ResultsDays);
         var feature = Compiling.Condition(checks[0].Source, timeframe).Features.Single(f => f.Name == name);
         var handle = rig.Frame.HandleOf(feature);
         handle.ShouldBeGreaterThanOrEqualTo(0);

@@ -71,7 +71,6 @@ public sealed class VwapPullbackTests
         result.IsSuccess.ShouldBeTrue(string.Join("; ", result.Problems.Select(p => p.Path + " " + p.Problem.Code)));
         result.Problems.ShouldBeEmpty();
         result.Compiled!.HistoryDepth.ShouldBe(3);
-        result.Compiled.NeedsContext.ShouldBeFalse();
         result.Compiled.NeedsExpiryDays.ShouldBeFalse();
     }
 

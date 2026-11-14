@@ -334,7 +334,7 @@ public sealed class DeterminismAndResetTests
         }
     }
 
-    /// <summary>A mixed frame: bar features on four timeframes, the day lane, and every date-driven feature, with a calendar, a context covering the bars and some expiry dates.</summary>
+    /// <summary>A mixed frame: bar features on four timeframes, the day lane, and the calendar features, with a calendar and some expiry dates.</summary>
     private static (List<FeatureSpec> Specs, FrameOptions Options) DateDrivenFrame(List<Bar> bars, int seed)
     {
         List<FeatureSpec> specs =
@@ -346,11 +346,11 @@ public sealed class DeterminismAndResetTests
             .. FrameContextFixtures.Specs(TestSpecs.ContextNames),
         ];
         var expiry = new HashSet<DateOnly>(FrameContextFixtures.Dates(new DateOnly(2026, 1, 1), new DateOnly(2027, 12, 31)).Where(d => d.DayOfWeek == DayOfWeek.Thursday));
-        return (specs, new FrameOptions(CalendarFixtures.For(bars), FrameOptions.DefaultHistoryDepth, FrameContextFixtures.Build(FrameContextFixtures.Covering(bars, seed)), expiry));
+        return (specs, new FrameOptions(CalendarFixtures.For(bars), FrameOptions.DefaultHistoryDepth, expiry));
     }
 
     [Fact]
-    public void Two_runs_with_the_calendar_and_market_context_features_give_the_same_bits_also_on_another_thread()
+    public void Two_runs_with_the_calendar_features_give_the_same_bits_also_on_another_thread()
     {
         var bars = SeriesGenerator.Random(51, 6_000, 9_000, specialSessions: true);
         var (specs, options) = DateDrivenFrame(bars, 51);
@@ -368,7 +368,7 @@ public sealed class DeterminismAndResetTests
     }
 
     [Fact]
-    public void A_frame_with_the_calendar_and_market_context_features_that_was_reset_equals_a_new_one()
+    public void A_frame_with_the_calendar_features_that_was_reset_equals_a_new_one()
     {
         var earlier = SeriesGenerator.Random(53, 3_000, 4_000, specialSessions: true);
         var bars = SeriesGenerator.Random(52, 6_000, 9_000, specialSessions: true);
@@ -398,7 +398,7 @@ public sealed class DeterminismAndResetTests
     }
 
     [Fact]
-    public void The_calendar_and_market_context_features_and_their_messages_do_not_depend_on_the_current_culture()
+    public void The_calendar_features_and_their_messages_do_not_depend_on_the_current_culture()
     {
         var bars = SeriesGenerator.Random(54, 4_000, 6_000, specialSessions: true);
         var (specs, options) = DateDrivenFrame(bars, 54);

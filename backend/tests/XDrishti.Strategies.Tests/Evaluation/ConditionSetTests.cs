@@ -53,19 +53,15 @@ public sealed class ConditionSetTests
     }
 
     [Fact]
-    public void The_plan_needs_a_context_or_expiry_dates_when_any_condition_does()
+    public void The_plan_needs_expiry_dates_when_any_condition_does()
     {
         var plain = Of("close > 0");
-        var context = Of("regime() == 1");
+        var other = Of("rsi(14) > 50");
         var expiry = Of("is_expiry_day == 1");
 
-        ConditionSet.Merge([plain]).NeedsContext.ShouldBeFalse();
         ConditionSet.Merge([plain]).NeedsExpiryDays.ShouldBeFalse();
-        ConditionSet.Merge([plain, context]).NeedsContext.ShouldBeTrue();
-        ConditionSet.Merge([plain, context]).NeedsExpiryDays.ShouldBeFalse();
+        ConditionSet.Merge([plain, other]).NeedsExpiryDays.ShouldBeFalse();
         ConditionSet.Merge([expiry, plain]).NeedsExpiryDays.ShouldBeTrue();
-        ConditionSet.Merge([expiry, plain]).NeedsContext.ShouldBeFalse();
-        ConditionSet.Merge([plain, expiry, context]).NeedsContext.ShouldBeTrue();
     }
 
     [Fact]
@@ -75,7 +71,6 @@ public sealed class ConditionSetTests
 
         plan.Conditions.ShouldBeEmpty();
         plan.Features.ShouldBeEmpty();
-        plan.NeedsContext.ShouldBeFalse();
         plan.NeedsExpiryDays.ShouldBeFalse();
         plan.BindAll(Frames.OfClose()).ShouldBeEmpty();
     }
@@ -148,13 +143,13 @@ public sealed class ConditionSetTests
     }
 
     [Fact]
-    public void A_frame_made_from_the_plan_needs_the_context_and_the_expiry_dates_the_plan_says()
+    public void A_frame_made_from_the_plan_needs_the_expiry_dates_the_plan_says()
     {
-        var plan = ConditionSet.Merge([Of("close > 0"), Of("regime() == 1"), Of("is_expiry_day == 1")]);
+        var plan = ConditionSet.Merge([Of("close > 0"), Of("is_expiry_day == 1")]);
         var options = new FrameOptions { HistoryDepth = plan.HistoryDepth };
 
-        FeatureFrame.Create(plan.Features, options).IsFailure.ShouldBeTrue("the plan said it needs both");
-        FeatureFrame.Create(plan.Features, options with { Context = Contexts.Covering(Clock.Mon, Clock.Fri, 1), ExpiryDays = new HashSet<DateOnly>() }).IsSuccess.ShouldBeTrue();
+        FeatureFrame.Create(plan.Features, options).IsFailure.ShouldBeTrue("the plan said it needs the expiry dates");
+        FeatureFrame.Create(plan.Features, options with { ExpiryDays = new HashSet<DateOnly>() }).IsSuccess.ShouldBeTrue();
     }
 
     [Fact]

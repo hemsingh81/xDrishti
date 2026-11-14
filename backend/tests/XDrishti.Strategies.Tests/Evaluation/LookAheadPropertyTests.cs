@@ -6,13 +6,12 @@ namespace XDrishti.Strategies.Tests.Evaluation;
 
 /// <summary>
 /// Criterion 10, the point of the slice: <b>a later bar can never change an earlier answer</b>. For 240 seeds (40 on each of the evaluation timeframes 1m, 5m, 15m, 1h, 1D and 1W) and 1,200 random conditions (five to
-/// a seed, all in one frame, a context on half of the seeds), the three-valued result and the decision of every condition at every closed bar of the evaluation timeframe is the same (a) when every later 1-minute bar is
+/// a seed, all in one frame), the three-valued result and the decision of every condition at every closed bar of the evaluation timeframe is the same (a) when every later 1-minute bar is
 /// removed and (b) when every later bar is replaced by arbitrary values — extreme prices, zero prices, zero volumes, huge volumes —, for cut points at the closed bars (all of them when there are few, a sample with the first and
-/// the last otherwise) and a few minutes in the middle of a bar (see <see cref="LookAheadProperty"/>). On the seeds that have a market context the same runs also remove, or change, the context days dated at or after the
-/// cut date, which a step on that date must not read (the context is read as of the previous day).
+/// the last otherwise) and a few minutes in the middle of a bar (see <see cref="LookAheadProperty"/>).
 /// <para>
 /// The <b>negative controls</b> prove that the property can fail: run through a feeder that gives the frame the first bar after the step before reading (<see cref="NextBarFeeder"/>), one that runs the frame on to the
-/// close of the higher-timeframe bar before reading (<see cref="FormingBarFeeder"/>) or one that reads the context day of the date itself (<see cref="SameDayContextFeeder"/>), the same property reports violations — for
+/// close of the higher-timeframe bar before reading (<see cref="FormingBarFeeder"/>), the same property reports violations — for
 /// hand-written conditions that must be caught, and for the random conditions —, while the honest feeder reports none on the very same inputs.
 /// </para>
 /// <para>
@@ -31,14 +30,13 @@ public sealed class LookAheadPropertyTests
 
     public static TheoryData<Timeframe> Evaluations { get; } = [.. Evaluated];
 
-    /// <summary>The conditions of a seed, printed in the three spacings and both bracket styles, compiled once, with the series, context and expiry dates that fit.</summary>
+    /// <summary>The conditions of a seed, printed in the three spacings and both bracket styles, compiled once, with the series and expiry dates that fit.</summary>
     private static (Scenario Scenario, Bar[] Bars) SeedFor(int seed, Timeframe evaluation)
     {
-        var withContext = seed % 2 == 0;
-        var generator = new ModelGenerator(seed, evaluation, withContext, allowExpiryDays: true);
+        var generator = new ModelGenerator(seed, evaluation, allowExpiryDays: true);
         var sources = Enumerable.Range(0, ConditionsPerSeed).Select(i => Printer.Print(generator.Next(), (i + seed) % 2 == 0 ? Parens.Always : Parens.Minimal, (Spacing)((i + seed) % 3))).ToList();
         var bars = OracleSeries.For(seed, evaluation, light: true);
-        var scenario = Scenario.Create(evaluation, sources, expiryDays: OracleContext.ExpiryDays(seed), contextDays: withContext ? OracleContext.Days(seed, bars) : null);
+        var scenario = Scenario.Create(evaluation, sources, expiryDays: OracleExpiry.ExpiryDays(seed));
         return (scenario, bars);
     }
 
@@ -60,7 +58,6 @@ public sealed class LookAheadPropertyTests
         var violations = new List<string>();
         var comparisons = 0;
         var cuts = 0;
-        var contextRuns = 0;
         var values = new Dictionary<Truth, int> { [Truth.True] = 0, [Truth.False] = 0, [Truth.Unknown] = 0 };
 
         for (var s = 0; s < SeedsPerTimeframe; s++)
@@ -73,7 +70,6 @@ public sealed class LookAheadPropertyTests
             violations.AddRange(report.Violations.Select(v => $"seed {seed}: {v}"));
             comparisons += report.Comparisons;
             cuts += report.Cuts;
-            contextRuns += report.ContextRuns;
             foreach (var (truth, count) in report.Values)
             {
                 values[truth] += count;
@@ -83,7 +79,6 @@ public sealed class LookAheadPropertyTests
         violations.ShouldBeEmpty(violations.Count + " answers changed when later bars changed:\n" + Show(violations));
         cuts.ShouldBeGreaterThan(SeedsPerTimeframe * 4, "too few cut points for " + evaluation);
         comparisons.ShouldBeGreaterThan(SeedsPerTimeframe * ConditionsPerSeed * 20, "too few values compared for " + evaluation);
-        contextRuns.ShouldBeGreaterThan(SeedsPerTimeframe * 4, "too few runs with the context days from the cut date on removed or changed for " + evaluation);
         values[Truth.True].ShouldBeGreaterThan(0, evaluation + ": the conditions were never true at a closed bar");
         values[Truth.False].ShouldBeGreaterThan(0, evaluation + ": the conditions were never false at a closed bar");
         values[Truth.Unknown].ShouldBeGreaterThan(0, evaluation + ": the conditions were never unknown at a closed bar");
@@ -163,43 +158,6 @@ public sealed class LookAheadPropertyTests
         leaky.ShouldBeGreaterThan(0, "the property did not notice a feeder that reads the forming higher-timeframe bar on " + evaluation);
     }
 
-    /// <summary>Conditions on the context: a feeder that lets a step on the date <i>D</i> read the record dated <i>D</i> must change them.</summary>
-    private static readonly string[] ContextSources =
-    [
-        "vix > 18",
-        "vix_chg > 0",
-        "vix_pct > 50",
-        "breadth > 50",
-        "index_trend >= 0",
-        "regime() != 4",
-        "regime_vol == 1",
-        "index_vol_pct > 40",
-    ];
-
-    [Theory]
-    [MemberData(nameof(Evaluations))]
-    public void A_feeder_that_reads_the_context_day_of_the_date_itself_is_reported_as_a_violation(Timeframe evaluation)
-    {
-        var honest = 0;
-        var leaky = 0;
-        var runs = 0;
-        for (var s = 0; s < 6; s++)
-        {
-            var seed = 920_000 + (int)evaluation * 1_000 + s;
-            var bars = OracleSeries.For(seed, evaluation, light: true);
-            var scenario = Scenario.Create(evaluation, ContextSources, contextDays: OracleContext.Days(seed, bars));
-
-            honest += LookAheadProperty.Check(new HonestFeeder(), scenario, bars, seed).ViolationCount;
-            var wrong = LookAheadProperty.Check(new SameDayContextFeeder(), scenario, bars, seed);
-            leaky += wrong.ViolationCount;
-            runs += wrong.ContextRuns;
-        }
-
-        honest.ShouldBe(0, "the honest feeder must report nothing on the same inputs");
-        runs.ShouldBeGreaterThan(0);
-        leaky.ShouldBeGreaterThan(0, "the property did not notice a feeder that reads the context day of the date itself on " + evaluation);
-    }
-
     [Theory]
     [MemberData(nameof(Evaluations))]
     public void Both_wrong_feeders_are_also_reported_on_the_random_conditions_of_the_property(Timeframe evaluation)
@@ -238,51 +196,6 @@ public sealed class LookAheadPropertyTests
         perturbed[101..].Any(b => b.Volume == 0).ShouldBeTrue("no zero volume among the replaced bars");
         perturbed[101..].Any(b => b.Close >= 1e11).ShouldBeTrue("no extreme price among the replaced bars");
         perturbed[101..].Any(b => b.Close == 0).ShouldBeTrue("no zero price among the replaced bars");
-    }
-
-    [Fact]
-    public void The_context_variants_of_a_cut_are_the_full_context_up_to_the_day_before_the_cut_date_and_differ_from_the_cut_date_on()
-    {
-        var bars = OracleSeries.Build(5, SeriesShape.Dense, 1);
-        var days = OracleContext.Days(5, bars);
-        var cutDate = SessionClock.DateOf(bars[bars.Length / 2].EpochSeconds);
-        var full = OracleContext.Build(days);
-        var without = OracleContext.Build(days.Where(d => d.Date < cutDate));
-        var changed = OracleContext.Build(days.Select(d => d.Date < cutDate ? d : OracleContext.Altered(d)));
-        var dayAfter = cutDate.AddDays(1);
-
-        // what a step on the cut date (or before it) reads is the same in the three
-        full.TryAsOf(cutDate, out var fullAtCut).ShouldBeTrue();
-        without.TryAsOf(cutDate, out var withoutAtCut).ShouldBeTrue();
-        changed.TryAsOf(cutDate, out var changedAtCut).ShouldBeTrue();
-        withoutAtCut.ShouldBe(fullAtCut);
-        changedAtCut.ShouldBe(fullAtCut);
-
-        // from the next date the record of the cut date is visible, and it is not the same in the three: the variants are real changes
-        full.TryAsOf(dayAfter, out var fullAfter).ShouldBeTrue();
-        without.TryAsOf(dayAfter, out var withoutAfter).ShouldBeTrue();
-        changed.TryAsOf(dayAfter, out var changedAfter).ShouldBeTrue();
-        withoutAfter.Date.ShouldBeLessThan(cutDate);
-        fullAfter.Date.ShouldBe(cutDate);
-        changedAfter.Date.ShouldBe(cutDate);
-        changedAfter.Vix.ShouldBe(99.9);
-        changedAfter.ShouldNotBe(fullAfter);
-    }
-
-    [Fact]
-    public void The_scenario_with_records_keeps_them_and_a_scenario_with_a_ready_context_or_none_has_none()
-    {
-        var bars = OracleSeries.Build(5, SeriesShape.Dense, 1);
-        var days = OracleContext.Days(5, bars);
-
-        var withRecords = Scenario.Create(Timeframe.M5, ["vix > 18"], contextDays: days);
-        var withReady = Scenario.Create(Timeframe.M5, ["vix > 18"], OracleContext.Build(days));
-        var report = LookAheadProperty.Check(new HonestFeeder(), withReady, bars, 1);
-
-        withRecords.ContextDays.ShouldBe(days);
-        withReady.ContextDays.ShouldBeNull();
-        report.ContextRuns.ShouldBe(0, "a scenario that was given a ready context cannot have its records cut");
-        report.ViolationCount.ShouldBe(0);
     }
 
     [Fact]

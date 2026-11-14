@@ -31,11 +31,10 @@ public sealed class GeneratedConditionsRunTests
         var conditions = Enumerable.Range(0, 25).Select(_ => Compiling.Condition(generator.Next().Source, timeframe, ValidConditionGenerator.Parameters)).ToList();
         var plan = ConditionSet.Merge(conditions);
         var bars = BarsFor(timeframe, seed);
-        var context = Contexts.Covering(DateOnly.FromDateTime(bars[0].Start.UtcDateTime), DateOnly.FromDateTime(bars[^1].Start.UtcDateTime), seed, daysBefore: 20);
         var expiry = new HashSet<DateOnly>(Enumerable.Range(0, 800).Select(i => Clock.Mon.AddDays(i)).Where(d => d.DayOfWeek == DayOfWeek.Thursday));
         var created = FeatureFrame.Create(
             plan.Features.Count == 0 ? [Specs.Close(timeframe)] : plan.Features,
-            new FrameOptions { HistoryDepth = plan.HistoryDepth, Context = plan.NeedsContext ? context : null, ExpiryDays = plan.NeedsExpiryDays ? expiry : null });
+            new FrameOptions { HistoryDepth = plan.HistoryDepth, ExpiryDays = plan.NeedsExpiryDays ? expiry : null });
         created.IsSuccess.ShouldBeTrue(created.IsFailure ? created.Error.Message : string.Empty);
         var frame = created.Value;
         var bound = plan.BindAll(frame);

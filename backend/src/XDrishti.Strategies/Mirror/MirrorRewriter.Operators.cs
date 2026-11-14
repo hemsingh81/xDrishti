@@ -185,11 +185,6 @@ internal sealed partial class MirrorRewriter
 
     private Typed? BuiltinCall(Call call, Builtin builtin)
     {
-        if (builtin == Builtin.Regime)
-        {
-            return ContextName(call);
-        }
-
         var expected = builtin switch
         {
             Builtin.Between => 3,

@@ -52,7 +52,7 @@ public sealed class EventHoldSimulatorTests
     private static SimulationResult Run(StrategyDefinition definition, IReadOnlyList<Bar> bars, ResultsDayInputs inputs, TradingCalendar? calendar = null)
     {
         var simulator = Sim.Create(definition, Timeframe.D1, Cand.NoSlippage);
-        var result = simulator.Run(Scan.Instrument, bars, Sim.Tick, calendar ?? DefaultWeek(), null, null, null, inputs);
+        var result = simulator.Run(Scan.Instrument, bars, Sim.Tick, calendar ?? DefaultWeek(), null, null, inputs);
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Code + ": " + result.Error.Message : string.Empty);
         return result.Value;
     }

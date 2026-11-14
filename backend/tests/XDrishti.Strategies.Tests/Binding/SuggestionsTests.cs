@@ -13,7 +13,7 @@ public sealed class SuggestionsTests
 
     private static readonly string[] BuiltinFunctions = ["crosses_above", "crosses_below", "rising", "falling", "between", "abs", "min", "max"];
 
-    private static readonly string[] CallableNames = [.. IndicatorCatalog.All.Select(i => i.Name), .. BuiltinFunctions, "regime"];
+    private static readonly string[] CallableNames = [.. IndicatorCatalog.All.Select(i => i.Name), .. BuiltinFunctions];
 
     public static TheoryData<string> FeatureNames { get; } = [.. IndicatorCatalog.All.Select(i => i.Name)];
 
@@ -200,7 +200,7 @@ public sealed class SuggestionsTests
     public void A_typo_of_a_name_as_a_value_suggests_names_of_values_too()
     {
         Compiling.OnlyError("todya_open > 1").Suggestion.ShouldBe("today_open");
-        Compiling.OnlyError("vixx > 1").Suggestion.ShouldBe("vix");
+        Compiling.OnlyError("gap_pctt > 1").Suggestion.ShouldBe("gap_pct");
         Compiling.OnlyError("day_of_wek == 1").Suggestion.ShouldBe("day_of_week");
         Compiling.OnlyError("day_of_week == TUES").Suggestion.ShouldBe("TUE");
         Compiling.OnlyError("rsi(rsi_ln) > 1", parameters: Compiling.Params(("rsi_len", 14))).Suggestion.ShouldBe("rsi_len");

@@ -80,7 +80,6 @@ describe('RobustnessSummary, block bootstrap (CF-03)', () => {
     monteCarlo: null,
     byYear: [],
     signFlipBaseline: null,
-    byRegime: 'unavailable',
     limits: [],
   } as unknown as Schemas['RobustnessView'];
 

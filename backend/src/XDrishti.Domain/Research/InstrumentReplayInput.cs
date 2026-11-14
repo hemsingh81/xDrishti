@@ -2,7 +2,6 @@ using XDrishti.Domain.Filings;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
-using XDrishti.Domain.Market.Context;
 
 namespace XDrishti.Domain.Research;
 
@@ -22,8 +21,6 @@ namespace XDrishti.Domain.Research;
 /// <param name="Tick">The instrument's tick; absent only with a <paramref name="PresetSkip"/> (nothing is scanned then, so no fill needs it): for <see cref="SkipReason.TickSizeInvalid"/> because there is none, for <see cref="SkipReason.CsvAdjustedTwice"/> when the master's tick is refused as well. The record then has no tick.</param>
 /// <param name="PresetSkip">A skip the runner decided (<see cref="SkipReason.CsvAdjustedTwice"/> or <see cref="SkipReason.TickSizeInvalid"/>): the replay classifies the sessions and hashes the bars and does not scan. An empty list gives <c>no_bars</c> whatever it says.</param>
 /// <param name="SkipDetail">A note on the preset skip, kept in the record.</param>
-/// <param name="ContextDays">The stored market-context days (P3-lift, ADR 0145), oldest first, shared by every instrument of a run; given only when the strategy reads the context, otherwise null. A decision reads the latest day strictly before its date.</param>
-/// <param name="ContextNote">Why there are no <paramref name="ContextDays"/> for a strategy that reads the context (<c>no_context</c>); null otherwise.</param>
 /// <param name="Events">The results-calendar snapshot of the run (P15-06, ADR 0182), shared by every instrument; given only when the strategy names <c>not_event_day</c>, otherwise null. A decision reads only the rows visible at its own instant.</param>
 /// <param name="ResultsDays">What the results-days features read (P15-05, ADR 0185), shared by every instrument; given only when the strategy names <c>days_to_results</c> or <c>days_since_results</c>, otherwise null. The replay builds the instrument's per-date series from it.</param>
 /// <param name="TurnoverOn">The 20-day median traded value in rupees of the instrument on an entry date (CF-05, ADR 0230); given only for a run whose strategy names <c>min_turnover</c>, otherwise null. With the filter named and no lookup, every entry is blocked and counted.</param>
@@ -46,8 +43,6 @@ public sealed record InstrumentReplayInput(
     SkipReason? PresetSkip = null,
     string? SkipDetail = null,
     CostContext? Costs = null,
-    IReadOnlyList<ContextDayRecord>? ContextDays = null,
-    string? ContextNote = null,
     EventCalendarSnapshot? Events = null,
     ResultsDayInputs? ResultsDays = null,
     Func<DateOnly, LiquidityTier>? TierOn = null,

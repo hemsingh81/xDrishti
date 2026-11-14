@@ -154,7 +154,7 @@ public sealed class IndicatorCatalogTests
     }
 
     [Fact]
-    public void The_catalog_lists_the_forty_four_names_of_p3_01_and_p3_01b_and_the_twelve_date_driven_ones_of_p3_01c()
+    public void The_catalog_lists_the_forty_four_names_of_p3_01_and_p3_01b_and_the_date_driven_ones_of_p3_01c()
     {
         string[] added =
         [
@@ -165,7 +165,7 @@ public sealed class IndicatorCatalogTests
         IndicatorCatalog.All.Count(i => !i.DateDriven).ShouldBe(20 + added.Length);
         IndicatorCatalog.All.Count(i => !i.DateDriven).ShouldBe(45);
         IndicatorCatalog.All.Count.ShouldBe(45 + TestSpecs.ContextNames.Count + TestSpecs.ResultsNames.Count + TestSpecs.RsNames.Count);
-        IndicatorCatalog.All.Count.ShouldBe(64);
+        IndicatorCatalog.All.Count.ShouldBe(54);
         foreach (var name in added)
         {
             IndicatorCatalog.TryGet(name, out var info).ShouldBeTrue(name);
@@ -261,8 +261,8 @@ public sealed class IndicatorCatalogTests
     [Fact]
     public void Default_specs_of_the_catalog_are_valid_where_the_timeframe_allows()
     {
-        // the date-driven names need the context and the expiry dates in the options; an empty context and an empty set are enough for the frame to be valid
-        var options = new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>(), ResultsDays: new Dictionary<DateOnly, ResultsDayValues>(), RelativeStrength: RelativeStrengthDays.Empty);
+        // the date-driven names need the expiry dates in the options; an empty set is enough for the frame to be valid
+        var options = new FrameOptions(ExpiryDays: new HashSet<DateOnly>(), ResultsDays: new Dictionary<DateOnly, ResultsDayValues>(), RelativeStrength: RelativeStrengthDays.Empty);
         foreach (var info in IndicatorCatalog.All.Where(i => !i.Name.StartsWith("or_", StringComparison.Ordinal)))
         {
             FeatureFrame.Create([info.DefaultSpec()], options).IsSuccess.ShouldBeTrue(info.Name);
@@ -408,84 +408,13 @@ public sealed class IndicatorCatalogTests
     }
 
     [Fact]
-    public void The_declared_warm_up_of_the_date_driven_names_is_the_measured_number_of_context_days_for_the_default_options()
+    public void The_declared_warm_up_of_the_calendar_names_is_one_date()
     {
         foreach (var name in TestSpecs.ContextNames)
         {
             IndicatorCatalog.TryGet(name, out var info).ShouldBeTrue();
-
-            var (measured, instance) = MeasureDateFeature(name, new ContextOptions(), 330);
-
-            measured.ShouldBe(info.WarmUp(info.DefaultSpec()), $"{name}: the declared warm-up");
-            instance.ShouldBe(measured, $"{name}: the warm-up of the instance in a frame");
+            info.WarmUp(info.DefaultSpec()).ShouldBe(1, name);
         }
-    }
-
-    [Theory]
-    [MemberData(nameof(OptionSets))]
-    public void The_warm_up_of_a_date_driven_instance_is_the_measured_number_of_context_days_for_the_options_of_its_context(string label, ContextOptions options, int days)
-    {
-        foreach (var name in TestSpecs.ContextNames)
-        {
-            var (measured, instance) = MeasureDateFeature(name, options, days);
-
-            instance.ShouldBe(measured, $"{label}: {name}");
-        }
-    }
-
-    public static TheoryData<string, ContextOptions, int> OptionSets() => new()
-    {
-        { "small", FrameContextFixtures.Small, 60 },
-        { "slow trend", FrameContextFixtures.SlowTrend, 80 },
-        { "long adx", new ContextOptions(TrendSmaPeriod: 5, TrendSlopeDays: 1, AdxPeriod: 20, AtrPeriod: 2, PercentileWindow: 3), 80 },
-        { "one-day slope and window", new ContextOptions(TrendSmaPeriod: 2, TrendSlopeDays: 1, AdxPeriod: 1, AtrPeriod: 1, PercentileWindow: 1), 30 },
-    };
-
-    [Fact]
-    public void The_declared_warm_ups_of_the_twelve_names_follow_the_definitions()
-    {
-        int Warm(string name) => IndicatorCatalog.TryGet(name, out var info) ? info.WarmUp(info.DefaultSpec()) : -1;
-
-        Warm("day_of_week").ShouldBe(1);
-        Warm("is_expiry_day").ShouldBe(1);
-        Warm("index_trend").ShouldBe(55, "the 50-day average, a 5-day slope of it");
-        Warm("index_adx").ShouldBe(28, "ADX(14) is ready at 2 * 14");
-        Warm("index_vol_pct").ShouldBe(265, "the ATR(14) and then a window of 252 of its values: 14 + 252 - 1");
-        Warm("vix").ShouldBe(1);
-        Warm("vix_pct").ShouldBe(252);
-        Warm("vix_chg").ShouldBe(2);
-        Warm("breadth").ShouldBe(1);
-        Warm("regime_trend").ShouldBe(55);
-        Warm("regime_vol").ShouldBe(265);
-        Warm("regime").ShouldBe(265);
-    }
-
-    /// <summary>
-    /// For a date-driven feature on a context with a VIX and a breadth on every day, stepped once on the date of each record (so that the date of record i sees record i - 1): how many context days preceded the first date
-    /// at which it was ready (the number of dates stepped, for the two calendar names, which read no context), after checking that it stays ready, and the warm-up the frame reports for it.
-    /// </summary>
-    private static (int Measured, int Instance) MeasureDateFeature(string name, ContextOptions options, int dayCount)
-    {
-        var records = FrameContextFixtures.Consecutive(40, dayCount);
-        var context = FrameContextFixtures.Build(records, options);
-        var frame = FeatureFrame.Create([new FeatureSpec(name)], new FrameOptions(Context: context, ExpiryDays: new HashSet<DateOnly>())).Value;
-        var first = -1;
-        for (var i = 0; i < records.Count; i++)
-        {
-            frame.Step(Minutes.Close(records[i].Date, Minutes.Open, 100));
-
-            if (frame.IsReady(0))
-            {
-                first = first < 0 ? i : first;
-            }
-            else
-            {
-                first.ShouldBe(-1, $"{name} stays ready once it is ready");
-            }
-        }
-
-        first.ShouldBeGreaterThanOrEqualTo(0, $"{name} was ready on a context of {dayCount} days");
-        return (name is "day_of_week" or "is_expiry_day" ? first + 1 : first, frame.WarmUp(0));
     }
 
     /// <summary>Bars whose highs rise to a peak at index n and fall again, and whose lows fall to a trough there: the first pivot (high and low) is confirmed at bar 2n + 1, the earliest possible.</summary>

@@ -87,12 +87,6 @@ export function buildProfile(over: Partial<Profile> = {}): Profile {
         { symbol: 'BBB', returnPct: -24, share: -2 },
       ],
     },
-    regime: {
-      status: nonValue('unavailable', 'no regime code is recorded for the window'),
-      unknown: 0,
-      minDays: 30,
-      rows: [],
-    },
     turnover: { turnover: nonValue('unavailable', 'membership history starts on 2026-06-01'), adds: 0, removes: 0 },
     capacity: {
       medianAdv: value(250_000_000),
@@ -148,31 +142,6 @@ export function buildRichProfile(over: Partial<Profile> = {}): Profile {
           symbols.map((__, c) => (r === c ? 1 : r + c === 3 ? null : 0.3 + 0.1 * Math.min(r, c))),
         ),
       },
-    },
-    regime: {
-      status: value(2),
-      unknown: 1,
-      minDays: 30,
-      rows: [
-        {
-          code: 1,
-          label: 'UP_LOW_VOL',
-          days: 40,
-          meanReturn: value(0.001),
-          vol: value(0.1),
-          hitRate: value(0.55),
-          state: 'value',
-        },
-        {
-          code: 6,
-          label: 'RANGE_HIGH_VOL',
-          days: 9,
-          meanReturn: nonValue('insufficient', 'n = 9, at least 30 needed'),
-          vol: nonValue('insufficient', 'n = 9, at least 30 needed'),
-          hitRate: nonValue('insufficient', 'n = 9, at least 30 needed'),
-          state: 'insufficient',
-        },
-      ],
     },
     ...over,
   });

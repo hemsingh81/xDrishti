@@ -29,7 +29,7 @@ public sealed class BasketAnalyticsPropertyTests
     private static BasketProfile Run(IReadOnlyList<MemberSeries> members, IReadOnlyList<DailyClose> benchmark, int lastDay, Dictionary<DateOnly, int?>? regimes = null)
     {
         var set = members.Select(m => m.Symbol).ToHashSet(StringComparer.Ordinal);
-        return BasketAnalytics.Profile(new BasketProfileInput(members, _ => set, [D(0)], benchmark, regimes ?? [], new ProfileWindow(D(0), D(lastDay))), Options);
+        return BasketAnalytics.Profile(new BasketProfileInput(members, _ => set, [D(0)], benchmark, new ProfileWindow(D(0), D(lastDay))), Options);
     }
 
     private static string Digest(BasketProfile p) => JsonSerializer.Serialize(p);

@@ -75,8 +75,8 @@ public sealed class PreparedTicketStrategy
             return new PreparedTicketStrategy(null, side.StrategyId, hash, sideText, "the cell style `" + cellStyle + "` is not the strategy's style `" + styleText + "`", null, false);
         }
 
-        var dailyOnly = side.Features.All(f => f.Timeframe >= Timeframe.D1) && !side.NeedsContext && !side.NeedsExpiryDays
-            && side.Items.All(i => !i.Condition.ReadsClock && !i.Condition.NeedsContext && !i.Condition.NeedsExpiryDays);
+        var dailyOnly = side.Features.All(f => f.Timeframe >= Timeframe.D1) && !side.NeedsExpiryDays
+            && side.Items.All(i => !i.Condition.ReadsClock && !i.Condition.NeedsExpiryDays);
         return new PreparedTicketStrategy(side, side.StrategyId, hash, sideText, null, ExitMatch.Find(side.Exits, cellExit), dailyOnly);
     }
 }

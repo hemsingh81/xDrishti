@@ -51,7 +51,7 @@ internal sealed class BindingScope(string source, Timeframe evaluationTimeframe,
 
     /// <summary>
     /// What the catalog says about the spec: the field errors the frame's own validation gives for a frame of this one feature (a parameter outside its range, a combination such as <c>fast</c> not below <c>slow</c>, a
-    /// timeframe the feature cannot run on), without the ones about the frame's options (a context or expiry dates are the caller's to give). Empty when the spec is valid. Asked once per spec.
+    /// timeframe the feature cannot run on), without the ones about the frame's options (expiry dates are the caller's to give). Empty when the spec is valid. Asked once per spec.
     /// </summary>
     public IReadOnlyList<FieldError> CatalogAnswer(FeatureSpec spec)
     {

@@ -31,7 +31,6 @@ public sealed class CompiledSideTests
             Spec("atr", Timeframe.M15, 14),
         ]);
         side.HistoryDepth.ShouldBe(2);
-        side.NeedsContext.ShouldBeFalse();
         side.NeedsExpiryDays.ShouldBeFalse();
         (side.StrategyId, side.Side, side.Style, side.EvaluationTimeframe).ShouldBe(("VWAP_RSI_TREND", Side.Buy, Style.Intraday, Timeframe.M15));
     }
@@ -300,21 +299,6 @@ public sealed class CompiledSideTests
     // ---- criterion 17: needs --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     [Fact]
-    public void A_condition_on_the_regime_makes_the_side_need_a_context_and_the_note_is_in_the_problems_and_not_in_the_warnings()
-    {
-        var definition = Defs.Basic().WithBuy(b => b with { Trigger = Defs.All("regime() == \"UP_LOW_VOL\"") });
-
-        var result = Located.Compile(definition);
-
-        result.IsSuccess.ShouldBeTrue(Located.Show(result));
-        result.Compiled!.NeedsContext.ShouldBeTrue();
-        result.Compiled.NeedsExpiryDays.ShouldBeFalse();
-        result.ShouldHave(LintCodes.NeedsContext, "buy.trigger[0]", ProblemSeverity.Information);
-        result.Compiled.Warnings.ShouldBeEmpty();
-        FeatureFrame.Create(result.Compiled.Features, new FrameOptions { HistoryDepth = result.Compiled.HistoryDepth }).IsFailure.ShouldBeTrue("a frame made without the context is refused as before");
-    }
-
-    [Fact]
     public void A_condition_on_is_expiry_day_makes_the_side_need_the_expiry_dates()
     {
         var definition = Defs.Basic().WithBuy(b => b with { Trigger = Defs.All("is_expiry_day == 1") });
@@ -323,7 +307,6 @@ public sealed class CompiledSideTests
 
         result.IsSuccess.ShouldBeTrue(Located.Show(result));
         result.Compiled!.NeedsExpiryDays.ShouldBeTrue();
-        result.Compiled.NeedsContext.ShouldBeFalse();
         result.ShouldHave(LintCodes.NeedsExpiryDays, "buy.trigger[0]", ProblemSeverity.Information);
         FeatureFrame.Create(result.Compiled.Features, new FrameOptions { HistoryDepth = result.Compiled.HistoryDepth }).IsFailure.ShouldBeTrue();
         FeatureFrame.Create(result.Compiled.Features, new FrameOptions { HistoryDepth = result.Compiled.HistoryDepth, ExpiryDays = new HashSet<DateOnly>() }).IsSuccess.ShouldBeTrue();

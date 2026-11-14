@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using XDrishti.Application.Abstractions.Learning;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Learning;
 using XDrishti.Domain.Confidence;
@@ -25,14 +24,13 @@ public sealed class ComputeCellStatsShrinkageTests
 
     private readonly ICellStatsStore _store = Substitute.For<ICellStatsStore>();
 
-    private readonly IContextFigures _figures = Substitute.For<IContextFigures>();
 
     private CellSnapshotToStore? _written;
 
     private ComputeCellStatsHandler Handler(ShrinkageOptions? shrinkage, ConfidenceOptions? confidence = null)
     {
         _store.StoreAsync(Arg.Do<CellSnapshotToStore>(s => _written = s), Ct).Returns(true);
-        return new ComputeCellStatsHandler(_runs, _store, _figures, new FakeTimeProvider(new DateTimeOffset(2026, 3, 11, 0, 0, 0, TimeSpan.Zero)), NullLogger<ComputeCellStatsHandler>.Instance, confidence, shrinkage);
+        return new ComputeCellStatsHandler(_runs, _store, new FakeTimeProvider(new DateTimeOffset(2026, 3, 11, 0, 0, 0, TimeSpan.Zero)), NullLogger<ComputeCellStatsHandler>.Instance, confidence, shrinkage);
     }
 
     private static async IAsyncEnumerable<RunTrade> Stream(SimTrade[] trades)
@@ -109,7 +107,7 @@ public sealed class ComputeCellStatsShrinkageTests
         report.ShouldNotBe(none);
         again.ShouldBe(report);
         floor.ShouldNotBe(report);
-        confidenceOnly.ShouldBe(ComputeCellStatsHandler.KeyOf(AsOf, Command().Options, $"{KeyA}:intraday:FIXED_RR", null, new ConfidenceOptions()));
+        confidenceOnly.ShouldBe(ComputeCellStatsHandler.KeyOf(AsOf, Command().Options, $"{KeyA}:intraday:FIXED_RR", new ConfidenceOptions()));
         withConfidence.ShouldNotBe(confidenceOnly);
     }
 

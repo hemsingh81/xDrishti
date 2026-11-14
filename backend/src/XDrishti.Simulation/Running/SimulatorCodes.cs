@@ -21,9 +21,6 @@ public static class SimulatorCodes
     /// <summary>A filter the strategy names that nothing evaluates (<c>min_turnover</c>, path <c>filters[i]</c>), or <c>not_event_day</c> run with no results-calendar snapshot or trading calendar (P15-06).</summary>
     public const string FilterNotAvailable = "simulation.filter_not_available";
 
-    /// <summary>A side that reads the market context was run with none given (a programming error: the replay skips with <c>context_unavailable</c> first). Since P3-lift (ADR 0145) a strategy that reads the context is accepted; the former refusal <c>simulation.needs_context</c> is gone.</summary>
-    public const string ContextNotGiven = "simulation.context_not_given";
-
     /// <summary>A side that reads the expiry dates (<c>is_expiry_day</c>): no expiry calendar is stored and none can be derived from stored data (P3-lift, ADR 0145, D5). Path <c>buy</c>.</summary>
     public const string NeedsExpiryDays = "simulation.needs_expiry_days";
 

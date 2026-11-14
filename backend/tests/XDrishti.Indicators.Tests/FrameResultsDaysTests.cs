@@ -71,7 +71,6 @@ public sealed class FrameResultsDaysTests
             IndicatorCatalog.TryGet(name, out var info).ShouldBeTrue(name);
             info.DateDriven.ShouldBeTrue(name);
             info.RequiresResultsDays.ShouldBeTrue(name);
-            info.RequiresContext.ShouldBeFalse(name);
             info.RequiresExpiryDays.ShouldBeFalse(name);
             info.SupportedTimeframes.ShouldBe([Timeframe.M1], name);
         }

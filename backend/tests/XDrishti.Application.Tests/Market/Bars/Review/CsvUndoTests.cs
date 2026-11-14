@@ -56,7 +56,7 @@ public sealed class CsvUndoTests
         new AggregatePhaseRunner(_aggregates, new FixedCalendar(), _settings, new CorporateActionDetection(new FakeDailySeries(), new InMemoryActionData(), new InMemoryActionData(), _clock), _clock, NullLogger<AggregatePhaseRunner>.Instance),
         new QualityPhaseRunner(new FakeQualityData(), new FakeQualityRuns(), _bars, new FakeBarGaps(), new FixedCalendar(), _settings, _clock, NullLogger<QualityPhaseRunner>.Instance),
         new FakeCalendarUpkeep(),
-        new FakeContextUpkeep(),
+        new FakeBasketUpkeep(),
         _clock,
         NullLogger<ExecuteDataJobHandler>.Instance);
 

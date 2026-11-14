@@ -93,7 +93,7 @@ public sealed class LagRuleMatrixTests
     }
 
     /// <summary>
-    /// The calendar and context features change once a date, so their previous value is the previous <i>date</i>; every bar feature, on 1m too, has the previous <i>bar</i>. A lagged call that reads both would compare
+    /// The calendar features change once a date, so their previous value is the previous <i>date</i>; every bar feature, on 1m too, has the previous <i>bar</i>. A lagged call that reads both would compare
     /// two different moments, so a feature of the date is a clock of its own and is refused next to a bar feature on every strategy timeframe, written plainly or with <c>tf("1m")</c> (the one timeframe the date
     /// features can be written with).
     /// </summary>
@@ -103,9 +103,9 @@ public sealed class LagRuleMatrixTests
     {
         string[] mixed =
         [
-            "crosses_above(close, vix)", "crosses_below(vix, ema(20))", "crosses_above(close, index.trend)", "crosses_below(close, breadth)", "crosses_above(close, day_of_week)",
-            "rising(close * vix, 2)", "falling(volume - day_of_week, 1)", "rising(close + regime_vol, 3)", "crosses_above(tf(\"1m\").close, vix)", "crosses_below(vix, tf(\"1m\").close)",
-            "crosses_above(tf(\"1D\").close, vix_pct)", "rising(abs(close - vix), 2)", "falling(min(close, vix), 2)",
+            "crosses_above(close, day_of_week)", "crosses_below(day_of_week, ema(20))", "crosses_above(close, day_of_week)", "crosses_below(close, day_of_week)", "crosses_above(close, day_of_week)",
+            "rising(close * day_of_week, 2)", "falling(volume - day_of_week, 1)", "rising(close + day_of_week, 3)", "crosses_above(tf(\"1m\").close, day_of_week)", "crosses_below(day_of_week, tf(\"1m\").close)",
+            "crosses_above(tf(\"1D\").close, day_of_week)", "rising(abs(close - day_of_week), 2)", "falling(min(close, day_of_week), 2)",
         ];
 
         foreach (var source in mixed)
@@ -114,7 +114,7 @@ public sealed class LagRuleMatrixTests
 
             var error = errors.ShouldHaveSingleItem(source + " on " + Code(strategy));
             error.Code.ShouldBe(LintCodes.MixedTimeframesInLag, source);
-            error.Message.ShouldContain("the date (calendar and context features)", Case.Sensitive, source);
+            error.Message.ShouldContain("the date (calendar features)", Case.Sensitive, source);
         }
     }
 
@@ -124,8 +124,8 @@ public sealed class LagRuleMatrixTests
     {
         string[] allowed =
         [
-            "crosses_above(vix, 20)", "crosses_below(vix, breadth)", "crosses_above(day_of_week, 3)", "rising(vix, 2)", "falling(vix - index_trend, 2)", "rising(vix[1] + vix, 2)", "crosses_above(vix, vix_pct)",
-            "regime() == 3", "rising(close, 3) and rising(vix, 3)", "crosses_above(close, ema(20)) and crosses_above(vix, 20)",
+            "crosses_above(day_of_week, 20)", "crosses_below(day_of_week, day_of_week)", "crosses_above(day_of_week, 3)", "rising(day_of_week, 2)", "falling(day_of_week - day_of_week, 2)", "rising(day_of_week[1] + day_of_week, 2)", "crosses_above(day_of_week, day_of_week)",
+            "rising(close, 3) and rising(day_of_week, 3)", "crosses_above(close, ema(20)) and crosses_above(day_of_week, 20)",
         ];
 
         foreach (var source in allowed)
@@ -138,13 +138,13 @@ public sealed class LagRuleMatrixTests
     [MemberData(nameof(Strategies))]
     public void The_explicit_form_the_message_offers_for_a_bar_feature_against_the_date_compiles_and_reads_the_previous_bar_only_for_the_bar_feature(Timeframe strategy)
     {
-        var refused = Compiling.Of("crosses_above(close, vix)", strategy);
+        var refused = Compiling.Of("crosses_above(close, day_of_week)", strategy);
 
         var offered = refused.Errors.ShouldHaveSingleItem().Suggestion.ShouldNotBeNull();
         var plan = Compiling.Condition(offered, strategy);
 
-        offered.ShouldBe("close > vix and close[1] <= vix");
-        plan.HistoryDepth.ShouldBe(2, "only close is read one bar back; vix is read as it is now");
+        offered.ShouldBe("close > day_of_week and close[1] <= day_of_week");
+        plan.HistoryDepth.ShouldBe(2, "only close is read one bar back; day_of_week is read as it is now");
     }
 
     [Theory]

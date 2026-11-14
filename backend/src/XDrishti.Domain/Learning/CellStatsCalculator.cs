@@ -16,14 +16,12 @@ public static class CellStatsCalculator
     private static readonly CellWindow[] Windows = [CellWindow.All, CellWindow.Days250, CellWindow.Days60];
 
     /// <summary>
-    /// The rows, for every cell and every window, in the order of the input then the windows. The options must be usable (<see cref="CellStatsOptions.Problems"/>). With <paramref name="regimeCells"/> (P6-02, ADR 0146) the rows of those cells follow,
-    /// shrunk toward the same strategy rate; the system and strategy rates are taken from <paramref name="cells"/> alone, so a trade is never counted twice and the rows of <paramref name="cells"/> are the same with and without them.
-    /// With <paramref name="confidence"/> (CF-01, ADR 0203) each row also carries its <see cref="CellStatsRow.Dependence"/> (null or Off: no such member and every other field exactly as before); only in the <see cref="ConfidenceMode.Gate"/> mode does <see cref="CellStatsRow.Enough"/> change.
+    /// The rows, for every cell and every window, in the order of the input then the windows. The options must be usable (<see cref="CellStatsOptions.Problems"/>). With <paramref name="confidence"/> (CF-01, ADR 0203) each row also carries its <see cref="CellStatsRow.Dependence"/> (null or Off: no such member and every other field exactly as before); only in the <see cref="ConfidenceMode.Gate"/> mode does <see cref="CellStatsRow.Enough"/> change.
     /// With <paramref name="shrinkage"/> (CF-02, ADR 0204) each row also carries its <see cref="CellStatsRow.Shrinkage"/> (null or Off: no such member); no other field of any row changes.
-    /// With <paramref name="universeCells"/> (BK-11, ADR 0261) the tier cells follow the regime cells; each is shrunk toward the posterior of its own <c>*</c> cell (the parent link, <see cref="CellId.Parent"/>), and the <c>*</c> rows are the same with and without them.
+    /// With <paramref name="universeCells"/> (BK-11, ADR 0261) the tier cells follow the cells; each is shrunk toward the posterior of its own <c>*</c> cell (the parent link, <see cref="CellId.Parent"/>), and the <c>*</c> rows are the same with and without them.
     /// A tier cell has no <see cref="CellStatsRow.Shrinkage"/> (CF-02 does not yet have it in its chain; owner question 2).
     /// </summary>
-    public static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, DateOnly asOf, CellStatsOptions options, IReadOnlyList<CellInput>? regimeCells = null, ConfidenceOptions? confidence = null, ShrinkageOptions? shrinkage = null, IReadOnlyList<CellInput>? universeCells = null)
+    public static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, DateOnly asOf, CellStatsOptions options, ConfidenceOptions? confidence = null, ShrinkageOptions? shrinkage = null, IReadOnlyList<CellInput>? universeCells = null)
     {
         ArgumentNullException.ThrowIfNull(cells);
         ArgumentNullException.ThrowIfNull(options);
@@ -65,24 +63,6 @@ public static class CellStatsCalculator
                 var (input, trades) = slices[window][i];
                 rows.Add(Row(input, window, trades, asOf, strategyRates[window][input.Cell.Strategy], options, confidence));
                 traded.Add(trades);
-            }
-        }
-
-        if (regimeCells is not null)
-        {
-            foreach (var input in regimeCells)
-            {
-                foreach (var window in Windows)
-                {
-                    if (!strategyRates[window].TryGetValue(input.Cell.Strategy, out var prior))
-                    {
-                        throw new ArgumentException($"The regime cell {input.Cell.Key} has no cell of its strategy among the cells.", nameof(regimeCells));
-                    }
-
-                    var inWindow = InWindow(input.Trades, asOf, window);
-                    rows.Add(Row(input, window, inWindow, asOf, prior, options, confidence));
-                    traded.Add(inWindow);
-                }
             }
         }
 

@@ -17,7 +17,7 @@ namespace XDrishti.Simulation.Running;
 /// the <see cref="TradeWalker"/>. The two stages share nothing but the entry candidate, which carries no exit, so the same entries can be replayed under every exit policy (P4).
 /// <para>
 /// <b>What it runs.</b> An intraday strategy, or a swing strategy evaluated inside the session (30m or 1h; ADR 0040), on an evaluation timeframe up to one day, entered at the close of the trigger bar, with a stop that is a level
-/// (<c>or_opposite</c>, <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c> or <c>bar_high</c>, no buffer, read on the evaluation timeframe), exactly one exit candidate (<c>FIXED_RR</c>, <c>PARTIAL_BE</c> or <c>PARTIAL_TRAIL</c> from P4-02, from P4-03 <c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c> or <c>EMA_TRAIL</c>, or from P4-04 <c>PYRAMID</c>, whose ladders are not candidate lists) with one value in each list, at most the <c>time_stop</c> overlay, no <c>min_turnover</c> filter (the filter <c>not_event_day</c> is evaluated from a results-calendar snapshot, P15-06) and no expiry dates. A side may read the daily market context (P3-lift, ADR 0145): <see cref="Run"/> is given a <see cref="ScanContext"/> and every decision reads the latest context day strictly before its date. A swing side is held up to its
+/// (<c>or_opposite</c>, <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c> or <c>bar_high</c>, no buffer, read on the evaluation timeframe), exactly one exit candidate (<c>FIXED_RR</c>, <c>PARTIAL_BE</c> or <c>PARTIAL_TRAIL</c> from P4-02, from P4-03 <c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c> or <c>EMA_TRAIL</c>, or from P4-04 <c>PYRAMID</c>, whose ladders are not candidate lists) with one value in each list, at most the <c>time_stop</c> overlay, no <c>min_turnover</c> filter (the filter <c>not_event_day</c> is evaluated from a results-calendar snapshot, P15-06) and no expiry dates. A swing side is held up to its
 /// <c>max_hold_sessions</c> (the entry session counts as the first) and is gated to one open position per instrument and side (<see cref="PositionGate"/>). <see cref="Create"/> refuses everything else by name (<see cref="SimulatorCodes"/>) with a located problem, rather than
 /// ignoring it: a result must be what it says it is. A side that does not compile makes <see cref="Create"/> return no simulator; a half strategy is never run.
 /// </para>
@@ -54,9 +54,6 @@ public sealed class Simulator
 
     /// <summary>The fill rules every walk of this simulator applies (the default ones when <see cref="Create"/> was given none).</summary>
     public FillRules Fills => _fills;
-
-    /// <summary>Some side reads the daily market context: <see cref="Run"/> needs one (the replay reads the stored days for such a strategy only).</summary>
-    public bool ReadsContext => _sides.Any(s => s.Compiled.NeedsContext);
 
     /// <summary>Some side names the filter <c>not_event_day</c>: <see cref="Run"/> needs a results-calendar snapshot and a trading calendar, and a run is refused with <c>simulation.filter_not_available</c> without them (P15-06, ADR 0182).</summary>
     public bool ReadsEvents => _sides.Any(s => s.Compiled.NeedsEventCalendar);
@@ -173,7 +170,6 @@ public sealed class Simulator
     /// <param name="tick">The instrument's tick size (<see cref="TickSpec.FromMasterPaise"/>); the price grid of its fills and of its entry limit.</param>
     /// <param name="calendar">The trading calendar, or null for the regular 09:15 to 15:30 session.</param>
     /// <param name="quantity">The full size <c>Q</c> of ADR 0042 for an exact entry and an initial risk, for a <c>PYRAMID</c> to see an add of no whole share (P4-04, D3); null in a gross run, where no add is skipped for its quantity.</param>
-    /// <param name="context">The daily market context the context features read (P3-lift, ADR 0145); required when a side reads it (<see cref="ReadsContext"/>), ignored otherwise.</param>
     /// <param name="events">The results-calendar snapshot the filter <c>not_event_day</c> reads (P15-06); required, with a <paramref name="calendar"/>, when a side names the filter (<see cref="ReadsEvents"/>), ignored otherwise.</param>
     /// <param name="resultsDays">What the features <c>days_to_results</c> and <c>days_since_results</c> read (P15-05); required, with a <paramref name="calendar"/>, when a side names either (<see cref="ReadsResultsDays"/>), ignored otherwise.</param>
     /// <param name="turnoverOn">The 20-day median traded value in rupees on an entry date (CF-05, ADR 0230); read when a side names <c>min_turnover</c>; null or a null answer blocks the entry.</param>
@@ -181,22 +177,17 @@ public sealed class Simulator
     /// <param name="memberOn">Whether the instrument is a member of the basket on an entry date (BK-11b, dated members); null for every other run. A date that is not a member date takes no new entry.</param>
     /// <param name="tierOn">The liquidity tier of the instrument on an entry date (CF-05, D2); read only when the fill rules ask for conservative slippage, and null then excludes every trade.</param>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null, RelativeStrengthInputs? relativeStrength = null, Func<DateOnly, bool>? memberOn = null) =>
-        RunUntilCancelled(instrument, bars, tick, calendar, quantity, context, events, resultsDays, tierOn, turnoverOn, CancellationToken.None, relativeStrength, memberOn);
+    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null, RelativeStrengthInputs? relativeStrength = null, Func<DateOnly, bool>? memberOn = null) =>
+        RunUntilCancelled(instrument, bars, tick, calendar, quantity, events, resultsDays, tierOn, turnoverOn, CancellationToken.None, relativeStrength, memberOn);
 
     /// <summary>As <c>Run</c>, looking at <paramref name="cancellationToken"/> every few thousand minutes of the scan; a stop raises <see cref="OperationCanceledException"/> (AU-12). A separate overload so that existing callers are unchanged.</summary>
-    public Result<SimulationResult> RunUntilCancelled(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, ScanContext? context, EventCalendarSnapshot? events, ResultsDayInputs? resultsDays, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn, CancellationToken cancellationToken, RelativeStrengthInputs? relativeStrength = null, Func<DateOnly, bool>? memberOn = null)
+    public Result<SimulationResult> RunUntilCancelled(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, EventCalendarSnapshot? events, ResultsDayInputs? resultsDays, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn, CancellationToken cancellationToken, RelativeStrengthInputs? relativeStrength = null, Func<DateOnly, bool>? memberOn = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
         if (ReadsResultsDays && (resultsDays is null || calendar is null))
         {
             return Result.Failure<SimulationResult>(ResultsDaysNotGivenError());
-        }
-
-        if (ReadsContext && context is null)
-        {
-            return Result.Failure<SimulationResult>(ContextNotGivenError());
         }
 
         if (ReadsRelativeStrength && relativeStrength is null)
@@ -221,7 +212,7 @@ public sealed class Simulator
         var strength = relativeStrength is null ? null : RelativeStrengthScan.For(relativeStrength);
         foreach (var side in _sides)
         {
-            var created = EntryScanner.Create(side.Compiled, instrument, calendar, context, series, strength);
+            var created = EntryScanner.Create(side.Compiled, instrument, calendar, series, strength);
             if (created.IsFailure)
             {
                 return Result.Failure<SimulationResult>(created.Error);
@@ -257,9 +248,6 @@ public sealed class Simulator
         var ordered = outcomes.OrderBy(o => o.Candidate.DecisionEpochSeconds).ThenBy(o => o.Candidate.Side).ToList().AsReadOnly();
         return Result.Success(new SimulationResult(HeaderOf(), ordered, scans.AsReadOnly(), walk));
     }
-
-    /// <summary>The error of a context-reading side run with no context.</summary>
-    internal static Error ContextNotGivenError() => Error.Validation(SimulatorCodes.ContextNotGiven, "The strategy reads the market context and none was given; the replay skips such an instrument with `context_unavailable` before it runs.");
 
     /// <summary>The error of a side that names <c>not_event_day</c> run with no results-calendar snapshot or no trading calendar: the replay skips such an instrument with <c>event_calendar_unavailable</c> first, and the use case refuses a run with no rows at all.</summary>
     internal static Error EventsNotGivenError() => Error.Validation(SimulatorCodes.FilterNotAvailable, "The strategy names the filter `not_event_day` and no results calendar snapshot or trading calendar was given (P15-04).");

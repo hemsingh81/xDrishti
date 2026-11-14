@@ -6,13 +6,11 @@ using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Market.Strength;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Strength;
-using XDrishti.Application.Tests.Market.Context;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Calendar;
@@ -112,10 +110,11 @@ public sealed class ComputeRelativeStrengthTests
             IReadOnlySet<ActionKey> keys = exDate is { } ex && exIndex >= 0 ? new HashSet<ActionKey> { new(ids[exIndex], ex, CorporateActionKind.Split) } : new HashSet<ActionKey>();
             actions.ListKeysAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(keys));
 
-            var context = new FakeContextBarSource { Legs = new ContextLegs(withIndex ? new ContextInstrument(IndexId, "NSE:NIFTY") : null, null, [], []) };
+            var benchmark = Substitute.For<IBenchmarkIndex>();
+            benchmark.FindAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<Guid?>(withIndex ? IndexId : null));
             var calendar = Substitute.For<ITradingCalendar>();
             calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(new TradingCalendar()));
-            Handler = new ComputeRelativeStrengthHandler(Settings, new FakeContextSettings(), context, baskets, bars, actions, Store, calendar, new FakeTimeProvider(new DateTimeOffset(2026, 6, 30, 14, 30, 0, TimeSpan.Zero)), NullLogger<ComputeRelativeStrengthHandler>.Instance);
+            Handler = new ComputeRelativeStrengthHandler(Settings, benchmark, baskets, bars, actions, Store, calendar, new FakeTimeProvider(new DateTimeOffset(2026, 6, 30, 14, 30, 0, TimeSpan.Zero)), NullLogger<ComputeRelativeStrengthHandler>.Instance);
         }
 
         public RelativeStrengthSettings Settings { get; }

@@ -1,10 +1,9 @@
-using XDrishti.Indicators;
 using XDrishti.Strategies.Lint;
 using XDrishti.Strategies.Syntax;
 
 namespace XDrishti.Strategies.Binding;
 
-/// <summary>The builtin functions: <c>crosses_above</c>, <c>crosses_below</c>, <c>rising</c>, <c>falling</c>, <c>between</c>, <c>abs</c>, <c>min</c>, <c>max</c> and <c>regime()</c>.</summary>
+/// <summary>The builtin functions: <c>crosses_above</c>, <c>crosses_below</c>, <c>rising</c>, <c>falling</c>, <c>between</c>, <c>abs</c>, <c>min</c>.</summary>
 internal sealed partial class Binder
 {
     /// <summary>The largest count a <c>rising</c> or <c>falling</c> node keeps; a larger one is refused by the lint, so the exact value does not matter.</summary>
@@ -43,12 +42,6 @@ internal sealed partial class Binder
                 "`" + BuiltinExample(builtin) + "` takes " + (parameters.Count == 0 ? "no arguments" : Count(parameters.Count, "argument")) + ", but " + Given(arguments.Count) + ".",
                 span);
             return new BoundInvalid(call.Span, [.. arguments.Select(a => a.Bound)]);
-        }
-
-        if (builtin == Builtin.Regime)
-        {
-            IndicatorCatalog.TryGet("regime", out var regime);
-            return BindFeature(regime, call.Name, [], null, call.Span, true);
         }
 
         for (var i = 0; i < arguments.Count; i++)

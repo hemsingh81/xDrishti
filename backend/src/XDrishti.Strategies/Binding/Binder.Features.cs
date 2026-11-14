@@ -130,7 +130,7 @@ internal sealed partial class Binder
                 plain);
         }
 
-        return new BoundFeature(spec, 0, info.Name == "regime" ? BoundType.Regime : BoundType.Number, !isCall, span);
+        return new BoundFeature(spec, 0, BoundType.Number, !isCall, span);
     }
 
     /// <summary>The basket of <c>mom_rank</c> (BK-09): a text that names one of the pre-registered baskets; anything else is refused with the names that are allowed.</summary>

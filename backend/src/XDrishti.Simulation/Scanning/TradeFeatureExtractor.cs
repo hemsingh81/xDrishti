@@ -12,7 +12,7 @@ namespace XDrishti.Simulation.Scanning;
 /// decision instant. The loop stops at the last decision of the timeframe, so a bar after it is never touched: no feature can see the future by construction (and a property test cuts the bars to prove it). Pure calculation: no I/O, no clock.
 /// <para>
 /// The bars are every stored bar of the instrument from its first one, adjusted with the applied corporate actions as the replay does; sessions the replay left out (a halt, a discontinuity) are fed here, so a warm-up can differ slightly from what the scanner saw
-/// (stated limit). The market-context features are NaN unless a <see cref="MarketContext"/> is given.
+/// (stated limit). The eight market-context slots of catalog tf-1 (<c>index_trend</c> to <c>regime</c>) are retired: always NaN (ADR 0292).
 /// </para>
 /// </summary>
 public static class TradeFeatureExtractor
@@ -24,14 +24,12 @@ public static class TradeFeatureExtractor
     /// <param name="factors">The applied corporate actions.</param>
     /// <param name="calendar">The trading calendar.</param>
     /// <param name="decisions">The trades of the instrument (any timeframe).</param>
-    /// <param name="context">The daily market context, or null while it is not loaded.</param>
     /// <param name="expiryDays">The expiry dates, or null when unknown (then <c>is_expiry_day</c> is NaN).</param>
     public static IReadOnlyDictionary<string, double[]> Extract(
         IReadOnlyList<Bar> rawBars,
         AdjustmentFactors factors,
         TradingCalendar calendar,
         IReadOnlyList<TradeFeatureDecision> decisions,
-        MarketContext? context = null,
         IReadOnlySet<DateOnly>? expiryDays = null)
     {
         ArgumentNullException.ThrowIfNull(rawBars);
@@ -41,19 +39,19 @@ public static class TradeFeatureExtractor
         var result = new Dictionary<string, double[]>(decisions.Count, StringComparer.Ordinal);
         foreach (var group in decisions.GroupBy(d => d.Timeframe))
         {
-            Run(group.Key, [.. group.OrderBy(d => d.DecisionEpochSeconds).ThenBy(d => d.TradeKey, StringComparer.Ordinal)], rawBars, factors, calendar, context, expiryDays, result);
+            Run(group.Key, [.. group.OrderBy(d => d.DecisionEpochSeconds).ThenBy(d => d.TradeKey, StringComparer.Ordinal)], rawBars, factors, calendar, expiryDays, result);
         }
 
         return result;
     }
 
-    private static void Run(Timeframe tf, List<TradeFeatureDecision> points, IReadOnlyList<Bar> raw, AdjustmentFactors factors, TradingCalendar calendar, MarketContext? context, IReadOnlySet<DateOnly>? expiry, Dictionary<string, double[]> result)
+    private static void Run(Timeframe tf, List<TradeFeatureDecision> points, IReadOnlyList<Bar> raw, AdjustmentFactors factors, TradingCalendar calendar, IReadOnlySet<DateOnly>? expiry, Dictionary<string, double[]> result)
     {
         var specs = new List<FeatureSpec>();
-        int H(string name, double p1 = 0, double p2 = 0, double p3 = 0, Timeframe? frameTf = null, bool needsContext = false, bool needsExpiry = false)
+        int H(string name, double p1 = 0, double p2 = 0, double p3 = 0, Timeframe? frameTf = null, bool needsExpiry = false)
         {
             var spec = new FeatureSpec(name, frameTf ?? tf, PriceSource.Default, p1, p2, p3);
-            if ((needsContext && context is null) || (needsExpiry && expiry is null) || !IndicatorCatalog.TryGet(name, out var info) || !info.Supports(spec.Timeframe))
+            if ((needsExpiry && expiry is null) || !IndicatorCatalog.TryGet(name, out var info) || !info.Supports(spec.Timeframe))
             {
                 return -1;
             }
@@ -77,15 +75,11 @@ public static class TradeFeatureExtractor
             H("rsi", Period), H("atr", Period), H("adx", Period), H("plus_di", Period), H("minus_di", Period), H("ema", 20), H("ema", 50), H("macd_hist", 12, 26, 9), H("bb_width", 20, 2), H("bb_upper", 20, 2), H("bb_lower", 20, 2),
             H("roc", 10), H("rel_volume", 20), H("vwap"), H("highest", 20), H("lowest", 20), H("supertrend_dir", 10, 3), H("gap_pct"), H("prev_day_close"), H("today_low"), H("today_high"), H("prev_day_high"), H("prev_day_low"), H("today_open"),
         };
-        var date = new[]
-        {
-            H("is_expiry_day", frameTf: Timeframe.M1, needsExpiry: true), H("index_trend", frameTf: Timeframe.M1, needsContext: true), H("index_adx", frameTf: Timeframe.M1, needsContext: true), H("index_vol_pct", frameTf: Timeframe.M1, needsContext: true),
-            H("vix", frameTf: Timeframe.M1, needsContext: true), H("vix_pct", frameTf: Timeframe.M1, needsContext: true), H("vix_chg", frameTf: Timeframe.M1, needsContext: true), H("breadth", frameTf: Timeframe.M1, needsContext: true),
-            H("regime", frameTf: Timeframe.M1, needsContext: true),
-        };
+        // the eight slots of the market context in catalog tf-1 are retired (ADR 0292): the layout stays so that stored rows and models keep their meaning, and they are always unknown
+        var date = new[] { H("is_expiry_day", frameTf: Timeframe.M1, needsExpiry: true), -1, -1, -1, -1, -1, -1, -1, -1 };
 
         // Shortcut: each timeframe re-walks every stored bar of the instrument with its own frame (time and memory grow with timeframes x bars); fine for one instrument at a time, share one pass if it shows in a profile.
-        var created = FeatureFrame.Create(specs, new FrameOptions(calendar, 1, context, expiry));
+        var created = FeatureFrame.Create(specs, new FrameOptions(calendar, 1, ExpiryDays: expiry));
         if (created.IsFailure)
         {
             throw new InvalidOperationException("The feature frame could not be built: " + created.Error.Message);

@@ -32,7 +32,7 @@ public sealed class MirrorTableTests
         var missing = IndicatorCatalog.All.Select(i => i.Name).Where(n => !Classified(n)).ToList();
 
         missing.ShouldBeEmpty();
-        IndicatorCatalog.All.Count.ShouldBe(64);
+        IndicatorCatalog.All.Count.ShouldBe(54);
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class MirrorTableTests
     [Fact]
     public void Every_builtin_is_rewritten_or_refused()
     {
-        var unknown = Vocabulary.BuiltinNames.Where(n => n != "regime" && !MirrorTable.Builtins.Contains(n)).ToList();
+        var unknown = Vocabulary.BuiltinNames.Where(n => !MirrorTable.Builtins.Contains(n)).ToList();
 
         unknown.ShouldBeEmpty();
     }

@@ -62,9 +62,7 @@ public static class CompilerWarmup
         new("tf(\"1m\").close > tf(\"10m\").close and tf(\"15m\").ema(9) > tf(\"30m\").ema(21) and tf(\"1h\").rsi(14) < 60"),
         new("tf(\"1D\").sma(20) > tf(\"1W\").close and tf(\"1W\").ema(10) > tf(\"1M\").close"),
 
-        // the regime, the market context, the calendar and the previous day
-        new("regime() == \"UP_LOW_VOL\" or regime() != 3 or vix < 15 and vix_pct > 50 and vix_chg < 1"),
-        new("index.trend == 1 and index.adx > 20 and index_vol_pct < 50 and breadth > 50 and regime_trend > 0 and regime_vol > 0"),
+        // the calendar and the previous day
         new("is_expiry_day == 1 and gap_pct > 0.5 and today.open < today.high and today.low > 0"),
         new("not (days_to_results <= 2) and days_since_results >= 1"),
         new("days_since_results == 0 and results_sue_q == 5 and results_car3_q >= 2 and results_car3_q <= 4"),
@@ -132,7 +130,6 @@ public static class CompilerWarmup
         // time, regime and types
         new("time >= \"9:45\""),
         new("time >= \"09:45\"", Timeframe.D1),
-        new("regime() == \"UP_LOW_VOLL\""),
         new("close and rsi(14)"),
         new("close"),
     ];
@@ -155,15 +152,11 @@ public static class CompilerWarmup
         // what a host does with a strategy: merge the conditions, make the frame for the plan and bind them to it, which builds their delegates; the frame has no data, the compiler does not need any
         var plan = ConditionSet.Merge(compiled);
         var bound = 0;
-        var context = MarketContext.Create([]);
-        if (context.IsSuccess)
+        var options = new FrameOptions { HistoryDepth = plan.HistoryDepth, ExpiryDays = new HashSet<DateOnly>(), ResultsDays = new Dictionary<DateOnly, ResultsDayValues>(), RelativeStrength = RelativeStrengthDays.Empty };
+        var frame = FeatureFrame.Create(plan.Features, options);
+        if (frame.IsSuccess)
         {
-            var options = new FrameOptions { HistoryDepth = plan.HistoryDepth, Context = context.Value, ExpiryDays = new HashSet<DateOnly>(), ResultsDays = new Dictionary<DateOnly, ResultsDayValues>(), RelativeStrength = RelativeStrengthDays.Empty };
-            var frame = FeatureFrame.Create(plan.Features, options);
-            if (frame.IsSuccess)
-            {
-                bound = plan.BindAll(frame.Value).Count;
-            }
+            bound = plan.BindAll(frame.Value).Count;
         }
 
         var refused = 0;
@@ -184,7 +177,6 @@ public static class CompilerWarmup
     {
         var compiled = 0;
         var bound = 0;
-        var context = MarketContext.Create([]);
         foreach (var item in WarmupStrategies.Valid)
         {
             if (StrategyCompiler.Compile(item.Definition, item.Timeframe, item.Side).Compiled is not { } side)
@@ -193,12 +185,7 @@ public static class CompilerWarmup
             }
 
             compiled++;
-            if (!context.IsSuccess)
-            {
-                continue;
-            }
-
-            var options = new FrameOptions { HistoryDepth = side.HistoryDepth, Context = context.Value, ExpiryDays = new HashSet<DateOnly>(), ResultsDays = new Dictionary<DateOnly, ResultsDayValues>(), RelativeStrength = RelativeStrengthDays.Empty };
+            var options = new FrameOptions { HistoryDepth = side.HistoryDepth, ExpiryDays = new HashSet<DateOnly>(), ResultsDays = new Dictionary<DateOnly, ResultsDayValues>(), RelativeStrength = RelativeStrengthDays.Empty };
             var frame = FeatureFrame.Create(side.Features, options);
             if (frame.IsSuccess)
             {

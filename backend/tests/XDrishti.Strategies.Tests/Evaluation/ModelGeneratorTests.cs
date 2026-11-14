@@ -23,9 +23,9 @@ public sealed class ModelGeneratorTests
     public void Every_generated_condition_is_accepted_by_the_compiler(Timeframe evaluation)
     {
         var refused = new List<string>();
-        foreach (var (withContext, seed) in new[] { (true, 11), (false, 12) })
+        foreach (var (withExpiry, seed) in new[] { (true, 11), (false, 12) })
         {
-            var generator = new ModelGenerator(seed * 1_000 + (int)evaluation, evaluation, withContext, withContext);
+            var generator = new ModelGenerator(seed * 1_000 + (int)evaluation, evaluation, withExpiry);
             for (var i = 0; i < PerTimeframe; i++)
             {
                 var model = generator.Next();
@@ -43,15 +43,14 @@ public sealed class ModelGeneratorTests
 
     [Theory]
     [MemberData(nameof(Evaluations))]
-    public void A_generator_without_a_context_never_reads_the_context_and_without_expiry_dates_never_reads_them(Timeframe evaluation)
+    public void A_generator_without_expiry_dates_never_reads_them(Timeframe evaluation)
     {
-        var generator = new ModelGenerator(77 + (int)evaluation, evaluation, allowContext: false, allowExpiryDays: false);
+        var generator = new ModelGenerator(77 + (int)evaluation, evaluation, allowExpiryDays: false);
 
         var facts = Enumerable.Range(0, 300).Select(_ => ModelFacts.Of(generator.Next())).ToList();
 
-        facts.Any(f => f.NeedsContext).ShouldBeFalse();
         facts.Any(f => f.NeedsExpiryDays).ShouldBeFalse();
-        facts.SelectMany(f => f.Features).Any(s => IndicatorCatalog.TryGet(s.Name, out var info) && (info.RequiresContext || info.RequiresExpiryDays)).ShouldBeFalse();
+        facts.SelectMany(f => f.Features).Any(s => IndicatorCatalog.TryGet(s.Name, out var info) && info.RequiresExpiryDays).ShouldBeFalse();
     }
 
     /// <summary>
@@ -63,7 +62,7 @@ public sealed class ModelGeneratorTests
     [MemberData(nameof(Evaluations))]
     public void A_lagged_call_never_mixes_the_date_with_a_bar_feature_or_two_bar_timeframes_and_lagged_calls_over_the_date_alone_do_occur(Timeframe evaluation)
     {
-        var generator = new ModelGenerator(31 + (int)evaluation, evaluation, allowContext: true, allowExpiryDays: true);
+        var generator = new ModelGenerator(31 + (int)evaluation, evaluation, allowExpiryDays: true);
         var mixed = new List<string>();
         var dateOnly = 0;
         var barOnly = 0;
@@ -97,13 +96,13 @@ public sealed class ModelGeneratorTests
     {
         foreach (var evaluation in new[] { Timeframe.D1, Timeframe.W1, Timeframe.Mo1 })
         {
-            var generator = new ModelGenerator(5, evaluation, true, true);
+            var generator = new ModelGenerator(5, evaluation, true);
             Enumerable.Range(0, 400).Any(_ => ModelFacts.Of(generator.Next()).UsesTime).ShouldBeFalse(evaluation + " used time");
         }
 
         foreach (var evaluation in new[] { Timeframe.M1, Timeframe.M5, Timeframe.M10, Timeframe.M15, Timeframe.M30, Timeframe.H1 })
         {
-            var generator = new ModelGenerator(5, evaluation, true, true);
+            var generator = new ModelGenerator(5, evaluation, true);
             Enumerable.Range(0, 400).Any(_ => ModelFacts.Of(generator.Next()).UsesTime).ShouldBeTrue(evaluation + " never used time");
         }
     }
@@ -116,7 +115,7 @@ public sealed class ModelGeneratorTests
         var sources = new List<string>();
         foreach (var evaluation in Timeframes.All)
         {
-            var generator = new ModelGenerator(4_000 + (int)evaluation, evaluation, true, true);
+            var generator = new ModelGenerator(4_000 + (int)evaluation, evaluation, true);
             for (var i = 0; i < 700; i++)
             {
                 sources.Add(Printer.Print(generator.Next(), Parens.Always, Spacing.Normal));
@@ -153,15 +152,8 @@ public sealed class ModelGeneratorTests
         { "prev_day flat", @"prev_day_[a-z]+" },
         { "today dotted", @"today\.[a-z]+" },
         { "today flat", @"today_[a-z]+" },
-        { "index.trend", @"index\.trend" },
-        { "index.adx", @"index\.adx" },
-        { "index_trend", @"index_trend" },
-        { "index_adx", @"index_adx" },
         { "time before the text", @"time [<>=!]=? ""[0-9:]{5}""" },
         { "time after the text", @"""[0-9:]{5}"" [<>=!]=? time" },
-        { "regime by name", @"regime\(\) [=!]= ""[A-Z_]+""" },
-        { "regime name first", @"""[A-Z_]+"" [=!]= regime\(\)" },
-        { "regime by code", @"regime\(\) [=!]= [1-9]\b" },
         { "weekday constant", @"\b(MON|TUE|WED|THU|FRI)\b" },
         { "weekend constant", @"\b(SAT|SUN)\b" },
         { "day_of_week", @"\bday_of_week\b" },
@@ -196,12 +188,12 @@ public sealed class ModelGeneratorTests
     }
 
     [Fact]
-    public void All_61_catalog_names_but_the_three_stored_row_ones_are_read_by_the_generated_conditions()
+    public void All_catalog_names_but_the_three_stored_row_ones_are_read_by_the_generated_conditions()
     {
         var names = new HashSet<string>();
         foreach (var evaluation in Timeframes.All)
         {
-            var generator = new ModelGenerator(9_000 + (int)evaluation, evaluation, true, true, allowResultsDays: true);
+            var generator = new ModelGenerator(9_000 + (int)evaluation, evaluation, true, allowResultsDays: true);
             for (var i = 0; i < 1_500; i++)
             {
                 foreach (var spec in ModelFacts.Of(generator.Next()).Features)
@@ -213,7 +205,7 @@ public sealed class ModelGeneratorTests
 
         var missing = IndicatorCatalog.All.Where(i => !i.RequiresRelativeStrength).Select(i => i.Name).Where(n => !names.Contains(n)).ToList();
 
-        IndicatorCatalog.All.Count.ShouldBe(64);
+        IndicatorCatalog.All.Count.ShouldBe(54);
         missing.ShouldBeEmpty("never read: " + string.Join(", ", missing));
     }
 
@@ -222,7 +214,7 @@ public sealed class ModelGeneratorTests
     {
         foreach (var evaluation in Timeframes.All)
         {
-            var generator = new ModelGenerator(1_234 + (int)evaluation, evaluation, true, true);
+            var generator = new ModelGenerator(1_234 + (int)evaluation, evaluation, true);
             var others = 0;
             for (var i = 0; i < 300; i++)
             {

@@ -90,16 +90,10 @@ public static class FeatureSpecForms
         ["today.open > 0"] = On15(Of("today_open", M15)),
         ["today.high > 0"] = On15(Of("today_high", M15)),
         ["today.low > 0"] = On15(Of("today_low", M15)),
-        ["index.trend == 1"] = On15(Of("index_trend", Timeframe.M1)),
-        ["index.adx > 20"] = On15(Of("index_adx", Timeframe.M1)),
 
         // the calendar and the context are read on 1m whatever the strategy timeframe is
         ["day_of_week == TUE"] = On15(Of("day_of_week", Timeframe.M1)),
         ["is_expiry_day == 1"] = At(Timeframe.D1, Of("is_expiry_day", Timeframe.M1)),
-        ["vix > 20"] = On15(Of("vix", Timeframe.M1)),
-        ["regime() == 1"] = On15(Of("regime", Timeframe.M1)),
-        ["regime() == \"DOWN_HIGH_VOL\""] = At(Timeframe.W1, Of("regime", Timeframe.M1)),
-        ["tf(\"1m\").vix > 20"] = On15(Of("vix", Timeframe.M1)),
 
         // strategy parameters become part of the spec
         ["rsi(rsi_len) > 50"] = With(new Dictionary<string, double> { ["rsi_len"] = 21 }, Rsi(M15, 21)),

@@ -8,7 +8,7 @@ namespace XDrishti.Indicators.Tests.Benchmarks;
 /// A small benchmark harness without BenchmarkDotNet. The tests are <b>explicit</b>: <c>dotnet test</c> and <c>scripts/check.sh</c> skip them. Run them in Release:
 /// <c>dotnet test --project tests/XDrishti.Indicators.Tests -c Release -- --explicit only --filter-class "*ThroughputBenchmarks*"</c>.
 /// They print updates per second per indicator (through <see cref="IIndicator"/>, the P3-01 ones and the P3-01b ones), the bars per second of every timeframe builder (the weekly and monthly ones included) and the microseconds of
-/// one step of a 12-feature, of a 20-feature, of a 20-feature frame with six calendar and market-context features, of a 28-feature (1m, 1h, 1D, 1W, 1M lanes) and of an 81-handle (the twelve per-session names on every intraday lane, ADR 0035) <see cref="FeatureFrame"/> with history depth 8, and
+/// one step of a 12-feature, of a 20-feature, of a 20-feature frame with two calendar features, of a 28-feature (1m, 1h, 1D, 1W, 1M lanes) and of an 81-handle (the twelve per-session names on every intraday lane, ADR 0035) <see cref="FeatureFrame"/> with history depth 8, and
 /// assert only the floors of the specs (10 million updates per second per core for each indicator, 1 microsecond per 1-minute step of the frames).
 /// </summary>
 [Collection(ExclusiveRun.Name)]
@@ -22,9 +22,6 @@ public sealed class ThroughputBenchmarks
     private static readonly Lazy<Bar[]> LazyBars = new(() => [.. SeriesGenerator.Sessions(5, 2_700)]);
 
     private static Bar[] Bars => LazyBars.Value;
-
-    /// <summary>Consecutive weekdays from mid-2024 for 3,300 days (to 2037): every date of <see cref="Bars"/> (2026 to 2036) is inside, with a warm-up of more than 265 days before it.</summary>
-    private static readonly Lazy<MarketContext> LazyContext = new(() => FrameContextFixtures.Build(FrameContextFixtures.Consecutive(88, 3_300)));
 
     /// <summary>Every Tuesday from 2026 to 2037, the expiry dates of the context benchmarks.</summary>
     private static readonly Lazy<IReadOnlySet<DateOnly>> LazyTuesdays = new(() => new HashSet<DateOnly>(FrameContextFixtures.Dates(new DateOnly(2026, 1, 1), new DateOnly(2037, 12, 31)).Where(d => d.DayOfWeek == DayOfWeek.Tuesday)));
@@ -182,9 +179,9 @@ public sealed class ThroughputBenchmarks
     }
 
     [Fact(Explicit = true)]
-    public void Twenty_feature_frame_with_six_context_features_step_in_microseconds()
+    public void Twenty_feature_frame_with_two_calendar_features_step_in_microseconds()
     {
-        var frame = AllocationTests.TwentyFeatureFrameWithContext(null, LazyContext.Value, LazyTuesdays.Value);
+        var frame = AllocationTests.TwentyFeatureFrameWithCalendar(null, LazyTuesdays.Value);
         var rate = BestRate(() =>
         {
             frame.Reset();
@@ -197,10 +194,10 @@ public sealed class ThroughputBenchmarks
         });
 
         var microseconds = 1e6 / rate;
-        frame.Count.ShouldBe(26);
-        frame.IsReady(frame.HandleOf(new FeatureSpec("regime"))).ShouldBeTrue("the context features had numbers in the measured window");
-        Report("FeatureFrame, 20 features on 1m/5m/15m/1h/1D + 6 context features (vix, vix_pct, index_trend, regime, day_of_week, is_expiry_day), history depth 8 (best of " + Repeats + ")", [$"{rate / 1e6,8:F2} M steps/s   {microseconds,6:F3} µs per 1-minute step"]);
-        microseconds.ShouldBeLessThan(1.0, "target: 20 features with 6 context features in at most 1 microsecond per step");
+        frame.Count.ShouldBe(22);
+        frame.IsReady(frame.HandleOf(new FeatureSpec("day_of_week"))).ShouldBeTrue("the calendar features had numbers in the measured window");
+        Report("FeatureFrame, 20 features on 1m/5m/15m/1h/1D + 2 calendar features (day_of_week, is_expiry_day), history depth 8 (best of " + Repeats + ")", [$"{rate / 1e6,8:F2} M steps/s   {microseconds,6:F3} µs per 1-minute step"]);
+        microseconds.ShouldBeLessThan(1.0, "target: 20 features with 2 calendar features in at most 1 microsecond per step");
     }
 
     [Fact(Explicit = true)]
@@ -210,7 +207,7 @@ public sealed class ThroughputBenchmarks
         var rates = new List<double>();
         foreach (var kind in Enum.GetValues<DateFeatureKind>())
         {
-            var rate = BestRate(() => Run(new DateFeature(kind, LazyContext.Value, LazyTuesdays.Value)));
+            var rate = BestRate(() => Run(new DateFeature(kind, LazyTuesdays.Value)));
             report.Add($"{kind,-16} {rate / 1e6,8:F1} M updates/s   {1e9 / rate,6:F1} ns/update");
             rates.Add(rate);
         }

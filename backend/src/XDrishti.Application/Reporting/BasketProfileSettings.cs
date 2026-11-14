@@ -15,10 +15,6 @@ public sealed class BasketProfileSettings
     [Range(2, 100)]
     public int MinVoters { get; set; } = 5;
 
-    /// <summary>Fewest days for a regime row to be a number.</summary>
-    [Range(5, 500)]
-    public int MinDaysPerRegime { get; set; } = 30;
-
     /// <summary>Most members one basket may hold for a profile.</summary>
     [Range(5, 2000)]
     public int MaxInstruments { get; set; } = 300;
@@ -39,7 +35,6 @@ public sealed class BasketProfileSettings
     public BasketProfileOptions ToOptions(double discontinuityThreshold, double capacityDailyShare) => new()
     {
         MinVoters = MinVoters,
-        MinDaysPerRegime = MinDaysPerRegime,
         CapacityPct = capacityDailyShare,
         DiscontinuityThreshold = discontinuityThreshold,
     };

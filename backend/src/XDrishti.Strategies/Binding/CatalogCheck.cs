@@ -5,7 +5,7 @@ namespace XDrishti.Strategies.Binding;
 
 /// <summary>
 /// What the indicator catalog says about one feature spec: the field errors the frame's own validation gives for a frame of this one feature (a parameter outside its range, a combination such as <c>fast</c> not below
-/// <c>slow</c>, an opening range that is not whole bars, a timeframe the feature cannot run on), without the ones about the frame's options (a context or expiry dates are the caller's to give). One rule for the binder of a
+/// <c>slow</c>, an opening range that is not whole bars, a timeframe the feature cannot run on), without the ones about the frame's options (expiry dates are the caller's to give). One rule for the binder of a
 /// condition and for the compile of a stop and of an exit (spec P3-02b): periods, whole numbers, whole bars and timeframes are never copied.
 /// </summary>
 internal static class CatalogCheck

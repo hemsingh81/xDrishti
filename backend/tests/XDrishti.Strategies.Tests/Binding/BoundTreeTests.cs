@@ -90,35 +90,6 @@ public sealed class BoundTreeTests
     }
 
     [Fact]
-    public void A_regime_name_becomes_the_comparison_of_the_regime_feature_with_its_code_and_a_turned_comparison_is_turned_back()
-    {
-        var named = Tree("regime() == \"RANGE_HIGH_VOL\"").ShouldBeOfType<BoundCompare>();
-        var turned = Tree("\"DOWN_LOW_VOL\" != regime()").ShouldBeOfType<BoundCompare>();
-        var coded = Tree("3 == regime()").ShouldBeOfType<BoundCompare>();
-
-        named.Left.ShouldBeOfType<BoundFeature>().Spec.ShouldBe(Specs.Of("regime", Timeframe.M1));
-        named.Left.Type.ShouldBe(BoundType.Regime);
-        (named.Operator, named.Right.ShouldBeOfType<BoundNumber>().Value).ShouldBe((BinaryOperator.Equal, 6));
-        turned.Left.ShouldBeOfType<BoundFeature>().Type.ShouldBe(BoundType.Regime);
-        (turned.Operator, turned.Right.ShouldBeOfType<BoundNumber>().Value).ShouldBe((BinaryOperator.NotEqual, 7));
-        coded.Left.ShouldBeOfType<BoundFeature>().Type.ShouldBe(BoundType.Regime);
-        coded.Right.ShouldBeOfType<BoundNumber>().Value.ShouldBe(3);
-    }
-
-    [Theory]
-    [InlineData("regime() == 1", BinaryOperator.Equal, 1)]
-    [InlineData("regime() != 9", BinaryOperator.NotEqual, 9)]
-    [InlineData("regime() == 4 + 2", BinaryOperator.Equal, 6)]
-    [InlineData("9 != regime()", BinaryOperator.NotEqual, 9)]
-    public void A_regime_code_is_kept_as_written_with_the_regime_on_the_left(string source, BinaryOperator op, int code)
-    {
-        var compare = Tree(source).ShouldBeOfType<BoundCompare>();
-
-        compare.Left.ShouldBeOfType<BoundFeature>().Type.ShouldBe(BoundType.Regime);
-        (compare.Operator, compare.Right.ShouldBeOfType<BoundNumber>().Value).ShouldBe((op, code));
-    }
-
-    [Fact]
     public void The_builtins_have_nodes_of_their_own()
     {
         var crossing = Tree("crosses_above(close, vwap)").ShouldBeOfType<BoundCrossing>();
@@ -172,7 +143,7 @@ public sealed class BoundTreeTests
             tree.Type.ShouldBe(BoundType.Bool, generated.Source);
             Visit(tree, node =>
             {
-                node.Type.ShouldBeOneOf([BoundType.Number, BoundType.Bool, BoundType.Regime], generated.Source + " -> " + node);
+                node.Type.ShouldBeOneOf([BoundType.Number, BoundType.Bool], generated.Source + " -> " + node);
                 node.ShouldNotBeOfType<BoundInvalid>();
                 node.ShouldNotBeOfType<BoundText>();
                 node.ShouldNotBeOfType<BoundTimeKeyword>();

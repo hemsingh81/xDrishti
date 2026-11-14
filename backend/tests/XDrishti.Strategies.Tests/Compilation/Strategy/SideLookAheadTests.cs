@@ -76,7 +76,7 @@ public sealed class SideLookAheadTests
     private static (CompiledSide Side, Bar[] Bars) SideFor(int seed, Timeframe evaluation)
     {
         var random = new Random(seed);
-        var generator = new ModelGenerator(seed, evaluation, false, false);
+        var generator = new ModelGenerator(seed, evaluation, false);
         ConditionList List() => new(random.Next(2) == 0 ? ListMode.All : ListMode.Any, [.. Enumerable.Range(0, random.Next(2, 4)).Select(_ => Printer.Print(generator.Next()))]);
         var parameters = ModelGenerator.Parameters.Select(p => new StrategyParam(p.Key, p.Value)).ToList();
         var swing = evaluation == Timeframe.D1;

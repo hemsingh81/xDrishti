@@ -2,7 +2,6 @@ using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Market.Strength;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Domain.Common;
@@ -24,8 +23,7 @@ public sealed record RelativeStrengthComputed(IReadOnlyList<DateOnly> Written, I
 
 internal sealed class ComputeRelativeStrengthHandler(
     RelativeStrengthSettings settings,
-    IContextSettings contextSettings,
-    IContextBarSource contextBars,
+    IBenchmarkIndex benchmark,
     IBasketQueries baskets,
     IBarQueries bars,
     ICorporateActionQueries actions,
@@ -124,8 +122,8 @@ internal sealed class ComputeRelativeStrengthHandler(
             series[id] = new MemberSeries(symbol, await ClosesAsync(id, todo[0], todo[^1], cancellationToken), [], false, false);
         }
 
-        var index = (await contextBars.ReadAsync(contextSettings.IndexSymbols, [], cancellationToken)).Index;
-        IReadOnlyList<DailyClose> indexCloses = index is null ? [] : await ClosesAsync(index.Id, todo[0], todo[^1], cancellationToken);
+        var index = await benchmark.FindAsync(cancellationToken);
+        IReadOnlyList<DailyClose> indexCloses = index is null ? [] : await ClosesAsync(index.Value, todo[0], todo[^1], cancellationToken);
         var exDates = new Dictionary<Guid, IReadOnlySet<DateOnly>>();
         foreach (var group in (await actions.ListKeysAsync([.. members.Keys], cancellationToken)).GroupBy(k => k.InstrumentId))
         {

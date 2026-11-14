@@ -1,4 +1,3 @@
-using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Planning;
 
 namespace XDrishti.Application.Abstractions.Planning;
@@ -14,7 +13,4 @@ public static class PlanContextNotes
 
     /// <summary>There is no Trading account to size for.</summary>
     public const string NoAccountNote = "No Trading account to size for.";
-
-    /// <summary>What the breadth in the market gate is (P3-01e): the owner's own tracked set, not the market. Appended after the flag lines, so a cut of the basis never takes a flag.</summary>
-    public static string MarketBreadth(int? universe) => BreadthWording.Note(universe);
 }

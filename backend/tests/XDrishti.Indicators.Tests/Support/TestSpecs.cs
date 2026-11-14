@@ -7,7 +7,7 @@ internal static class TestSpecs
 {
     /// <summary>
     /// Several specs per catalog indicator on the timeframe; indicators that cannot run there (vwap and the opening range on 1D, those and the session values on 1W and 1M) are left out, and so are the date-driven
-    /// features (<see cref="ContextNames"/>): they read a market context rather than bars and have tests of their own.
+    /// features (<see cref="ContextNames"/>): they read dates rather than bars and have tests of their own.
     /// </summary>
     public static List<FeatureSpec> Variants(Timeframe timeframe)
     {
@@ -26,10 +26,10 @@ internal static class TestSpecs
         return specs;
     }
 
-    /// <summary>The two calendar features and the ten that read the market context, in the order of the catalog (independent of the catalog's own flags).</summary>
+    /// <summary>The two calendar features, in the order of the catalog (independent of the catalog's own flags).</summary>
     public static IReadOnlyList<string> ContextNames { get; } =
     [
-        "day_of_week", "is_expiry_day", "index_trend", "index_adx", "index_vol_pct", "vix", "vix_pct", "vix_chg", "breadth", "regime_trend", "regime_vol", "regime",
+        "day_of_week", "is_expiry_day",
     ];
 
     /// <summary>The two results-event features (P15-05): date-driven, 1m only, they read the per-date series of <see cref="FrameOptions.ResultsDays"/>.</summary>
@@ -37,9 +37,6 @@ internal static class TestSpecs
 
     /// <summary>The three relative-strength features (BK-09): date-driven, 1m only, with parameters, reading <see cref="FrameOptions.RelativeStrength"/>.</summary>
     public static IReadOnlyList<string> RsNames { get; } = ["mom_rank", "rs_vs_index", "sector_rs"];
-
-    /// <summary>The ten names that read the market context (all of <see cref="ContextNames"/> but the two calendar ones).</summary>
-    public static IReadOnlyList<string> MarketContextNames { get; } = [.. ContextNames.Skip(2)];
 
     /// <summary>One spec per catalog indicator that runs on the timeframe (the first variant of each): a small frame that still covers every kind of state, for the checks that run at every step of a long series.</summary>
     public static List<FeatureSpec> Representatives(Timeframe timeframe) => [.. Variants(timeframe).DistinctBy(s => s.Name)];

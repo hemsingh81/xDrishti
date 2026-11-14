@@ -1,6 +1,7 @@
 # P3-lift — The simulator reads the market context (and keeps refusing the expiry days, with the reason)
 
 - **Status:** Approved (owner's standing run instruction, 2026-10-22/26: go slice after slice; the owner asked for this row to be built next, with the agent deciding the gaps). Decisions D1 to D8 are the agent's and are recorded in [ADR 0145](../adr/0145-the-simulator-reads-the-market-context-point-in-time-from-stored-days-and-the-run-key-carries-their-fingerprint.md).
+- **Dropped (ADR 0292, 2026-11-14):** the NIFTY 50 / INDIA VIX market context this spec built was removed (table, job, features, readers); nothing in it is current. The text below is history. See [ADR 0292](../adr/0292-features-that-wait-on-the-owner-are-removed-the-market-context-the-charge-sheet-and-the-pre-registered-hold-out-replay.md).
 - **Phase / roadmap row:** P3 — row "P3-lift: lift `simulation.needs_context` and `needs_expiry_days`".
 - **Design refs:** docs/design/11-strategy-lab.md §2 (market context) · docs/design/07-strategies.md §6 (regime) · ADR 0033 (context, Amendment 14 age bound) · ADR 0034, 0036 (lint `needs_context`, `needs_expiry_days`) · ADR 0037 (the two-stage simulator) · ADR 0039 (Application names no engine type).
 - **Needs (built):** P3-01c (`MarketContext`, `FrameOptions.Context`), P3-01d (`market.context_daily`, `IContextDayStore`, `ContextDayRecord`), P3-01e (breadth), P3-04 (`InstrumentReplayer`, run key).

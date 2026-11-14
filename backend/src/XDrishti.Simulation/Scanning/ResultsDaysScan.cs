@@ -8,7 +8,7 @@ using XDrishti.Strategies.Model;
 namespace XDrishti.Simulation.Scanning;
 
 /// <summary>
-/// The per-date series of <c>days_to_results</c> and <c>days_since_results</c> for one instrument (P15-05, ADR 0185), opaque outside the scanning stage like <see cref="ScanContext"/>: the running stage builds it with <see cref="For"/> from the run's inputs and hands it to
+/// The per-date series of <c>days_to_results</c> and <c>days_since_results</c> for one instrument (P15-05, ADR 0185), opaque outside the scanning stage: the running stage builds it with <see cref="For"/> from the run's inputs and hands it to
 /// <see cref="EntryScanner"/> without naming the indicator library. The walk does no I/O: the series is built from the snapshot and the filing times already in memory, once per instrument and run.
 /// </summary>
 public sealed class ResultsDaysScan

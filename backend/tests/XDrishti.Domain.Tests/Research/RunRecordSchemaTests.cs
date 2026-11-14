@@ -76,7 +76,7 @@ public sealed class RunRecordSchemaTests
             "ReplayOptions: MinSessionCompleteness, DiscontinuityThreshold",
             "InstrumentReplay: Record, Trades, OpenAtEnd",
             "RunHeader: Strategy, EngineVersion, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, Calendar, Costs, ContextSha256, Events, ResultsDays, Purpose, RelativeStrength, UniverseBasis, BackfillAdmission",
-            "InstrumentReplayInput: InstrumentId, Symbol, RawBars, Factors, CsvAdjustedThrough, Calendar, Options, From, To, Tick, PresetSkip, SkipDetail, Costs, ContextDays, ContextNote, Events, ResultsDays, TierOn, TurnoverOn, RelativeStrength, MemberOn, PreSeam",
+            "InstrumentReplayInput: InstrumentId, Symbol, RawBars, Factors, CsvAdjustedThrough, Calendar, Options, From, To, Tick, PresetSkip, SkipDetail, Costs, Events, ResultsDays, TierOn, TurnoverOn, RelativeStrength, MemberOn, PreSeam",
             "CostRecord: SheetId, RatesSha256, SheetJson, Checked, Capital, Profile, MaxCostR",
             "EventFilterRecord: CalendarSha256, CalendarRows, LagMinutes, EvfVersion",
             "ResultsDaysRecord: CalendarSha256, CalendarRows, FilingsSha256, FilingRows, LagMinutes, RdsVersion, SurpriseSha256, SurpriseRows, SbpVersion, SurpriseUnverified, SurpriseSeasons, SurpriseThinSeasons, MissedReactionFilings, ReactionFilings",

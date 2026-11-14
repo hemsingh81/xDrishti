@@ -75,7 +75,6 @@ public sealed class RefreshCellStatsHandlerTests
     {
         _calendar.GetAsync(Ct).Returns(new TradingCalendar());
         _holdOut.CurrentAsync(Ct).Returns(new HoldOutBlock(new DateOnly(2026, 5, 5), new DateOnly(2020, 1, 1), new DateOnly(2026, 11, 1), 6, "h", DateTimeOffset.UnixEpoch));
-        _cells.ListRegimeLatestAsync(null, null, Ct).Returns([]);
         _cells.ListUniverseLatestAsync(null, null, Ct).Returns([]);
         _compute.HandleAsync(Arg.Do<ComputeCellStatsCommand>(c => _computed = c), Ct).Returns(Result.Success(new CellStatsOutcome(new string('9', 64), 2, 12, 80, false)));
         _writer.Write(Arg.Any<SimulationRun>()).Returns(_ => (RunRecordText)RuntimeHelpers.GetUninitializedObject(typeof(RunRecordText)));
@@ -261,7 +260,7 @@ public sealed class RefreshCellStatsHandlerTests
         _runs.FindAsync(Arg.Is<string>(k => k != R1), Ct).Returns(call => Header(call.Arg<string>(), Sha1, "ORB", End));
         _runs.StreamTradesAsync(Arg.Any<string>(), false, Ct).Returns(_ => OneTrade());
         _cells.StoreAsync(Arg.Any<CellSnapshotToStore>(), Ct).Returns(true);
-        var realCompute = new ComputeCellStatsHandler(_runs, _cells, Substitute.For<XDrishti.Application.Abstractions.Market.Context.IContextFigures>(), new FakeTimeProvider(new DateTimeOffset(2026, 11, 12, 12, 0, 0, TimeSpan.Zero)), NullLogger<ComputeCellStatsHandler>.Instance);
+        var realCompute = new ComputeCellStatsHandler(_runs, _cells, new FakeTimeProvider(new DateTimeOffset(2026, 11, 12, 12, 0, 0, TimeSpan.Zero)), NullLogger<ComputeCellStatsHandler>.Instance);
         RefreshCellStatsHandler Real() => new(_runs, _cells, _holdOut, new HoldOutOptions(), _calendar, _strategies, _registrations, _planner, _simulation, _store, _writer, _ledger, realCompute, new FakeTimeProvider(new DateTimeOffset(2026, 11, 12, 12, 0, 0, TimeSpan.Zero)), NullLogger<RefreshCellStatsHandler>.Instance);
 
         var before = (await Real().HandleAsync(new RefreshCellStatsCommand("t"), Ct)).Value.SnapshotKey;
@@ -347,19 +346,6 @@ public sealed class RefreshCellStatsHandlerTests
 
         result.Error.Code.ShouldBe(CellsRefreshErrors.NotRebuildableCode);
         await _simulation.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
-    }
-
-    [Fact]
-    public async Task The_regime_split_of_the_template_snapshot_is_repeated()
-    {
-        Newest(new CellSource(R1, "intraday", "E"));
-        Source(R1, Sha1, "ORB", End, registered: true);
-        _cells.ListRegimeLatestAsync(null, null, Ct).Returns([Template(new CellSource(R1, "intraday", "E"))]);
-
-        await Handler().HandleAsync(new RefreshCellStatsCommand("system:cells-refresh"), Ct);
-
-        _computed!.ByRegime.ShouldBeTrue();
-        _computed.ByUniverse.ShouldBeFalse();
     }
 
     /// <summary>A ledger whose first append throws, then inserts by run id once (as the database does with ON CONFLICT DO NOTHING).</summary>

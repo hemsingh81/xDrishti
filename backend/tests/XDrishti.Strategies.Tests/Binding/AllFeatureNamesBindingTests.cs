@@ -8,9 +8,6 @@ namespace XDrishti.Strategies.Tests.Binding;
 /// <summary>Criterion 3: every one of the 60 catalog names can be written in its DSL form with default arguments and binds to the spec the catalog's <c>DefaultSpec</c> gives.</summary>
 public sealed class AllFeatureNamesBindingTests
 {
-    /// <summary>The ten names that read the daily market context (written out; not taken from the catalog's flags).</summary>
-    private static readonly string[] ContextNames = ["index_trend", "index_adx", "index_vol_pct", "vix", "vix_pct", "vix_chg", "breadth", "regime_trend", "regime_vol", "regime"];
-
     public static TheoryData<string> Names { get; } = [.. IndicatorCatalog.All.Select(i => i.Name)];
 
     public static TheoryData<string, Timeframe> NamesOnOtherTimeframes { get; } =
@@ -19,8 +16,8 @@ public sealed class AllFeatureNamesBindingTests
     [Fact]
     public void The_table_of_forms_has_one_form_for_each_of_the_60_names_of_the_catalog()
     {
-        IndicatorCatalog.All.Count.ShouldBe(64);
-        AllFeatureForms.Forms.Count.ShouldBe(64);
+        IndicatorCatalog.All.Count.ShouldBe(54);
+        AllFeatureForms.Forms.Count.ShouldBe(54);
         AllFeatureForms.Forms.Keys.OrderBy(n => n, StringComparer.Ordinal).ShouldBe(IndicatorCatalog.All.Select(i => i.Name).OrderBy(n => n, StringComparer.Ordinal));
     }
 
@@ -55,7 +52,7 @@ public sealed class AllFeatureNamesBindingTests
             error.Message.ShouldContain("'" + name + "'", Case.Sensitive, "names the feature");
             error.Message.ShouldContain(timeframe.ToCode(), Case.Sensitive, "names the timeframe");
         }
-        else if (FeatureFrame.Create([expected], new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>(), ResultsDays: new Dictionary<DateOnly, ResultsDayValues>(), RelativeStrength: RelativeStrengthDays.Empty)).IsFailure)
+        else if (FeatureFrame.Create([expected], new FrameOptions(ExpiryDays: new HashSet<DateOnly>(), ResultsDays: new Dictionary<DateOnly, ResultsDayValues>(), RelativeStrength: RelativeStrengthDays.Empty)).IsFailure)
         {
             // the default of a parameter can be refused on a longer timeframe (an opening range of 15 minutes is not a whole number of 30m or 1h bars)
             result.Errors.ShouldHaveSingleItem().Code.ShouldBe(LintCodes.BadArguments);
@@ -69,11 +66,10 @@ public sealed class AllFeatureNamesBindingTests
 
     [Theory]
     [MemberData(nameof(Names))]
-    public void The_plan_needs_a_context_for_exactly_the_ten_context_names_and_expiry_days_for_the_expiry_day(string name)
+    public void The_plan_needs_expiry_days_for_exactly_the_expiry_day(string name)
     {
         var plan = Compiling.Condition(AllFeatureForms.ConditionOf(name), Timeframe.M1);
 
-        plan.NeedsContext.ShouldBe(ContextNames.Contains(name), name);
         plan.NeedsExpiryDays.ShouldBe(name == "is_expiry_day", name);
     }
 
@@ -82,7 +78,7 @@ public sealed class AllFeatureNamesBindingTests
     public void A_form_written_with_empty_parentheses_binds_the_same_as_without_them_when_the_feature_has_no_parameters(string name)
     {
         IndicatorCatalog.TryGet(name, out var info).ShouldBeTrue();
-        if (info.Parameters.Count > 0 || name == "regime")
+        if (info.Parameters.Count > 0)
         {
             return;
         }

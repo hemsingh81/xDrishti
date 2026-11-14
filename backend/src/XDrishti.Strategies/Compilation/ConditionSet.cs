@@ -18,7 +18,6 @@ public static class ConditionSet
         var features = new List<FeatureSpec>();
         var seen = new HashSet<FeatureSpec>();
         var depth = 1;
-        var needsContext = false;
         var needsExpiryDays = false;
         foreach (var condition in conditions)
         {
@@ -33,10 +32,9 @@ public static class ConditionSet
             }
 
             depth = Math.Max(depth, condition.HistoryDepth);
-            needsContext |= condition.NeedsContext;
             needsExpiryDays |= condition.NeedsExpiryDays;
         }
 
-        return new CompiledPlan(kept.AsReadOnly(), features.AsReadOnly(), depth, needsContext, needsExpiryDays);
+        return new CompiledPlan(kept.AsReadOnly(), features.AsReadOnly(), depth, needsExpiryDays);
     }
 }

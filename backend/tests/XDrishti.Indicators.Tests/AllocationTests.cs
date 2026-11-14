@@ -27,9 +27,6 @@ public sealed class AllocationTests
 
     private static readonly TradingCalendar GappyCalendar = CalendarFixtures.For(GappyBars);
 
-    /// <summary>Consecutive weekdays from mid-2024 for 1,800 days (to 2031): the dates of both series are inside, with a warm-up of more than 265 days before them, so every context feature has a number.</summary>
-    private static readonly MarketContext Context = FrameContextFixtures.Build(FrameContextFixtures.Consecutive(77, 1_800));
-
     /// <summary>Every Tuesday of 2026 and 2027: the expiry dates of the frames below (a lookup that hits and one that misses both happen).</summary>
     private static readonly IReadOnlySet<DateOnly> Tuesdays = new HashSet<DateOnly>(FrameContextFixtures.Dates(new DateOnly(2026, 1, 1), new DateOnly(2027, 12, 31)).Where(d => d.DayOfWeek == DayOfWeek.Tuesday));
 
@@ -461,7 +458,7 @@ public sealed class AllocationTests
     {
         AllocationProbe.ShouldAllocateNothing(window =>
         {
-            IIndicator[] indicators = [.. Enum.GetValues<DateFeatureKind>().Select(kind => new DateFeature(kind, Context, Tuesdays))];
+            IIndicator[] indicators = [.. Enum.GetValues<DateFeatureKind>().Select(kind => new DateFeature(kind, Tuesdays))];
             foreach (var indicator in indicators)
             {
                 for (var i = 0; i < WarmUpSteps; i++)
@@ -489,29 +486,29 @@ public sealed class AllocationTests
     }
 
     [Fact]
-    public void A_twenty_feature_frame_with_six_context_features_allocates_nothing_including_the_date_change_step()
+    public void A_twenty_feature_frame_with_two_calendar_features_allocates_nothing_including_the_date_change_step()
     {
         foreach (var bars in new[] { Bars, GappyBars })
         {
             foreach (var calendar in new TradingCalendar?[] { null, bars == GappyBars ? GappyCalendar : new TradingCalendar() })
             {
                 FeatureFrame? measured = null;
-                AssertFrameAllocatesNothing(() => measured = TwentyFeatureFrameWithContext(calendar), bars);
+                AssertFrameAllocatesNothing(() => measured = TwentyFeatureFrameWithCalendar(calendar), bars);
 
-                measured.ShouldNotBeNull().Count.ShouldBe(26);
+                measured.ShouldNotBeNull().Count.ShouldBe(22);
                 DatesIn(bars).ShouldBeGreaterThan(100, "the measured window changes the date more than a hundred times");
-                measured.IsReady(measured.HandleOf(new FeatureSpec("regime"))).ShouldBeTrue("the context features have numbers in the window");
-                measured.IsReady(measured.HandleOf(new FeatureSpec("vix_pct"))).ShouldBeTrue();
+                measured.IsReady(measured.HandleOf(new FeatureSpec("day_of_week"))).ShouldBeTrue("the calendar features have numbers in the window");
+                measured.IsReady(measured.HandleOf(new FeatureSpec("is_expiry_day"))).ShouldBeTrue();
             }
         }
     }
 
     [Fact]
-    public void A_frame_of_all_twelve_date_driven_names_allocates_nothing_also_with_skipped_bars_and_after_a_reset()
+    public void A_frame_of_both_calendar_names_allocates_nothing_also_with_skipped_bars_and_after_a_reset()
     {
         AllocationProbe.ShouldAllocateNothing(window =>
         {
-            var frame = FrameContextFixtures.Frame(TestSpecs.ContextNames, Context, Tuesdays);
+            var frame = FrameContextFixtures.Frame(TestSpecs.ContextNames, Tuesdays);
             for (var i = 0; i < WarmUpSteps; i++)
             {
                 frame.Step(GappyBars[i]);
@@ -610,20 +607,15 @@ public sealed class AllocationTests
     internal static FeatureFrame TwentyFeatureFrame(TradingCalendar? calendar = null) => FeatureFrame.Create(TwentySpecs(), new FrameOptions(calendar)).Value;
 
     /// <summary>
-    /// The twenty features of <see cref="TwentyFeatureFrame"/> and six that read the calendar and the market context (<c>vix</c>, <c>vix_pct</c>, <c>index_trend</c>, <c>regime</c>, <c>day_of_week</c>,
-    /// <c>is_expiry_day</c>): 26 handles. Also the benchmark frame of the context features. The context and the expiry dates default to the ones of this class.
+    /// The twenty features of <see cref="TwentyFeatureFrame"/> and two that read the calendar (<c>day_of_week</c>, <c>is_expiry_day</c>): 22 handles. Also the benchmark frame of the calendar features. The expiry dates default to the ones of this class.
     /// </summary>
-    internal static FeatureFrame TwentyFeatureFrameWithContext(TradingCalendar? calendar = null, MarketContext? context = null, IReadOnlySet<DateOnly>? expiryDays = null) => FeatureFrame.Create(
+    internal static FeatureFrame TwentyFeatureFrameWithCalendar(TradingCalendar? calendar = null, IReadOnlySet<DateOnly>? expiryDays = null) => FeatureFrame.Create(
     [
         .. TwentySpecs(),
-        new FeatureSpec("vix"),
-        new FeatureSpec("vix_pct"),
-        new FeatureSpec("index_trend"),
-        new FeatureSpec("regime"),
         new FeatureSpec("day_of_week"),
         new FeatureSpec("is_expiry_day"),
     ],
-    new FrameOptions(calendar, FrameOptions.DefaultHistoryDepth, context ?? Context, expiryDays ?? Tuesdays)).Value;
+    new FrameOptions(calendar, FrameOptions.DefaultHistoryDepth, expiryDays ?? Tuesdays)).Value;
 
     private static FeatureSpec[] TwentySpecs() =>
     [

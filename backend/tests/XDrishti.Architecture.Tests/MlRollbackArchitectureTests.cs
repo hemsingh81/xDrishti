@@ -64,7 +64,7 @@ public sealed class MlRollbackArchitectureTests
         "XDrishti.Application.Learning.OwnerDesignateModelHandler", "XDrishti.Application.Learning.OwnerDesignateModelCommand",
         typeof(IRollbackProposalReader).FullName!, typeof(IRollbackProposalStore).FullName!, typeof(IMlSwitchSettings).FullName!, typeof(IMlSwitchStore).FullName!, typeof(IMlMonitorChecks).FullName!,
         typeof(IRollbackEvidence).FullName!, typeof(IChallengerEvidence).FullName!, typeof(MlSwitches).FullName!,
-        typeof(MlPromotion).FullName!, typeof(RollbackPolicy).FullName!, typeof(MlSwitch).FullName!, typeof(RegimeCellRule).FullName!,
+        typeof(MlPromotion).FullName!, typeof(RollbackPolicy).FullName!, typeof(MlSwitch).FullName!,
     ];
 
     /// <summary>Stands for an automatic rollback that promotes: it holds the promotion handler's contract. The closure of the scan must reach the handler through it.</summary>
@@ -601,8 +601,8 @@ public sealed class MlRollbackArchitectureTests
         ours.GetTypes().Count().ShouldBeGreaterThan(15);
         var result = ours.Should().NotHaveDependencyOnAny(forbidden).GetResult();
         result.IsSuccessful.ShouldBeTrue(string.Join(", ", result.FailingTypeNames ?? []));
-        var domain = Types.InAssembly(Domain).That().HaveNameMatching("^(MlPromotion|MlPromotionFacts|MlPromotionResult|RollbackPolicy|RollbackDecision|RollbackTrigger|RollbackInputs|RollbackCellSeries|RegimeCellRule|MlSwitch)$");
-        domain.GetTypes().Count().ShouldBe(10);
+        var domain = Types.InAssembly(Domain).That().HaveNameMatching("^(MlPromotion|MlPromotionFacts|MlPromotionResult|RollbackPolicy|RollbackDecision|RollbackTrigger|RollbackInputs|RollbackCellSeries|MlSwitch)$");
+        domain.GetTypes().Count().ShouldBe(9);
         domain.Should().NotHaveDependencyOnAny([.. forbidden, "System.IO", "System.Net", "System.Data", "System.Threading.Tasks", "System.TimeProvider", "System.Random", "Npgsql", "Microsoft.EntityFrameworkCore", "XDrishti.Application", "XDrishti.Infrastructure"]).GetResult().IsSuccessful.ShouldBeTrue();
         foreach (var store in new[] { "RollbackProposals", "MlSwitchSettings", "MlMonitorChecks" })
         {
