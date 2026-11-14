@@ -37,7 +37,7 @@ public sealed class LabRobustnessBlockTests
     private LabRobustness Service(BootstrapOptions? bootstrap = null, LabSettings? settings = null)
     {
         _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(FabricatedRun.Standard()));
-        return new LabRobustness(_simulation, settings ?? LabSettings.Default, null, bootstrap);
+        return new LabRobustness(_simulation, settings ?? LabSettings.Default, bootstrap);
     }
 
     private static StrategyDescription Described(params (string Name, double Value)[] parameters) =>

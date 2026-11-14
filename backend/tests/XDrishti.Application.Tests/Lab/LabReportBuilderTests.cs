@@ -29,7 +29,7 @@ public sealed partial class LabReportBuilderTests
         new SensitivityView("15m", "FIXED_RR{rr=2}", null, [new ParameterSensitivityView("rr", [], verdict, "r")], "in-sample"),
         new MonteCarloView(400, 1000, "1", 0.4, 8, 0.2, 0.4, 0.6, 5, 9, share),
         years ?? [new YearView(2025, 200, 0.4, 80, 1.5, true), new YearView(2026, 200, 0.4, 80, 1.5, true)],
-        new SignFlipBaselineView("sign_flip", 400, 1000, "2", 0.4, 0.1, p, "lenient"), "unavailable: x", ["block limit"]);
+        new SignFlipBaselineView("sign_flip", 400, 1000, "2", 0.4, 0.1, p, "lenient"), ["block limit"]);
 
     [Fact]
     public void CF_04_C_the_data_limit_is_derived_from_the_stored_span_of_the_run_short_and_deep()

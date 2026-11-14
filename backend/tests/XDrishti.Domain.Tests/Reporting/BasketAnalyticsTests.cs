@@ -297,24 +297,4 @@ public sealed class BasketAnalyticsTests
         dated.Basis.ShouldBe(MemberTurnover.Dated);
     }
 
-    [Fact]
-    public void Regimes_with_too_few_days_are_shown_as_insufficient_and_unknown_days_sit_in_no_group()
-    {
-        var index = Manual([.. Enumerable.Range(0, 60).Select(i => i % 2 == 0 ? 0.01 : -0.004)]);
-        var regimes = new Dictionary<DateOnly, int?>();
-        for (var i = 0; i < 60; i++)
-        {
-            regimes[D(i)] = i < 45 ? 5 : i < 57 ? 7 : null;
-        }
-
-        var result = RegimeSplit.Compute(index, [], regimes, Options);
-
-        result.Rows.Select(r => (r.Code, r.Days)).ToArray().ShouldBe([(5, 45), (7, 12)]);
-        result.Rows[0].MeanDailyReturn.State.ShouldBe(MetricState.Value);
-        result.Rows[0].HitRate.State.ShouldBe(MetricState.Unavailable);
-        result.Rows[1].MeanDailyReturn.State.ShouldBe(MetricState.Insufficient);
-        result.Rows[1].MeanDailyReturn.Reason.ShouldBe("n = 12, at least 30 needed");
-        result.Unknown.ShouldBe(3);
-        RegimeSplit.Compute(index, [], new Dictionary<DateOnly, int?>(), Options).Status.State.ShouldBe(MetricState.Unavailable);
-    }
 }

@@ -38,7 +38,6 @@ public sealed class EvidencePreflightWriteTests(ApiFactory factory)
         view.Items.ShouldAllBe(i => i.State == "MET" || i.State == "NOT MET" || i.State == "UNAVAILABLE");
         view.Items.Single(i => i.Item == GetEvidencePreflightHandler.HoldOutItem).State.ShouldBe("MET");
         view.Items.Single(i => i.Item == GetEvidencePreflightHandler.CaptureItem).State.ShouldBe("MET");
-        view.Items.Single(i => i.Item == GetEvidencePreflightHandler.ChargeSheetItem).State.ShouldNotBe("MET");
     }
 
     private async Task ExecuteAsync(string sql)

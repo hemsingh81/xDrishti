@@ -7,9 +7,6 @@ namespace XDrishti.Strategies.Tests.Support.Oracle;
 internal sealed record LookAheadReport(IReadOnlyList<string> Violations, int Cuts, int Comparisons, IReadOnlyDictionary<Truth, int> Values)
 {
     public int ViolationCount { get; init; } = Violations.Count;
-
-    /// <summary>How many of the runs also had the context days from the cut date on removed or changed (0 for a scenario with no context records).</summary>
-    public int ContextRuns { get; init; }
 }
 
 /// <summary>
@@ -18,15 +15,9 @@ internal sealed record LookAheadReport(IReadOnlyList<string> Violations, int Cut
 /// times. At every step up to <i>c</i> at which the evaluation timeframe closed a bar, the three-valued result and the decision of every condition must be the same as in the full run: the future does not reach the
 /// past. The cut points are the closed bars themselves (all of them when there are few, else a sample that always has the first and the last) and a few minutes in the middle of a bar.
 /// <para>
-/// <b>The market context is cut with the bars.</b> A frame at a step on the date <i>D</i> reads the context as of the latest day strictly before <i>D</i>, so the record dated <i>D</i> and every later one must not matter for
-/// any step up to the cut (whose date is <i>D</i>): in the truncated run the records from <i>D</i> on are removed too, in the perturbed run they are replaced by changed ones (<see cref="OracleContext.Altered"/>: other prices, a
-/// VIX of 99.9, a breadth of 3), exactly as the prefix property of the date lane in the Indicators tests does. A scenario that was given its records (<see cref="Scenario.ContextDays"/>) gets this; one without
-/// context, or given a ready context, keeps its context unchanged in every run.
-/// </para>
-/// <para>
 /// <b>What it guards, and what it cannot.</b> A compiled condition is a pure function of the frame as it is at the step, and the feeder gives the frame the bars up to the step before the condition is read, so the
 /// answer at step <i>i</i> cannot depend on a later bar whatever the compiled code does. What the property can see is the <i>feed</i> and the <i>frame</i>: a feeder that reads after a later bar (the negative controls),
-/// a frame whose closed values or calendar or context lookups depend on bars it has not been given, hidden or static state that makes a run differ from another, non-determinism. It cannot fail for a change in the
+/// a frame whose closed values or calendar lookups depend on bars it has not been given, hidden or static state that makes a run differ from another, non-determinism. It cannot fail for a change in the
 /// compiler (a wrong lag, a wrong clock) — those are guarded by the interpreter oracle, the hand examples and, for "reads only the past", the tests of the expression trees and the architecture test on the members
 /// of the frame the library may use (<c>CompiledTreeTests</c>, <c>StrategiesArchitectureTests</c>).
 /// </para>
@@ -40,18 +31,12 @@ internal static class LookAheadProperty
         var cuts = Cuts(full, random, maximumClosedCuts);
         var violations = new List<string>();
         var comparisons = 0;
-        var contextRuns = 0;
         foreach (var cut in cuts)
         {
-            var cutDate = SessionClock.DateOf(bars[cut].EpochSeconds);
-            var withoutFuture = scenario.ContextDays is { } days ? scenario.WithContextDays([.. days.Where(d => d.Date < cutDate)]) : scenario;
-            var withChangedFuture = scenario.ContextDays is { } all ? scenario.WithContextDays([.. all.Select(d => d.Date < cutDate ? d : OracleContext.Altered(d))]) : scenario;
-            contextRuns += scenario.ContextDays is null ? 0 : 2;
-
-            var truncated = feeder.Run(withoutFuture, [.. bars.Take(cut + 1)]);
-            comparisons += Compare(scenario, full, truncated, cut, "later bars" + (scenario.ContextDays is null ? string.Empty : " and the context days from their date on") + " removed after bar " + cut, violations);
-            var perturbed = feeder.Run(withChangedFuture, Perturb(bars, cut, random));
-            comparisons += Compare(scenario, full, perturbed, cut, "later bars" + (scenario.ContextDays is null ? string.Empty : " and the context days from their date on") + " replaced after bar " + cut, violations);
+            var truncated = feeder.Run(scenario, [.. bars.Take(cut + 1)]);
+            comparisons += Compare(scenario, full, truncated, cut, "later bars removed after bar " + cut, violations);
+            var perturbed = feeder.Run(scenario, Perturb(bars, cut, random));
+            comparisons += Compare(scenario, full, perturbed, cut, "later bars replaced after bar " + cut, violations);
         }
 
         var values = new Dictionary<Truth, int> { [Truth.True] = 0, [Truth.False] = 0, [Truth.Unknown] = 0 };
@@ -66,7 +51,7 @@ internal static class LookAheadProperty
             }
         }
 
-        return new LookAheadReport(violations, cuts.Count, comparisons, values) { ContextRuns = contextRuns };
+        return new LookAheadReport(violations, cuts.Count, comparisons, values);
     }
 
     /// <summary>The bars up to <paramref name="cut"/> as they were, and every later bar at the same time with arbitrary values.</summary>

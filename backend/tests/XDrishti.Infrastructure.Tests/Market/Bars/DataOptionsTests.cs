@@ -179,12 +179,11 @@ public sealed class DataOptionsTests
     }
 
     [Fact]
-    public void The_index_depth_defaults_to_five_years_and_the_context_job_is_on_with_its_documented_numbers()
+    public void The_index_depth_defaults_to_five_years()
     {
         var options = new DataOptions();
 
         options.Dhan.InitialDaysIndex.ShouldBe(1825);
-        (options.Context.Enabled, options.Context.VixGraceSessions, options.Context.MinDayFraction).ShouldBe((true, 5, 0.96));
         DataOptions.IsValid(options).ShouldBeTrue();
     }
 
@@ -204,46 +203,4 @@ public sealed class DataOptionsTests
         DataOptions.IsValid(new DataOptions { Dhan = new DhanDataOptions { InitialDaysIndex = days } }).ShouldBeTrue();
     }
 
-    [Theory]
-    [InlineData(0, 0.96)]
-    [InlineData(31, 0.96)]
-    [InlineData(5, 0.49)]
-    [InlineData(5, 1.01)]
-    public void Context_settings_outside_their_range_are_refused(int grace, double fraction)
-    {
-        DataOptions.IsValid(new DataOptions { Context = new ContextDataOptions { VixGraceSessions = grace, MinDayFraction = fraction } }).ShouldBeFalse();
-    }
-
-    [Fact]
-    public void The_breadth_defaults_are_the_documented_ones_and_valid()
-    {
-        var options = new DataOptions();
-
-        (options.Context.Breadth.SmaSessions, options.Context.Breadth.MinVoters, options.Context.Breadth.MinShare, options.Context.BreadthGraceSessions, options.Context.Breadth.MinBarShare).ShouldBe((20, 50, 0.5, 5, 0.9));
-        DataOptions.IsValid(options).ShouldBeTrue();
-    }
-
-    [Theory]
-    [InlineData(1, 50, 0.5, 5)]
-    [InlineData(251, 50, 0.5, 5)]
-    [InlineData(20, 0, 0.5, 5)]
-    [InlineData(20, 1001, 0.5, 5)]
-    [InlineData(20, 50, 0.09, 5)]
-    [InlineData(20, 50, 1.01, 5)]
-    [InlineData(20, 50, 0.5, 0)]
-    [InlineData(20, 50, 0.5, 31)]
-    public void Breadth_settings_outside_their_range_are_refused(int sma, int voters, double share, int grace)
-    {
-        var context = new ContextDataOptions { BreadthGraceSessions = grace, Breadth = new BreadthDataOptions { SmaSessions = sma, MinVoters = voters, MinShare = share } };
-
-        DataOptions.IsValid(new DataOptions { Context = context }).ShouldBeFalse();
-    }
-
-    [Theory]
-    [InlineData(-0.1)]
-    [InlineData(1.1)]
-    public void A_bar_share_outside_zero_to_one_is_refused(double share)
-    {
-        DataOptions.IsValid(new DataOptions { Context = new ContextDataOptions { Breadth = new BreadthDataOptions { MinBarShare = share } } }).ShouldBeFalse();
-    }
 }

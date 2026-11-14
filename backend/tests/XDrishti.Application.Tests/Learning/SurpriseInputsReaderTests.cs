@@ -3,14 +3,12 @@
 using NSubstitute;
 using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Market.Bars;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Research;
 using XDrishti.Domain.Filings;
 using XDrishti.Domain.Market.Calendar;
-using XDrishti.Domain.Market.Context;
 using XDrishti.Tests.Shared;
 
 namespace XDrishti.Application.Tests.Learning;
@@ -34,16 +32,14 @@ public sealed class SurpriseInputsReaderTests
 
     private readonly IShareholdingAsOf _holdings = Substitute.For<IShareholdingAsOf>();
 
-    private readonly IContextDayStore _context = Substitute.For<IContextDayStore>();
 
     private SurpriseInputsReader Reader()
     {
-        _context.ListAsync(Ct).Returns(ValueTask.FromResult<IReadOnlyList<ContextDayRecord>>([]));
         _bars.ReadDailyBarsAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Ct).Returns(ValueTask.FromResult<IReadOnlyList<BarRow>>([]));
         _factors.GetAsync(Arg.Any<Guid>(), Ct).Returns(XDrishti.Domain.Market.Actions.AdjustmentFactors.None);
         _facts.Facts(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Ct).Returns(ValueTask.FromResult(new ResultFactsAnswer([], 0) { ParserVersion = ResultsParser.Version }));
         _holdings.Latest(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Ct).Returns(ValueTask.FromResult(new ShareholdingAnswer(ShareholdingAnswer.Unavailable, null, null, ShareholdingAnswer.NoEntry)));
-        return new SurpriseInputsReader(new ExtensionFeatureExtractor(_bars, _factors, _facts, _holdings), _context);
+        return new SurpriseInputsReader(new ExtensionFeatureExtractor(_bars, _factors, _facts, _holdings));
     }
 
     [Fact]

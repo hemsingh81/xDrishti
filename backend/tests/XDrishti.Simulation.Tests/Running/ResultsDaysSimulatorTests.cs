@@ -25,7 +25,7 @@ public sealed class ResultsDaysSimulatorTests
     private static SimulationResult Run(StrategyDefinition definition, ResultsDayInputs? inputs)
     {
         var simulator = Sim.Create(definition, Timeframe.M15, Cand.NoSlippage);
-        var result = simulator.Run(Scan.Instrument, Cases.F("F1").Bars, Sim.Tick, DefaultWeek(), null, null, null, inputs);
+        var result = simulator.Run(Scan.Instrument, Cases.F("F1").Bars, Sim.Tick, DefaultWeek(), null, null, inputs);
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Code + ": " + result.Error.Message : string.Empty);
         return result.Value;
     }
@@ -52,7 +52,7 @@ public sealed class ResultsDaysSimulatorTests
         var unordered = new[] { new Bar(120, 1, 1, 1, 1, 1), new Bar(60, 1, 1, 1, 1, 1) };
 
         var noInputs = simulator.Run(Scan.Instrument, unordered, Sim.Tick, DefaultWeek());
-        var noCalendar = simulator.Run(Scan.Instrument, unordered, Sim.Tick, null, null, null, null, Meeting(Instrument, Mon));
+        var noCalendar = simulator.Run(Scan.Instrument, unordered, Sim.Tick, null, null, null, Meeting(Instrument, Mon));
 
         foreach (var refused in new[] { noInputs, noCalendar })
         {
@@ -118,7 +118,7 @@ public sealed class ResultsDaysSimulatorTests
             var simulator = Sim.Create(OrbV1.Create(), fills: Cand.NoSlippage);
 
             var without = simulator.Run(Scan.Instrument, bars, Sim.Tick, DefaultWeek());
-            var given = simulator.Run(Scan.Instrument, bars, Sim.Tick, DefaultWeek(), null, null, null, Meeting(Instrument, Mon));
+            var given = simulator.Run(Scan.Instrument, bars, Sim.Tick, DefaultWeek(), null, null, Meeting(Instrument, Mon));
 
             Render.Result(given.Value).ShouldBe(Render.Result(without.Value), name);
         }

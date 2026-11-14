@@ -60,7 +60,7 @@ public sealed class ProblemOrderAndFuzzTests
     [Fact]
     public void Errors_come_first_and_the_warnings_and_notes_after_them_each_group_in_its_order()
     {
-        var definition = Defs.Basic().WithBuy(b => b with { Setup = Defs.All("tf(\"15m\").close > 1"), Trigger = Defs.All("closee > 1", "regime() == \"UP_LOW_VOL\"") }) with
+        var definition = Defs.Basic().WithBuy(b => b with { Setup = Defs.All("tf(\"15m\").close > 1"), Trigger = Defs.All("closee > 1", "is_expiry_day == 0") }) with
         {
             Params = [new StrategyParam("close", 1)],
             Filters = [FilterNames.MinTurnover],

@@ -215,20 +215,6 @@ public sealed class ReplayFactsTests
     }
 
     [Fact]
-    public async Task The_market_gate_reads_the_latest_context_day_before_the_plan_date_never_a_later_day()
-    {
-        var world = new ReplayWorld().WithDefaults("AAA");
-        world.ContextVix[new DateOnly(2026, 10, 7)] = 18;
-        world.ContextVix[new DateOnly(2026, 10, 9)] = 31; // after the session of the 8th
-        var facts = world.Facts();
-
-        var market = await facts.MarketAsync(new DateOnly(2026, 10, 8), new DateOnly(2026, 10, 9), [], [], Ct);
-
-        market.Gate!.AsOf.ShouldBe(new DateOnly(2026, 10, 7));
-        market.Gate.Vix.ShouldBe(18);
-    }
-
-    [Fact]
     public async Task Correlations_use_day_bars_up_to_the_session_only()
     {
         var honest = new ReplayWorld().WithDefaults("AAA", "BBB");

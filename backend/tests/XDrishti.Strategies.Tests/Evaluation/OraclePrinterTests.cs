@@ -114,10 +114,6 @@ public sealed class OraclePrinterTests
         Minimal(new TimeCmp(">=", 585, "09:45", true)).ShouldBe("\"09:45\" <= time");
         Minimal(new TimeCmp("<", 585, "09:45", true)).ShouldBe("\"09:45\" > time");
         Minimal(new TimeCmp("==", 585, "09:45", true)).ShouldBe("\"09:45\" == time");
-        var regime = new Leaf(new Feature("regime()", "regime()", false, new FeatureSpec("regime")), Timeframe.M1, false, 0);
-        Minimal(new RegimeCmp(true, 1, "UP_LOW_VOL", false, regime)).ShouldBe("regime() == \"UP_LOW_VOL\"");
-        Minimal(new RegimeCmp(false, 1, "UP_LOW_VOL", true, regime)).ShouldBe("\"UP_LOW_VOL\" != regime()");
-        Minimal(new RegimeCmp(true, 7, null, false, regime)).ShouldBe("regime() == 7");
     }
 
     [Fact]

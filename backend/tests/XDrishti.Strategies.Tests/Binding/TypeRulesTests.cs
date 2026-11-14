@@ -1,12 +1,11 @@
-using XDrishti.Strategies.Binding;
 using XDrishti.Strategies.Lint;
 using static XDrishti.Strategies.Tests.Support.Compiling;
 
 namespace XDrishti.Strategies.Tests.Binding;
 
 /// <summary>
-/// The types of the spec (<i>Types</i>): <c>and or not</c> take true/false values; arithmetic and ordering take numbers; <c>==</c> and <c>!=</c> take two numbers, two true/false values, <c>time</c> with a time text, or
-/// <c>regime()</c> with a regime name or a code 1 to 9; anything else is a type error. Every pair of the seven kinds of operand is tried with every operator; the rule that decides is written out once, below, from the spec.
+/// The types of the spec (<i>Types</i>): <c>and or not</c> take true/false values; arithmetic and ordering take numbers; <c>==</c> and <c>!=</c> take two numbers, two true/false values, or <c>time</c> with a time text;
+/// anything else is a type error. Every pair of the five kinds of operand is tried with every operator; the rule that decides is written out once, below, from the spec.
 /// </summary>
 public sealed class TypeRulesTests
 {
@@ -17,8 +16,6 @@ public sealed class TypeRulesTests
         Bool,
         Time,
         TimeText,
-        Regime,
-        RegimeText,
     }
 
     private static readonly Dictionary<Kind, string> Snippets = new()
@@ -28,8 +25,6 @@ public sealed class TypeRulesTests
         [Kind.Bool] = "(close > 1)",
         [Kind.Time] = "time",
         [Kind.TimeText] = "\"09:45\"",
-        [Kind.Regime] = "regime()",
-        [Kind.RegimeText] = "\"UP_LOW_VOL\"",
     };
 
     public static TheoryData<string, Kind, Kind> Pairs { get; } =
@@ -47,17 +42,16 @@ public sealed class TypeRulesTests
         "<" or "<=" or ">" or ">=" => (Numeric(left) && Numeric(right)) || (left == Kind.Time && right == Kind.TimeText) || (left == Kind.TimeText && right == Kind.Time),
         _ => (Numeric(left) && Numeric(right))
             || (left == Kind.Bool && right == Kind.Bool)
-            || (left == Kind.Time && right == Kind.TimeText) || (left == Kind.TimeText && right == Kind.Time)
-            || (left == Kind.Regime && (right == Kind.RegimeText || right == Kind.Constant)) || (right == Kind.Regime && (left == Kind.RegimeText || left == Kind.Constant)),
+            || (left == Kind.Time && right == Kind.TimeText) || (left == Kind.TimeText && right == Kind.Time),
     };
 
     private static string Written(string op, Kind left, Kind right) =>
         op is "+" or "-" or "*" or "/" ? $"({Snippets[left]} {op} {Snippets[right]}) > 0" : $"{Snippets[left]} {op} {Snippets[right]}";
 
     [Fact]
-    public void The_matrix_has_588_cases()
+    public void The_matrix_has_300_cases()
     {
-        Pairs.Count.ShouldBe(12 * 7 * 7);
+        Pairs.Count.ShouldBe(12 * 5 * 5);
     }
 
     [Theory]
@@ -79,26 +73,9 @@ public sealed class TypeRulesTests
         }
     }
 
-    /// <summary>The code of the first error of a pair that is refused: a text next to the time is judged as a time, a text next to the regime as a regime name; every other pair is a type mismatch.</summary>
-    private static string ExpectedCode(string op, Kind left, Kind right)
-    {
-        var comparison = op is "<" or "<=" or ">" or ">=" or "==" or "!=";
-        if (comparison && ((left == Kind.Time && right == Kind.RegimeText) || (left == Kind.RegimeText && right == Kind.Time)))
-        {
-            return LintCodes.BadTimeLiteral;
-        }
-
-        if (op is "==" or "!=" && ((left == Kind.Regime && right == Kind.TimeText) || (left == Kind.TimeText && right == Kind.Regime)))
-        {
-            return LintCodes.UnknownName;
-        }
-
-        return LintCodes.TypeMismatch;
-    }
-
     [Theory]
     [MemberData(nameof(Pairs))]
-    public void A_pair_of_the_wrong_types_is_a_type_mismatch_except_a_text_that_is_no_time_or_no_regime_name(string op, Kind left, Kind right)
+    public void A_pair_of_the_wrong_types_is_a_type_mismatch_(string op, Kind left, Kind right)
     {
         if (Accepts(op, left, right))
         {
@@ -109,14 +86,14 @@ public sealed class TypeRulesTests
         var errors = Of(source).Errors.ToList();
 
         errors.ShouldNotBeEmpty(source);
-        errors[0].Code.ShouldBe(ExpectedCode(op, left, right), source);
+        errors[0].Code.ShouldBe(LintCodes.TypeMismatch, source);
     }
 
     [Theory]
     [MemberData(nameof(Pairs))]
     public void A_comparison_of_the_wrong_types_names_both_sides_in_its_message(string op, Kind left, Kind right)
     {
-        if (Accepts(op, left, right) || op is "and" or "or" or "+" or "-" or "*" or "/" || ExpectedCode(op, left, right) != LintCodes.TypeMismatch)
+        if (Accepts(op, left, right) || op is "and" or "or" or "+" or "-" or "*" or "/")
         {
             return;
         }
@@ -134,7 +111,6 @@ public sealed class TypeRulesTests
         Kind.Number or Kind.Constant => "a number",
         Kind.Bool => "a true/false value",
         Kind.Time => "the time of day",
-        Kind.Regime => "a market regime",
         _ => "a text",
     };
 
@@ -198,47 +174,6 @@ public sealed class TypeRulesTests
         {
             Of(shape).IsSuccess.ShouldBe(Numeric(kind), shape);
         }
-    }
-
-    [Theory]
-    [InlineData("regime() == 1", true)]
-    [InlineData("regime() == 9", true)]
-    [InlineData("regime() != 5", true)]
-    [InlineData("regime() == 0", false)]
-    [InlineData("regime() == 10", false)]
-    [InlineData("regime() == 2.5", false)]
-    [InlineData("regime() == -1", false)]
-    [InlineData("1 == regime()", true)]
-    [InlineData("regime() == 4 + 2", true)]
-    [InlineData("regime() == 5 + 5", false)]
-    [InlineData("regime() == \"UP_LOW_VOL\"", true)]
-    [InlineData("\"DOWN_HIGH_VOL\" == regime()", true)]
-    [InlineData("regime() == \"UP_LOW_VOL \"", false)]
-    [InlineData("regime() == \"\"", false)]
-    [InlineData("regime() <= 4", false)]
-    [InlineData("regime() > 4", false)]
-    public void The_regime_is_compared_with_a_name_or_a_whole_code_from_1_to_9(string source, bool valid)
-    {
-        Of(source).IsSuccess.ShouldBe(valid, source);
-    }
-
-    [Theory]
-    [InlineData("regime() == \"UP_LOW_VOL\"", 1)]
-    [InlineData("regime() == \"UP_NORMAL_VOL\"", 2)]
-    [InlineData("regime() == \"UP_HIGH_VOL\"", 3)]
-    [InlineData("regime() == \"RANGE_LOW_VOL\"", 4)]
-    [InlineData("regime() == \"RANGE_NORMAL_VOL\"", 5)]
-    [InlineData("regime() == \"RANGE_HIGH_VOL\"", 6)]
-    [InlineData("regime() == \"DOWN_LOW_VOL\"", 7)]
-    [InlineData("regime() == \"DOWN_NORMAL_VOL\"", 8)]
-    [InlineData("regime() == \"DOWN_HIGH_VOL\"", 9)]
-    public void The_nine_regime_names_are_the_codes_1_to_9(string source, int code)
-    {
-        var plan = Condition(source);
-
-        var compare = plan.Tree.ShouldBeOfType<BoundCompare>();
-        compare.Left.ShouldBeOfType<BoundFeature>().Type.ShouldBe(BoundType.Regime);
-        compare.Right.ShouldBeOfType<BoundNumber>().Value.ShouldBe(code);
     }
 
     /// <summary>A sum of ones, exactly <paramref name="length"/> characters long (the last number gets the extra digits).</summary>

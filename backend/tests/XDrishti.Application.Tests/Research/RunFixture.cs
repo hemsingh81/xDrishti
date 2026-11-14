@@ -5,7 +5,6 @@ using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Baskets;
@@ -51,7 +50,6 @@ internal sealed class RunFixture
 
     public FakeCostSheetStore CostSheets { get; } = new();
 
-    public IContextDayStore ContextDays { get; } = Substitute.For<IContextDayStore>();
 
     public IEventCalendarSnapshots EventSnapshots { get; } = Substitute.For<IEventCalendarSnapshots>();
 
@@ -92,7 +90,7 @@ internal sealed class RunFixture
         Classifications.SectorsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns((IReadOnlyDictionary<Guid, string>)new Dictionary<Guid, string>());
     }
 
-    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, ContextDays, EventSnapshots, FilingTimes, SurpriseReader, Time, Log, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IRandomEntryEngine>(), NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IPlaceboEngine>(), new XDrishti.Application.Tests.Market.History.FakeSeams(), EntryTiers, CostStress is null ? null : new Settings(CostStress), new XDrishti.Application.Market.Strength.RelativeStrengthRunReader(Strength, Baskets, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Market.Baskets.IDerivedVersionStore>(), Classifications), Derived);
+    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, EventSnapshots, FilingTimes, SurpriseReader, Time, Log, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IRandomEntryEngine>(), NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IPlaceboEngine>(), new XDrishti.Application.Tests.Market.History.FakeSeams(), EntryTiers, CostStress is null ? null : new Settings(CostStress), new XDrishti.Application.Market.Strength.RelativeStrengthRunReader(Strength, Baskets, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Market.Baskets.IDerivedVersionStore>(), Classifications), Derived);
 
     /// <summary>Registers an instrument with a row (the tick is in paise, as the master has it) and its stored bars.</summary>
     public Guid Add(string symbol, IEnumerable<Bar>? bars = null, decimal? tickPaise = 5m, Guid? id = null)

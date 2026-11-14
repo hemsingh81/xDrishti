@@ -9,14 +9,14 @@ namespace XDrishti.Strategies.Tests.Support.Oracle;
 /// Random valid conditions as <see cref="Node"/> models for an evaluation timeframe; the same seed gives the same sequence. It never writes text — <see cref="Printer"/> does — and it knows the spec of what it builds from
 /// its own tables, so it shares nothing with the parser or the binder. It covers every construct of the language: all six comparisons on numbers and on true/false values, arithmetic including a division by zero,
 /// <c>abs</c>, <c>min</c>, <c>max</c>, <c>crosses_above/below</c>, <c>rising/falling</c>, <c>between</c>, <c>not/and/or</c>, <c>true/false</c>, subscripts on references of any timeframe, <c>tf(…)</c> qualification,
-/// strategy parameters, the dotted spellings (<c>prev_day.high</c>, <c>today.open</c>, <c>index.trend</c>, <c>index.adx</c>), defaults left out (<c>rsi()</c>), <c>source=</c>, <c>time</c> against a text (intraday
-/// evaluation only), <c>day_of_week</c> against <c>MON … SUN</c>, <c>regime()</c> by name or by code, and the calendar and context features (when allowed). A lagged call (<c>crosses_*</c>, <c>rising</c>, <c>falling</c>) only
-/// ever has leaves on one clock — the same bar timeframe, or only features of the date (the calendar and the context: their previous value is the previous <i>date</i>, so they are never mixed with a bar feature,
+/// strategy parameters, the dotted spellings (<c>prev_day.high</c>, <c>today.open</c>), defaults left out (<c>rsi()</c>), <c>source=</c>, <c>time</c> against a text (intraday
+/// evaluation only), <c>day_of_week</c> against <c>MON … SUN</c>, and the calendar features (when allowed). A lagged call (<c>crosses_*</c>, <c>rising</c>, <c>falling</c>) only
+/// ever has leaves on one clock — the same bar timeframe, or only features of the date (the calendar: their previous value is the previous <i>date</i>, so they are never mixed with a bar feature,
 /// 1m included) —, so every condition is one the language accepts; <see cref="Parameters"/> must be given to the compiler with the text. With <c>sessionBound</c> every feature leaf is one of the twelve per-session
 /// features (<c>vwap</c>, single and multi-bar <c>or_high</c> and <c>or_low</c>, <c>today.*</c>, <c>prev_day.*</c>, <c>gap_pct</c>) on any of the six intraday timeframes, now and then on 1D where the catalog runs them, with
 /// subscripts, crossings and runs, so that the rule of ADR 0035 is exercised at every date change; the default draws are not touched (the seeds of the main corpus give the same conditions as before).
 /// </summary>
-internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowContext, bool allowExpiryDays, bool sessionBound = false, bool allowResultsDays = false)
+internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowExpiryDays, bool sessionBound = false, bool allowResultsDays = false)
 {
     /// <summary>The strategy parameters the conditions use.</summary>
     public static readonly IReadOnlyDictionary<string, double> Parameters = new Dictionary<string, double> { ["fast_len"] = 9, ["slow_len"] = 21, ["level"] = 55 };
@@ -37,8 +37,6 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
     private static readonly string[] RawNames = ["open", "high", "low", "close", "close", "close", "volume"];
 
     private static readonly string[] Sources = ["close", "open", "high", "low"];
-
-    private static readonly string[] ContextNames = ["index_trend", "index_adx", "index_vol_pct", "vix", "vix_pct", "vix_chg", "breadth", "regime_trend", "regime_vol"];
 
     private static readonly string[] IndicatorNames =
     [
@@ -133,7 +131,7 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
         {
             var index = Chance(85) ? _random.Next(5) : _random.Next(5, 7);
             var day = new Const(Weekdays[index], index + 1);
-            var leaf = new Leaf(DateFeature("day_of_week", "day_of_week", false, false), Timeframe.M1, Chance(10), Chance(25) ? _random.Next(1, 4) : 0);
+            var leaf = new Leaf(DateFeature("day_of_week", "day_of_week", false), Timeframe.M1, Chance(10), Chance(25) ? _random.Next(1, 4) : 0);
             return Chance(80) ? new Cmp(Pick(Comparisons), leaf, day) : new Cmp(Pick(Comparisons), day, leaf);
         }
 
@@ -145,7 +143,7 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
 
         if (roll < 88)
         {
-            return RegimeCompare() ?? (Node)Compare();
+            return Compare();
         }
 
         if (roll < 91)
@@ -215,19 +213,6 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
     }
 
     private static string TimeText(int minuteOfDay) => (minuteOfDay / 60).ToString("00", CultureInfo.InvariantCulture) + ":" + (minuteOfDay % 60).ToString("00", CultureInfo.InvariantCulture);
-
-    private RegimeCmp? RegimeCompare()
-    {
-        if (!allowContext)
-        {
-            return null;
-        }
-
-        var code = _random.Next(1, 10);
-        var byName = Chance(60);
-        var regime = new Leaf(new Feature("regime()", "regime()", false, new FeatureSpec("regime", Timeframe.M1), ReadsContext: true), Timeframe.M1, false, 0);
-        return new RegimeCmp(Chance(60), code, byName ? RegimeNames.All[code - 1] : null, byName && Chance(30), regime);
-    }
 
     // ---- numbers ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -421,10 +406,10 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
 
     private Leaf DateLeaf()
     {
-        var choices = new List<Feature> { DateFeature("day_of_week", "day_of_week", false, false) };
+        var choices = new List<Feature> { DateFeature("day_of_week", "day_of_week", false) };
         if (allowExpiryDays)
         {
-            choices.Add(DateFeature("is_expiry_day", "is_expiry_day", false, true));
+            choices.Add(DateFeature("is_expiry_day", "is_expiry_day", true));
         }
 
         if (allowResultsDays)
@@ -436,20 +421,11 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
             choices.Add(new Feature("results_car3_q", "results_car3_q", true, new FeatureSpec("results_car3_q", Timeframe.M1), ReadsResultsDays: true));
         }
 
-        if (allowContext)
-        {
-            foreach (var name in ContextNames)
-            {
-                var dotted = name switch { "index_trend" => "index.trend", "index_adx" => "index.adx", _ => name };
-                choices.Add(DateFeature(Chance(50) ? dotted : name, name, true, false));
-            }
-        }
-
         return new Leaf(Pick(choices.ToArray()), Timeframe.M1, Chance(15), Chance(30) ? _random.Next(1, 4) : 0);
     }
 
-    private static Feature DateFeature(string text, string flat, bool context, bool expiry) =>
-        new(text, flat, true, new FeatureSpec(flat, Timeframe.M1), context, expiry);
+    private static Feature DateFeature(string text, string flat, bool expiry) =>
+        new(text, flat, true, new FeatureSpec(flat, Timeframe.M1), expiry);
 
     /// <summary>The parameterless features that are not raw bars: the patterns, <c>vwap</c>, the previous day and today, the gap (where the catalog runs them).</summary>
     private Feature? Extra(Timeframe frame)

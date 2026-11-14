@@ -25,8 +25,8 @@ public sealed class CellStatsShrinkageTests
 
     private static CellStatsRow Pick(IReadOnlyList<CellStatsRow> rows, CellId id, CellWindow window = CellWindow.All) => rows.Single(r => r.Cell == id && r.Window == window);
 
-    private static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, ShrinkageOptions? shrinkage = null, IReadOnlyList<CellInput>? regime = null) =>
-        CellStatsCalculator.Compute(cells, AsOf, Options, regime, null, shrinkage ?? On);
+    private static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, ShrinkageOptions? shrinkage = null) =>
+        CellStatsCalculator.Compute(cells, AsOf, Options, null, shrinkage ?? On);
 
     [Fact]
     public void Without_the_options_or_with_Off_the_rows_are_what_they_were_and_ReportOnly_changes_only_the_new_member()
@@ -34,7 +34,7 @@ public sealed class CellStatsShrinkageTests
         var cells = new[] { Cell(Id("A"), 40, 0.2), Cell(Id("A", "5m"), 12, -0.3), Cell(Id("B"), 35, 0.1), Cell(Id("B", "5m"), 8, 0.5) };
         var plain = CellStatsCalculator.Compute(cells, AsOf, Options);
 
-        var off = CellStatsCalculator.Compute(cells, AsOf, Options, null, null, new ShrinkageOptions(Mode: ConfidenceMode.Off));
+        var off = CellStatsCalculator.Compute(cells, AsOf, Options, null, new ShrinkageOptions(Mode: ConfidenceMode.Off));
         var report = Compute(cells);
 
         plain.ShouldAllBe(r => r.Shrinkage == null);
@@ -51,9 +51,9 @@ public sealed class CellStatsShrinkageTests
     public void With_the_confidence_options_too_only_the_shrinkage_member_is_added()
     {
         var cells = new[] { Cell(Id("A"), 40, 0.2), Cell(Id("A", "5m"), 12, -0.3), Cell(Id("B"), 35, 0.1) };
-        var with = CellStatsCalculator.Compute(cells, AsOf, Options, null, new ConfidenceOptions());
+        var with = CellStatsCalculator.Compute(cells, AsOf, Options, new ConfidenceOptions());
 
-        var both = CellStatsCalculator.Compute(cells, AsOf, Options, null, new ConfidenceOptions(), On);
+        var both = CellStatsCalculator.Compute(cells, AsOf, Options, new ConfidenceOptions(), On);
 
         for (var i = 0; i < with.Count; i++)
         {
@@ -101,57 +101,6 @@ public sealed class CellStatsShrinkageTests
     }
 
     [Fact]
-    public void A_regime_cell_is_shrunk_toward_its_star_cell_without_itself_when_that_has_30_trades()
-    {
-        var star = Id("S");
-        var regime = Id("S", regime: "up");
-        // the star cell has 70 trades, 12 of them in the regime cell: 58 are left
-        var all = Trades(58, 0.1).Concat(Trades(12, 0.8)).ToList();
-        var rows = Compute([new CellInput(star, true, all)], null, [new CellInput(regime, true, Trades(12, 0.8))]);
-
-        var r = Pick(rows, regime).Shrinkage!;
-
-        r.ParentLevel.ShouldBe("star");
-        r.ParentMeanR!.Value.ShouldBe(0.1, 1e-9);
-        r.ShrunkMeanR!.Value.ShouldBeInRange(0.1, 0.8);
-    }
-
-    [Fact]
-    public void The_chain_falls_through_to_strategy_then_system_then_unavailable()
-    {
-        var star = Id("S");
-        var regime = Id("S", regime: "up");
-        var regimeCell = new CellInput(regime, true, Trades(12, 0.8));
-        var starCell = new CellInput(star, true, Trades(28, 0.1).Concat(Trades(12, 0.8)).ToList());   // 40 trades, 28 without the regime cell: under 30
-
-        var strategy = Compute([starCell, Cell(Id("S", "5m"), 35, 0.0)], null, [regimeCell]);
-        var system = Compute([starCell, Cell(Id("S", "5m"), 20, 0.0), Cell(Id("T"), 45, -0.1)], null, [regimeCell]);
-        var none = Compute([starCell, Cell(Id("S", "5m"), 20, 0.0), Cell(Id("T"), 5, -0.1)], null, [regimeCell]);
-
-        Pick(strategy, regime).Shrinkage!.ParentLevel.ShouldBe("strategy");
-        Pick(strategy, regime).Shrinkage!.ParentMeanR!.Value.ShouldBe(0.0, 1e-9);
-        Pick(system, regime).Shrinkage!.ParentLevel.ShouldBe("system");
-        Pick(none, regime).Shrinkage!.Note.ShouldBe("unavailable: no parent with 30 trades");
-        Pick(none, regime).Shrinkage!.ParentLevel.ShouldBeNull();
-        Pick(strategy, star).Shrinkage!.ParentLevel.ShouldBe("strategy");   // a star cell starts at its strategy
-    }
-
-    [Fact]
-    public void Adding_regime_cells_does_not_change_a_star_cell()
-    {
-        var cells = new[] { Cell(Id("S"), 60, 0.2), Cell(Id("S", "5m"), 40, 0.0), Cell(Id("T"), 40, 0.1) };
-        var split = new CellInput(Id("S", regime: "up"), true, Trades(10, 0.3));
-
-        var without = Compute(cells);
-        var with = Compute(cells, null, [split]);
-
-        foreach (var c in cells)
-        {
-            Pick(with, c.Cell).Shrinkage.ShouldBe(Pick(without, c.Cell).Shrinkage);
-        }
-    }
-
-    [Fact]
     public void A_group_with_fewer_than_three_siblings_uses_the_floor_and_the_default_strength_and_says_so()
     {
         var rows = Compute([Cell(Id("S"), 40, 0.4), Cell(Id("S", "5m"), 40, 0.0)]);
@@ -188,7 +137,7 @@ public sealed class CellStatsShrinkageTests
         // 24 trades in 8 entry sessions whose levels alternate: strongly clustered, so effective n is well below the weight n
         var cells = Enumerable.Range(0, 5).Select(i => new CellInput(Id("S", "tf" + i), true, [.. Enumerable.Range(0, 24).Select(k => new CellTrade(AsOf.AddDays(-1 - (k / 3)), (i * 0.3) + (k / 3 % 2 == 0 ? 0.8 : -0.8) + (k % 2 * 0.1), 0.5, 1, AsOf.AddDays(-2 - (k / 3))))])).ToList();
 
-        var rows = CellStatsCalculator.Compute(cells, AsOf, Options, null, new ConfidenceOptions(), On);
+        var rows = CellStatsCalculator.Compute(cells, AsOf, Options, new ConfidenceOptions(), On);
 
         var row = Pick(rows, Id("S", "tf2"));
         var nEff = row.Dependence!.NEff;
@@ -301,13 +250,12 @@ public sealed class CellStatsShrinkageTests
             }
         }
 
-        var regime = new[] { new CellInput(Id("S", "tf0", "up"), true, Trades(6, 0.4)), new CellInput(Id("T", "tf1", "down"), true, Trades(9, -0.2)) };
-        var baseline = Compute(cells, null, regime);
+        var baseline = Compute(cells);
         for (var seed = 1; seed <= 5; seed++)
         {
             var shuffler = new Random(seed);
             var shuffled = cells.OrderBy(_ => shuffler.Next()).ToList();
-            var rows = Compute(shuffled, null, regime.Reverse().ToArray());
+            var rows = Compute(shuffled);
             foreach (var row in baseline)
             {
                 rows.Single(r => r.Cell == row.Cell && r.Window == row.Window).Shrinkage.ShouldBe(row.Shrinkage);
@@ -321,7 +269,7 @@ public sealed class CellStatsShrinkageTests
         var gate = new ShrinkageOptions(Mode: ConfidenceMode.Gate);
 
         gate.Problems().ShouldContain(p => p.Contains("Gate is not offered", StringComparison.Ordinal));
-        Should.Throw<ArgumentException>(() => CellStatsCalculator.Compute([Cell(Id("S"), 40, 0.2)], AsOf, Options, null, null, gate));
+        Should.Throw<ArgumentException>(() => CellStatsCalculator.Compute([Cell(Id("S"), 40, 0.2)], AsOf, Options, null, gate));
         new ShrinkageOptions(Mode: ConfidenceMode.Off).Problems().ShouldBeEmpty();
         On.Problems().ShouldBeEmpty();
     }

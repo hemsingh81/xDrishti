@@ -7,7 +7,6 @@ using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.OptionIv;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Learning;
@@ -17,7 +16,6 @@ using XDrishti.Domain.Common;
 using XDrishti.Domain.Filings;
 using XDrishti.Domain.Learning.Extensions;
 using XDrishti.Domain.Market.Calendar;
-using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Research;
 using XDrishti.Tests.Shared;
 
@@ -45,7 +43,6 @@ public sealed class ExtractExtensionFeaturesHandlerTests
 
     private readonly IResultsFilingTimes _filingTimes = Substitute.For<IResultsFilingTimes>();
 
-    private readonly IContextDayStore _context = Substitute.For<IContextDayStore>();
 
     private readonly IFilingSettings _settings = Substitute.For<IFilingSettings>();
 
@@ -75,7 +72,6 @@ public sealed class ExtractExtensionFeaturesHandlerTests
         _calendar.GetAsync(Ct).Returns(new TradingCalendar());
         _snapshots.ReadAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<DateOnly>(), Ct).Returns(ValueTask.FromResult(Result.Success(EventCalendarSnapshot.Create([], 5))));
         _filingTimes.ReadAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Ct).Returns(ValueTask.FromResult<IReadOnlyList<ResultsFilingTime>>([new ResultsFilingTime(FabricatedRun.IdA, new DateOnly(2026, 6, 30), Filed.ToUniversalTime())]));
-        _context.ListAsync(Ct).Returns(ValueTask.FromResult<IReadOnlyList<ContextDayRecord>>([]));
         _bars.ReadDailyBarsAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Ct).Returns(ValueTask.FromResult<IReadOnlyList<BarRow>>([]));
         _factors.GetAsync(Arg.Any<Guid>(), Ct).Returns(XDrishti.Domain.Market.Actions.AdjustmentFactors.None);
         _facts.Facts(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Ct).Returns(ValueTask.FromResult(new ResultFactsAnswer([], 0) { ParserVersion = ResultsParser.Version }));
@@ -83,7 +79,7 @@ public sealed class ExtractExtensionFeaturesHandlerTests
         _rows.AppendWithRecordAsync(Arg.Do<IReadOnlyList<ExtensionFeatureRow>>(r => _written = r), Arg.Do<ExtensionExtractionRecord>(r => _record = r), Arg.Any<DateTimeOffset>(), Ct)
             .Returns(ci => ValueTask.FromResult((ci.ArgAt<IReadOnlyList<ExtensionFeatureRow>>(0).Count, true)));
         var extractor = new ExtensionFeatureExtractor(_bars, _factors, _facts, _holdings);
-        return new ExtractExtensionFeaturesHandler(_runs, _calendar, _snapshots, _filingTimes, _context, _settings, extractor, _iv, _rows, _records, new FakeTimeProvider(new DateTimeOffset(2026, 11, 2, 0, 0, 0, TimeSpan.Zero)), NullLogger<ExtractExtensionFeaturesHandler>.Instance);
+        return new ExtractExtensionFeaturesHandler(_runs, _calendar, _snapshots, _filingTimes, _settings, extractor, _iv, _rows, _records, new FakeTimeProvider(new DateTimeOffset(2026, 11, 2, 0, 0, 0, TimeSpan.Zero)), NullLogger<ExtractExtensionFeaturesHandler>.Instance);
     }
 
     private static StoredRunHeader Header() =>
@@ -268,7 +264,6 @@ public sealed class ExtractExtensionFeaturesHandlerTests
         record.NanCountsJson.ShouldContain("\"iv_rank_252\":{\"no_options\":1}");
         record.NanCountsJson.ShouldContain("\"sources\":{\"archive_watermark\":\"42\",\"iv_unit\":\"percent_assumed\",\"quality_run_ids\":\"1,2,3\"}");
         await _filingTimes.DidNotReceiveWithAnyArgs().ReadAsync(default!, Ct);
-        await _context.DidNotReceiveWithAnyArgs().ListAsync(Ct);
     }
 
     [Theory]

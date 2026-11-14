@@ -42,7 +42,7 @@ public sealed class LabRobustnessDelayTests
             var q = ci.Arg<RunSimulationQuery>();
             return Result.Success(q.Request.Fills is { EntryDelayMinutes: > 0 } ? delayed(baseRun) : baseRun);
         });
-        return new LabRobustness(_simulation, LabSettings.Default, null, null, options);
+        return new LabRobustness(_simulation, LabSettings.Default, null, options);
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public sealed class LabRobustnessDelayTests
         _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Arg.Any<CancellationToken>()).Returns(ci =>
             ci.Arg<RunSimulationQuery>().Request.Fills is { EntryDelayMinutes: > 0 } ? Result.Failure<SimulationRun>(Error.Validation("x", "no bars")) : Result.Success(FabricatedRun.Standard()));
 
-        var outcome = await RunAsync(new LabRobustness(_simulation, LabSettings.Default, null, null, new CostStressOptions()));
+        var outcome = await RunAsync(new LabRobustness(_simulation, LabSettings.Default, null, new CostStressOptions()));
 
         outcome.Delay.ShouldNotBeNull().Error.ShouldBe("no bars");
         outcome.Delay!.Signals.ShouldBeEmpty();
@@ -103,7 +103,7 @@ public sealed class LabRobustnessDelayTests
 
         // the base is the Standard run (it has trades); an empty base is arranged here by an empty answer for both
         _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(FabricatedRun.Standard() with { Trades = [] }));
-        var empty = await RunAsync(new LabRobustness(_simulation, LabSettings.Default, null, null, new CostStressOptions()));
+        var empty = await RunAsync(new LabRobustness(_simulation, LabSettings.Default, null, new CostStressOptions()));
 
         outcome.Delay.ShouldNotBeNull();
         empty.Delay.ShouldNotBeNull().Signals.ShouldBeEmpty();

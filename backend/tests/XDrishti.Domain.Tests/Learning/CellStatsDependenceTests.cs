@@ -38,7 +38,7 @@ public sealed class CellStatsDependenceTests
         var input = new CellInput(Cell(), true, Clustered());
 
         var plain = CellStatsCalculator.Compute([input], AsOf, Options);
-        var off = CellStatsCalculator.Compute([input], AsOf, Options, null, new ConfidenceOptions(Mode: ConfidenceMode.Off));
+        var off = CellStatsCalculator.Compute([input], AsOf, Options, new ConfidenceOptions(Mode: ConfidenceMode.Off));
 
         plain.ShouldAllBe(r => r.Dependence == null);
         off.Count.ShouldBe(plain.Count);
@@ -54,7 +54,7 @@ public sealed class CellStatsDependenceTests
         var input = new CellInput(Cell(), true, Clustered(7, 5));   // 35 trades: enough by count (30), few by independence
         var plain = All(CellStatsCalculator.Compute([input], AsOf, Options));
 
-        var report = All(CellStatsCalculator.Compute([input], AsOf, Options, null, new ConfidenceOptions()));
+        var report = All(CellStatsCalculator.Compute([input], AsOf, Options, new ConfidenceOptions()));
 
         (report with { Dependence = null }).ShouldBe(plain);
         report.Enough.ShouldBeTrue();
@@ -70,9 +70,9 @@ public sealed class CellStatsDependenceTests
     public void Gate_changes_Enough_and_nothing_else()
     {
         var input = new CellInput(Cell(), true, Clustered(7, 5));
-        var report = All(CellStatsCalculator.Compute([input], AsOf, Options, null, new ConfidenceOptions()));
+        var report = All(CellStatsCalculator.Compute([input], AsOf, Options, new ConfidenceOptions()));
 
-        var gate = All(CellStatsCalculator.Compute([input], AsOf, Options, null, new ConfidenceOptions(Mode: ConfidenceMode.Gate)));
+        var gate = All(CellStatsCalculator.Compute([input], AsOf, Options, new ConfidenceOptions(Mode: ConfidenceMode.Gate)));
 
         gate.Enough.ShouldBeFalse();
         (gate with { Enough = true, Dependence = report.Dependence }).ShouldBe(report);
@@ -83,7 +83,7 @@ public sealed class CellStatsDependenceTests
     {
         var few = new CellInput(Cell(), true, Clustered(1, 3));   // 3 trades: below the 5 needed for an estimate
 
-        var gate = All(CellStatsCalculator.Compute([few], AsOf, new CellStatsOptions(MinTrades: 1), null, new ConfidenceOptions(Mode: ConfidenceMode.Gate)));
+        var gate = All(CellStatsCalculator.Compute([few], AsOf, new CellStatsOptions(MinTrades: 1), new ConfidenceOptions(Mode: ConfidenceMode.Gate)));
 
         gate.Dependence!.NEff.ShouldBeNull();
         gate.Dependence.Note.ShouldBe("unavailable: n < 5");
@@ -95,8 +95,8 @@ public sealed class CellStatsDependenceTests
     {
         var input = new CellInput(Cell(), true, Clustered());
 
-        var a = CellStatsCalculator.Compute([input], AsOf, Options, null, new ConfidenceOptions());
-        var b = CellStatsCalculator.Compute([input], AsOf, Options, null, new ConfidenceOptions());
+        var a = CellStatsCalculator.Compute([input], AsOf, Options, new ConfidenceOptions());
+        var b = CellStatsCalculator.Compute([input], AsOf, Options, new ConfidenceOptions());
 
         b.Select(r => r.Dependence).ShouldBe(a.Select(r => r.Dependence));
     }
@@ -106,7 +106,7 @@ public sealed class CellStatsDependenceTests
     {
         var old = Clustered().Select(t => new CellTrade(t.ExitDate, t.R, t.MaeR, t.MfeR)).ToList();
 
-        var row = All(CellStatsCalculator.Compute([new CellInput(Cell(), true, old)], AsOf, Options, null, new ConfidenceOptions()));
+        var row = All(CellStatsCalculator.Compute([new CellInput(Cell(), true, old)], AsOf, Options, new ConfidenceOptions()));
 
         old[0].EntryDate.ShouldBeNull();
         old[0].HasEntryCluster.ShouldBeFalse();
@@ -135,8 +135,8 @@ public sealed class CellStatsDependenceTests
         var withFuture = new CellInput(Cell(), true, trades);
         var onlyKnown = new CellInput(Cell(), true, [.. trades.Where(t => t.ExitDate <= cutoff)]);
 
-        var a = All(CellStatsCalculator.Compute([withFuture], cutoff, Options, null, new ConfidenceOptions()));
-        var b = All(CellStatsCalculator.Compute([onlyKnown], cutoff, Options, null, new ConfidenceOptions()));
+        var a = All(CellStatsCalculator.Compute([withFuture], cutoff, Options, new ConfidenceOptions()));
+        var b = All(CellStatsCalculator.Compute([onlyKnown], cutoff, Options, new ConfidenceOptions()));
 
         a.N.ShouldBe(20);
         a.Dependence.ShouldBe(b.Dependence);

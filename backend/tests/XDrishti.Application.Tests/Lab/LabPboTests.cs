@@ -21,7 +21,7 @@ public sealed class LabPboTests
 
     private static LabVerdictView Verdict(string outcome, PboView? pbo) => new(
         outcome, 4, 1.5, new EvidenceView(100, 0.4, 1.8, 12, 9, 4, 2, "walk_forward"), [], ["a limit"], [], [], [],
-        new RobustnessView(new SensitivityView("15m", "x", null, [], "l"), null, [], null, "n", [], Pbo: pbo));
+        new RobustnessView(new SensitivityView("15m", "x", null, [], "l"), null, [], null, [], Pbo: pbo));
 
     private static PboView Figure(double? pbo, string mode = "Gate") => new(mode, 12, 8, 70, pbo, 0.2, 0.5, "Mean", false, mode + "/8/10/0.5/Mean", pbo is null ? "unavailable: x" : "note");
 

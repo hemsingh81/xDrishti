@@ -47,7 +47,7 @@ public static class LintCodes
 
     /// <summary>
     /// A <c>crosses_above/below</c>, <c>rising</c> or <c>falling</c> whose features are not all on one timeframe, so that "the previous value" of each side would be a different time. The span is the call; the message
-    /// names the timeframes and, when one side is a plain reference, the explicit form that says what is meant (the suggestion). A feature of the date (calendar and context features) is a clock of its own, on any strategy timeframe;
+    /// names the timeframes and, when one side is a plain reference, the explicit form that says what is meant (the suggestion). A feature of the date (calendar features) is a clock of its own, on any strategy timeframe;
     /// when it is one of the clocks and there is no explicit form, the message says that such a feature changes once a date, so it is compared without a lag or only the bar side is lagged by hand. Error.
     /// </summary>
     public const string MixedTimeframesInLag = "strategy.lint.mixed_timeframes_in_lag";

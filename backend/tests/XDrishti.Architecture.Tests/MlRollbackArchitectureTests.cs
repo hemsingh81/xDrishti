@@ -64,7 +64,7 @@ public sealed class MlRollbackArchitectureTests
         "XDrishti.Application.Learning.OwnerDesignateModelHandler", "XDrishti.Application.Learning.OwnerDesignateModelCommand",
         typeof(IRollbackProposalReader).FullName!, typeof(IRollbackProposalStore).FullName!, typeof(IMlSwitchSettings).FullName!, typeof(IMlSwitchStore).FullName!, typeof(IMlMonitorChecks).FullName!,
         typeof(IRollbackEvidence).FullName!, typeof(IChallengerEvidence).FullName!, typeof(MlSwitches).FullName!,
-        typeof(MlPromotion).FullName!, typeof(RollbackPolicy).FullName!, typeof(MlSwitch).FullName!, typeof(RegimeCellRule).FullName!,
+        typeof(MlPromotion).FullName!, typeof(RollbackPolicy).FullName!, typeof(MlSwitch).FullName!,
     ];
 
     /// <summary>Stands for an automatic rollback that promotes: it holds the promotion handler's contract. The closure of the scan must reach the handler through it.</summary>

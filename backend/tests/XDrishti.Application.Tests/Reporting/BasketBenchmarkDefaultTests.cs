@@ -65,7 +65,7 @@ public sealed class BasketBenchmarkDefaultTests
 
         view.Index.Symbol.ShouldBeNull();
         view.Hold.Number!.Value.ShouldBe(4.0, 1e-9);
-        foreach (var m in new[] { view.Risk.Beta60, view.Risk.Beta252, view.Risk.Alpha, view.Risk.TrackingError, view.Risk.UpCapture, view.Risk.DownCapture, view.IndexDifference.Index, view.IndexDifference.Difference, view.Regime.Status })
+        foreach (var m in new[] { view.Risk.Beta60, view.Risk.Beta252, view.Risk.Alpha, view.Risk.TrackingError, view.Risk.UpCapture, view.Risk.DownCapture, view.IndexDifference.Index, view.IndexDifference.Difference })
         {
             m.State.ShouldBe("unavailable");
         }

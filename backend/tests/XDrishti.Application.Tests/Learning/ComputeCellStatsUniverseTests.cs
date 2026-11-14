@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using XDrishti.Application.Abstractions.Learning;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Learning;
 using XDrishti.Domain.Learning;
@@ -24,7 +23,6 @@ public sealed class ComputeCellStatsUniverseTests
 
     private readonly ICellStatsStore _store = Substitute.For<ICellStatsStore>();
 
-    private readonly IContextFigures _figures = Substitute.For<IContextFigures>();
 
     private readonly IUniverseSeriesSource _source = Substitute.For<IUniverseSeriesSource>();
 
@@ -35,7 +33,7 @@ public sealed class ComputeCellStatsUniverseTests
     private ComputeCellStatsHandler Handler(bool withSource = true)
     {
         _store.StoreAsync(Arg.Do<CellSnapshotToStore>(s => _written = s), Ct).Returns(true);
-        return new ComputeCellStatsHandler(_runs, _store, _figures, new FakeTimeProvider(new DateTimeOffset(2026, 3, 11, 0, 0, 0, TimeSpan.Zero)), NullLogger<ComputeCellStatsHandler>.Instance, universeSource: withSource ? _source : null);
+        return new ComputeCellStatsHandler(_runs, _store, new FakeTimeProvider(new DateTimeOffset(2026, 3, 11, 0, 0, 0, TimeSpan.Zero)), NullLogger<ComputeCellStatsHandler>.Instance, universeSource: withSource ? _source : null);
     }
 
     /// <summary>Shares 1 to 35, each with a daily session from 2025-11-01 up to the day before <paramref name="until"/>; the share with the higher number trades less, so share 1 is the most liquid (the top third) and share 35 the least.</summary>

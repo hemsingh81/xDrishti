@@ -24,7 +24,7 @@ public sealed class CancelledReplayTests
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
 
-        Should.Throw<OperationCanceledException>(() => simulator.RunUntilCancelled(Cand.Test, bars, Sim.Tick, null, null, null, null, null, null, null, cancelled.Token));
+        Should.Throw<OperationCanceledException>(() => simulator.RunUntilCancelled(Cand.Test, bars, Sim.Tick, null, null, null, null, null, null, cancelled.Token));
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public sealed class CancelledReplayTests
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
 
-        Should.Throw<OperationCanceledException>(() => comparison.RunUntilCancelled(Cand.Test, bars, Sim.Tick, null, null, null, null, null, null, null, cancelled.Token));
+        Should.Throw<OperationCanceledException>(() => comparison.RunUntilCancelled(Cand.Test, bars, Sim.Tick, null, null, null, null, null, null, cancelled.Token));
     }
 
     [Fact]
@@ -44,6 +44,6 @@ public sealed class CancelledReplayTests
     {
         var simulator = Simulator.Create(OrbV1.Create(), Timeframe.M15).Simulator.ShouldNotBeNull();
 
-        simulator.RunUntilCancelled(Cand.Test, ManyBars(), Sim.Tick, null, null, null, null, null, null, null, CancellationToken.None).IsSuccess.ShouldBeTrue();
+        simulator.RunUntilCancelled(Cand.Test, ManyBars(), Sim.Tick, null, null, null, null, null, null, CancellationToken.None).IsSuccess.ShouldBeTrue();
     }
 }

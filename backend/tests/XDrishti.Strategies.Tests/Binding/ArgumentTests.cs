@@ -165,11 +165,6 @@ public sealed class ArgumentTests
     public void A_feature_without_parameters_takes_no_arguments(string name)
     {
         var info = Info(name);
-        if (name == "regime")
-        {
-            return;
-        }
-
         var error = OnlyError($"{name}(1) > 0", Timeframe.M1);
 
         error.Code.ShouldBe(LintCodes.BadArguments);

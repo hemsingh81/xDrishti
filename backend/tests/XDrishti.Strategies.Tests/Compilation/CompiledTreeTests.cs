@@ -30,7 +30,7 @@ public sealed class CompiledTreeTests
     [
         "close > 100", "close[2] > close", "rsi(14) > 55 and close > ema(20)", "not (rsi(14) > 55) or close < open", "crosses_above(close, vwap)", "crosses_below(tf(\"1h\").close[3], tf(\"1h\").ema(20))",
         "rising(close, 4)", "falling(close[3] + open, 6)", "between(close, 100, 200)", "abs(close - open) > min(high - low, 10) * max(1, 2)", "close / (high - low) > 1", "-close < -100 or (close > 1) == (open > 1)",
-        "time >= \"09:45\"", "time < \"10:00\" and close > open", "regime() == \"UP_LOW_VOL\"", "day_of_week == TUE and is_expiry_day == 0", "crosses_above(vix, 20)", "rising(vix - index_trend, 3)",
+        "time >= \"09:45\"", "time < \"10:00\" and close > open", "day_of_week == TUE and is_expiry_day == 0", "crosses_above(day_of_week, 3)", "rising(day_of_week - is_expiry_day, 3)",
         "rising(close[200], 50)", "crosses_above(close[254], vwap)",
     ];
 
@@ -79,7 +79,7 @@ public sealed class CompiledTreeTests
         var methods = new HashSet<string>();
         foreach (var (withContext, seed) in new[] { (true, 21), (false, 22) })
         {
-            var generator = new ModelGenerator(seed * 1_000 + (int)evaluation, evaluation, withContext, withContext);
+            var generator = new ModelGenerator(seed * 1_000 + (int)evaluation, evaluation, withContext);
             for (var i = 0; i < 150; i++)
             {
                 var source = Printer.Print(generator.Next(), Parens.Minimal, Spacing.Normal);

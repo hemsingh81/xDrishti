@@ -53,7 +53,7 @@ public sealed class EvaluationBenchmarks
     }
 
     /// <summary>Parse, bind, lint and merge the ten conditions, make a frame for them and bind them to it (which builds their delegates).</summary>
-    private static Timing CompileTen(MarketContext context)
+    private static Timing CompileTen()
     {
         var jitMethods = JitInfo.GetCompiledMethodCount(currentThread: true);
         var jitTime = JitInfo.GetCompilationTime(currentThread: true);
@@ -68,7 +68,7 @@ public sealed class EvaluationBenchmarks
         var compile = watch.Elapsed.TotalMilliseconds;
         var plan = ConditionSet.Merge(conditions);
         var merge = watch.Elapsed.TotalMilliseconds - compile;
-        var frame = FeatureFrame.Create(plan.Features, new FrameOptions { HistoryDepth = plan.HistoryDepth, Context = context }).Value;
+        var frame = FeatureFrame.Create(plan.Features, new FrameOptions { HistoryDepth = plan.HistoryDepth, ExpiryDays = new HashSet<DateOnly>() }).Value;
         var created = watch.Elapsed.TotalMilliseconds - compile - merge;
         var bound = plan.BindAll(frame);
         var total = watch.Elapsed.TotalMilliseconds;
@@ -77,12 +77,6 @@ public sealed class EvaluationBenchmarks
         // after the figures are taken: the first call of an assertion is itself JIT-compiled
         bound.Count.ShouldBe(10);
         return timing;
-    }
-
-    private static MarketContext ContextOfTheBenchmark()
-    {
-        var bars = Series.Sessions(5, 3);
-        return Contexts.Covering(DateOnly.FromDateTime(bars[0].Start.UtcDateTime), DateOnly.FromDateTime(bars[^1].Start.UtcDateTime), 4, daysBefore: 120);
     }
 
     private static Timing Median(IEnumerable<Timing> timings)
@@ -310,9 +304,8 @@ public sealed class EvaluationBenchmarks
     [Fact(Explicit = true)]
     public void Compile_bind_and_build_ten_conditions_cold_and_warm()
     {
-        var context = ContextOfTheBenchmark();
-        var cold = CompileTen(context);
-        var warm = Enumerable.Range(0, WarmRuns).Select(_ => CompileTen(context)).ToList();
+        var cold = CompileTen();
+        var warm = Enumerable.Range(0, WarmRuns).Select(_ => CompileTen()).ToList();
         var median = Median(warm);
         var best = warm.OrderBy(t => t.WithoutFrame).First();
         Report(
@@ -336,12 +329,11 @@ public sealed class EvaluationBenchmarks
     {
         // The assertion assumes what a host does: the warm-up has run to its end before the first request (it runs on a thread-pool thread right after the host starts, and a host needs far longer than the warm-up to be
         // ready). Here both run on this thread, one after the other. A request that arrives while the warm-up is still running waits for the part of the JIT that it has not done yet.
-        var context = ContextOfTheBenchmark();
         var watch = Stopwatch.StartNew();
         CompilerWarmup.Run();
         var warmUp = watch.Elapsed.TotalMilliseconds;
-        var first = CompileTen(context);
-        var second = CompileTen(context);
+        var first = CompileTen();
+        var second = CompileTen();
         Report(
             "Parse + bind + lint + compile of ten conditions, first run after CompilerWarmup.Run (milliseconds)",
             [
@@ -367,7 +359,7 @@ public sealed class EvaluationBenchmarks
             for (var warm = 0; warm < 200; warm++)
             {
                 var r = ConditionCompiler.Compile(source, new CompileContext(TenConditions.Evaluation)).Condition!;
-                r.Bind(Frames.Of(new FrameOptions { HistoryDepth = r.HistoryDepth, Context = Contexts.Covering(Clock.Mon, Clock.Fri, 1) }, [.. r.Features]));
+                r.Bind(Frames.Of(new FrameOptions { HistoryDepth = r.HistoryDepth, ExpiryDays = new HashSet<DateOnly>() }, [.. r.Features]));
             }
 
             var frames = new List<FeatureFrame>();
@@ -379,10 +371,9 @@ public sealed class EvaluationBenchmarks
             }
 
             var compileMs = compileWatch.Elapsed.TotalMilliseconds / Rounds;
-            var context = Contexts.Covering(Clock.Mon, Clock.Fri, 1);
             foreach (var c in made.Take(1))
             {
-                frames.Add(Frames.Of(new FrameOptions { HistoryDepth = c.HistoryDepth, Context = context }, [.. c.Features]));
+                frames.Add(Frames.Of(new FrameOptions { HistoryDepth = c.HistoryDepth, ExpiryDays = new HashSet<DateOnly>() }, [.. c.Features]));
             }
 
             var bindWatch = Stopwatch.StartNew();

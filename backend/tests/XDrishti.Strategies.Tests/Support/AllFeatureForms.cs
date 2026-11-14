@@ -1,8 +1,7 @@
 namespace XDrishti.Strategies.Tests.Support;
 
 /// <summary>
-/// The 56 names of the catalog written in their DSL form with the default arguments, as doc 11 §2 lists them (a feature with parameters is called, <c>rsi()</c>; one without is a bare name, <c>close</c>; the dotted
-/// spellings for the context names the DSL abbreviates; <c>regime()</c> for the regime). Written out here by hand and checked against the catalog by a test, so a name added to the catalog without a form fails.
+/// The names of the catalog written in their DSL form with the default arguments, as doc 11 §2 lists them (a feature with parameters is called, <c>rsi()</c>; one without is a bare name, <c>close</c>). Written out here by hand and checked against the catalog by a test, so a name added to the catalog without a form fails.
 /// </summary>
 internal static class AllFeatureForms
 {
@@ -46,16 +45,6 @@ internal static class AllFeatureForms
         ["volume"] = "volume",
         ["day_of_week"] = "day_of_week",
         ["is_expiry_day"] = "is_expiry_day",
-        ["index_trend"] = "index.trend",
-        ["index_adx"] = "index.adx",
-        ["index_vol_pct"] = "index_vol_pct",
-        ["vix"] = "vix",
-        ["vix_pct"] = "vix_pct",
-        ["vix_chg"] = "vix_chg",
-        ["breadth"] = "breadth",
-        ["regime_trend"] = "regime_trend",
-        ["regime_vol"] = "regime_vol",
-        ["regime"] = "regime()",
         ["prev_day_open"] = "prev_day.open",
         ["prev_day_high"] = "prev_day.high",
         ["prev_day_low"] = "prev_day.low",
@@ -74,6 +63,6 @@ internal static class AllFeatureForms
         ["sector_rs"] = "sector_rs(63)",
     };
 
-    /// <summary>A whole condition that reads the form: a comparison with 0 (the regime, which is compared with a name or a code, with 1).</summary>
-    public static string ConditionOf(string name) => name == "regime" ? "regime() == 1" : Forms[name] + " > 0";
+    /// <summary>A whole condition that reads the form: a comparison with 0.</summary>
+    public static string ConditionOf(string name) => Forms[name] + " > 0";
 }

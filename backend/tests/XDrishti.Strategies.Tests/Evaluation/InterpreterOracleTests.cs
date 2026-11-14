@@ -89,7 +89,7 @@ public sealed partial class InterpreterOracleTests
             for (var block = 0; block < Blocks; block++)
             {
                 var seed = SeedOf(evaluation, flavour, block);
-                var run = Prepare(seed, evaluation, withContext: flavour == 0, block, rejected);
+                var run = Prepare(seed, evaluation, block, rejected);
                 conditions += run.Models.Count;
                 if (run.Plan is null)
                 {
@@ -149,8 +149,8 @@ public sealed partial class InterpreterOracleTests
     [Fact]
     public void The_same_seed_gives_the_same_conditions_and_the_same_series()
     {
-        var first = new ModelGenerator(5, Timeframe.M15, true, true);
-        var second = new ModelGenerator(5, Timeframe.M15, true, true);
+        var first = new ModelGenerator(5, Timeframe.M15, true);
+        var second = new ModelGenerator(5, Timeframe.M15, true);
 
         var a = Enumerable.Range(0, 20).Select(_ => Printer.Print(first.Next())).ToList();
         var b = Enumerable.Range(0, 20).Select(_ => Printer.Print(second.Next())).ToList();
@@ -271,9 +271,9 @@ public sealed partial class InterpreterOracleTests
     private static int SeedOf(Timeframe evaluation, int flavour, int block) => 700_000 + (int)evaluation * 1_000 + flavour * 100 + block;
 
     /// <summary>Generates the models, prints and compiles them (what the compiler refuses is added to <paramref name="rejected"/>), and makes the frame from what the <i>models</i> read, not from the plan.</summary>
-    private static Block Prepare(int seed, Timeframe evaluation, bool withContext, int block, List<string> rejected, bool sessionBound = false)
+    private static Block Prepare(int seed, Timeframe evaluation, int block, List<string> rejected, bool sessionBound = false)
     {
-        var generator = new ModelGenerator(seed, evaluation, allowContext: withContext, allowExpiryDays: block % 2 == 0, sessionBound);
+        var generator = new ModelGenerator(seed, evaluation, allowExpiryDays: block % 2 == 0, sessionBound);
         var models = Enumerable.Range(0, ConditionsPerBlock).Select(_ => generator.Next()).ToList();
         var sources = models.Select((m, i) => Printer.Print(m, (i + block) % 2 == 0 ? Parens.Always : Parens.Minimal, (Spacing)(((i + block) / 2) % 3))).ToList();
         var facts = models.Select(ModelFacts.Of).ToList();
@@ -300,7 +300,7 @@ public sealed partial class InterpreterOracleTests
 
         var specs = facts.SelectMany(f => f.Features).Append(Specs.Close(evaluation)).Distinct().ToList();
         var depth = Math.Min(FrameOptions.MaxHistoryDepth, facts.Max(f => f.HistoryDepth) + (block % 3 == 0 ? 7 : 0));
-        var options = new FrameOptions(null, depth, withContext ? OracleContext.For(seed, bars) : null, block % 2 == 0 ? OracleContext.ExpiryDays(seed) : null);
+        var options = new FrameOptions(null, depth, block % 2 == 0 ? OracleExpiry.ExpiryDays(seed) : null);
         return new Block(evaluation, models, sources, bars, ConditionSet.Merge(compiled), compiled, facts, options, specs);
     }
 
@@ -324,9 +324,9 @@ public sealed partial class InterpreterOracleTests
                 differences.Add($"`{run.Sources[k]}`: history depth {condition.HistoryDepth} instead of {facts.HistoryDepth}");
             }
 
-            if (condition.NeedsContext != facts.NeedsContext || condition.NeedsExpiryDays != facts.NeedsExpiryDays)
+            if (condition.NeedsExpiryDays != facts.NeedsExpiryDays)
             {
-                differences.Add($"`{run.Sources[k]}`: needs context {condition.NeedsContext}, expiry days {condition.NeedsExpiryDays} instead of {facts.NeedsContext}, {facts.NeedsExpiryDays}");
+                differences.Add($"`{run.Sources[k]}`: needs expiry days {condition.NeedsExpiryDays} instead of {facts.NeedsExpiryDays}");
             }
         }
     }

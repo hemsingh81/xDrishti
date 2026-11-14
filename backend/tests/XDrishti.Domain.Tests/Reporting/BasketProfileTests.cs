@@ -20,7 +20,7 @@ public sealed class BasketProfileTests
             bench.Add(new DailyClose(D(80), to));
         }
 
-        return BasketAnalytics.Profile(new BasketProfileInput(members, at, [D(0)], bench, new Dictionary<DateOnly, int?>(), new ProfileWindow(D(0), D(80))), Options);
+        return BasketAnalytics.Profile(new BasketProfileInput(members, at, [D(0)], bench, new ProfileWindow(D(0), D(80))), Options);
     }
 
     private static HashSet<string> Set(params string[] symbols) => symbols.ToHashSet(StringComparer.Ordinal);

@@ -35,7 +35,7 @@ public sealed partial class InterpreterOracleTests
         {
             foreach (var shape in Enum.GetValues<SeriesShape>())
             {
-                var run = Prepare(SessionSeedOf(evaluation, round, shape), evaluation, withContext: false, block++, rejected, sessionBound: true);
+                var run = Prepare(SessionSeedOf(evaluation, round, shape), evaluation, block++, rejected, sessionBound: true);
                 conditions += run.Models.Count;
                 if (run.Plan is null)
                 {

@@ -60,7 +60,7 @@ public sealed class LabRobustnessPboTests
     {
         _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Arg.Any<CancellationToken>())
             .Returns(ci => (runs ?? (q => Result.Success(RunOf(Params(q)))))(ci.Arg<RunSimulationQuery>()));
-        return new LabRobustness(_simulation, LabSettings.Default, null, null, null, pbo);
+        return new LabRobustness(_simulation, LabSettings.Default, null, null, pbo);
     }
 
     private static async Task<RobustnessOutcome> RunAsync(LabRobustness service, int parameters, LabRun? run = null) =>

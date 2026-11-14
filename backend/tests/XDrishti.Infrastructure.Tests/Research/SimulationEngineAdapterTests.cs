@@ -228,7 +228,6 @@ public sealed class SimulationEngineAdapterTests
 
         public bool HoldsOvernight => throw new NotSupportedException();
 
-        public bool ReadsContext => false;
 
         public bool ReadsEvents => false;
 

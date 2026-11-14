@@ -27,7 +27,7 @@ internal sealed record BoolLit(bool Value) : Node;
 /// A catalog feature as the DSL writes it: <see cref="Text"/> unqualified, <see cref="QualifiedText"/> after <c>tf("…").</c> (the flat catalog name for a dotted spelling), whether it is a reference that can take a subscript
 /// (<c>close</c>) or a call (<c>rsi(14)</c>) that cannot, and the <see cref="Spec"/> on 1m (the timeframe is replaced by the leaf's).
 /// </summary>
-internal sealed record Feature(string Text, string QualifiedText, bool IsReference, FeatureSpec Spec, bool ReadsContext = false, bool ReadsExpiryDays = false, bool ReadsResultsDays = false);
+internal sealed record Feature(string Text, string QualifiedText, bool IsReference, FeatureSpec Spec, bool ReadsExpiryDays = false, bool ReadsResultsDays = false);
 
 /// <summary>A feature read on <see cref="Frame"/>, <see cref="Lag"/> closed bars back (the subscript), written with <c>tf(…)</c> when <see cref="Qualified"/>.</summary>
 internal sealed record Leaf(Feature Feature, Timeframe Frame, bool Qualified, int Lag) : Node
@@ -72,14 +72,8 @@ internal sealed record Between(Node Value, Node Low, Node High) : Node;
 /// </summary>
 internal sealed record TimeCmp(string Op, int MinuteOfDay, string Text, bool Mirrored) : Node;
 
-/// <summary>
-/// <c>regime()</c> equal or not equal to a regime: by <see cref="Name"/> (<c>"UP_LOW_VOL"</c>, on either side) or, when <see cref="Name"/> is null, by the code written as a number on the right. <see cref="Code"/> is the code the
-/// oracle's own table gives for the name.
-/// </summary>
-internal sealed record RegimeCmp(bool Equal, int Code, string? Name, bool NameOnLeft, Leaf Regime) : Node;
-
 /// <summary>What follows from how a condition is built: the features it reads, the history it needs and what the frame must be given. Worked out from the model, not from the library.</summary>
-internal sealed record Facts(IReadOnlyList<FeatureSpec> Features, int HistoryDepth, bool NeedsContext, bool NeedsExpiryDays, bool UsesTime);
+internal sealed record Facts(IReadOnlyList<FeatureSpec> Features, int HistoryDepth, bool NeedsExpiryDays, bool UsesTime);
 
 /// <summary>The facts of a model and the walk behind them.</summary>
 internal static class ModelFacts
@@ -99,7 +93,7 @@ internal static class ModelFacts
         }
 
         var deepest = reads.Count == 0 ? 0 : reads.Max(r => r.Lag);
-        return new Facts(features, deepest + 1, reads.Any(r => r.Leaf.Feature.ReadsContext), reads.Any(r => r.Leaf.Feature.ReadsExpiryDays), time);
+        return new Facts(features, deepest + 1, reads.Any(r => r.Leaf.Feature.ReadsExpiryDays), time);
     }
 
     /// <summary>
@@ -159,9 +153,6 @@ internal static class ModelFacts
                 break;
             case TimeCmp:
                 time = true;
-                break;
-            case RegimeCmp r:
-                reads.Add((r.Regime, r.Regime.Lag + offset));
                 break;
             case Lit or Const or BoolLit:
                 break;

@@ -45,9 +45,8 @@ public sealed class ReplayGoldenTests
             }
 
             var table = request.Instruments.Count < 2 ? null : CorrelationTable.FromReturns(returns, request.ForDate, [.. request.Instruments.Select(i => i.Symbol)]);
-            var day = world.ContextVix.Keys.Where(k => k < request.ForDate).Select(k => (DateOnly?)k).Max();
-            MarketGateInput? gate = day is { } d ? new MarketGateInput(d, world.ContextVix[d], 0.6, null) : null;
-            return ValueTask.FromResult(Result.Success(new PlanContext(book, instruments, [account], table, gate, [], ["live"], BookFromLedger: true, MarketNote: gate is null ? null : XDrishti.Application.Abstractions.Planning.PlanContextNotes.MarketBreadth(100))));
+            MarketGateInput? gate = null;
+            return ValueTask.FromResult(Result.Success(new PlanContext(book, instruments, [account], table, gate, [], ["live"], BookFromLedger: true, MarketNote: null)));
         }
     }
 
@@ -109,18 +108,15 @@ public sealed class ReplayGoldenTests
     }
 
     [Fact]
-    public async Task A_session_with_an_open_book_a_reduced_gate_and_smart_rule_blocks_matches_the_live_plan()
+    public async Task A_session_with_an_open_book_and_smart_rule_blocks_matches_the_live_plan()
     {
         var world = Four(0.7, 2.0, 3.3, 4.9, 5.7);
         world.Fill = new FillConstraints(MaxEntriesPerDay: 5, MaxOpenPositions: 6, MaxPerSector: 10, MaxPairCorrelation: 1.0, MaxIntraday: 10, MaxSwing: 10, MaxNetLongRiskPct: 50, MaxNetShortRiskPct: 50, MaxPerTradeRiskPct: 2.0);
         world.Smart = new SmartRulesOptions(CorrelationEnabled: false);
-        world.ContextVix[ReplayWorld.Start.AddDays(-3)] = 19;
-        world.ContextVix[ReplayWorld.Start] = 19; // India VIX at 19: the gate is reduced (18 reduces, 22 cancels), the plan keeps half and cuts the risk to 0.75
 
         var (blocked, _, open) = await Golden(world, 3, 1);
 
         open.ShouldBeGreaterThan(0, "the book is not empty");
-        blocked.ShouldContain(b => b.Reason == BlockReason.Gate);
         blocked.ShouldContain(b => b.Reason == BlockReason.SmartRule); // the symbols already held come back as candidates
     }
 

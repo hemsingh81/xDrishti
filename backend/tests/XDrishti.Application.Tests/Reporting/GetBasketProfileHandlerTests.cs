@@ -141,18 +141,6 @@ public sealed class GetBasketProfileHandlerTests
     }
 
     [Fact]
-    public async Task Without_regime_codes_the_regime_panel_is_unavailable_with_the_reason()
-    {
-        var (basket, _, _, _, _) = Seeded();
-
-        var view = await OkAsync(basket);
-
-        view.Regime.Status.State.ShouldBe("unavailable");
-        view.Regime.Rows.ShouldBeEmpty();
-        view.Evidence.UnavailableInputs.ShouldContain(s => s.StartsWith("regime", StringComparison.Ordinal));
-    }
-
-    [Fact]
     public async Task A_single_snapshot_says_so_in_the_basis_and_the_limits_and_a_dated_basket_gives_the_first_date()
     {
         var (basket, a, b, c, _) = Seeded();

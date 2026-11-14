@@ -65,7 +65,7 @@ public sealed class MultiFaultOrderTests
         "lag_on_non_feature: a constant", "lag_on_non_feature: the time",
         "mixed_timeframes_in_lag: a crossing of the close and a daily average", "mixed_timeframes_in_lag: a sum of two timeframes in rising",
         "bad_time_literal: one digit for the hour", "bad_time_literal: before the open", "bad_time_literal: an hour that does not exist",
-        "type_mismatch: the time against a number", "type_mismatch: a number against a true/false value", "type_mismatch: ordering a regime", "type_mismatch: not of a number", "type_mismatch: two regimes",
+        "type_mismatch: the time against a number", "type_mismatch: a number against a true/false value", "type_mismatch: not of a number",
     ];
 
     public static TheoryData<int> Seeds { get; } = [.. Enumerable.Range(0, 60)];

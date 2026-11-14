@@ -34,8 +34,7 @@ public sealed class SideAllocationTests
 
     private static (FeatureFrame Frame, BoundSide Bound) Build(CompiledSide side)
     {
-        var context = Contexts.Covering(DateOnly.FromDateTime(Bars[0].Start.UtcDateTime), DateOnly.FromDateTime(Bars[^1].Start.UtcDateTime), 4, daysBefore: 120);
-        var created = FeatureFrame.Create(side.Features, new FrameOptions { HistoryDepth = side.HistoryDepth, Context = context });
+        var created = FeatureFrame.Create(side.Features, new FrameOptions { HistoryDepth = side.HistoryDepth, ExpiryDays = new HashSet<DateOnly>() });
         created.IsSuccess.ShouldBeTrue(created.IsFailure ? created.Error.Message : string.Empty);
         return (created.Value, side.Bind(created.Value));
     }

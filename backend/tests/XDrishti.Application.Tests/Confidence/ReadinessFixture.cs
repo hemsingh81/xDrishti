@@ -290,7 +290,7 @@ internal sealed class ReadinessFixture
             new SensitivityView("15m", "FIXED_RR", null, [], string.Empty),
             new MonteCarloView(330, 1000, "s", 0.2, 5, 0.1, 0.2, 0.3, 4, 12, 0.1, 9),
             [new YearView(2024, 100, 0.2, 20, 1.3, true), new YearView(2025, 120, 0.2, 24, 1.3, true), new YearView(2026, 110, 0.2, 22, 1.3, true)],
-            null, string.Empty, [], null, null, null,
+            null, [], null,
             [new QuarterView(2025, 1, 60, 0.2), new QuarterView(2025, 2, 60, 0.2), new QuarterView(2025, 3, 60, 0.2), new QuarterView(2025, 4, 60, -0.3), new QuarterView(2026, 1, 90, 0.2)],
             0.10),
         new DeflatedSharpeView("ReportOnly", 2, 2, null, null, 0.2, 320, null, null, 0.99, 0.95, string.Empty, string.Empty, string.Empty),

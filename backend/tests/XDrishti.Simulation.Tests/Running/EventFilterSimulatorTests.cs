@@ -26,7 +26,7 @@ public sealed class EventFilterSimulatorTests
     private static SimulationResult Run(StrategyDefinition definition, IReadOnlyList<Bar> bars, EventCalendarSnapshot? events, Timeframe timeframe = Timeframe.M15, TradingCalendar? calendar = null)
     {
         var simulator = Sim.Create(definition, timeframe, Cand.NoSlippage);
-        var result = simulator.Run(Scan.Instrument, bars, Sim.Tick, calendar ?? DefaultWeek(), null, null, events);
+        var result = simulator.Run(Scan.Instrument, bars, Sim.Tick, calendar ?? DefaultWeek(), null, events);
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Code + ": " + result.Error.Message : string.Empty);
         return result.Value;
     }
@@ -137,7 +137,7 @@ public sealed class EventFilterSimulatorTests
             var simulator = Sim.Create(OrbV1.Create(), fills: Cand.NoSlippage);
 
             var without = simulator.Run(Scan.Instrument, bars, Sim.Tick, DefaultWeek());
-            var blocking = simulator.Run(Scan.Instrument, bars, Sim.Tick, DefaultWeek(), null, null, EventRows.Snapshot(Instrument, Mon));
+            var blocking = simulator.Run(Scan.Instrument, bars, Sim.Tick, DefaultWeek(), null, EventRows.Snapshot(Instrument, Mon));
 
             simulator.ReadsEvents.ShouldBeFalse();
             string.Join("\n", blocking.Value.Outcomes.Select(o => OutcomeFormatter.Render(Result.Success(o.Walk)))).ShouldBe(string.Join("\n", without.Value.Outcomes.Select(o => OutcomeFormatter.Render(Result.Success(o.Walk)))), name);
@@ -153,7 +153,7 @@ public sealed class EventFilterSimulatorTests
         var simulator = Sim.Create(Intraday, fills: Cand.NoSlippage);
 
         var none = simulator.Run(Scan.Instrument, Cases.F("F1").Bars, Sim.Tick, DefaultWeek());
-        var noCalendar = simulator.Run(Scan.Instrument, Cases.F("F1").Bars, Sim.Tick, null, null, null, EventRows.Snapshot(Instrument, Tue));
+        var noCalendar = simulator.Run(Scan.Instrument, Cases.F("F1").Bars, Sim.Tick, null, null, EventRows.Snapshot(Instrument, Tue));
 
         none.IsFailure.ShouldBeTrue();
         none.Error.Code.ShouldBe("simulation.filter_not_available");
@@ -169,8 +169,8 @@ public sealed class EventFilterSimulatorTests
         comparison.Comparison.ShouldNotBeNull();
 
         var none = comparison.Comparison.Run(Scan.Instrument, Cases.F("F1").Bars, Sim.Tick, DefaultWeek());
-        var noCalendar = comparison.Comparison.Run(Scan.Instrument, Cases.F("F1").Bars, Sim.Tick, null, null, null, EventRows.Snapshot(Instrument, Tue));
-        var withBoth = comparison.Comparison.Run(Scan.Instrument, Cases.F("F1").Bars, Sim.Tick, DefaultWeek(), null, null, EventRows.Snapshot(Instrument, Mon));
+        var noCalendar = comparison.Comparison.Run(Scan.Instrument, Cases.F("F1").Bars, Sim.Tick, null, null, EventRows.Snapshot(Instrument, Tue));
+        var withBoth = comparison.Comparison.Run(Scan.Instrument, Cases.F("F1").Bars, Sim.Tick, DefaultWeek(), null, EventRows.Snapshot(Instrument, Mon));
 
         none.Error.Code.ShouldBe("simulation.filter_not_available");
         noCalendar.Error.Code.ShouldBe("simulation.filter_not_available");

@@ -15,7 +15,8 @@ public static class MirrorTable
 
     private static readonly FrozenSet<string> Refused = new[]
     {
-        "day_of_week", "is_expiry_day", "results_sue_q", "results_car3_q", "mom_rank", "rs_vs_index", "sector_rs",
+        // the market-context names were dropped from the catalog (ADR 0291) but stay listed: the table and its version are part of the run key of a mirrored SELL, which must not change
+        "day_of_week", "is_expiry_day", "index_trend", "index_adx", "index_vol_pct", "vix", "vix_pct", "vix_chg", "breadth", "regime_trend", "regime_vol", "regime", "results_sue_q", "results_car3_q", "mom_rank", "rs_vs_index", "sector_rs",
         "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN",
     }.ToFrozenSet(StringComparer.Ordinal);
 

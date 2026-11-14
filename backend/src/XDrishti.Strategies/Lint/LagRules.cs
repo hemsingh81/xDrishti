@@ -10,7 +10,7 @@ namespace XDrishti.Strategies.Lint;
 /// at that many more closed bars back: the lags add up, so <c>rising(close[200], 100)</c> reads 300 bars back. The frame keeps <see cref="FrameOptions.MaxHistoryDepth"/> values (lags 0 to 255), so a condition whose
 /// largest lag plus 1 is above it is <c>lag_too_deep</c>; the largest lag plus 1 is the history depth the plan asks for. <b>Clocks.</b> A lagged evaluation reads "the previous value" of each feature on its own
 /// clock; if the features of one <c>crosses_*</c>, <c>rising</c> or <c>falling</c> run on different clocks the previous values would be different moments, so it is <c>mixed_timeframes_in_lag</c>. A clock is a bar
-/// timeframe (<c>close</c> on 15m: the previous 15-minute bar) or <b>the date</b>: the calendar and context features (<see cref="IndicatorInfo.DateDriven"/>) are read on 1m whatever the strategy runs on, but change
+/// timeframe (<c>close</c> on 15m: the previous 15-minute bar) or <b>the date</b>: the calendar features (<see cref="IndicatorInfo.DateDriven"/>) are read on 1m whatever the strategy runs on, but change
 /// once a date and their previous value is the previous <i>date</i>, never the previous minute. So they are a clock of their own on every evaluation timeframe, 1m included: they may be lagged among themselves and
 /// against constants, never against a bar feature (ADR 0034, Amendment 4). <b>Sessions.</b> The twelve features that start again at each India date (<see cref="IndicatorInfo.RestartsEachSession"/>) keep the history of
 /// the current session only in the frame (ADR 0035), so a lagged read of one of them never compares two sessions: on the first bar of a session <c>vwap[1]</c> is unknown, and a crossing against it is unknown, not a cross of
@@ -46,8 +46,8 @@ internal static class LagRules
     {
         private const int MaxDepth = FrameOptions.MaxHistoryDepth;
 
-        /// <summary>How the message names the clock of the calendar and context features.</summary>
-        private const string DateClock = "the date (calendar and context features)";
+        /// <summary>How the message names the clock of the calendar features.</summary>
+        private const string DateClock = "the date (calendar features)";
 
         private readonly HashSet<IBoundExpression> _reported = new(ReferenceEqualityComparer.Instance);
 
@@ -206,10 +206,10 @@ internal static class LagRules
         /// </summary>
         private static string Advice(string? explicitForm, bool dateIsAClock) =>
             explicitForm is not null ? "Compare on one timeframe, or say what you mean: `" + explicitForm + "`."
-            : dateIsAClock ? "A calendar or context feature changes once a date, so compare it without a lag, or lag only the bar side by hand."
+            : dateIsAClock ? "A calendar feature changes once a date, so compare it without a lag, or lag only the bar side by hand."
             : "Compare on one timeframe.";
 
-        /// <summary>A calendar or context feature: it changes once a date, so its previous value is the previous date, whatever the timeframe it is read on.</summary>
+        /// <summary>A calendar feature: it changes once a date, so its previous value is the previous date, whatever the timeframe it is read on.</summary>
         private static bool IsDateDriven(BoundFeature feature) => IndicatorCatalog.TryGet(feature.Spec.Name, out var info) && info.DateDriven;
 
         /// <summary>

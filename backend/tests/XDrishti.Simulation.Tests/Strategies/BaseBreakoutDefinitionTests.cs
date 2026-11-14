@@ -84,8 +84,7 @@ public sealed class BaseBreakoutDefinitionTests
         simulator.Simulator.ShouldNotBeNull().HoldsOvernight.ShouldBeTrue();
         prepared.Problems.ShouldBeEmpty();
         prepared.Strategy.ShouldNotBeNull();
-        compiled.Compiled!.NeedsContext.ShouldBeFalse();
-        compiled.Compiled.NeedsExpiryDays.ShouldBeFalse();
+        compiled.Compiled!.NeedsExpiryDays.ShouldBeFalse();
     }
 
     [Fact]

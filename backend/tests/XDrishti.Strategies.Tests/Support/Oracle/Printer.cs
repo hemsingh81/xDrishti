@@ -106,13 +106,6 @@ internal static class Printer
                         return (t.Mirrored ? text + Symbol(Mirror(t.Op), "time") + "time" : "time" + Symbol(t.Op, text) + text, 4);
                     }
 
-                case RegimeCmp r:
-                    {
-                        var operand = r.Name is null ? r.Code.ToString(CultureInfo.InvariantCulture) : "\"" + r.Name + "\"";
-                        var op = r.Equal ? "==" : "!=";
-                        return (r.NameOnLeft ? operand + Symbol(op, "regime()") + "regime()" : "regime()" + Symbol(op, operand) + operand, 4);
-                    }
-
                 default:
                     throw new InvalidOperationException("Unknown model node " + node);
             }

@@ -135,18 +135,3 @@ internal sealed class FormingBarFeeder : IFeeder
         return log;
     }
 }
-
-/// <summary>
-/// Wrong: the date lane reads the context day dated <i>D</i> itself at a step on <i>D</i> (a same-day close) instead of the latest day strictly before it. Modelled by moving every record of the context one calendar day
-/// back, so that the strictly-before rule of the frame lands on the record of the same date. With the records from the cut date on removed or changed the answers on that date differ from the ones of the full series.
-/// </summary>
-internal sealed class SameDayContextFeeder : IFeeder
-{
-    public string Name => "reads the context day of the date itself";
-
-    public RunLog Run(Scenario scenario, IReadOnlyList<Bar> bars)
-    {
-        var shifted = scenario.ContextDays is { } days ? scenario.WithContextDays([.. days.Select(d => d with { Date = d.Date.AddDays(-1) })]) : scenario;
-        return new HonestFeeder().Run(shifted, bars);
-    }
-}

@@ -269,8 +269,6 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
         await SetCutAsync(index, Seam);
 
         using var scope = Factory.Services.CreateScope();
-        var legs = await scope.ServiceProvider.GetRequiredService<XDrishti.Application.Abstractions.Market.Context.IContextBarSource>().ReadAsync(["NSE:NIFTY"], [], Ct);
-        legs.IndexLegs.Select(l => l.Date).ShouldBe([new DateOnly(2024, 4, 3)]);
         var daily = await scope.ServiceProvider.GetRequiredService<IBarQueries>().ReadDailyBarsAsync(index, new DateOnly(2024, 1, 1), new DateOnly(2024, 12, 31), Ct);
         daily.Count.ShouldBe(1);
 

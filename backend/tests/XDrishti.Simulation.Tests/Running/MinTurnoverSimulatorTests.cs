@@ -18,7 +18,7 @@ public sealed class MinTurnoverSimulatorTests
     private static Result<SimulationResult> Run(StrategyDefinition definition, FillRules fills, Func<DateOnly, decimal?>? turnover)
     {
         var simulator = Sim.Create(definition, Timeframe.M15, fills);
-        return simulator.Run(Scan.Instrument, Cases.F("F1").Bars, Sim.Tick, DefaultWeek(), null, null, null, null, null, turnover);
+        return simulator.Run(Scan.Instrument, Cases.F("F1").Bars, Sim.Tick, DefaultWeek(), null, null, null, null, turnover);
     }
 
     [Fact]

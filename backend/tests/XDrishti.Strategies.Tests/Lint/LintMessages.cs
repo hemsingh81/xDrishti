@@ -9,8 +9,6 @@ internal static class LintMessages
     private static string Range(string comparison, string feature, string bounds, string suggestion) =>
         $"`{comparison}` can never be true: {feature} is {bounds}, so the rule never fires. The nearest comparison that can be true is `{suggestion}`.";
 
-    private static string Context(string feature) => $"`{feature}` reads the daily market context: create the frame with a MarketContext (FrameOptions.Context).";
-
     public static readonly IReadOnlyDictionary<string, string[]> Cases = new Dictionary<string, string[]>
     {
         ["unknown_name: a typo of a feature"] =
@@ -43,19 +41,11 @@ internal static class LintMessages
         ],
         ["unknown_name: a typo of a scope"] =
         [
-            "`todya` is not a scope; the dotted names are prev_day.open|high|low|close|volume, today.open|high|low and index.trend|adx. Did you mean `today`?",
+            "`todya` is not a scope; the dotted names are prev_day.open|high|low|close|volume, today.open|high|low. Did you mean `today`?",
         ],
         ["unknown_name: a typo after a scope"] =
         [
             "`prev_day.hgih` is not a name: after `prev_day.` comes open, high, low, close or volume. Did you mean `prev_day.high`?",
-        ],
-        ["unknown_name: a dotted name that is spelled with an underscore"] =
-        [
-            "`index.vol_pct` is not a name: after `index.` comes trend or adx. Did you mean `index_vol_pct`?",
-        ],
-        ["unknown_name: a regime name in lower case"] =
-        [
-            "`\"up_low_vol\"` is not a market regime; the names are UP_LOW_VOL, UP_NORMAL_VOL, UP_HIGH_VOL, RANGE_LOW_VOL, RANGE_NORMAL_VOL, RANGE_HIGH_VOL, DOWN_LOW_VOL, DOWN_NORMAL_VOL and DOWN_HIGH_VOL. Did you mean `\"UP_LOW_VOL\"`?",
         ],
         ["unknown_name: a function with a timeframe"] =
         [
@@ -216,7 +206,7 @@ internal static class LintMessages
         ],
         ["unsupported_timeframe: a date feature on 1h"] =
         [
-            "'vix' changes once per date; it can only be asked for on 1m (the default), not on 1h. `vix` runs on 1m.",
+            "'day_of_week' changes once per date; it can only be asked for on 1m (the default), not on 1h. `day_of_week` runs on 1m.",
         ],
         ["negative_or_zero_lag: a subscript of zero"] =
         [
@@ -347,43 +337,43 @@ internal static class LintMessages
         ],
         ["mixed_timeframes_in_lag: a feature of the context against a bar feature"] =
         [
-            "`crosses_above(close, vix)` mixes the timeframes 15m and the date (calendar and context features): the previous value of each side would be a different moment. Compare on one timeframe, or say what you mean: `close > vix and close[1] <= vix`.",
+            "`crosses_above(close, day_of_week)` mixes the timeframes 15m and the date (calendar features): the previous value of each side would be a different moment. Compare on one timeframe, or say what you mean: `close > day_of_week and close[1] <= day_of_week`.",
         ],
         ["mixed_timeframes_in_lag: the context against a bar feature on a 1m strategy"] =
         [
-            "`crosses_above(close, vix)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. Compare on one timeframe, or say what you mean: `close > vix and close[1] <= vix`.",
+            "`crosses_above(close, day_of_week)` mixes the timeframes 1m and the date (calendar features): the previous value of each side would be a different moment. Compare on one timeframe, or say what you mean: `close > day_of_week and close[1] <= day_of_week`.",
         ],
         ["mixed_timeframes_in_lag: the context first on a 1m strategy lags the bar feature by hand"] =
         [
-            "`crosses_below(vix, close)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. Compare on one timeframe, or say what you mean: `vix < close and vix >= close[1]`.",
+            "`crosses_below(day_of_week, close)` mixes the timeframes 1m and the date (calendar features): the previous value of each side would be a different moment. Compare on one timeframe, or say what you mean: `day_of_week < close and day_of_week >= close[1]`.",
         ],
         ["mixed_timeframes_in_lag: the index trend against a bar feature on a 1m strategy"] =
         [
-            "`crosses_above(close, index.trend)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. Compare on one timeframe, or say what you mean: `close > index.trend and close[1] <= index.trend`.",
+            "`crosses_above(close, day_of_week)` mixes the timeframes 1m and the date (calendar features): the previous value of each side would be a different moment. Compare on one timeframe, or say what you mean: `close > day_of_week and close[1] <= day_of_week`.",
         ],
         ["mixed_timeframes_in_lag: a product of a bar feature and the context in rising on a 1m strategy"] =
         [
-            "`rising(close * vix, 2)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. A calendar or context feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
+            "`rising(close * day_of_week, 2)` mixes the timeframes 1m and the date (calendar features): the previous value of each side would be a different moment. A calendar feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
         ],
         ["mixed_timeframes_in_lag: a calendar feature against a bar feature in falling on a 1m strategy"] =
         [
-            "`falling(close - day_of_week, 1)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. A calendar or context feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
+            "`falling(close - day_of_week, 1)` mixes the timeframes 1m and the date (calendar features): the previous value of each side would be a different moment. A calendar feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
         ],
         ["mixed_timeframes_in_lag: a 1m bar feature written with tf against the context on a 15m strategy"] =
         [
-            "`crosses_above(tf(\"1m\").close, vix)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. A calendar or context feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
+            "`crosses_above(tf(\"1m\").close, day_of_week)` mixes the timeframes 1m and the date (calendar features): the previous value of each side would be a different moment. A calendar feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
         ],
         ["mixed_timeframes_in_lag: a 1m bar feature written with tf against the context on a daily strategy"] =
         [
-            "`crosses_above(tf(\"1m\").close, vix)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. A calendar or context feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
+            "`crosses_above(tf(\"1m\").close, day_of_week)` mixes the timeframes 1m and the date (calendar features): the previous value of each side would be a different moment. A calendar feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
         ],
         ["mixed_timeframes_in_lag: the context against a bar feature on a daily strategy"] =
         [
-            "`crosses_below(close, breadth)` mixes the timeframes 1D and the date (calendar and context features): the previous value of each side would be a different moment. Compare on one timeframe, or say what you mean: `close < breadth and close[1] >= breadth`.",
+            "`crosses_below(close, day_of_week)` mixes the timeframes 1D and the date (calendar features): the previous value of each side would be a different moment. Compare on one timeframe, or say what you mean: `close < day_of_week and close[1] >= day_of_week`.",
         ],
         ["mixed_timeframes_in_lag: two bar timeframes and the context"] =
         [
-            "`rising(close + tf(\"1h\").close - vix, 2)` mixes the timeframes 15m, 1h and the date (calendar and context features): the previous value of each side would be a different moment. A calendar or context feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
+            "`rising(close + tf(\"1h\").close - day_of_week, 2)` mixes the timeframes 15m, 1h and the date (calendar features): the previous value of each side would be a different moment. A calendar feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
         ],
         ["mixed_timeframes_in_lag: only the second crossing mixes"] =
         [
@@ -503,12 +493,12 @@ internal static class LintMessages
         ],
         ["time_on_daily: a number to compare the time with does not hide it"] =
         [
-            "`>` cannot compare `time` (the time of day) with `5` (a number). A comparison takes two numbers, two true/false values (only == and !=), `time` and a \"HH:MM\" text, or `regime()` and a regime name or a code from 1 to 9 (only == and !=).",
+            "`>` cannot compare `time` (the time of day) with `5` (a number). A comparison takes two numbers, two true/false values (only == and !=) or `time` and a \"HH:MM\" text.",
             "`time` is the minute at which the evaluated bar closed, and a 1D bar has no time of day. Run the strategy on an intraday timeframe, or leave the time out.",
         ],
         ["time_on_daily: a number before the time does not hide it"] =
         [
-            "`<` cannot compare `5` (a number) with `time` (the time of day). A comparison takes two numbers, two true/false values (only == and !=), `time` and a \"HH:MM\" text, or `regime()` and a regime name or a code from 1 to 9 (only == and !=).",
+            "`<` cannot compare `5` (a number) with `time` (the time of day). A comparison takes two numbers, two true/false values (only == and !=) or `time` and a \"HH:MM\" text.",
             "`time` is the minute at which the evaluated bar closed, and a 1D bar has no time of day. Run the strategy on an intraday timeframe, or leave the time out.",
         ],
         ["time_on_daily: a subscript on the time does not hide it"] =
@@ -564,25 +554,13 @@ internal static class LintMessages
         [
             "The left side of `and` needs a true/false value, but `time` is the time of day. Compare `time` with a text, like time >= \"09:45\".",
         ],
-        ["type_mismatch: not of a regime"] =
-        [
-            "`not` needs a true/false value, but `regime()` is a market regime. Compare it with a regime name, like regime() == \"UP_LOW_VOL\".",
-        ],
         ["type_mismatch: the time against a number"] =
         [
-            "`>` cannot compare `time` (the time of day) with `5` (a number). A comparison takes two numbers, two true/false values (only == and !=), `time` and a \"HH:MM\" text, or `regime()` and a regime name or a code from 1 to 9 (only == and !=).",
+            "`>` cannot compare `time` (the time of day) with `5` (a number). A comparison takes two numbers, two true/false values (only == and !=) or `time` and a \"HH:MM\" text.",
         ],
         ["type_mismatch: a number against a true/false value"] =
         [
-            "`>` cannot compare `close` (a number) with `true` (a true/false value). A comparison takes two numbers, two true/false values (only == and !=), `time` and a \"HH:MM\" text, or `regime()` and a regime name or a code from 1 to 9 (only == and !=).",
-        ],
-        ["type_mismatch: ordering a regime"] =
-        [
-            "`<` cannot compare `regime()` (a market regime) with `3` (a number). A comparison takes two numbers, two true/false values (only == and !=), `time` and a \"HH:MM\" text, or `regime()` and a regime name or a code from 1 to 9 (only == and !=).",
-        ],
-        ["type_mismatch: a regime code that does not exist"] =
-        [
-            "`10` is not a regime code: `regime()` is compared with a regime name or a code from 1 (UP_LOW_VOL) to 9 (DOWN_HIGH_VOL).",
+            "`>` cannot compare `close` (a number) with `true` (a true/false value). A comparison takes two numbers, two true/false values (only == and !=) or `time` and a \"HH:MM\" text.",
         ],
         ["type_mismatch: not of a number"] =
         [
@@ -594,19 +572,15 @@ internal static class LintMessages
         ],
         ["type_mismatch: two texts"] =
         [
-            "`==` cannot compare `\"UP\"` (a text) with `\"UP\"` (a text). A comparison takes two numbers, two true/false values (only == and !=), `time` and a \"HH:MM\" text, or `regime()` and a regime name or a code from 1 to 9 (only == and !=).",
-        ],
-        ["type_mismatch: two regimes"] =
-        [
-            "`==` cannot compare `regime()` (a market regime) with `regime()` (a market regime). A comparison takes two numbers, two true/false values (only == and !=), `time` and a \"HH:MM\" text, or `regime()` and a regime name or a code from 1 to 9 (only == and !=).",
+            "`==` cannot compare `\"UP\"` (a text) with `\"UP\"` (a text). A comparison takes two numbers, two true/false values (only == and !=) or `time` and a \"HH:MM\" text.",
         ],
         ["type_mismatch: ordering true/false values"] =
         [
-            "`<` cannot compare `true` (a true/false value) with `false` (a true/false value). A comparison takes two numbers, two true/false values (only == and !=), `time` and a \"HH:MM\" text, or `regime()` and a regime name or a code from 1 to 9 (only == and !=).",
+            "`<` cannot compare `true` (a true/false value) with `false` (a true/false value). A comparison takes two numbers, two true/false values (only == and !=) or `time` and a \"HH:MM\" text.",
         ],
         ["type_mismatch: a condition that is a text"] =
         [
-            "A condition must be true or false, but `\"09:45\"` is a text. A text can only be compared with `time` or `regime()`.",
+            "A condition must be true or false, but `\"09:45\"` is a text. A text can only be compared with `time`.",
         ],
         ["type_mismatch: a condition that is the time"] =
         [
@@ -616,17 +590,9 @@ internal static class LintMessages
         [
             "The right side of `+` needs a number, but `true` is a true/false value.",
         ],
-        ["type_mismatch: a regime against a feature"] =
-        [
-            "`==` cannot compare `regime()` (a market regime) with `close` (a number). A comparison takes two numbers, two true/false values (only == and !=), `time` and a \"HH:MM\" text, or `regime()` and a regime name or a code from 1 to 9 (only == and !=).",
-        ],
         ["type_mismatch: a parameter that is not a number"] =
         [
             "The strategy parameter `bad` is NaN, not a finite number; parameters are numbers.",
-        ],
-        ["type_mismatch: a regime in arithmetic"] =
-        [
-            "Argument 1 (`x`) of `abs` needs a number, but `regime()` is a market regime. Compare it with a regime name, like regime() == \"UP_LOW_VOL\".",
         ],
         ["constant_condition: one less than two"] =
         [
@@ -667,9 +633,7 @@ internal static class LintMessages
         ["never_true: rsi below 0"] = [Range("rsi(14) < 0", "rsi", "between 0 and 100", "rsi(14) <= 0")],
         ["never_true: adx above 100"] = [Range("adx(14) > 100", "adx", "between 0 and 100", "adx(14) >= 100")],
         ["never_true: volume below 0"] = [Range("volume < 0", "volume", "at least 0", "volume <= 0")],
-        ["never_true: regime volatility above 2"] = [Range("regime_vol > 2", "regime_vol", "between 0 and 2", "regime_vol >= 2"), Context("regime_vol")],
         ["never_true: supertrend direction above 1"] = [Range("supertrend_dir(10, 3) > 1", "supertrend_dir", "between -1 and 1", "supertrend_dir(10, 3) >= 1")],
-        ["never_true: breadth above 100"] = [Range("breadth > 100", "breadth", "between 0 and 100", "breadth >= 100"), Context("breadth")],
         ["never_true: day of week above 7"] = [Range("day_of_week > 7", "day_of_week", "between 1 and 7", "day_of_week >= 7")],
         ["never_true: a crossing of a bounded oscillator has no suggestion"] =
         [
@@ -691,24 +655,14 @@ internal static class LintMessages
         ],
         ["redundant_timeframe: a feature of the day on 1m"] =
         [
-            "`tf(\"1m\")` is redundant: the strategy already runs on 1m. Write `vix`.",
-            "`vix` reads the daily market context: create the frame with a MarketContext (FrameOptions.Context).",
-        ],
-        ["needs_context: the regime"] =
-        [
-            "`regime` reads the daily market context: create the frame with a MarketContext (FrameOptions.Context).",
-        ],
-        ["needs_context: two context features give one note"] =
-        [
-            "`vix` reads the daily market context: create the frame with a MarketContext (FrameOptions.Context).",
+            "`tf(\"1m\")` is redundant: the strategy already runs on 1m. Write `day_of_week`.",
         ],
         ["needs_expiry_days: the expiry day"] =
         [
             "`is_expiry_day` reads the expiry dates: create the frame with the expiry dates (FrameOptions.ExpiryDays; an empty set is allowed).",
         ],
-        ["needs_expiry_days: both notes in source order"] =
+        ["needs_expiry_days: one note at the first feature that needs it"] =
         [
-            "`index_trend` reads the daily market context: create the frame with a MarketContext (FrameOptions.Context).",
             "`is_expiry_day` reads the expiry dates: create the frame with the expiry dates (FrameOptions.ExpiryDays; an empty set is allowed).",
         ],
         ["shadowed_name: a parameter named like a feature"] =

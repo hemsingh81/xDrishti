@@ -52,7 +52,6 @@ public sealed class BasketReportReaderTests
             new ProfileDispersionView(enough ? V(0.02) : Thin(members, 5), V(0.02), V(0.01), members),
             new ProfileCorrelationView(enough ? V(0.41) : Thin(members, 5), enough ? V(3.1) : Thin(members, 5), members, members * (members - 1) / 2, false, new CorrelationMatrixView(members, rows.Take(40).Select(r => r.Symbol).ToList(), [[1.0]])),
             new ProfileContributionView(V(0.8), members, rows.Take(5).ToList(), rows.TakeLast(5).ToList(), rows),
-            new ProfileRegimeView(new MetricView("unavailable", null, "no regime recorded"), 0, 20, []),
             new ProfileTurnoverView(V(0), 0, 0),
             new ProfileCapacityView(V(1e8), V(5e7), V(4e5), V(0), V(1), members, [], 0.5),
             new ProfileHoldOutView(new MetricView("unavailable", null, "no trades"), 0, 20, []),
@@ -248,12 +247,11 @@ public sealed class BasketReportReaderTests
     }
 
     [Fact]
-    public async Task The_worst_case_of_300_members_hold_out_cells_and_long_regime_lists_fits_or_is_marked_cut()
+    public async Task The_worst_case_of_300_members_hold_out_cells_fits_or_is_marked_cut()
     {
         var view = Profile(members: 300, points: 400, excluded: 300);
         var cells = Enumerable.Range(0, 80).Select(i => new ProfileHoldOutCellView($"STRATEGY_{i}", new DateOnly(2026, 1, 1), 30, 30, V(0.1), V(0.2), "agrees")).ToList();
-        var regimes = Enumerable.Range(0, 40).Select(i => new RegimeRowView(i, $"regime {i} with a long label", 50, V(0.001), V(0.01), V(0.5), "value")).ToList();
-        view = view with { HoldOut = view.HoldOut with { Cells = cells }, Regime = view.Regime with { Rows = regimes } };
+        view = view with { HoldOut = view.HoldOut with { Cells = cells } };
         var (reader, _, _, _) = Build(view);
 
         var answer = await reader.GetAsync("basket_profile", Q(("basket", "Banking")), Ct);

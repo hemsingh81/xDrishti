@@ -76,7 +76,7 @@ public sealed partial class InterpreterOracleTests
                         return new Walked(blocks, tally.Comparisons, tally.Mismatches.Count);
                     }
 
-                    var run = Prepare(SeedOf(evaluation, flavour, block), evaluation, withContext: flavour == 0, block, rejected);
+                    var run = Prepare(SeedOf(evaluation, flavour, block), evaluation, block, rejected);
                     rejected.ShouldBeEmpty("the compiler refused conditions of the language:\n" + string.Join("\n", rejected));
                     blocks++;
                     var (frame, _) = run.NewFrame();

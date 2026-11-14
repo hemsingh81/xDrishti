@@ -47,7 +47,7 @@ public sealed class PlanTests
         ["crosses_above(close[254], vwap)"] = ([Close, Of("vwap")], 256),
         ["tf(\"1h\").ema(20) > tf(\"1h\").ema(50) and close > 0"] = ([Of("ema", 20, 0, Timeframe.H1), Of("ema", 50, 0, Timeframe.H1), Close], 1),
         ["tf(\"1D\").close[1] > tf(\"1D\").close"] = ([Specs.Close(Timeframe.D1)], 2),
-        ["vix[3] > 20"] = ([Of("vix", 0, 0, Timeframe.M1)], 4),
+        ["rsi(14)[3] > 20"] = ([Of("rsi", 14)], 4),
         ["day_of_week == TUE and day_of_week[2] != 5"] = ([Of("day_of_week", 0, 0, Timeframe.M1)], 3),
     };
 
@@ -57,9 +57,9 @@ public sealed class PlanTests
         [.. new[] { Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.H1, Timeframe.D1, Timeframe.W1, Timeframe.Mo1 }.SelectMany(t => Enumerable.Range(0, 10).Select(b => (t, b)))];
 
     private static FrameOptions OptionsFor(CompiledPlanFacts plan) =>
-        new(null, plan.Depth, plan.NeedsContext ? MarketContext.Create([]).Value : null, plan.NeedsExpiryDays ? new HashSet<DateOnly>() : null);
+        new(null, plan.Depth, plan.NeedsExpiryDays ? new HashSet<DateOnly>() : null);
 
-    private sealed record CompiledPlanFacts(int Depth, bool NeedsContext, bool NeedsExpiryDays);
+    private sealed record CompiledPlanFacts(int Depth, bool NeedsExpiryDays);
 
     [Theory]
     [MemberData(nameof(HandSources))]
@@ -76,21 +76,17 @@ public sealed class PlanTests
     }
 
     [Theory]
-    [InlineData("regime() == 1", true, false)]
-    [InlineData("vix > 20", true, false)]
-    [InlineData("index.trend == 1 and day_of_week == TUE", true, false)]
-    [InlineData("is_expiry_day == 1", false, true)]
-    [InlineData("is_expiry_day == 1 and breadth > 50", true, true)]
-    [InlineData("day_of_week == TUE", false, false)]
-    [InlineData("close > vwap", false, false)]
-    public void The_plan_says_whether_the_frame_needs_a_context_or_expiry_dates(string source, bool context, bool expiryDays)
+    [InlineData("is_expiry_day == 1", true)]
+    [InlineData("is_expiry_day == 1 and rsi(14) > 50", true)]
+    [InlineData("day_of_week == TUE", false)]
+    [InlineData("close > vwap", false)]
+    public void The_plan_says_whether_the_frame_needs_expiry_dates(string source, bool expiryDays)
     {
         var plan = Compiling.Condition(source);
 
-        plan.NeedsContext.ShouldBe(context);
         plan.NeedsExpiryDays.ShouldBe(expiryDays);
-        FeatureFrame.Create(plan.Features, new FrameOptions { HistoryDepth = plan.HistoryDepth }).IsSuccess.ShouldBe(!context && !expiryDays, "a frame without them is refused exactly when the plan says they are needed");
-        FeatureFrame.Create(plan.Features, OptionsFor(new CompiledPlanFacts(plan.HistoryDepth, true, true))).IsSuccess.ShouldBeTrue();
+        FeatureFrame.Create(plan.Features, new FrameOptions { HistoryDepth = plan.HistoryDepth }).IsSuccess.ShouldBe(!expiryDays, "a frame without them is refused exactly when the plan says they are needed");
+        FeatureFrame.Create(plan.Features, OptionsFor(new CompiledPlanFacts(plan.HistoryDepth, true))).IsSuccess.ShouldBeTrue();
     }
 
     [Theory]
@@ -108,10 +104,9 @@ public sealed class PlanTests
             var plan = result.Condition!;
             plan.Features.ShouldBe(generated.Features, generated.Source);
             plan.HistoryDepth.ShouldBe(generated.HistoryDepth, generated.Source);
-            plan.NeedsContext.ShouldBe(generated.NeedsContext, generated.Source);
             plan.NeedsExpiryDays.ShouldBe(generated.NeedsExpiryDays, generated.Source);
 
-            var created = FeatureFrame.Create(plan.Features, OptionsFor(new CompiledPlanFacts(plan.HistoryDepth, plan.NeedsContext, plan.NeedsExpiryDays)));
+            var created = FeatureFrame.Create(plan.Features, OptionsFor(new CompiledPlanFacts(plan.HistoryDepth, plan.NeedsExpiryDays)));
             created.IsSuccess.ShouldBeTrue(generated.Source + " -> " + (created.IsFailure ? created.Error.Message + " " + string.Join("; ", created.Error.Fields?.Select(f => f.Field + ": " + f.Message) ?? []) : string.Empty));
             created.Value.HistoryDepth.ShouldBe(plan.HistoryDepth);
             created.Value.Count.ShouldBe(plan.Features.Count);
@@ -135,19 +130,18 @@ public sealed class PlanTests
 
             var bare = FeatureFrame.Create(plan.Features, new FrameOptions { HistoryDepth = plan.HistoryDepth });
 
-            bare.IsSuccess.ShouldBe(!plan.NeedsContext && !plan.NeedsExpiryDays, generated.Source);
+            bare.IsSuccess.ShouldBe(!plan.NeedsExpiryDays, generated.Source);
         }
     }
 
     [Fact]
-    public void A_condition_that_needs_no_context_is_accepted_without_the_options_the_generated_conditions_would_get()
+    public void A_condition_that_needs_no_expiry_dates_is_accepted_without_the_options_the_generated_conditions_would_get()
     {
-        var generator = new ValidConditionGenerator(99, Timeframe.M5, allowContext: false, allowExpiryDays: false);
+        var generator = new ValidConditionGenerator(99, Timeframe.M5, allowExpiryDays: false);
 
         for (var i = 0; i < 200; i++)
         {
             var generated = generator.Next();
-            generated.NeedsContext.ShouldBeFalse();
             generated.NeedsExpiryDays.ShouldBeFalse();
             var plan = Compiling.Condition(generated.Source, Timeframe.M5, ValidConditionGenerator.Parameters);
 
@@ -185,6 +179,6 @@ public sealed class PlanTests
         a.ShouldContain(s => s.Contains("between(", StringComparison.Ordinal));
         a.ShouldContain(s => s.Contains("tf(\"", StringComparison.Ordinal));
         a.ShouldContain(s => s.Contains("time ", StringComparison.Ordinal));
-        a.ShouldContain(s => s.Contains("regime()", StringComparison.Ordinal));
+        a.ShouldContain(s => s.Contains("day_of_week", StringComparison.Ordinal));
     }
 }

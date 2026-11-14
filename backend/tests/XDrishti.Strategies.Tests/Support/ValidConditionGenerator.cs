@@ -15,7 +15,7 @@ namespace XDrishti.Strategies.Tests.Support;
 /// call over two timeframes, a history of more than <c>maxLag + MaxLag + 1</c> bars, or a feature the catalog refuses on the timeframe.
 /// </para>
 /// </summary>
-internal sealed class ValidConditionGenerator(int seed, Timeframe evaluationTimeframe, bool allowContext = true, bool allowExpiryDays = true, int maxLag = 12)
+internal sealed class ValidConditionGenerator(int seed, Timeframe evaluationTimeframe, bool allowExpiryDays = true, int maxLag = 12)
 {
     /// <summary>The strategy parameters the conditions use (<c>fast_len</c>, <c>slow_len</c>, <c>level</c>).</summary>
     public static readonly IReadOnlyDictionary<string, double> Parameters = new Dictionary<string, double> { ["fast_len"] = 9, ["slow_len"] = 21, ["level"] = 55 };
@@ -83,7 +83,7 @@ internal sealed class ValidConditionGenerator(int seed, Timeframe evaluationTime
 
     private readonly record struct Read(FeatureSpec Spec, int Lag);
 
-    private sealed record Part(string Text, List<Read> Reads, bool Context = false, bool Expiry = false, bool Time = false)
+    private sealed record Part(string Text, List<Read> Reads, bool Expiry = false, bool Time = false)
     {
         public Part Shifted(int by) => this with { Reads = [.. Reads.Select(r => r with { Lag = r.Lag + by })] };
     }
@@ -101,7 +101,7 @@ internal sealed class ValidConditionGenerator(int seed, Timeframe evaluationTime
             }
 
             var deepest = part.Reads.Max(r => r.Lag);
-            return new GeneratedCondition(part.Text, features, deepest + 1, part.Context, part.Expiry, part.Time);
+            return new GeneratedCondition(part.Text, features, deepest + 1, part.Expiry, part.Time);
         }
     }
 
@@ -140,7 +140,7 @@ internal sealed class ValidConditionGenerator(int seed, Timeframe evaluationTime
                     var name = _random.Next(2) == 0 ? "crosses_above" : "crosses_below";
                     var a = Number(1, frame);
                     var b = _random.Next(4) == 0 ? new Part(Pick(Numbers), []) : Number(1, frame);
-                    var call = new Part(name + "(" + a.Text + ", " + b.Text + ")", [.. a.Shifted(1).Reads, .. b.Shifted(1).Reads], a.Context || b.Context, a.Expiry || b.Expiry);
+                    var call = new Part(name + "(" + a.Text + ", " + b.Text + ")", [.. a.Shifted(1).Reads, .. b.Shifted(1).Reads], a.Expiry || b.Expiry);
                     return call;
                 }
 
@@ -186,32 +186,20 @@ internal sealed class ValidConditionGenerator(int seed, Timeframe evaluationTime
         return new Part(day.Text + " " + Pick(["==", "!=", "<", ">="]) + " " + Pick(["MON", "TUE", "WED", "THU", "FRI"]), day.Reads);
     }
 
-    /// <summary>A feature of the day (the calendar, the context) against a number, or the regime against a name.</summary>
+    /// <summary>A feature of the day (the calendar) against a number.</summary>
     private Part DateFeature()
     {
-        var choices = new List<(string Text, string Name, bool Context, bool Expiry)> { ("day_of_week", "day_of_week", false, false) };
+        var choices = new List<(string Text, string Name, bool Expiry)> { ("day_of_week", "day_of_week", false) };
         if (allowExpiryDays)
         {
-            choices.Add(("is_expiry_day", "is_expiry_day", false, true));
+            choices.Add(("is_expiry_day", "is_expiry_day", true));
         }
 
-        if (allowContext)
-        {
-            choices.AddRange([("vix", "vix", true, false), ("vix_pct", "vix_pct", true, false), ("regime_trend", "regime_trend", true, false), ("index.adx", "index_adx", true, false), ("breadth", "breadth", true, false), ("index.trend", "index_trend", true, false)]);
-        }
-
-        if (allowContext && _random.Next(4) == 0)
-        {
-            string[] names = ["UP_LOW_VOL", "UP_NORMAL_VOL", "RANGE_HIGH_VOL", "DOWN_HIGH_VOL"];
-            var name = _random.Next(2) == 0 ? "\"" + Pick(names) + "\"" : _random.Next(1, 10).ToString(CultureInfo.InvariantCulture);
-            return new Part("regime() " + Pick(["==", "!="]) + " " + name, [new Read(S("regime", Timeframe.M1), 0)], Context: true);
-        }
-
-        var (text, featureName, context, expiry) = choices[_random.Next(choices.Count)];
+        var (text, featureName, expiry) = choices[_random.Next(choices.Count)];
         var lag = _random.Next(3) == 0 ? _random.Next(1, maxLag + 1) : 0;
         var written = lag == 0 ? text : text + "[" + lag.ToString(CultureInfo.InvariantCulture) + "]";
         var right = _random.Next(3) == 0 ? "level" : Pick(Numbers);
-        return new Part(written + " " + Pick(Comparisons) + " " + right, [new Read(S(featureName, Timeframe.M1), lag)], context, expiry);
+        return new Part(written + " " + Pick(Comparisons) + " " + right, [new Read(S(featureName, Timeframe.M1), lag)], expiry);
     }
 
     /// <summary>A number: a literal, a parameter, a feature (of <paramref name="pin"/> when given, of any timeframe otherwise), or arithmetic on those.</summary>
@@ -261,7 +249,7 @@ internal sealed class ValidConditionGenerator(int seed, Timeframe evaluationTime
     private static Part Wrap(string prefix, Part inner) => inner with { Text = prefix + (prefix == "not " || prefix == "-" ? Parenthesised(inner.Text) : inner.Text) };
 
     private static Part Call(string name, Part[] arguments) =>
-        new(name + "(" + string.Join(", ", arguments.Select(a => a.Text)) + ")", [.. arguments.SelectMany(a => a.Reads)], arguments.Any(a => a.Context), arguments.Any(a => a.Expiry));
+        new(name + "(" + string.Join(", ", arguments.Select(a => a.Text)) + ")", [.. arguments.SelectMany(a => a.Reads)], arguments.Any(a => a.Expiry));
 
     private static Part Join(Part left, string op, Part right, bool parenthesise)
     {
@@ -269,7 +257,6 @@ internal sealed class ValidConditionGenerator(int seed, Timeframe evaluationTime
         return new Part(
             parenthesise ? "(" + text + ")" : text,
             [.. left.Reads, .. right.Reads],
-            left.Context || right.Context,
             left.Expiry || right.Expiry,
             left.Time || right.Time);
     }

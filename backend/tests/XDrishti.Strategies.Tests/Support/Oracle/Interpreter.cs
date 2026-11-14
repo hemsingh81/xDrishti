@@ -21,7 +21,6 @@ internal enum Tri
 /// <item>an operand of a lagged call is evaluated <i>at lag k</i>: every feature leaf is read with <c>At(handle, own subscript + k)</c>, constants stay constants;
 /// <c>crosses_above(a, b)</c> is <c>a[0] &gt; b[0] and a[1] &lt;= b[1]</c>, <c>rising(x, n)</c> is <c>x[0] &gt; x[1] &gt; … &gt; x[n]</c>; <c>between</c> includes both ends;</item>
 /// <item><c>time</c> is the India clock time at which the evaluated bar closed: the start of the last accepted 1-minute bar plus one minute, in whole minutes; unknown while the frame has taken no bar;</item>
-/// <item><c>regime()</c> is the feature <c>regime</c> (1 to 9) and a name is resolved by the oracle's own table of the nine names;</item>
 /// <item>the twelve features that restart each session, on a timeframe from 1m to 1h, are not read from the frame at all but from the <see cref="SessionReference"/> (ADR 0035): the interpreter throws when it meets one
 /// and was given none.</item>
 /// </list>
@@ -129,7 +128,7 @@ internal sealed class Interpreter(FeatureFrame frame, SessionReference? sessions
     // ---- true / false / unknown ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     private static bool IsTruthValued(Node node) =>
-        node is BoolLit or Not or Logic or Cmp or Crosses or Streak or Between or TimeCmp or RegimeCmp;
+        node is BoolLit or Not or Logic or Cmp or Crosses or Streak or Between or TimeCmp;
 
     private static Tri Of(bool holds) => holds ? Tri.True : Tri.False;
 
@@ -206,18 +205,6 @@ internal sealed class Interpreter(FeatureFrame frame, SessionReference? sessions
 
             case TimeCmp t:
                 return CompareTime(t);
-            case RegimeCmp r:
-                {
-                    var value = Read(r.Regime, 0);
-                    if (double.IsNaN(value))
-                    {
-                        return Tri.Unknown;
-                    }
-
-                    var same = value == r.Code;
-                    return Of(r.Equal ? same : !same);
-                }
-
             default:
                 throw new InvalidOperationException("Not a true/false value: " + node);
         }

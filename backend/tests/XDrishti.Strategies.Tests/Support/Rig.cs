@@ -6,7 +6,7 @@ using XDrishti.Strategies.Compilation;
 namespace XDrishti.Strategies.Tests.Support;
 
 /// <summary>
-/// The setup every evaluation test starts from: compile the conditions for a timeframe, merge their plans, create the one frame they share (with the history depth, the context and the expiry dates the plan asks for, and
+/// The setup every evaluation test starts from: compile the conditions for a timeframe, merge their plans, create the one frame they share (with the history depth and the expiry dates the plan asks for, and
 /// any extra features a test wants the frame to have; <c>close</c> on the evaluation timeframe when the conditions read no feature at all, which a frame cannot be created without), bind each condition and step the frame. <see cref="Step"/> returns the truth of every
 /// condition after the bar, and <see cref="Word"/> writes a series of truths as letters (<c>T</c>, <c>F</c>, <c>U</c>) so that a hand-calculated table reads as a string.
 /// </summary>
@@ -27,13 +27,12 @@ internal sealed class Rig
 
     public IReadOnlyList<BoundCondition> Bound => _bound;
 
-    public static Rig Of(Timeframe timeframe, string source, MarketContext? context = null, IReadOnlySet<DateOnly>? expiryDays = null, IReadOnlyList<FeatureSpec>? extra = null, IReadOnlyDictionary<string, double>? parameters = null, TradingCalendar? calendar = null, int minimumDepth = 1, IReadOnlyDictionary<DateOnly, ResultsDayValues>? resultsDays = null) =>
-        Of(timeframe, [source], context, expiryDays, extra, parameters, calendar, minimumDepth, resultsDays);
+    public static Rig Of(Timeframe timeframe, string source, IReadOnlySet<DateOnly>? expiryDays = null, IReadOnlyList<FeatureSpec>? extra = null, IReadOnlyDictionary<string, double>? parameters = null, TradingCalendar? calendar = null, int minimumDepth = 1, IReadOnlyDictionary<DateOnly, ResultsDayValues>? resultsDays = null) =>
+        Of(timeframe, [source], expiryDays, extra, parameters, calendar, minimumDepth, resultsDays);
 
     public static Rig Of(
         Timeframe timeframe,
         IReadOnlyList<string> sources,
-        MarketContext? context = null,
         IReadOnlySet<DateOnly>? expiryDays = null,
         IReadOnlyList<FeatureSpec>? extra = null,
         IReadOnlyDictionary<string, double>? parameters = null,
@@ -50,7 +49,7 @@ internal sealed class Rig
             specs.Add(Specs.Close(timeframe));
         }
 
-        var options = new FrameOptions(calendar, Math.Max(plan.HistoryDepth, minimumDepth), plan.NeedsContext ? context ?? throw new InvalidOperationException("The conditions need a market context.") : context, plan.NeedsExpiryDays ? expiryDays ?? throw new InvalidOperationException("The conditions need expiry dates.") : expiryDays, resultsDays);
+        var options = new FrameOptions(calendar, Math.Max(plan.HistoryDepth, minimumDepth), plan.NeedsExpiryDays ? expiryDays ?? throw new InvalidOperationException("The conditions need expiry dates.") : expiryDays, resultsDays);
         var created = FeatureFrame.Create(specs, options);
         created.IsSuccess.ShouldBeTrue(created.IsFailure ? created.Error.Message + " " + string.Join("; ", created.Error.Fields?.Select(f => f.Field + ": " + f.Message) ?? []) : string.Empty);
         var bound = plan.BindAll(created.Value);

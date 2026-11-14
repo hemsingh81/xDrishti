@@ -6,7 +6,6 @@ using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
-using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Abstractions.Selection;
@@ -19,7 +18,6 @@ using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
-using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Selection;
 using XDrishti.Domain.Selection.SizeScaling;
 using XDrishti.Tests.Shared;
@@ -89,8 +87,6 @@ internal sealed class ReplayWorld
     public List<(DateOnly AsOf, StoredCellStats Row)> Snapshots { get; } = [];
 
     public Dictionary<string, List<ChangelogEntry>> Changelog { get; } = [];
-
-    public SortedDictionary<DateOnly, double> ContextVix { get; } = [];
 
     public DateOnly HoldOutStart { get; set; } = new(2027, 3, 1);
 
@@ -232,14 +228,6 @@ internal sealed class ReplayWorld
         var calendar = Substitute.For<ITradingCalendar>();
         calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new TradingCalendar());
 
-        var context = Substitute.For<IContextFigures>();
-        context.AsOfAsync(Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(call =>
-        {
-            var date = call.Arg<DateOnly>();
-            var day = ContextVix.Keys.Where(k => k < date).Select(k => (DateOnly?)k).Max();
-            return ValueTask.FromResult(day is { } d ? new ContextRead(Blank<ContextFigures>() with { AsOf = d, Basis = "t", Vix = ContextVix[d], Breadth = 60, BreadthUniverse = 100 }, null) : new ContextRead(null, ContextRead.NoContext));
-        });
-
         var classifications = Substitute.For<IHoldingClassifications>();
         classifications.SectorsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns(call => ValueTask.FromResult<IReadOnlyDictionary<Guid, string>>(call.Arg<IReadOnlyCollection<Guid>>().ToDictionary(id => id, id => "Sector" + (id == Ids["DDD"] ? "2" : "1"))));
         classifications.BasketsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns(call => ValueTask.FromResult<IReadOnlyDictionary<Guid, IReadOnlyList<BasketRef>>>(call.Arg<IReadOnlyCollection<Guid>>().ToDictionary(id => id, id => (IReadOnlyList<BasketRef>)[new BasketRef(Basket, "B")])));
@@ -255,7 +243,7 @@ internal sealed class ReplayWorld
         sizing.BudgetsAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyDictionary<Guid, double>>(new Dictionary<Guid, double>()));
 
         return new ReplayFacts(
-            holdOut, new HoldOutOptions(TrainingEmbargoDays: EmbargoDays), baskets, Substitute.For<IInstrumentQueries>(), strategies, stats, changelog, Runs, minute, Seams, days, calendar, context, classifications, sheets, basketSettings, sizing,
+            holdOut, new HoldOutOptions(TrainingEmbargoDays: EmbargoDays), baskets, Substitute.For<IInstrumentQueries>(), strategies, stats, changelog, Runs, minute, Seams, days, calendar, classifications, sheets, basketSettings, sizing,
             new SystemReplayOptions { IncompleteDataShare = incompleteShare }, Smart, Rules, Fill);
     }
 

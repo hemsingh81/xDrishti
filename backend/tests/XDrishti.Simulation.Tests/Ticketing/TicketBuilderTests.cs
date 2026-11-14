@@ -340,12 +340,10 @@ public sealed class TicketBuilderTests
         Assert.Contains(weekday.Parts, p => p.Text == "day_of_week == 1" && !p.KnownAtClose && p.Truth == SetupTruth.Unknown);
     }
 
-    [Theory]
-    [InlineData("vix > 20")]
-    [InlineData("is_expiry_day == 1")]
-    public void A_market_context_or_expiry_day_part_cannot_be_evaluated_and_is_unavailable(string condition)
+    [Fact]
+    public void An_expiry_day_part_cannot_be_evaluated_and_is_unavailable()
     {
-        Assert.Equal(TicketVerdict.Unavailable, Run(Swing([Up, condition], [Up])).Verdict);
+        Assert.Equal(TicketVerdict.Unavailable, Run(Swing([Up, "is_expiry_day == 1"], [Up])).Verdict);
     }
 
     [Fact]
