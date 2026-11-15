@@ -1,8 +1,10 @@
 import CloseIcon from '@mui/icons-material/Close';
-import { Box, Drawer, IconButton, Stack, Typography } from '@mui/material';
+import { Box, Button, Drawer, IconButton, Stack, Typography } from '@mui/material';
+import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { formatDate, formatInr, formatIstTime, formatPrice } from '@/shared/lib/format';
-import type { SimDaySnapshot } from '../../api/simDaysApi';
+import { ErrorState, LoadingState } from '@/shared/ui';
+import { simDayQuery } from '../../api/simDaysApi';
 import { HindsightBanner } from '../replay/HindsightBanner';
 
 function Section({ title, count, children }: { title: string; count: number; children: ReactNode }) {
@@ -25,24 +27,47 @@ function Section({ title, count, children }: { title: string; count: number; chi
 }
 
 /** One stored day: its trades, picks, blocked with reasons and fills. */
-export function SimDayDrawer({ day, onClose }: { day: SimDaySnapshot | null; onClose: () => void }) {
+export function SimDayDrawer({
+  runId,
+  session,
+  onPlay,
+  onClose,
+}: {
+  runId: string;
+  session: string | null;
+  onPlay: (day: string) => void;
+  onClose: () => void;
+}) {
+  const query = useQuery({ ...simDayQuery(runId, session ?? '', true), enabled: session !== null });
+  const day = session === null ? null : (query.data ?? null);
   return (
     <Drawer
       anchor="right"
-      open={day !== null}
+      open={session !== null}
       onClose={onClose}
       slotProps={{ paper: { sx: { width: { xs: '100%', sm: 480 }, p: 2 } } }}
     >
       <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
         <Typography variant="h2" component="h2">
-          {day ? `Day ${formatDate(day.session)}` : 'Day'}
+          {session ? `Day ${formatDate(session)}` : 'Day'}
         </Typography>
         <IconButton aria-label="Close the day" onClick={onClose} sx={{ minWidth: 44, minHeight: 44 }}>
           <CloseIcon />
         </IconButton>
       </Stack>
+      {session !== null && query.isPending && <LoadingState label="Loading the day…" />}
+      {query.isError && <ErrorState error={query.error} />}
       {day && (
         <Box>
+          <Button
+            variant="contained"
+            onClick={() => {
+              onPlay(day.session);
+            }}
+            sx={{ minHeight: 44, mb: 1.5 }}
+          >
+            Play this day
+          </Button>
           <HindsightBanner run={day} />
           <Typography variant="body2" sx={{ my: 1.5 }}>
             {`Closing equity ${formatInr(day.equityClose)} · ${day.openPositions} open · ${day.costsLabel}`}

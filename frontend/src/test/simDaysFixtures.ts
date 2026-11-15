@@ -37,6 +37,7 @@ export const buildSimDays = (over: Partial<View> = {}): View => ({
   speedSecondsPerMinute: 1,
   createdAt: '2026-11-15T03:00:00Z',
   updatedAt: '2026-11-15T03:00:00Z',
+  hasNewSessions: false,
   ...over,
 });
 
@@ -240,9 +241,42 @@ export function tapeHandler(asked: string[] = []) {
   });
 }
 
-/** The status and the cursor day; other days are 404 (not stored). */
-export function simDaysServer(view: View = buildSimDays(), day: Snapshot | null = buildSimDay()) {
+export const simSettings: Schemas['SimDaysSettingsView'] = {
+  defaultCapital: 2_500_000,
+  speedSecondsPerMinute: 1,
+  autoContinue: false,
+};
+
+export const listItem = (
+  view: View,
+  over: Partial<Schemas['SimDaysListItemView']> = {},
+): Schemas['SimDaysListItemView'] => ({
+  id: view.id,
+  phase: view.phase,
+  active: !['complete', 'cancelled', 'error'].includes(view.phase),
+  auto: view.auto,
+  mode: view.mode,
+  scope: { baskets: 1, instruments: 0 },
+  start: view.start,
+  end: view.end,
+  cursor: view.cursor,
+  capital: view.capital,
+  equity: view.equity,
+  daysDone: view.daysDone,
+  createdAt: view.createdAt,
+  ...over,
+});
+
+/** The settings, the list of runs, the status, the stored-days list and the cursor day; other days are 404 (not stored). */
+export function simDaysServer(
+  view: View = buildSimDays(),
+  day: Snapshot | null = buildSimDay(),
+  stored: Schemas['SimDayListItemView'][] = [],
+) {
   return [
+    http.get('/api/sim/days/settings', () => HttpResponse.json(simSettings)),
+    http.get('/api/sim/days', () => HttpResponse.json({ items: [listItem(view)], nextCursor: null })),
+    http.get('/api/sim/days/:id/days', () => HttpResponse.json({ items: stored, nextCursor: null })),
     http.get('/api/sim/days/:id', () => HttpResponse.json(view)),
     http.get('/api/sim/days/:id/days/:date', ({ params }) =>
       day && params.date === day.session

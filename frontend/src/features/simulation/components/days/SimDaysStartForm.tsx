@@ -16,9 +16,17 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useBasketNames } from '@/features/reports';
+import { formatInr } from '@/shared/lib/format';
+import { LoadingState } from '@/shared/ui';
 import { Typeahead } from '@/shared/ui/Typeahead';
-import { simInstrumentSearchQuery, simProblemText, useStartSimDays } from '../../api/simDaysApi';
-import { initialSimDaysForm, simDaysProblem, toSimDaysBody, type SimDaysForm } from '../../lib/simDaysForm';
+import { simDaysSettingsQuery, simInstrumentSearchQuery, simProblemText, useStartSimDays } from '../../api/simDaysApi';
+import {
+  defaultCapital,
+  initialSimDaysForm,
+  simDaysProblem,
+  toSimDaysBody,
+  type SimDaysForm,
+} from '../../lib/simDaysForm';
 
 const grid = {
   display: 'grid',
@@ -28,7 +36,15 @@ const grid = {
 
 /** Starts a day-by-day simulation. The API's refusals (sim.invalid, sim.busy) are shown as they are worded. */
 export function SimDaysStartForm({ onStarted }: { onStarted: (id: string) => void }) {
-  const [form, setForm] = useState<SimDaysForm>(initialSimDaysForm);
+  const settings = useQuery(simDaysSettingsQuery);
+  if (settings.isPending) return <LoadingState label="Loading the defaults…" />;
+  // without the defaults the form still works: the API applies its own capital when the field is left as it is
+  const capital = settings.data ? String(settings.data.defaultCapital) : defaultCapital;
+  return <StartForm onStarted={onStarted} capital={capital} />;
+}
+
+function StartForm({ onStarted, capital }: { onStarted: (id: string) => void; capital: string }) {
+  const [form, setForm] = useState<SimDaysForm>({ ...initialSimDaysForm, capital });
   const [tried, setTried] = useState(false);
   const [text, setText] = useState('');
   const baskets = useBasketNames();
@@ -85,7 +101,7 @@ export function SimDaysStartForm({ onStarted }: { onStarted: (id: string) => voi
           size="small"
           label="Capital (₹)"
           inputMode="numeric"
-          helperText="Default ₹10,00,000."
+          helperText={`Default ${formatInr(Number(capital))}.`}
           value={form.capital}
           onChange={(e) => {
             set({ capital: e.target.value.replace(/[^0-9.]/g, '') });

@@ -1,43 +1,43 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { ErrorState, LoadingState } from '@/shared/ui';
-import { simDayQuery, type SimDays, type SimDaySnapshot } from '../../api/simDaysApi';
+import { simDayQuery, simDaysSettingsQuery, type SimDaySnapshot } from '../../api/simDaysApi';
 import { useSimPlayback } from '../../hooks/useSimPlayback';
 import { SimClock } from './SimClock';
 import { SimLiveBoard } from './SimLiveBoard';
 
 interface Props {
-  run: SimDays;
+  runId: string;
+  /** The day played: the settled cursor day, or a stored day chosen in the history. */
+  day: string;
+  stored: boolean;
   startAtEnd: boolean;
   /** Bumped by Instant on a settled day: jump to its end. */
   endSignal: number;
   onEquity: (equity: number | null) => void;
 }
 
-/** The settled cursor day played on the clock, with its live board. */
-export function SimDayPlayer({ run, ...rest }: Props) {
-  const day = useQuery(simDayQuery(run.id, run.cursor, false));
-  if (day.isPending) return <LoadingState label="Loading the day…" />;
+/** A settled or stored day played on the clock, with its live board. */
+export function SimDayPlayer(props: Props) {
+  const day = useQuery(simDayQuery(props.runId, props.day, props.stored));
+  const settings = useQuery(simDaysSettingsQuery);
+  if (day.isPending || settings.isPending) return <LoadingState label="Loading the day…" />;
   if (day.isError) return <ErrorState error={day.error} />;
   if (!day.data) return null;
-  return <Player run={run} trades={day.data.trades} snapshot={day.data} {...rest} />;
+  const speed = settings.data?.speedSecondsPerMinute ?? 10;
+  return <Player {...props} snapshot={day.data} secondsPerMinute={speed > 0 ? speed : 10} />;
 }
 
 function Player({
-  run,
+  runId,
+  day,
   snapshot,
-  trades,
+  secondsPerMinute,
   startAtEnd,
   endSignal,
   onEquity,
-}: Props & { snapshot: SimDaySnapshot; trades: SimDaySnapshot['trades'] }) {
-  const clock = useSimPlayback({
-    id: run.id,
-    day: run.cursor,
-    trades,
-    secondsPerMinute: run.speedSecondsPerMinute > 0 ? run.speedSecondsPerMinute : 10,
-    startAtEnd,
-  });
+}: Props & { snapshot: SimDaySnapshot; secondsPerMinute: number }) {
+  const clock = useSimPlayback({ id: runId, day, trades: snapshot.trades, secondsPerMinute, startAtEnd });
   const { toEnd } = clock;
   useEffect(() => {
     if (endSignal > 0) toEnd();
@@ -56,7 +56,7 @@ function Player({
       ) : (
         !clock.error && <LoadingState label="Loading the tape…" />
       )}
-      <SimClock clock={clock} day={run.cursor} />
+      <SimClock clock={clock} day={day} />
     </>
   );
 }

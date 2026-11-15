@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   Table,
   TableBody,
   TableCell,
@@ -11,34 +12,21 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { useQueries } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { formatDate, formatInr, formatPercent } from '@/shared/lib/format';
+import { formatDate, formatInr } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { TimeSeriesChart, type ChartSeries } from '@/shared/ui/chart';
-import { simDayQuery, type SimDays, type SimDaySnapshot } from '../../api/simDaysApi';
-import { dayBefore, weekdaysBack } from '../../lib/simDaysForm';
+import { simDayListQuery, type SimDays } from '../../api/simDaysApi';
 import { SimDayDrawer } from './SimDayDrawer';
 
-/** How many recent weekdays are read: there is no list of the stored days, so each weekday is asked (a holiday is a 404). */
-export const historyDays = 30;
-
-/** The stored days (newest first) and the equity over them; a day opens its drawer. */
-export function SimDayHistory({ run }: { run: SimDays }) {
-  const last = run.phase === 'complete' ? run.cursor : dayBefore(run.cursor);
-  const dates = run.daysDone === 0 ? [] : weekdaysBack(run.start, last, historyDays);
-  const days = useQueries({ queries: dates.map((date) => simDayQuery(run.id, date, true)) });
-  const [open, setOpen] = useState<SimDaySnapshot | null>(null);
-  const stored = days.flatMap((d) => (d.data?.stored ? [d.data] : []));
-  const pending = days.some((d) => d.isPending);
-  const error = days.find((d) => d.isError)?.error;
+/** The stored days (newest first) and the equity over them; a day opens its drawer, from where it can be played. */
+export function SimDayHistory({ run, onPlay }: { run: SimDays; onPlay: (day: string) => void }) {
+  const list = useInfiniteQuery(simDayListQuery(run.id));
+  const [open, setOpen] = useState<string | null>(null);
+  const days = list.data?.pages.flatMap((p) => p.items) ?? [];
   const series: ChartSeries[] = [
-    {
-      id: 'equity',
-      name: 'Equity',
-      color: 'accent',
-      data: [...stored].reverse().map((d) => [d.session, d.equityClose] as const),
-    },
+    { id: 'equity', name: 'Equity', color: 'accent', data: days.map((d) => [d.session, d.equityClose] as const) },
   ];
   return (
     <Card component="section" aria-labelledby="sim-history-title">
@@ -46,10 +34,10 @@ export function SimDayHistory({ run }: { run: SimDays }) {
         <Typography id="sim-history-title" variant="h2" component="h2">
           Day history
         </Typography>
-        {pending && <LoadingState label="Loading the days…" />}
-        {error && <ErrorState error={error} />}
-        {!pending && stored.length === 0 && <Typography color="text.secondary">No day is stored yet.</Typography>}
-        {stored.length > 0 && (
+        {list.isPending && <LoadingState label="Loading the days…" />}
+        {list.isError && <ErrorState error={list.error} />}
+        {list.data && days.length === 0 && <Typography color="text.secondary">No day is stored yet.</Typography>}
+        {days.length > 0 && (
           <>
             <Box sx={{ minWidth: 0 }}>
               <TimeSeriesChart
@@ -67,48 +55,52 @@ export function SimDayHistory({ run }: { run: SimDays }) {
                     <TableCell>Day</TableCell>
                     <TableCell align="right">Trades</TableCell>
                     <TableCell align="right">Picks</TableCell>
-                    <TableCell align="right">Blocked</TableCell>
-                    <TableCell align="right">Open</TableCell>
                     <TableCell align="right">Equity</TableCell>
-                    <TableCell align="right">Drawdown</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {stored.map((d) => (
+                  {[...days].reverse().map((d) => (
                     <TableRow key={d.session}>
                       <TableCell>
                         <Button
                           size="small"
                           onClick={() => {
-                            setOpen(d);
+                            setOpen(d.session);
                           }}
                           sx={{ minHeight: 44, textTransform: 'none' }}
                         >
                           {formatDate(d.session)}
                         </Button>
+                        {d.seenHoldOut && <Chip size="small" label="hold-out" sx={{ ml: 0.5 }} />}
                       </TableCell>
-                      <TableCell align="right">{d.trades.length}</TableCell>
-                      <TableCell align="right">{d.picks.length}</TableCell>
-                      <TableCell align="right">{d.blocked.length}</TableCell>
-                      <TableCell align="right">{d.openPositions}</TableCell>
+                      <TableCell align="right">{d.trades}</TableCell>
+                      <TableCell align="right">{d.picks}</TableCell>
                       <TableCell align="right">{formatInr(d.equityClose)}</TableCell>
-                      <TableCell align="right">
-                        {d.drawdownPct === null ? '—' : `${formatPercent(d.drawdownPct)}%`}
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </TableContainer>
-            {run.daysDone > stored.length && (
-              <Typography variant="body2" color="text.secondary">
-                {`The latest ${stored.length} of ${run.daysDone} stored days are shown.`}
-              </Typography>
+            {list.hasNextPage && (
+              <Button
+                onClick={() => {
+                  void list.fetchNextPage();
+                }}
+                disabled={list.isFetchingNextPage}
+                sx={{ minHeight: 44, justifySelf: 'start' }}
+              >
+                Load later days
+              </Button>
             )}
           </>
         )}
         <SimDayDrawer
-          day={open}
+          runId={run.id}
+          session={open}
+          onPlay={(day) => {
+            setOpen(null);
+            onPlay(day);
+          }}
           onClose={() => {
             setOpen(null);
           }}

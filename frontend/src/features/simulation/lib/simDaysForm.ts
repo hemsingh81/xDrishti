@@ -46,24 +46,6 @@ export function toSimDaysBody(f: SimDaysForm): SimDaysStartBody {
   };
 }
 
-/** The weekdays (calendar days Monday to Friday) from `from` to `to`, newest first, at most `limit`. */
-export function weekdaysBack(from: string, to: string, limit: number): string[] {
-  const days: string[] = [];
-  for (
-    let ms = Date.parse(`${to}T00:00:00Z`);
-    ms >= Date.parse(`${from}T00:00:00Z`) && days.length < limit;
-    ms -= 86_400_000
-  ) {
-    const day = new Date(ms);
-    if (day.getUTCDay() !== 0 && day.getUTCDay() !== 6) days.push(day.toISOString().slice(0, 10));
-  }
-  return days;
-}
-
-/** The day before, as yyyy-mm-dd. */
-export const dayBefore = (day: string) =>
-  new Date(Date.parse(`${day}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
-
 const waitingText: Record<string, string> = {
   market_hours: 'market hours',
   low_disk: 'low disk space',

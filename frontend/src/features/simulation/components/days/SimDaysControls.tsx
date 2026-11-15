@@ -1,4 +1,6 @@
 import { Alert, Button, FormControlLabel, Stack, Switch } from '@mui/material';
+import { useState } from 'react';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { simProblemText, useSimDaysAction, type SimDays, type SimDaysAction } from '../../api/simDaysApi';
 
 const live = (phase: string) => phase === 'idle' || phase === 'settling' || phase === 'settled';
@@ -19,6 +21,7 @@ export function SimDaysControls({
   onInstantSettled: () => void;
 }) {
   const action = useSimDaysAction(run.id);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const busy = action.isPending;
   const { phase } = run;
   const manual = !run.auto && !busy;
@@ -69,7 +72,7 @@ export function SimDaysControls({
         >
           Advance
         </Button>
-        {phase === 'complete' && (
+        {phase === 'complete' && run.hasNewSessions && (
           <Button
             variant="contained"
             disabled={busy}
@@ -98,13 +101,29 @@ export function SimDaysControls({
           color="error"
           disabled={busy || !live(phase)}
           onClick={() => {
-            go('cancel');
+            setConfirmCancel(true);
           }}
           sx={{ minHeight: 44 }}
         >
           Cancel
         </Button>
       </Stack>
+      <ConfirmDialog
+        open={confirmCancel}
+        title="Cancel the simulation?"
+        confirmLabel="Cancel the simulation"
+        destructive
+        busy={busy}
+        onConfirm={() => {
+          setConfirmCancel(false);
+          go('cancel');
+        }}
+        onCancel={() => {
+          setConfirmCancel(false);
+        }}
+      >
+        A cancelled simulation is final: it cannot be resumed. Its stored days stay readable.
+      </ConfirmDialog>
       {action.isError && (
         <Alert severity="error" role="alert">
           {simProblemText(action.error, 'The simulation refused the step.')}

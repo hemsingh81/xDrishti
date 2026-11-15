@@ -1,4 +1,10 @@
-import { keepPreviousData, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  keepPreviousData,
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { api, ApiError, unwrap, type Schemas } from '@/shared/api';
 
 export type SimDays = Schemas['SimDaysView'];
@@ -91,8 +97,10 @@ export function useSimDaysAction(id: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (action: SimDaysAction) => send(id, action),
-    onSuccess: (run) => {
+    onSuccess: async (run) => {
       client.setQueryData(simDaysQuery(id).queryKey, run);
+      // a command answers hasNewSessions false: read the status again before Continue is offered; the lists move too
+      await client.invalidateQueries({ queryKey: simDaysRoot });
     },
   });
 }
@@ -111,4 +119,35 @@ export const simInstrumentSearchQuery = (text: string) =>
       unwrap(await api.GET('/api/instruments', { params: { query: { q: text.trim(), pageSize: 20 } }, signal })).items,
     enabled: text.trim().length > 0,
     placeholderData: keepPreviousData,
+  });
+
+export type SimDaysItem = Schemas['SimDaysListItemView'];
+export type SimDayItem = Schemas['SimDayListItemView'];
+
+/** The simulations, newest first (the first page is enough to find the active one and the recent past ones). */
+export const simDaysListQuery = queryOptions({
+  queryKey: [...simDaysRoot, 'list'] as const,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/sim/days', { params: { query: { limit: '50' } }, signal })),
+});
+
+/** The defaults: capital for the form and the playback speed. */
+export const simDaysSettingsQuery = queryOptions({
+  queryKey: [...simDaysRoot, 'settings'] as const,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/sim/days/settings', { signal })),
+  staleTime: 5 * 60_000,
+});
+
+/** A run's stored days, oldest first, page by page. */
+export const simDayListQuery = (id: string) =>
+  infiniteQueryOptions({
+    queryKey: [...simDaysRoot, id, 'days'] as const,
+    queryFn: async ({ signal, pageParam }) =>
+      unwrap(
+        await api.GET('/api/sim/days/{id}/days', {
+          params: { path: { id }, query: { limit: '250', sort: 'asc', ...(pageParam ? { cursor: pageParam } : {}) } },
+          signal,
+        }),
+      ),
+    initialPageParam: '',
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
   });

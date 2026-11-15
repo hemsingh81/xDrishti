@@ -7,7 +7,7 @@ import { buildBasket } from '@/test/fixtures';
 import { pinClock } from '@/test/pinClock';
 import { renderWithProviders } from '@/test/render';
 import { problemResponse, server } from '@/test/server';
-import { buildSimDay, buildSimDays, SIM, simDaysServer } from '@/test/simDaysFixtures';
+import { buildSimDay, buildSimDays, SIM, listItem, simDaysServer, simSettings } from '@/test/simDaysFixtures';
 import { simDaysInterval, simDaysPollMs } from './api/simDaysApi';
 import { SimDaysPage } from './components/days/SimDaysPage';
 
@@ -21,8 +21,9 @@ const findClock = () => screen.findByRole('region', { name: 'Simulation clock' }
 
 describe('SimDaysPage', () => {
   it('validates the start form and shows the API refusal inline', async () => {
-    localStorage.clear();
     server.use(
+      http.get('/api/sim/days/settings', () => HttpResponse.json(simSettings)),
+      http.get('/api/sim/days', () => HttpResponse.json({ items: [], nextCursor: null })),
       http.get('/api/baskets', () => HttpResponse.json([buildBasket()])),
       http.post('/api/sim/days', () =>
         problemResponse({ code: 'sim.busy', detail: 'A simulation is already active.' }, 409),
@@ -30,11 +31,11 @@ describe('SimDaysPage', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(<SimDaysPage />);
-    await user.click(screen.getByRole('button', { name: 'Start simulation' }));
+    await user.click(await screen.findByRole('button', { name: 'Start simulation' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Choose the start date.');
     await user.type(screen.getByLabelText(/^Start\s*\*?$/), '2026-02-02');
     expect(screen.getByRole('alert')).toHaveTextContent('Choose at least one stock or basket.');
-    expect(screen.getByLabelText('Capital (₹)')).toHaveValue('1000000');
+    expect(screen.getByLabelText('Capital (₹)')).toHaveValue('2500000');
     expect(screen.getByRole('radio', { name: /Learning/ })).toBeChecked();
     await user.click(screen.getByRole('combobox', { name: 'Baskets' }));
     await user.click(await screen.findByRole('option', { name: 'MyChoice' }));
@@ -44,9 +45,9 @@ describe('SimDaysPage', () => {
   });
 
   it('opens the new simulation after a start', async () => {
-    localStorage.clear();
     let body: Schemas['SimDaysStartBody'] | undefined;
     server.use(
+      http.get('/api/sim/days', () => HttpResponse.json({ items: [], nextCursor: null })),
       http.get('/api/baskets', () => HttpResponse.json([buildBasket()])),
       http.post('/api/sim/days', async ({ request }) => {
         body = (await request.json()) as Schemas['SimDaysStartBody'];
@@ -56,13 +57,13 @@ describe('SimDaysPage', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(<SimDaysPage />);
-    await user.type(screen.getByLabelText(/^Start\s*\*?$/), '2026-02-02');
+    await user.type(await screen.findByLabelText(/^Start\s*\*?$/), '2026-02-02');
     await user.click(screen.getByRole('combobox', { name: 'Baskets' }));
     await user.click(await screen.findByRole('option', { name: 'MyChoice' }));
     await user.keyboard('{Escape}');
     await user.click(screen.getByRole('button', { name: 'Start simulation' }));
     expect(await screen.findByRole('heading', { name: /Simulation 2 Feb 2026/ })).toBeInTheDocument();
-    expect(body).toMatchObject({ start: '2026-02-02', end: null, capital: 1_000_000, mode: 'learning' });
+    expect(body).toMatchObject({ start: '2026-02-02', end: null, capital: 2_500_000, mode: 'learning' });
     expect(body?.scope?.basketIds).toEqual([buildBasket().id]);
   });
 
@@ -109,7 +110,7 @@ describe('SimDaysPage', () => {
   it('runs a day: settle, then the clock plays it from 09:15', async () => {
     let settled = false;
     server.use(
-      http.get('/api/sim/days/:id', () => HttpResponse.json(buildSimDays({ phase: settled ? 'settled' : 'idle' }))),
+      http.get(`/api/sim/days/${SIM}`, () => HttpResponse.json(buildSimDays({ phase: settled ? 'settled' : 'idle' }))),
       http.post('/api/sim/days/:id/settle', () => {
         settled = true;
         return HttpResponse.json(buildSimDays({ phase: 'settled' }), { status: 202 });
@@ -129,7 +130,7 @@ describe('SimDaysPage', () => {
     let auto = true;
     const asked: boolean[] = [];
     server.use(
-      http.get('/api/sim/days/:id', () =>
+      http.get(`/api/sim/days/${SIM}`, () =>
         HttpResponse.json(buildSimDays({ phase: 'idle', auto, waiting: auto ? 'market_hours' : null })),
       ),
       ...simDaysServer(buildSimDays({ phase: 'idle' }), null),
@@ -153,20 +154,23 @@ describe('SimDaysPage', () => {
     expect(asked).toEqual([false, true]);
   });
 
-  it('continues a complete run, and shows a refusal in the API words', async () => {
+  it('offers Continue only with newer sessions, and shows a refusal in the API words', async () => {
     let calls = 0;
+    let view = buildSimDays({ phase: 'complete', daysDone: 5, cursor: '2026-02-06', hasNewSessions: true });
     server.use(
-      ...simDaysServer(buildSimDays({ phase: 'complete', daysDone: 5, cursor: '2026-02-06' }), null),
+      http.get(`/api/sim/days/${SIM}`, () => HttpResponse.json(view)),
       http.post('/api/sim/days/:id/continue', () => {
         calls += 1;
-        return calls === 1
-          ? problemResponse({ code: 'sim.nothing_new', detail: 'No newer complete session is stored.' }, 409)
-          : HttpResponse.json(buildSimDays({ phase: 'idle', cursor: '2026-02-09', daysDone: 5, daysTotal: 6 }));
+        if (calls === 1)
+          return problemResponse({ code: 'sim.nothing_new', detail: 'No newer complete session is stored.' }, 409);
+        view = buildSimDays({ phase: 'idle', cursor: '2026-02-09', daysDone: 5, daysTotal: 6 });
+        return HttpResponse.json(view);
       }),
+      ...simDaysServer(view, null),
     );
     const user = userEvent.setup();
     await show();
-    expect(await screen.findByText(/The simulation is complete/)).toBeInTheDocument();
+    expect(await screen.findByText(/Continue extends it/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run day' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByText('No newer complete session is stored.')).toBeInTheDocument();
@@ -177,16 +181,76 @@ describe('SimDaysPage', () => {
     expect(screen.getByText('5 of 6')).toBeInTheDocument();
   });
 
-  it('lists the stored days and opens one in the drawer', async () => {
+  it('hides Continue on a complete run with no newer session', async () => {
+    server.use(...simDaysServer(buildSimDays({ phase: 'complete', daysDone: 5, cursor: '2026-02-06' }), null));
+    await show();
+    expect(await screen.findByText(/Continue appears when newer sessions are stored/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument();
+  });
+
+  it('opens the active run without a link, and picks a past one', async () => {
+    const past = '55555555-5555-5555-5555-555555555555';
+    const active = buildSimDays({ phase: 'idle' });
+    server.use(
+      http.get('/api/sim/days', () =>
+        HttpResponse.json({
+          items: [
+            listItem(active),
+            listItem(buildSimDays({ id: past, phase: 'complete', start: '2026-01-05', end: '2026-01-09' })),
+          ],
+          nextCursor: null,
+        }),
+      ),
+      http.get(`/api/sim/days/${past}`, () =>
+        HttpResponse.json(buildSimDays({ id: past, phase: 'complete', start: '2026-01-05', end: '2026-01-09' })),
+      ),
+      ...simDaysServer(active, null),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<SimDaysPage />);
+    expect(await screen.findByRole('heading', { name: /Simulation 2 Feb 2026/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('combobox', { name: 'Simulation' }));
+    await user.click(await screen.findByRole('option', { name: /5 Jan 2026 to 9 Jan 2026/ }));
+    expect(await screen.findByRole('heading', { name: /Simulation 5 Jan 2026/ })).toBeInTheDocument();
+  });
+
+  it('asks before it cancels', async () => {
+    let cancelled = 0;
+    server.use(
+      http.post('/api/sim/days/:id/cancel', () => {
+        cancelled += 1;
+        return HttpResponse.json(buildSimDays({ phase: 'cancelled' }));
+      }),
+      ...simDaysServer(buildSimDays({ phase: 'idle' }), null),
+    );
+    const user = userEvent.setup();
+    await show();
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Cancel the simulation?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel the simulation' }));
+    await waitFor(() => {
+      expect(cancelled).toBe(1);
+    });
+  });
+
+  it('lists the stored days with the hold-out marker, and plays one from the drawer', async () => {
     const stored = buildSimDay({ stored: true });
-    server.use(...simDaysServer(buildSimDays({ phase: 'idle', cursor: '2026-02-03', daysDone: 1 }), stored));
+    server.use(
+      ...simDaysServer(buildSimDays({ phase: 'idle', cursor: '2026-02-03', daysDone: 1 }), stored, [
+        { session: '2026-02-02', equityClose: 1_000_040, trades: 2, picks: 1, seenHoldOut: true },
+      ]),
+    );
     const user = userEvent.setup();
     await show();
     const table = await screen.findByRole('table', { name: 'Stored days' });
     expect(within(table).getByText('₹10,00,040')).toBeInTheDocument();
+    expect(within(table).getByText('hold-out')).toBeInTheDocument();
     await user.click(within(table).getByRole('button', { name: '2 Feb 2026' }));
     expect(await screen.findByRole('heading', { name: 'Day 2 Feb 2026' })).toBeInTheDocument();
-    expect(screen.getByText(/RELIANCE BUY 10 at/)).toBeInTheDocument();
+    expect(await screen.findByText(/RELIANCE BUY 10 at/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Play this day' }));
+    expect(await within(await findClock()).findByText('09:15')).toBeInTheDocument();
+    expect(screen.getByText('Playing the stored day 2 Feb 2026.')).toBeInTheDocument();
   });
 
   it('shows the hold-out note and the cost label', async () => {
