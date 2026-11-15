@@ -33,13 +33,21 @@ public sealed class SimDaysApiTests(ApiFactory factory) : DataTestBase(factory)
     public override async ValueTask DisposeAsync()
     {
         Factory.ReplayStart.Gate = null;
-        Factory.ReplayStart.Facts = null;
+        await using (var connection = await OpenAsync())
+        {
+            // leave nothing behind for the next class: a fixed hold-out block feeds the bell notices (holdout_stalled), a run or day feeds the simulation reads
+            await ExecuteAsync(connection, "DELETE FROM research.sim_days_snapshots; DELETE FROM research.sim_days_runs;" + (_blockFixed ? " DELETE FROM lab.holdout_unlocks; DELETE FROM lab.holdout_releases; DELETE FROM lab.holdout_blocks;" : string.Empty));
+        }
+
         await base.DisposeAsync();
     }
 
     /// <summary>Fixes a hold-out block far after the test days, so the replay's clamp lets them be read.</summary>
+    private bool _blockFixed;
+
     private async Task BlockAfterTheTestDaysAsync()
     {
+        _blockFixed = true;
         await using var connection = await OpenAsync();
         await ExecuteAsync(connection, "DELETE FROM lab.holdout_unlocks; DELETE FROM lab.holdout_releases; DELETE FROM lab.holdout_blocks; INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2031-01-01', '2026-03-02', '2031-06-30', 12, repeat('a', 64), now())");
     }
