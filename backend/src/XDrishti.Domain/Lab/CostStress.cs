@@ -49,21 +49,22 @@ public static class CostStress
     /// <param name="oneXThreshold">The adjusted threshold of the existing expectancy gate.</param>
     /// <param name="oneXPassed">Whether the existing gate passed.</param>
     /// <param name="costsChecked">Whether the charge sheet is checked against a bill; false makes every row unavailable.</param>
-    public static CostStressResult Evaluate(IReadOnlyList<StressTrade> trades, CostStressOptions options, double oneXThreshold, bool oneXPassed, bool costsChecked)
+    /// <param name="basis">What the R is, printed in each reason (GROSS-01: the cost-basis label, such as <c>gross_less_buffer(0.10R)</c>).</param>
+    public static CostStressResult Evaluate(IReadOnlyList<StressTrade> trades, CostStressOptions options, double oneXThreshold, bool oneXPassed, bool costsChecked, string basis = "net")
     {
         ArgumentNullException.ThrowIfNull(trades);
         ArgumentNullException.ThrowIfNull(options);
         var points = new[]
         {
-            Point(trades, 1, oneXThreshold, ">=", costsChecked, (_, _) => oneXPassed),
-            Point(trades, options.MidMultiplier, options.MidFloorR, ">=", costsChecked, (v, f) => v >= f),
-            Point(trades, options.HighMultiplier, options.HighFloorR, ">", costsChecked, (v, f) => v > f),
+            Point(trades, 1, oneXThreshold, ">=", costsChecked, basis, (_, _) => oneXPassed),
+            Point(trades, options.MidMultiplier, options.MidFloorR, ">=", costsChecked, basis, (v, f) => v >= f),
+            Point(trades, options.HighMultiplier, options.HighFloorR, ">", costsChecked, basis, (v, f) => v > f),
         };
         var worst = points.Any(p => p.Status == StressStatus.Fail) ? StressStatus.Fail : points.Any(p => p.Status == StressStatus.Unavailable) ? StressStatus.Unavailable : StressStatus.Pass;
         return new CostStressResult(points, worst);
     }
 
-    private static StressPoint Point(IReadOnlyList<StressTrade> trades, double m, double floor, string comparison, bool costsChecked, Func<double, double, bool> passes)
+    private static StressPoint Point(IReadOnlyList<StressTrade> trades, double m, double floor, string comparison, bool costsChecked, string basis, Func<double, double, bool> passes)
     {
         var mean = Mean(trades, m);
         if (mean is not { } value)
@@ -78,7 +79,7 @@ public static class CostStress
         }
 
         var ok = passes(value, floor);
-        return new StressPoint(m, trades.Count, value, floor, comparison, ok ? StressStatus.Pass : StressStatus.Fail, $"net expectancy {shown} R {(ok ? comparison : Opposite(comparison))} {Num(floor)} R ({(ok ? "met" : "missed")})");
+        return new StressPoint(m, trades.Count, value, floor, comparison, ok ? StressStatus.Pass : StressStatus.Fail, $"{basis} expectancy {shown} R {(ok ? comparison : Opposite(comparison))} {Num(floor)} R ({(ok ? "met" : "missed")})");
     }
 
     private static string Opposite(string comparison) => comparison == ">=" ? "<" : "<=";

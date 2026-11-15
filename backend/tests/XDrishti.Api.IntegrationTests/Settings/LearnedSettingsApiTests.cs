@@ -104,6 +104,27 @@ public sealed class LearnedSettingsApiTests(ApiFactory factory) : DataTestBase(f
     }
 
     [Fact]
+    public async Task Raising_the_cost_buffer_needs_no_password_and_lowering_it_needs_the_owners_step_up()
+    {
+        // GROSS-01 (ADR 0294): Confidence:Costs:BufferR is declared safer higher
+        const string Buffer = "Confidence:Costs:BufferR";
+        var lower = await ProposeAsync(Buffer, "0.1", "0.08", "loosen");
+
+        var refused = await SendAsync(HttpMethod.Post, $"/api/settings/learned/{lower}/approve", new { });
+
+        refused.Status.ShouldBe(HttpStatusCode.Forbidden);
+        Code(refused.Body).ShouldBe("auth.step_up_required");
+        (await StateAsync(lower)).ShouldBe("proposed");
+        (await SendAsync(HttpMethod.Post, $"/api/settings/learned/{lower}/dismiss")).Status.ShouldBe(HttpStatusCode.OK);
+
+        var raise = await ProposeAsync(Buffer, "0.1", "0.11", "tighten");
+        var raised = await SendAsync(HttpMethod.Post, $"/api/settings/learned/{raise}/approve", new { });
+
+        raised.Status.ShouldBe(HttpStatusCode.OK);
+        (await StateAsync(raise)).ShouldBe("applied");
+    }
+
+    [Fact]
     public async Task Undoing_an_automatic_tightening_needs_the_password_and_records_an_owner_loosening()
     {
         var id = await ProposeAsync(Bps, "3", "3.3", "tighten", autoApply: "auto");

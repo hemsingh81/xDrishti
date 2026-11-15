@@ -45,9 +45,12 @@ internal sealed class LabCostStress(CostStressOptions options, CostBufferOptions
 
         // GROSS-01 (ADR 0294): a gross run is stressed on gross R less the cost buffer: each trade's cost is the buffer, so its R at multiplier m is gross - m x buffer. The buffer is the stated cost (there is no bill to check), so the rows are judged;
         // an unusable buffer leaves them unavailable, never a pass.
+        // shortcut: the buffer is a start-validated singleton (the host refuses an out-of-range value), so an invalid buffer cannot occur in a running host; the arm is kept fail closed for a host that skips the validation
         var buffered = gross && buffer.IsValid;
         IReadOnlyList<StressTrade> trades = buffered ? [.. oosTrades.Select(t => new StressTrade(t.R, buffer.Apply(t.R)))] : gross ? [] : [.. oosTrades.Select(t => new StressTrade(t.RExact!.Value, t.R))];
-        var result = CostStress.Evaluate(trades, options, gate?.Adjusted ?? 0, gate?.Passed ?? false, buffered || costsChecked);
+        // the 1x row of a buffered run is judged on its own figure (gross - 1 x buffer) against the gate's adjusted threshold, not on the gross gate's verdict
+        var oneXPassed = buffered ? CostStress.Mean(trades, 1) is { } oneX && oneX >= (gate?.Adjusted ?? double.PositiveInfinity) : gate?.Passed ?? false;
+        var result = CostStress.Evaluate(trades, options, gate?.Adjusted ?? 0, oneXPassed, buffered || costsChecked, buffered ? buffer.Label() : "net");
         var unavailable = gross && !buffered;
         var rows = result.Points.Select(p => new CostStressRowView(p.Multiplier, unavailable ? oosTrades.Count : p.Trades, p.ExpectancyR, p.Threshold, p.Comparison, Word(p.Status), unavailable ? Gross : p.Reason)).ToList();
         var delayView = delay is null ? null : DelayOf(delay, costsChecked);

@@ -183,6 +183,7 @@ internal sealed partial class AutoSwitchService(
             var account = await dataAccount.GetAsync(cancellationToken);
             return account.CanFetch ? (Pass, account.Name ?? "connected") : (Fail, account.Reason ?? account.Status);
         }));
+        // shortcut: the buffer is a start-validated singleton (the host refuses an out-of-range value), so an invalid buffer cannot occur in a running host; the arm is kept fail closed for a host that skips the validation
         list.Add(await CheckAsync("cost-basis", "The cost basis is stated (the gates judge gross R less the cost buffer)", () =>
             Task.FromResult(costBuffer.IsValid ? (Pass, costBuffer.Label() + "; setting " + costBuffer.KeyText()) : (Fail, "the cost buffer setting Confidence:Costs:BufferR is not readable or not valid: " + string.Join("; ", costBuffer.Problems())))));
         list.Add(await CheckAsync("chain", "The chain services exist", async () =>

@@ -45,5 +45,6 @@ internal sealed class LiveReadinessSource(
     }
 
     /// <summary>GROSS-01: the cost basis is stated when the cost buffer setting is valid; an invalid one is not a pass.</summary>
+    // shortcut: the buffer is a start-validated singleton, so false cannot occur in a running host; kept fail closed
     private bool? CostBasisStated() => costBuffer.IsValid;
 }

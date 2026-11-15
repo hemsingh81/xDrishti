@@ -130,12 +130,12 @@ internal static class LabReportBuilder
 
         if (v.CostStress is { } cs)
         {
-            if (!cs.CostsChecked)
+            if (!cs.CostsChecked && cs.CostBasis is null)
             {
                 w.Add(new ReportWarningView("costs_not_checked", "costs not checked against a bill: stress gates cannot PASS."));
             }
 
-            var missed = cs.Rows.Where(r => r.Multiplier > 1 && r.Status == "fail").Select(r => $"{F(r.Multiplier)}x stress (net expectancy {F(r.ExpectancyR ?? double.NaN)} R, floor {F(r.Threshold)} R)").ToList();
+            var missed = cs.Rows.Where(r => r.Multiplier > 1 && r.Status == "fail").Select(r => $"{F(r.Multiplier)}x stress ({cs.CostBasis ?? "net"} expectancy {F(r.ExpectancyR ?? double.NaN)} R, floor {F(r.Threshold)} R)").ToList();
             if (cs.Delay is { Status: "fail" } d)
             {
                 missed.Add($"the fill-one-minute-later test keeps {F((d.Retention ?? 0) * 100)} % of the expectancy per signal (needs {F(d.Required * 100)} %)");
@@ -241,9 +241,9 @@ internal static class LabReportBuilder
             }
         }
 
-        if (v.CostStress is not null)
+        if (v.CostStress is { } stressed)
         {
-            l.Add(CostStress.Formula);
+            l.Add(stressed.CostBasis is null ? CostStress.Formula : stressed.Formula); // GROSS-01: a buffered stress prints its own formula, never the net one
             l.Add(CostStress.FirstOrderLimit);
         }
 

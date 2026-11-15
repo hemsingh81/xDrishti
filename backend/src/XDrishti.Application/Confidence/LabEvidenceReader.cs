@@ -26,7 +26,8 @@ internal sealed class LabEvidenceReader(
     IQueryHandler<ListLabRunsQuery, Result<IReadOnlyList<LabRunView>>> runs,
     IQueryHandler<GetLabRunQuery, Result<LabRunView>> run,
     IQueryHandler<GetRegistrationQuery, Result<RegistrationView>> registration,
-    IQueryHandler<GetHoldOutQuery, Result<HoldOutView>> holdOut)
+    IQueryHandler<GetHoldOutQuery, Result<HoldOutView>> holdOut,
+    CostBufferOptions buffer)
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -70,9 +71,11 @@ internal sealed class LabEvidenceReader(
 
         var evidence = verdict.Evidence;
         var cells = verdict.Cells.Where(c => c.NoChoiceReason is null).Select(c => c.OosTrades).ToList();
-        double? expectancy = evidence.ExpectancyR;
+        // GROSS-01: rows 3 and 6 (and the backtest side of row 15) read the verdict's gross expectancy less the cost buffer; the spread is taken from the gross figures (a constant shift does not change it)
+        var grossExpectancy = evidence.ExpectancyR;
+        double? expectancy = grossExpectancy is { } g ? buffer.Apply(g) : null;
         var sr = verdict.DeflatedSharpe?.Sr;
-        double? sd = expectancy is { } m && sr is { } s && Math.Abs(s) > 1e-9 ? Math.Abs(m / s) : null;
+        double? sd = grossExpectancy is { } m && sr is { } s && Math.Abs(s) > 1e-9 ? Math.Abs(m / s) : null;
         var stress = verdict.CostStress?.Rows.Where(r => r.Multiplier > 1).OrderBy(r => r.Multiplier).ToList();
         var nulls = verdict.Nulls;
         var years = verdict.Robustness?.ByYear;
@@ -164,6 +167,7 @@ internal sealed class LabEvidenceReader(
         }
 
         notes.Add(string.Create(Inv, $"Lab results are read from the newest finished full run of version {v}. Rows 2, 3 and 6 are on the development out-of-sample trades (pre-hold-out); they are not recomputed with the hold-out trades, because the hold-out's effective n and spread are not stored."));
+        notes.Add("Rows 3 and 6 read the verdict's out-of-sample expectancy on " + buffer.Label() + " (its gross expectancy less the cost buffer; setting " + buffer.KeyText() + "). The fold counts of the stability sub-score are the verdict's stored gross counts: the per-fold expectancies are not stored, so they cannot be taken less the buffer.");
         notes.Add("Row 3 uses the verdict's own out-of-sample expectancy (the figure of the P5 expectancy gate), and the larger of the factor the gates used and the honest factor of the full trial count; the standard deviation behind row 6 is that expectancy over the per-trade Sharpe of the deflated-Sharpe block.");
         var costSheet = CostBasisOf(verdict, notes);
         return new LabEvidence(checklist with { Notes = rowNotes }, evidence.Folds, evidence.PositiveFolds, costSheet, reused, notes, LabTierSet(verdict));

@@ -769,18 +769,22 @@ public sealed class ScorecardReaderTests
         card.Notes.ShouldContain(n => n.Contains("gross_less_buffer(0.10R)", StringComparison.Ordinal));
         card.Notes.ShouldNotContain(n => n.Contains("net R", StringComparison.Ordinal));
         Status(card, 15).ShouldBe("pass");
+        card.Rows.Single(r => r.Number == 3).Value.ShouldStartWith("0.2 R"); // the verdict's gross 0.30 R less the buffer
+        card.Notes.ShouldContain(n => n.Contains("Rows 3 and 6 read the verdict's out-of-sample expectancy on gross_less_buffer(0.10R)", StringComparison.Ordinal));
     }
 
     [Fact]
     public async Task A_larger_buffer_makes_the_effect_negative_and_a_reference_on_another_buffer_is_refused_named()
     {
-        var f = new ReadinessFixture { Buffer = new CostBufferOptions(0.25) };
+        // gross 0.30 R less 0.35 R: the forward mean and the Lab expectancy are both -0.05 R
+        var f = new ReadinessFixture { Buffer = new CostBufferOptions(0.35) };
 
         var card = await CardAsync(f);
 
-        Status(card, 15).ShouldBe("fail");
+        card.SubScores.Single(s => s.Name == SubScore.EffectName).Score.ShouldBe(0);
+        Status(card, 3).ShouldBe("fail");
         card.SubScores.Single(s => s.Name == SubScore.AgreementName).State.ShouldBe("unavailable");
-        card.Notes.ShouldContain(n => n.Contains("reference_basis_mismatch", StringComparison.Ordinal) && n.Contains("gross_less_buffer(0.10R)", StringComparison.Ordinal) && n.Contains("gross_less_buffer(0.25R)", StringComparison.Ordinal));
+        card.Notes.ShouldContain(n => n.Contains("reference_basis_mismatch", StringComparison.Ordinal) && n.Contains("gross_less_buffer(0.10R)", StringComparison.Ordinal) && n.Contains("gross_less_buffer(0.35R)", StringComparison.Ordinal));
         card.Score.ShouldBe(0);
     }
 

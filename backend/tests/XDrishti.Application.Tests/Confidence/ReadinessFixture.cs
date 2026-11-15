@@ -236,7 +236,7 @@ internal sealed class ReadinessFixture
 
     public ForwardEdgeReader ForwardEdge => new(Shadow, Ledger, Buffer);
 
-    public LabEvidenceReader LabReader => new(Runs, Run, Registration, HoldOut);
+    public LabEvidenceReader LabReader => new(Runs, Run, Registration, HoldOut, Buffer);
 
     public ForwardEvidenceReader ForwardReader => new(ForwardEdge, Decay, Sequential, Kills, async cancellationToken => PaperPhaseVerdict.Met(await Phase.HandleAsync(new EvaluatePaperPhaseCheckQuery(null, null), cancellationToken)), Models, new StrategyCells(Log));
 
@@ -286,7 +286,7 @@ internal sealed class ReadinessFixture
 
     public static LabVerdictView GoodVerdict() => new(
         "PASS", 2, 1.25,
-        new EvidenceView(330, 0.20, 1.4, 6, 5, 5, 0, "wf", new DependenceView("ReportOnly", 330, 320, 1.03, "cluster", null, null, null, null, null, null, string.Empty, string.Empty)),
+        new EvidenceView(330, 0.30, 1.4, 6, 5, 5, 0, "wf", new DependenceView("ReportOnly", 330, 320, 1.03, "cluster", null, null, null, null, null, null, string.Empty, string.Empty)),
         [], [], [new CellView("c", "15m", "BUY", "d", "d", null, true, string.Empty, 6, 6, 40, 0.2, 0.1)], [], [],
         new RobustnessView(
             new SensitivityView("15m", "FIXED_RR", null, [], string.Empty),
@@ -295,7 +295,7 @@ internal sealed class ReadinessFixture
             null, [], null,
             [new QuarterView(2025, 1, 60, 0.2), new QuarterView(2025, 2, 60, 0.2), new QuarterView(2025, 3, 60, 0.2), new QuarterView(2025, 4, 60, -0.3), new QuarterView(2026, 1, 90, 0.2)],
             0.10),
-        new DeflatedSharpeView("ReportOnly", 2, 2, null, null, 0.2, 320, null, null, 0.99, 0.95, string.Empty, string.Empty, string.Empty),
+        new DeflatedSharpeView("ReportOnly", 2, 2, null, null, 0.3, 320, null, null, 0.99, 0.95, string.Empty, string.Empty, string.Empty),
         new CostStressView(
             "ReportOnly", false, string.Empty, string.Empty, false, null,
             [new CostStressRowView(1.0, 330, 0.2, 0, ">", "pass", string.Empty), new CostStressRowView(1.5, 330, 0.15, 0.08, ">=", "pass", string.Empty), new CostStressRowView(2.0, 330, 0.1, 0, ">", "pass", string.Empty)],

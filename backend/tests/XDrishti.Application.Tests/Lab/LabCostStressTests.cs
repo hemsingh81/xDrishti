@@ -161,6 +161,26 @@ public sealed class LabCostStressTests
     }
 
     [Fact]
+    public void No_reason_of_a_buffered_stress_says_net()
+    {
+        var block = Apply(new CostStressOptions(), Verdict(), [new SelectionTrade("c", D, D, 0.40)], checkedSheet: false).CostStress!;
+
+        block.Rows.ShouldAllBe(r => r.Reason.StartsWith("gross_less_buffer(0.10R) expectancy", StringComparison.Ordinal));
+        block.Rows.ShouldNotContain(r => r.Reason.Contains("net", StringComparison.Ordinal));
+        block.Formula.ShouldNotContain("net");
+    }
+
+    [Theory]
+    [InlineData(0.31, "pass")] // 0.31 - 0.10 = 0.21 >= 0.20
+    [InlineData(0.29, "fail")] // 0.19 < 0.20, although the gross gate passed
+    public void The_one_times_row_of_a_buffered_run_is_judged_on_gross_less_the_buffer_against_the_adjusted_threshold(double gross, string status)
+    {
+        var block = Apply(new CostStressOptions(), Verdict(oneXMin: 0.20, oneXPassed: true), [new SelectionTrade("c", D, D, gross)], checkedSheet: false).CostStress!;
+
+        block.Rows[0].Status.ShouldBe(status);
+    }
+
+    [Fact]
     public void A_gross_run_with_an_unusable_buffer_has_nothing_to_stress_and_reads_unavailable_never_a_number_or_a_pass()
     {
         var gross = new[] { new SelectionTrade("c", D, D, 0.20) };
