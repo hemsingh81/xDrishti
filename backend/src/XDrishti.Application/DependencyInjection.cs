@@ -787,6 +787,17 @@ public static class DependencyInjection
         services.AddScoped<StrategyAutoLookStep>();
         services.AddScoped<IHoldOutSealStep>(sp => sp.GetRequiredService<StrategyAutoLookStep>()); // seal step 20: the auto strategy look, never block 1 (HO-01 D10); its claim also takes block 1's look for SR-04 (ADR 0293)
         services.AddScoped<IHoldOutSealStep, HoldOutAutoReleaseStep>(); // seal step 90: the auto release (HO-01 D4)
+        // the day-by-day simulation (SR-04 part A, ADR 0293): a stored cursor over the SR-01 replay; research tables only, no order
+        services.TryAddSingleton(new XDrishti.Application.Replay.Sim.SimDaysOptions()); // the host replaces it with its configuration (section Sim)
+        services.AddScoped<SimDaysHoldOut>(); // the hold-out rule: inside block 1 only once its strategy look is stored, taken automatically when free
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.StartSimDaysCommand, Guid>, XDrishti.Application.Replay.Sim.StartSimDaysHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.SettleSimDayCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.SettleSimDayHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.AdvanceSimDayCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.AdvanceSimDayHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.SetSimAutoCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.SetSimAutoHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.ContinueSimDaysCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.ContinueSimDaysHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.CancelSimDaysCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.CancelSimDaysHandler>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Sim.GetSimDaysQuery, Result<XDrishti.Application.Replay.Sim.SimDaysView>>, XDrishti.Application.Replay.Sim.GetSimDaysHandler>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Sim.GetSimDayQuery, Result<XDrishti.Application.Replay.Sim.SimDaySnapshotView>>, XDrishti.Application.Replay.Sim.GetSimDayHandler>();
         services.AddScoped<ICommandHandler<RunHoldOutEpochsCommand, HoldOutEpochsOutcome>, RunHoldOutEpochsHandler>(); // the evening run of the seal steps (HO-01 D10)
         services.AddScoped<ICommandHandler<ReleaseHoldOutCommand, HoldOutBlockView>, ReleaseHoldOutHandler>();
         services.AddScoped<LabPlateau>(); // the plateau gate beside the nulls, read from the stored sweep (CF-07 part C, ADR 0210)
@@ -1110,17 +1121,6 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sweeps.StartReplaySweepRequest, XDrishti.Application.Replay.Job.StartedReplay>, XDrishti.Application.Replay.Sweeps.StartReplaySweepRequestHandler>(); // a start-date sweep: one queued run per start, one look each (SR-02 part B)
         services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Sweeps.GetReplaySweepQuery, Result<XDrishti.Application.Replay.Sweeps.ReplaySweepView>>, XDrishti.Application.Replay.Sweeps.GetReplaySweepHandler>();
         services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sweeps.CancelReplaySweepCommand, int>, XDrishti.Application.Replay.Sweeps.CancelReplaySweepHandler>();
-        // the day-by-day simulation (SR-04 part A, ADR 0293): a stored cursor over the SR-01 replay; research tables only, no order
-        services.TryAddSingleton(new XDrishti.Application.Replay.Sim.SimDaysOptions()); // the host replaces it with its configuration (section Sim)
-        services.AddScoped<SimDaysHoldOut>(); // the hold-out rule: inside block 1 only once its strategy look is stored, taken automatically when free
-        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.StartSimDaysCommand, Guid>, XDrishti.Application.Replay.Sim.StartSimDaysHandler>();
-        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.SettleSimDayCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.SettleSimDayHandler>();
-        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.AdvanceSimDayCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.AdvanceSimDayHandler>();
-        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.SetSimAutoCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.SetSimAutoHandler>();
-        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.ContinueSimDaysCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.ContinueSimDaysHandler>();
-        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.CancelSimDaysCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.CancelSimDaysHandler>();
-        services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Sim.GetSimDaysQuery, Result<XDrishti.Application.Replay.Sim.SimDaysView>>, XDrishti.Application.Replay.Sim.GetSimDaysHandler>();
-        services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Sim.GetSimDayQuery, Result<XDrishti.Application.Replay.Sim.SimDaySnapshotView>>, XDrishti.Application.Replay.Sim.GetSimDayHandler>();
         services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Reads.GetReplayTradeChartQuery, Result<XDrishti.Application.Replay.Reads.ReplayTradeChartView>>, XDrishti.Application.Replay.Reads.GetReplayTradeChartHandler>(); // a replay trade on its bars through the hold-out clamp (SR-02 part C)
         services.AddScoped<IEpochGate, FingerprintEpochGate>(); // the configuration fingerprint decides the epoch (P10-05, ADR 0119): detects, labels and records; applies and blocks nothing
         services.AddScoped<IConfigSnapshotSource, ConfigSnapshotSource>();
