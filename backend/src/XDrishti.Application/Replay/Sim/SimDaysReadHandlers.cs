@@ -21,9 +21,10 @@ internal sealed class GetSimDaysHandler(ISimDaysStore store, ITradingCalendar ca
         var hasNew = false;
         if (row.Phase == SimDays.Complete && await holdOut.HistoryAsync(cancellationToken) is { } history && history.LastComplete > row.End)
         {
-            // reads only: a free look of block 1 is claimed by Continue, never by the status
+            // reads only: a free look of block 1 is claimed by Continue, never by the status. A free look counts as new
+            // sessions (ADR 0293): Continue is the owner's way to take it, and the run extends once the look is stored.
             var answer = await holdOut.ResolveAsync(history.LastComplete, cancellationToken);
-            hasNew = SimDaysSupport.HasNewSessions(row, history.LastComplete, answer.End, calendar);
+            hasNew = answer.Claim is not null || SimDaysSupport.HasNewSessions(row, history.LastComplete, answer.End, calendar);
         }
 
         return Result.Success(SimDaysSupport.View(row, calendar, options, hasNew));
