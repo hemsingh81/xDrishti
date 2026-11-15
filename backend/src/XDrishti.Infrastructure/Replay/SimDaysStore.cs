@@ -188,6 +188,7 @@ internal sealed class SimDaysStore(NpgsqlDataSource dataSource) : ISimDaysStore
                 (SELECT coalesce(jsonb_agg(t.value ORDER BY (t.value->>'tradeNo')::bigint), '[]'::jsonb)::text
                  FROM research.sim_days_snapshots s CROSS JOIN LATERAL jsonb_array_elements(s.trades) t
                  WHERE s.run_id = @id AND s.session < @session AND t.value->>'exitSession' IS NULL
+                   -- shortcut: the NOT EXISTS unpacks every earlier snapshot per candidate trade (trades x days); measured 16-21 ms for 50 trades; rewrite as one GROUP BY over the earlier snapshots when runs exceed about a year
                    AND NOT EXISTS (
                        SELECT 1 FROM research.sim_days_snapshots s2 CROSS JOIN LATERAL jsonb_array_elements(s2.trades) t2
                        WHERE s2.run_id = @id AND s2.session < @session AND t2.value->>'tradeNo' = t.value->>'tradeNo' AND t2.value->>'exitSession' IS NOT NULL))
