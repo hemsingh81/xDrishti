@@ -50,5 +50,8 @@ public interface ISimDaysStore
     /// <summary>The stored days in session order.</summary>
     ValueTask<IReadOnlyList<SimDaySnapshotRow>> SnapshotsAsync(Guid id, CancellationToken cancellationToken);
 
+    /// <summary>The narrow read of the tape of <paramref name="session"/> (<see cref="SimTapeDay"/>): one round trip, never the whole run's records.</summary>
+    ValueTask<SimTapeDay> TapeDayAsync(Guid id, DateOnly session, CancellationToken cancellationToken);
+
     ValueTask<SimDaySnapshotRow?> SnapshotAsync(Guid id, DateOnly session, CancellationToken cancellationToken);
 }

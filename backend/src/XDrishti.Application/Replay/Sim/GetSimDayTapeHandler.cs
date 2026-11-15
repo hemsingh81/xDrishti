@@ -29,11 +29,11 @@ internal sealed class GetSimDayTapeHandler(ISimDaysStore store, IReplayFacts fac
             return Result.Failure<SimDayTapeView>(SimDays.Invalid("from and to are minutes of the day, from not after to"));
         }
 
-        var snapshots = await store.SnapshotsAsync(row.Id, cancellationToken);
+        var tape = await store.TapeDayAsync(row.Id, day, cancellationToken); // only this day, the close before it and the trades open coming into it
         string recordJson, tradesJson;
-        if (snapshots.FirstOrDefault(s => s.Session == day) is { } stored)
+        if (tape.RecordJson is { } storedRecord && tape.TradesJson is { } storedTrades)
         {
-            (recordJson, tradesJson) = (stored.RecordJson, stored.TradesJson);
+            (recordJson, tradesJson) = (storedRecord, storedTrades);
         }
         else if (row.Pending is { } pending && pending.Session == day)
         {
@@ -48,28 +48,16 @@ internal sealed class GetSimDayTapeHandler(ISimDaysStore store, IReplayFacts fac
             return Result.Failure<SimDayTapeView>(Error.NotFound("sim.day_not_found", "That day is not settled (yet)."));
         }
 
-        // the trades held into the day: their latest stored state before it, still open at its open
         var known = new Dictionary<long, SimDayTrade>();
-        var equityOpen = row.Capital;
-        foreach (var s in snapshots.Where(s => s.Session < day).OrderBy(s => s.Session))
+        foreach (var t in (ReplayJson.Read<List<SimDayTrade>>(tape.HeldJson) ?? []).Concat(ReplayJson.Read<List<SimDayTrade>>(tradesJson) ?? []))
         {
-            foreach (var t in ReplayJson.Read<List<SimDayTrade>>(s.TradesJson) ?? [])
-            {
-                known[t.TradeNo] = t;
-            }
-
-            equityOpen = s.EquityClose;
+            known[t.TradeNo] = t; // the day's own state of a held trade (its exit today) wins
         }
 
-        foreach (var t in ReplayJson.Read<List<SimDayTrade>>(tradesJson) ?? [])
-        {
-            known[t.TradeNo] = t;
-        }
-
-        var trades = known.Values.Where(t => t.EntrySession <= day && (t.ExitSession is null || t.ExitSession >= day)).OrderBy(t => t.TradeNo).ToList();
+        var trades = known.Values.OrderBy(t => t.TradeNo).ToList();
         var record = ReplayJson.Read<ReplaySessionRecord>(recordJson);
         var picked = record?.Fills.Where(f => f.Session == day).Select(f => f.Symbol) ?? [];
-        var symbols = trades.Select(t => t.Symbol).Concat(picked).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+        var symbols = trades.Where(t => SimTape.Minute(t.EntryAt) <= to).Select(t => t.Symbol).Concat(picked).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList(); // a trade that enters after "to" is not named yet
 
         if (row.ReadThrough is { } through && !facts.ReadInsideHoldOut(through))
         {
@@ -90,17 +78,15 @@ internal sealed class GetSimDayTapeHandler(ISimDaysStore store, IReplayFacts fac
             }
         }
 
+        var wanted = symbols.Where(ids.ContainsKey).ToDictionary(s => ids[s], s => s);
         var bars = new List<SimTapeBar>();
         try
         {
-            foreach (var symbol in symbols)
+            var read = await facts.DayMinuteBarsAsync(wanted.Keys, day, to.AddSeconds(59), cancellationToken); // one read; the bar that starts at the minute "to" is in, none after it
+            foreach (var (id, list) in read)
             {
-                if (ids.TryGetValue(symbol, out var id))
-                {
-                    var end = to.AddSeconds(59); // the bar that starts at the minute "to" is in; none after it
-                    bars.AddRange((await facts.DayMinuteBarsAsync(id, day, end, cancellationToken)).Where(b => b.EpochSeconds <= to.ToUnixTimeSeconds())
-                        .Select(b => new SimTapeBar(symbol, b.Start.ToOffset(IndiaTime.Offset), b.Open, b.High, b.Low, b.Close, b.Volume)));
-                }
+                var symbol = wanted[id];
+                bars.AddRange(list.Where(b => b.EpochSeconds <= to.ToUnixTimeSeconds()).Select(b => new SimTapeBar(symbol, b.Start.ToOffset(IndiaTime.Offset), b.Open, b.High, b.Low, b.Close, b.Volume)));
             }
         }
         catch (ReplayHoldOutException e)
@@ -108,6 +94,7 @@ internal sealed class GetSimDayTapeHandler(ISimDaysStore store, IReplayFacts fac
             return Result.Failure<SimDayTapeView>(Error.Conflict("sim.holdout", e.Message));
         }
 
+        var equityOpen = tape.EquityOpen ?? row.Capital;
         var board = SimTape.BoardAt(to, equityOpen, trades, bars);
         var events = SimTape.Events(day, trades).Where(e => e.At >= from && e.At <= to).ToList();
         var page = bars.Where(b => b.At >= from).OrderBy(b => b.At).ThenBy(b => b.Symbol, StringComparer.Ordinal).ToList();

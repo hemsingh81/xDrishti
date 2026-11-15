@@ -26,6 +26,29 @@ public static class SeamAwareBars
         return await CutAsync(seams, instrumentId, raw, cancellationToken);
     }
 
+    /// <summary><see cref="ReadAsync"/> for a set of instruments in one bar read and one seam read: the same high-water cut per instrument.</summary>
+    public static async ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<Bar>>> ReadManyAsync(IBarStore bars, IBackfillSeams seams, IReadOnlyCollection<Guid> instrumentIds, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(bars);
+        ArgumentNullException.ThrowIfNull(seams);
+        var raw = await bars.ReadManyAsync(instrumentIds, from, to, cancellationToken);
+        var cuts = await seams.SeamsOfAsync(instrumentIds, cancellationToken);
+        var all = new Dictionary<Guid, IReadOnlyList<Bar>>();
+        foreach (var (id, list) in raw)
+        {
+            if (!cuts.TryGetValue(id, out var seam))
+            {
+                all[id] = list;
+                continue;
+            }
+
+            var cut = new DateTimeOffset(IndiaTime.Today(seam).ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).ToUnixTimeSeconds();
+            all[id] = [.. list.Where(b => b.EpochSeconds >= cut)];
+        }
+
+        return all;
+    }
+
     /// <summary>Drops the bars before the India midnight of the instrument's high-water seam date from an already read list.</summary>
     public static async ValueTask<IReadOnlyList<Bar>> CutAsync(IBackfillSeams seams, Guid instrumentId, IReadOnlyList<Bar> raw, CancellationToken cancellationToken)
     {

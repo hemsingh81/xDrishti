@@ -96,7 +96,7 @@ internal sealed class ReplayFacts(
     public async ValueTask<IReadOnlyList<(DateOnly Session, double Close)>> DayClosesAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
         [.. (await _bars.DaysAsync(instrumentId, from, to, cancellationToken)).Select(b => (XDrishti.Domain.Market.IndiaTime.Today(b.Ts), b.Close))];
 
-    public ValueTask<IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>> DayMinuteBarsAsync(Guid instrumentId, DateOnly day, DateTimeOffset through, CancellationToken cancellationToken) => _bars.DayMinutesAsync(instrumentId, day, through, cancellationToken);
+    public ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>>> DayMinuteBarsAsync(IReadOnlyCollection<Guid> instrumentIds, DateOnly day, DateTimeOffset through, CancellationToken cancellationToken) => _bars.DayMinutesAsync(instrumentIds, day, through, cancellationToken);
 
     public void BeginRun(DateOnly last, ReplaySettingsSnapshot? stored, IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>>? versions = null, string? learningSources = null, bool learningFixed = false)
     {

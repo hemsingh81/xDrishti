@@ -233,7 +233,10 @@ public sealed class SimDaysApiTests(ApiFactory factory) : DataTestBase(factory)
         before.Keys.ShouldContain("paper.shadow_entries");
 
         (await PostAsync($"/api/sim/days/{id}/settle")).Status.ShouldBe(HttpStatusCode.Accepted);
-        await Factory.Services.GetRequiredService<SimDaysRunner>().TickAsync(Ct); // the real runner and engine take the manual settle (it runs in market hours too)
+        // The real runner and engine take the manual settle (it runs in market hours too). Here it can only fail: the integration doubles cannot step a session (StubReplayFacts throws
+        // on MarketAsync and SizingAsync) and seeding a whole tradable market is out of reach, so this proves a failed tick writes nothing. A successful settle is covered by
+        // SimDaysRunnerTests (the real engine over fakes, writing only through ISimDaysStore) and ReplayArchitectureTests (no write outside the two tables, statically).
+        await Factory.Services.GetRequiredService<SimDaysRunner>().TickAsync(Ct);
         var ticked = await WithStoreAsync(s => s.GetAsync(id, Ct).AsTask());
         ticked!.Phase.ShouldBe(SimDays.Failed, "the real runner took the settle and ran the real engine, which cannot prepare the test's empty basket: " + ticked.FailReason + ticked.Waiting);
         var after = await CountsAsync();
@@ -279,12 +282,57 @@ public sealed class SimDaysApiTests(ApiFactory factory) : DataTestBase(factory)
         (unsettled.Status, Code(unsettled.Body)).ShouldBe((HttpStatusCode.Conflict, SimDays.NotSettledCode));
         page.Status.ShouldBe(HttpStatusCode.OK, page.Body.ToString());
         page.Body.GetProperty("bars").GetArrayLength().ShouldBe(2, "no bar after to");
-        page.Body.GetProperty("events").EnumerateArray().Select(e => e.GetProperty("kind").GetString()).ShouldBe(["entry"]);
+        page.Body.GetProperty("events").EnumerateArray().Select(e => e.GetProperty("kind").GetString()).ShouldBe([SimTape.EntryKind]);
         var position = page.Body.GetProperty("board").GetProperty("open").EnumerateArray().Single();
         (position.GetProperty("lastPrice").GetDecimal(), position.GetProperty("runningPnl").GetDecimal()).ShouldBe((101m, 10m));
         (unknown.Status, Code(unknown.Body)).ShouldBe((HttpStatusCode.NotFound, SimDays.NotFoundCode));
         (never.Status, Code(never.Body)).ShouldBe((HttpStatusCode.NotFound, "sim.day_not_found"));
         (off.Status, Code(off.Body)).ShouldBe((HttpStatusCode.UnprocessableEntity, SimDays.InvalidCode));
+    }
+
+    [Fact]
+    public async Task A_one_minute_page_of_fifty_held_instruments_reads_only_the_day_and_answers_fast()
+    {
+        await BlockAfterTheTestDaysAsync();
+        var instruments = new List<Guid>();
+        for (var i = 0; i < 50; i++)
+        {
+            instruments.Add(await SeedAsync($"TAPEP{i:00}"));
+        }
+
+        await using (var connection = await OpenAsync())
+        {
+            // a full session (375 minutes) of D2 for every instrument, and one bar of D1
+            await ExecuteAsync(
+                connection,
+                "INSERT INTO market.bars_1m (instrument_id, ts, open, high, low, close, volume, source) SELECT i, @d2 + m * interval '1 minute', 100 + m * 0.01, 100 + m * 0.01, 100 + m * 0.01, 100 + m * 0.01, 100, 'csv' FROM unnest(@ids) i CROSS JOIN generate_series(0, 374) m UNION ALL SELECT i, @d1, 100, 100, 100, 100, 100, 'csv' FROM unnest(@ids) i",
+                ("ids", instruments.ToArray()), ("d2", new DateTimeOffset(D2.ToDateTime(new TimeOnly(9, 15)), TimeSpan.FromMinutes(330)).ToUniversalTime()), ("d1", new DateTimeOffset(D1.ToDateTime(new TimeOnly(9, 15)), TimeSpan.FromMinutes(330)).ToUniversalTime()));
+        }
+
+        var id = await StoredAsync();
+        var entry = new DateTimeOffset(D1.ToDateTime(new TimeOnly(9, 15)), TimeSpan.FromMinutes(330));
+        var held = instruments.Select((g, i) => new SimDayTrade(i + 1, $"TAPEP{i:00}", "BUY", "S1|1D|BUY|swing|FIXED_RR|*", 1, D1, entry, 100m, 95m, true, null, null, null, null, g)).ToArray();
+        (await PostAsync($"/api/sim/days/{id}/settle")).Status.ShouldBe(HttpStatusCode.Accepted);
+        (await WithStoreAsync(s => s.SettleAsync(id, Pending(D1) with { TradesJson = ReplayJson.Canonical(held) }, T0, Ct).AsTask())).ShouldBeTrue();
+        (await PostAsync($"/api/sim/days/{id}/advance")).Status.ShouldBe(HttpStatusCode.OK);
+        (await PostAsync($"/api/sim/days/{id}/settle")).Status.ShouldBe(HttpStatusCode.Accepted);
+        (await WithStoreAsync(s => s.SettleAsync(id, Pending(D2), T0, Ct).AsTask())).ShouldBeTrue();
+        var minute = Uri.EscapeDataString("2026-10-06T12:00:00+05:30");
+        var path = $"/api/sim/days/{id}/days/2026-10-06/tape?from={minute}&to={minute}";
+        (await GetAsync(path)).Status.ShouldBe(HttpStatusCode.OK); // warm the route once
+
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var page = await GetAsync(path);
+        clock.Stop();
+
+        TestContext.Current.SendDiagnosticMessage($"SR-04 tape: one-minute page of 50 instruments in {clock.ElapsedMilliseconds} ms");
+        page.Status.ShouldBe(HttpStatusCode.OK, page.Body.ToString());
+        page.Body.GetProperty("symbols").GetArrayLength().ShouldBe(50, "the trades held into the day are in play");
+        page.Body.GetProperty("bars").GetArrayLength().ShouldBe(50, "one minute: one bar each");
+        var board = page.Body.GetProperty("board");
+        board.GetProperty("open").GetArrayLength().ShouldBe(50);
+        board.GetProperty("equityOpen").GetDecimal().ShouldBe(1_000_500m, "the close of the stored day before");
+        clock.ElapsedMilliseconds.ShouldBeLessThan(200, "spec SR-04 non-functional: a one-minute page in < 200 ms");
     }
 
     private async Task<(HttpStatusCode Status, JsonElement Body)> GetAsync(string path)

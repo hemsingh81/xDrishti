@@ -153,7 +153,8 @@ internal sealed class StartSimDaysHandler(
         }
         catch
         {
-            await store.CancelAsync(id, time.GetUtcNow(), CancellationToken.None); // a claim or ledger failure leaves no active run behind
+            // a claim or ledger failure leaves no active run behind; when the claim had succeeded, block 1's look stays queued and recorded as auto by the seal service (spent, never unrecorded)
+            await store.CancelAsync(id, time.GetUtcNow(), CancellationToken.None);
             throw;
         }
 

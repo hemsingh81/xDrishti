@@ -1,4 +1,5 @@
 using XDrishti.Application.Abstractions.Replay;
+using XDrishti.Application.Replay;
 using XDrishti.Application.Replay.Sim;
 
 namespace XDrishti.Application.Tests.Replay.Sim;
@@ -51,6 +52,16 @@ internal sealed class FakeSimDaysStore : ISimDaysStore
     {
         Moved(id, r => SimDays.IsActive(r.Phase), r => r with { HoldOutNote = note });
         return ValueTask.CompletedTask;
+    }
+
+    public ValueTask<SimTapeDay> TapeDayAsync(Guid id, DateOnly session, CancellationToken cancellationToken)
+    {
+        var days = Days.GetValueOrDefault(id) ?? [];
+        var day = days.FirstOrDefault(d => d.Session == session);
+        var before = days.Where(d => d.Session < session).OrderBy(d => d.Session).ToList();
+        var stored = before.SelectMany(d => ReplayJson.Read<List<SimDayTrade>>(d.TradesJson) ?? []).ToList();
+        var held = stored.Where(t => t.ExitSession is null && !stored.Any(o => o.TradeNo == t.TradeNo && o.ExitSession is not null)).OrderBy(t => t.TradeNo).ToList();
+        return ValueTask.FromResult(new SimTapeDay(day?.RecordJson, day?.TradesJson, before.LastOrDefault()?.EquityClose, ReplayJson.Canonical(held)));
     }
 
     public ValueTask<bool> SetAutoAsync(Guid id, bool on, DateTimeOffset now, CancellationToken cancellationToken) => Move(id, r => SimDays.IsActive(r.Phase), r => r with { Auto = on });

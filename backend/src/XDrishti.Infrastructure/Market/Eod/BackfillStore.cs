@@ -164,6 +164,26 @@ internal sealed class BackfillStore(NpgsqlDataSource dataSource, IBackfillSettin
         return await reader.ReadAsync(cancellationToken) ? reader.GetFieldValue<DateTimeOffset>(0) : null;
     }
 
+    public async ValueTask<IReadOnlyDictionary<Guid, DateTimeOffset>> SeamsOfAsync(IReadOnlyCollection<Guid> instrumentIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(instrumentIds);
+        var all = new Dictionary<Guid, DateTimeOffset>();
+        if (instrumentIds.Count == 0)
+        {
+            return all;
+        }
+
+        await using var command = dataSource.CreateCommand("SELECT instrument_id, high_water_at FROM market.backfill_seams WHERE instrument_id = ANY(@ids) AND high_water_at IS NOT NULL");
+        command.Parameters.AddWithValue("ids", instrumentIds.Distinct().ToArray());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            all[reader.GetGuid(0)] = reader.GetFieldValue<DateTimeOffset>(1);
+        }
+
+        return all;
+    }
+
     public bool AdmitVerified => settings.AdmitVerified;
 
     // CF-04d: the stored facts of the admission rule, read whatever the switch says; PreSeamAdmission decides whether to ask (a run with the switch off asks for nothing).

@@ -211,6 +211,8 @@ internal sealed class ReplayWorld
             IReadOnlyList<Bar> bars = [.. Close[symbol].Select(p => (Epoch: Day.Epoch(p.Key, 929), Price: p.Value)).Where(b => b.Epoch >= from && b.Epoch <= to).Select(b => new Bar(b.Epoch, b.Price, b.Price, b.Price, b.Price, 1000))];
             return ValueTask.FromResult(bars);
         });
+        minute.ReadManyAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(call => new ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<Bar>>>(OneByOne(minute, call.Arg<IReadOnlyCollection<Guid>>(), call.ArgAt<DateTimeOffset>(1), call.ArgAt<DateTimeOffset>(2))));
+        Seams.SeamsOfAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns(new Dictionary<Guid, DateTimeOffset>());
 
         var days = Substitute.For<IBarQueries>();
         days.ReadDailyBarsAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(call =>
@@ -255,4 +257,15 @@ internal sealed class ReplayWorld
 
     /// <summary>Only the fields the code under test reads are set; the other fields of these wide records are not looked at.</summary>
     public static T Blank<T>() => (T)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(T));
+
+    private static async Task<IReadOnlyDictionary<Guid, IReadOnlyList<Bar>>> OneByOne(IBarStore minute, IReadOnlyCollection<Guid> ids, DateTimeOffset from, DateTimeOffset to)
+    {
+        var all = new Dictionary<Guid, IReadOnlyList<Bar>>();
+        foreach (var id in ids)
+        {
+            all[id] = await minute.ReadAsync(id, from, to, CancellationToken.None);
+        }
+
+        return all;
+    }
 }

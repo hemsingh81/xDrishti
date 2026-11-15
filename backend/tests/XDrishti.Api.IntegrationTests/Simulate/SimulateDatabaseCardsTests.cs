@@ -30,6 +30,17 @@ public sealed partial class SimulateDatabaseTests
     /// <summary>A bar store that answers the first read of an instrument as the database does and every later read of it with one more bar: what a backfill between the two passes would do.</summary>
     private sealed class DriftingStore(IBarStore inner) : IBarStore
     {
+        public async ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>>> ReadManyAsync(IReadOnlyCollection<Guid> instrumentIds, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+        {
+            var all = new Dictionary<Guid, IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>>();
+            foreach (var id in instrumentIds)
+            {
+                all[id] = await ReadAsync(id, from, to, cancellationToken);
+            }
+
+            return all;
+        }
+
         private readonly HashSet<Guid> _read = [];
 
         public ValueTask<IBarMergeSession> BeginMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken) => inner.BeginMergeAsync(instrumentId, source, cancellationToken);

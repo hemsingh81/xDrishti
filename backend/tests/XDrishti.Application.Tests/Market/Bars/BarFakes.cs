@@ -97,6 +97,17 @@ internal sealed class FakeListedInstruments : IListedInstruments
 /// <summary>Merges in memory: every bar added counts as inserted (the real precedence and counts are the database's, tested against it).</summary>
 internal sealed class FakeBarStore : IBarStore
 {
+    public async ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>>> ReadManyAsync(IReadOnlyCollection<Guid> instrumentIds, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    {
+        var all = new Dictionary<Guid, IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>>();
+        foreach (var id in instrumentIds)
+        {
+            all[id] = await ReadAsync(id, from, to, cancellationToken);
+        }
+
+        return all;
+    }
+
     public List<FakeSession> Sessions { get; } = [];
 
     /// <summary>Instruments whose merge throws, and what.</summary>

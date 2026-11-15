@@ -7,6 +7,12 @@ namespace XDrishti.Application.Replay.Sim;
 /// </summary>
 public static class SimTape
 {
+    /// <summary>The kind of an entry event.</summary>
+    public const string EntryKind = "entry";
+
+    /// <summary>The kind of an exit event.</summary>
+    public const string ExitKind = "exit";
+
     /// <summary>The first minute of the NSE session (09:15 India time) of <paramref name="day"/>.</summary>
     public static DateTimeOffset MarketOpen(DateOnly day) => At(day, 9, 15);
 
@@ -25,16 +31,16 @@ public static class SimTape
         {
             if (t.EntrySession == day)
             {
-                events.Add(new SimTapeEvent(Minute(t.EntryAt), "entry", t.TradeNo, t.Symbol, t.Side, t.Qty, t.EntryPrice, t.StopPrice, null, null));
+                events.Add(new SimTapeEvent(Minute(t.EntryAt), EntryKind, t.TradeNo, t.Symbol, t.Side, t.Qty, t.EntryPrice, t.StopPrice, null, null));
             }
 
             if (t.ExitSession == day && t.ExitAt is { } exitAt)
             {
-                events.Add(new SimTapeEvent(Minute(exitAt), "exit", t.TradeNo, t.Symbol, t.Side, t.Qty, t.ExitPrice, t.StopPrice, t.GrossPnl ?? 0, t.ExitReason));
+                events.Add(new SimTapeEvent(Minute(exitAt), ExitKind, t.TradeNo, t.Symbol, t.Side, t.Qty, t.ExitPrice, t.StopPrice, t.GrossPnl ?? 0, t.ExitReason));
             }
         }
 
-        return [.. events.OrderBy(e => e.At).ThenBy(e => e.Kind == "exit").ThenBy(e => e.TradeNo)];
+        return [.. events.OrderBy(e => e.At).ThenBy(e => e.Kind == ExitKind).ThenBy(e => e.TradeNo)];
     }
 
     /// <summary>

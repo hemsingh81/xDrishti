@@ -138,6 +138,36 @@ internal sealed class BarStore(NpgsqlDataSource dataSource, TimeProvider clock) 
         return bars;
     }
 
+    public async ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<Bar>>> ReadManyAsync(IReadOnlyCollection<Guid> instrumentIds, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(instrumentIds);
+        var all = instrumentIds.Distinct().ToDictionary(id => id, _ => new List<Bar>());
+        if (all.Count == 0)
+        {
+            return new Dictionary<Guid, IReadOnlyList<Bar>>();
+        }
+
+        await using var command = dataSource.CreateCommand(
+            """
+            SELECT instrument_id, extract(epoch FROM ts)::bigint, open, high, low, close, volume
+            FROM market.bars_1m
+            WHERE instrument_id = ANY(@ids) AND ts >= @from AND ts <= @to
+            ORDER BY instrument_id, ts
+            """);
+        command.Parameters.AddWithValue("ids", all.Keys.ToArray());
+        command.Parameters.AddWithValue("from", from);
+        command.Parameters.AddWithValue("to", to);
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                all[reader.GetGuid(0)].Add(new Bar(reader.GetInt64(1), reader.GetDouble(2), reader.GetDouble(3), reader.GetDouble(4), reader.GetDouble(5), reader.GetInt64(6)));
+            }
+        }
+
+        return all.ToDictionary(p => p.Key, p => (IReadOnlyList<Bar>)p.Value);
+    }
+
     private sealed class MergeSession(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,

@@ -177,6 +177,29 @@ internal sealed class SimDaysStore(NpgsqlDataSource dataSource) : ISimDaysStore
     public async ValueTask<SimDaySnapshotRow?> SnapshotAsync(Guid id, DateOnly session, CancellationToken cancellationToken) =>
         (await SnapshotRowsAsync("WHERE run_id = @id AND session = @session", id, session, cancellationToken)).FirstOrDefault();
 
+    public async ValueTask<SimTapeDay> TapeDayAsync(Guid id, DateOnly session, CancellationToken cancellationToken)
+    {
+        // a trade still open coming into the day: stored before it with no exit, and no earlier stored day has its exit (a trade is stored on its entry day and again on its exit day)
+        await using var command = dataSource.CreateCommand("""
+            SELECT
+                (SELECT record::text FROM research.sim_days_snapshots WHERE run_id = @id AND session = @session),
+                (SELECT trades::text FROM research.sim_days_snapshots WHERE run_id = @id AND session = @session),
+                (SELECT equity_close FROM research.sim_days_snapshots WHERE run_id = @id AND session < @session ORDER BY session DESC LIMIT 1),
+                (SELECT coalesce(jsonb_agg(t.value ORDER BY (t.value->>'tradeNo')::bigint), '[]'::jsonb)::text
+                 FROM research.sim_days_snapshots s CROSS JOIN LATERAL jsonb_array_elements(s.trades) t
+                 WHERE s.run_id = @id AND s.session < @session AND t.value->>'exitSession' IS NULL
+                   AND NOT EXISTS (
+                       SELECT 1 FROM research.sim_days_snapshots s2 CROSS JOIN LATERAL jsonb_array_elements(s2.trades) t2
+                       WHERE s2.run_id = @id AND s2.session < @session AND t2.value->>'tradeNo' = t.value->>'tradeNo' AND t2.value->>'exitSession' IS NOT NULL))
+            """);
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id);
+        command.Parameters.AddWithValue("session", NpgsqlDbType.Date, session);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        await reader.ReadAsync(cancellationToken);
+        return new SimTapeDay(
+            reader.IsDBNull(0) ? null : reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetDecimal(2), reader.GetString(3));
+    }
+
     private async ValueTask<List<SimDaySnapshotRow>> SnapshotRowsAsync(string where, Guid id, DateOnly? session, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand("SELECT session, record::text, picks::text, blocked::text, trades::text, equity_close, result_hash, end_in_force FROM research.sim_days_snapshots " + where);
