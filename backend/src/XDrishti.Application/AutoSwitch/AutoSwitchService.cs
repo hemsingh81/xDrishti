@@ -5,7 +5,6 @@ using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Platform;
-using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.SettingsCatalog;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.CellsRefresh;
@@ -15,6 +14,7 @@ using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Portfolio.BrokerHistory;
 using XDrishti.Application.SettingsCatalog;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 
 namespace XDrishti.Application.AutoSwitch;
 
@@ -31,7 +31,7 @@ internal sealed partial class AutoSwitchService(
     ICommandHandler<PauseServiceCommand, ServiceView> pause,
     IAutoScopeStore scopes,
     IDataAccountStatus dataAccount,
-    IChargeSheetConfirmationSource chargeSheet,
+    CostBufferOptions costBuffer,
     IAutoSwitchLog log,
     IPlanStore plans,
     TimeProvider clock,
@@ -91,7 +91,7 @@ internal sealed partial class AutoSwitchService(
             return Result.Failure<AutoView>(AutoSwitchErrors.Refused(string.Join("; ", blockers.Select(b => $"{b.Label} ({b.Status}: {b.Detail})"))));
         }
 
-        var snapshot = new SortedDictionary<string, string>(StringComparer.Ordinal) { ["auto.enabled.before"] = "false", ["auto.enabled.after"] = "true", ["builder.after"] = SelectionPlanBuilder.BuilderId };
+        var snapshot = new SortedDictionary<string, string>(StringComparer.Ordinal) { ["auto.enabled.before"] = "false", ["auto.enabled.after"] = "true", ["builder.after"] = SelectionPlanBuilder.BuilderId, ["costs.basis"] = costBuffer.Label(), ["Confidence:Costs:BufferR"] = costBuffer.BufferR.ToString("R", System.Globalization.CultureInfo.InvariantCulture) };
         var resumed = new List<string>();
         foreach (var id in Chain)
         {
@@ -183,8 +183,8 @@ internal sealed partial class AutoSwitchService(
             var account = await dataAccount.GetAsync(cancellationToken);
             return account.CanFetch ? (Pass, account.Name ?? "connected") : (Fail, account.Reason ?? account.Status);
         }));
-        list.Add(await CheckAsync("charge-sheet", "The charge sheet is confirmed (the chain needs costs)", async () =>
-            await chargeSheet.FindAsync(cancellationToken) is not null ? (Pass, "confirmed") : (Fail, "confirm the charge sheet first")));
+        list.Add(await CheckAsync("cost-basis", "The cost basis is stated (the gates judge gross R less the cost buffer)", () =>
+            Task.FromResult(costBuffer.IsValid ? (Pass, costBuffer.Label() + "; setting " + costBuffer.KeyText()) : (Fail, "the cost buffer setting Confidence:Costs:BufferR is not readable or not valid: " + string.Join("; ", costBuffer.Problems())))));
         list.Add(await CheckAsync("chain", "The chain services exist", async () =>
         {
             var missing = new List<string>();

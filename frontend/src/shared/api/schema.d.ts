@@ -10287,6 +10287,8 @@ export interface components {
       /** @description The hash of the sheet's rates the run was costed with, so a stored verdict says which numbers were checked. */
       sheetRatesSha256?: null | string;
       tiers?: null | components['schemas']['CostStressTiersView'];
+      /** @description The cost basis the rows were judged on: `gross_less_buffer(&lt;value&gt;R)` for a gross run stressed on the cost buffer (GROSS-01, ADR 0294); null when the trades carried a sheet's charges, or in a verdict stored before it. */
+      costBasis?: null | string;
     };
     /** @description What undoing a cost batch did: its entries are voided (nothing is deleted). Undoing a batch again is a no-op (`AlreadyUndone`, `Voided` 0). */
     CostUndoResult: {

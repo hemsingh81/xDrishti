@@ -18,7 +18,7 @@ internal sealed class GetSequentialStatusHandler(
     IShadowResultReader reader,
     IPaperLedgerData ledger,
     IBacktestPaperData paperData,
-    ICostConfirmationFact confirmation,
+    CostBufferOptions buffer,
     SequentialOptions options) : IQueryHandler<GetSequentialStatusQuery, Result<SequentialStatusView>>
 {
     public async ValueTask<Result<SequentialStatusView>> HandleAsync(GetSequentialStatusQuery query, CancellationToken cancellationToken)
@@ -66,14 +66,12 @@ internal sealed class GetSequentialStatusHandler(
 
         // The series is the longest run of complete sessions from the start of the epoch: it stops at the first session with a candidate still without a grade (EdgeSeries).
         var selection = EdgeSeries.Select(rows, epochId, prefix);
-        var graded = selection.Graded;
         var heldBack = selection.HeldBack;
-        var costs = await ShadowCostBasis.ReadAsync(graded, confirmation, cancellationToken);
-        var figures = EdgeSeries.Figures(selection, costs);
+        var figures = EdgeSeries.Figures(selection, buffer); // GROSS-01: gross R less the cost buffer, the one series of the scorecard and the decay report
         var noFigure = figures.NoFigure;
         var series = figures.Trades.Select(x => new SequentialTrade(x.R, x.DayCandidates)).ToList();
         var days = figures.Trades.Select(x => x.Row.SessionDate).ToList();
-        var basis = EdgeSeries.Basis(costs);
+        var basis = EdgeSeries.Basis(buffer);
         var notes = new List<string>();
         if (selection.ScopedCount == 0)
         {

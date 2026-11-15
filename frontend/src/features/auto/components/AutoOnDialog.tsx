@@ -42,8 +42,8 @@ export function AutoOnDialog({ onClose }: { onClose: () => void }) {
           <DialogContentText component="div">
             Turning Auto ON resumes the nightly chain: data refresh, simulation, training and the plan. Each night it
             prepares suggestions for the next session with reasons. It only suggests: no order is placed, nothing is
-            approved or armed. It will not turn on until the charge sheet is confirmed and every other precondition
-            passes.
+            approved or armed. It will not turn on until the cost basis is stated (gross R less the cost buffer) and
+            every other precondition passes.
           </DialogContentText>
           <TextField
             label="Your password for this change"

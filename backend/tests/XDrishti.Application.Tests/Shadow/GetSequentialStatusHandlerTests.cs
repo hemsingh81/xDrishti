@@ -32,14 +32,15 @@ public sealed class GetSequentialStatusHandlerTests
 
     private void Epoch(long id) => _ledger.EpochAsync(null, Ct).Returns(new EpochRow(id, Start, DateTimeOffset.UnixEpoch, "first", "default", "system"));
 
+    /// <summary>A gross row whose R on the GROSS-01 basis (gross less the 0.10 R buffer) is <paramref name="r"/>.</summary>
     private static ShadowResultRow Row(int day, string key, double? r, string status = "graded", long? epoch = 1, bool edge = true) =>
-        new(Start.AddDays(day), key, "primary", edge, status, r, r is null ? null : "gross", null, r, epoch, InSet: true);
+        new(Start.AddDays(day), key, "primary", edge, status, r + 0.10, r is null ? null : "gross", null, r + 0.10, epoch, InSet: true);
 
     /// <summary>One candidate a session (design effect 1), R given in order.</summary>
     private void Series(params double[] rs) => _reader.ResultsAsync(Ct).Returns([.. rs.Select((r, i) => Row(i, $"s|SYM{i}|Buy|d", r))]);
 
     private ValueTask<XDrishti.Domain.Common.Result<SequentialStatusView>> RunAsync(string scope = "system", string? strategy = null, SequentialOptions? options = null) =>
-        new GetSequentialStatusHandler(_reader, _ledger, _paper, _costs, options ?? new SequentialOptions()).HandleAsync(new GetSequentialStatusQuery(scope, strategy), Ct);
+        new GetSequentialStatusHandler(_reader, _ledger, _paper, new XDrishti.Domain.Confidence.CostBufferOptions(), options ?? new SequentialOptions()).HandleAsync(new GetSequentialStatusQuery(scope, strategy), Ct);
 
     [Fact]
     public async Task Thirty_one_straight_losses_read_failure_with_the_day_of_the_first_crossings()
@@ -133,19 +134,16 @@ public sealed class GetSequentialStatusHandlerTests
     }
 
     [Fact]
-    public async Task The_edge_series_uses_the_gross_r_until_the_charge_sheet_is_confirmed_and_says_so()
+    public async Task The_edge_series_uses_the_gross_r_less_the_buffer_whatever_the_charge_sheet_and_says_so()
     {
         _reader.ResultsAsync(Ct).Returns([new ShadowResultRow(Start, "k", "primary", true, "graded", 0.8, "net", "flat-10", 1.0, 1L, InSet: true)]);
-        _costs.ConfirmedOnAsync("flat-10", Ct).Returns((DateOnly?)null);
-
-        var unconfirmed = (await RunAsync()).Value;
         _costs.ConfirmedOnAsync("flat-10", Ct).Returns(Start);
-        var confirmed = (await RunAsync()).Value;
 
-        unconfirmed.Edge.Basis.ShouldContain("gross R");
-        unconfirmed.Edge.Sum.ShouldBe(SequentialFailureTest.Llr(1.0, 0.2, 1.5), 1e-12);
-        confirmed.Edge.Basis.ShouldContain("net R");
-        confirmed.Edge.Sum.ShouldBe(SequentialFailureTest.Llr(0.8, 0.2, 1.5), 1e-12);
+        var view = (await RunAsync()).Value;
+
+        view.Edge.Basis.ShouldStartWith("gross_less_buffer(0.10R)");
+        view.Edge.Basis.ShouldNotContain("net R");
+        view.Edge.Sum.ShouldBe(SequentialFailureTest.Llr(1.0 - 0.10, 0.2, 1.5), 1e-12);
     }
 
     [Fact]

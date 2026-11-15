@@ -106,7 +106,7 @@ public sealed class LabRunnerTests
         _variantStats.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
         _variantStats.AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>()).Returns(ci => ci.Arg<IReadOnlyList<VariantStatsRow>>().Count);
         return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, new ConfidenceOptions()), new LabRobustness(_simulation, LabSettings.Default, null, options), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance,
-            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, new LabCostStress(options), tiers: tiers);
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, new LabCostStress(options, new CostBufferOptions()), tiers: tiers);
     }
 
     private LabRunner Runner(ConfidenceOptions? confidence = null) => new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, confidence), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance, new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats);

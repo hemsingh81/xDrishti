@@ -13,8 +13,8 @@ public static class ReadinessCalculator
     /// <summary>The names of the hard-fail terms, as they are listed.</summary>
     public const string IntegrityName = "integrity fault";
 
-    /// <summary>The cost-sheet term.</summary>
-    public const string CostSheetName = "cost sheet not confirmed or not checked against a bill";
+    /// <summary>The cost-basis term (GROSS-01, ADR 0294): the Lab verdict's cost stress ran on gross R less the stated cost buffer.</summary>
+    public const string CostBasisName = "cost basis not stated or cost stress not run";
 
     /// <summary>The CF-09 term.</summary>
     public const string FailureBoundaryName = "CF-09 failure boundary crossed in this epoch";
@@ -38,7 +38,7 @@ public static class ReadinessCalculator
         var hard = new List<string>();
         var notApplicable = new List<string>();
         Term(faults.Integrity, IntegrityName, hard, notApplicable);
-        Term(faults.CostSheet, CostSheetName, hard, notApplicable);
+        Term(faults.CostSheet, CostBasisName, hard, notApplicable);
         foreach (var sub in subs)
         {
             switch (sub.State)
@@ -112,7 +112,7 @@ public static class ReadinessCalculator
         var bound = ScoreAnchors.LowerBound(i.ForwardMeanR!.Value, i.ForwardSdR!.Value, i.ForwardNEff!.Value);
         var score = ScoreAnchors.Effect(bound);
         var move = score >= 100 ? null : $"the lower 90 % bound must rise by {F(ScoreAnchors.FullEffectR - bound, "0.###")} R to reach {F(ScoreAnchors.FullEffectR)} R";
-        return new SubScore(SubScore.EffectName, SubScoreState.Scored, score, $"lower 90 % bound of the mean net R {F(bound, "0.###")} R (mean {F(i.ForwardMeanR.Value, "0.###")} R)", move);
+        return new SubScore(SubScore.EffectName, SubScoreState.Scored, score, $"lower 90 % bound of the mean R (gross less the cost buffer) {F(bound, "0.###")} R (mean {F(i.ForwardMeanR.Value, "0.###")} R)", move);
     }
 
     private static SubScore PowerSub(ScoreInputs i)

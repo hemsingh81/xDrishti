@@ -25,7 +25,7 @@ public sealed class LabCostStressTests
     private static SelectionTrade[] Thin() => [new SelectionTrade("c", D, D, 0.10, 0.22)];
 
     private static LabVerdictView Apply(CostStressOptions o, LabVerdictView v, SelectionTrade[] trades, bool checkedSheet = true, DelaySignals? delay = null) =>
-        new LabCostStress(o).Apply(v, trades, "fixture-a", checkedSheet, delay);
+        new LabCostStress(o, new CostBufferOptions()).Apply(v, trades, "fixture-a", checkedSheet, delay);
 
     [Fact]
     public void Off_returns_the_verdict_itself()
@@ -62,7 +62,7 @@ public sealed class LabCostStressTests
         var tiers = new CostStressTiersView(2, 0, 0, 2, 0, 2, 0, o.TierKeyText(), o.TierSnapshotHash(), "basis");
 
         var without = Apply(o, Verdict(), Good());
-        var with = new LabCostStress(o).Apply(Verdict(), Good(), "fixture-a", true, null, null, tiers);
+        var with = new LabCostStress(o, new CostBufferOptions()).Apply(Verdict(), Good(), "fixture-a", true, null, null, tiers);
 
         with.CostStress!.Tiers.ShouldBe(tiers);
         without.CostStress!.Tiers.ShouldBeNull();
@@ -84,7 +84,7 @@ public sealed class LabCostStressTests
         JsonSerializer.Deserialize<LabVerdictView>(old, Web)!.CostStress!.Tiers.ShouldBeNull();
 
         var tiers = new CostStressTiersView(3, 2, 1, 0, 0, 0, 0, "s", "h", "b");
-        var round = JsonSerializer.Deserialize<LabVerdictView>(JsonSerializer.Serialize(new LabCostStress(o).Apply(Verdict(), Good(), "fixture-a", true, null, null, tiers), Web), Web)!;
+        var round = JsonSerializer.Deserialize<LabVerdictView>(JsonSerializer.Serialize(new LabCostStress(o, new CostBufferOptions()).Apply(Verdict(), Good(), "fixture-a", true, null, null, tiers), Web), Web)!;
         round.CostStress!.Tiers.ShouldBe(tiers);
     }
 
@@ -145,14 +145,31 @@ public sealed class LabCostStressTests
     }
 
     [Fact]
-    public void A_gross_run_has_nothing_to_stress_and_reads_unavailable_never_a_number_or_a_pass()
+    public void A_gross_run_is_stressed_on_gross_r_less_the_buffer_and_labelled_so()
+    {
+        // GROSS-01: gross 0.40 R, buffer 0.10 R: 1.5x reads 0.40 - 0.15 = 0.25, 2x reads 0.40 - 0.20 = 0.20
+        var gross = new[] { new SelectionTrade("c", D, D, 0.40) };
+
+        var block = Apply(new CostStressOptions(), Verdict(), gross, checkedSheet: false).CostStress!;
+
+        block.CostBasis.ShouldBe("gross_less_buffer(0.10R)");
+        block.Rows[1].ExpectancyR!.Value.ShouldBe(0.25, 1e-9);
+        block.Rows[2].ExpectancyR!.Value.ShouldBe(0.20, 1e-9);
+        block.Rows.ShouldAllBe(r => r.Status == "pass");
+        block.Tradable.ShouldBe("pass");
+        block.Formula.ShouldBe(LabCostStress.BufferFormula);
+    }
+
+    [Fact]
+    public void A_gross_run_with_an_unusable_buffer_has_nothing_to_stress_and_reads_unavailable_never_a_number_or_a_pass()
     {
         var gross = new[] { new SelectionTrade("c", D, D, 0.20) };
 
-        var block = Apply(new CostStressOptions(), Verdict(), gross).CostStress!;
+        var block = new LabCostStress(new CostStressOptions(), new CostBufferOptions(double.NaN)).Apply(Verdict(), gross, null, false, null).CostStress!;
 
         block.Rows.ShouldAllBe(r => r.Status == "unavailable" && r.ExpectancyR == null && r.Reason == LabCostStress.Gross);
         block.Tradable.ShouldBe("unavailable");
+        block.CostBasis.ShouldBeNull();
     }
 
     [Fact]

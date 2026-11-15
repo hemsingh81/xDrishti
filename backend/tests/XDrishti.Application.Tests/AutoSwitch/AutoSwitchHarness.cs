@@ -7,7 +7,6 @@ using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Platform;
-using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.AutoSwitch;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Market.Bars.Eod;
@@ -16,7 +15,6 @@ using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Portfolio.BrokerHistory;
 using XDrishti.Application.Tests.LearnedSettings;
 using XDrishti.Domain.Common;
-using XDrishti.Domain.Reporting;
 
 namespace XDrishti.Application.Tests.AutoSwitch;
 
@@ -36,7 +34,6 @@ internal sealed class AutoSwitchHarness : IServiceScheduleReader, IAutoSwitch, I
 
         Scopes.Row = new StoredAutoScope(1, [Guid.NewGuid()], [], new string('a', 64), Owner, DateTimeOffset.UnixEpoch);
         DataAccount.GetAsync(Arg.Any<CancellationToken>()).Returns(new DataAccountState(Guid.NewGuid(), "Dhan", DataAccountStatuses.Connected, null));
-        Charges.FindAsync(Arg.Any<CancellationToken>()).Returns(new ChargeSheetConfirmation("sheet", "abc", new DateOnly(2026, 11, 1)));
         Plans.ListRunsAsync(Arg.Any<DateOnly?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new List<PlanRunRow>());
         Resume.HandleAsync(Arg.Any<ResumeServiceCommand>(), Arg.Any<CancellationToken>()).Returns(call => Set(call.Arg<ResumeServiceCommand>().ServiceId, true, call.Arg<ResumeServiceCommand>().Actor));
         Pause.HandleAsync(Arg.Any<PauseServiceCommand>(), Arg.Any<CancellationToken>()).Returns(call => Set(call.Arg<PauseServiceCommand>().ServiceId, false, call.Arg<PauseServiceCommand>().Actor));
@@ -58,7 +55,7 @@ internal sealed class AutoSwitchHarness : IServiceScheduleReader, IAutoSwitch, I
 
     public IDataAccountStatus DataAccount { get; } = Substitute.For<IDataAccountStatus>();
 
-    public IChargeSheetConfirmationSource Charges { get; } = Substitute.For<IChargeSheetConfirmationSource>();
+    public XDrishti.Domain.Confidence.CostBufferOptions CostBuffer { get; set; } = new();
 
     public IPlanStore Plans { get; } = Substitute.For<IPlanStore>();
 
@@ -66,7 +63,7 @@ internal sealed class AutoSwitchHarness : IServiceScheduleReader, IAutoSwitch, I
 
     public ICommandHandler<PauseServiceCommand, ServiceView> Pause { get; } = Substitute.For<ICommandHandler<PauseServiceCommand, ServiceView>>();
 
-    public AutoSwitchService Service() => new(this, Store, this, new ServiceRegistry([]), Resume, Pause, Scopes, DataAccount, Charges, this, Plans, new FakeTimeProvider(), NullLogger<AutoSwitchService>.Instance);
+    public AutoSwitchService Service() => new(this, Store, this, new ServiceRegistry([]), Resume, Pause, Scopes, DataAccount, CostBuffer, this, Plans, new FakeTimeProvider(), NullLogger<AutoSwitchService>.Instance);
 
     public async ValueTask<bool> IsOnAsync(CancellationToken cancellationToken) => (await Store.GetAsync(AutoSwitchService.Key, cancellationToken))?.Value == "true";
 

@@ -7,6 +7,7 @@ using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Paper;
 using XDrishti.Application.Shadow;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Readiness;
 using XDrishti.Domain.Research;
@@ -754,16 +755,45 @@ public sealed class ScorecardReaderTests
     }
 
     [Fact]
-    public async Task A_forward_series_gross_of_charges_is_not_offered_as_net()
+    public async Task A_gross_forward_series_is_judged_on_gross_r_less_the_buffer_and_labelled_so()
     {
+        // GROSS-01: no charge sheet is confirmed (gross forever); gross mean 0.30 R less the 0.10 R buffer is 0.20 R
         var f = new ReadinessFixture { Confirmed = false };
 
         var card = await CardAsync(f);
 
-        card.SubScores.Single(s => s.Name == SubScore.EffectName).State.ShouldBe("unavailable");
-        card.HardFails.ShouldContain(ReadinessCalculator.CostSheetName);
-        card.Notes.ShouldContain(n => n.Contains("gross of charges", StringComparison.Ordinal));
-        Status(card, 15).ShouldBe("unavailable");
+        card.SubScores.Single(s => s.Name == SubScore.EffectName).State.ShouldBe("scored");
+        card.SubScores.Single(s => s.Name == SubScore.AgreementName).State.ShouldBe("scored");
+        card.SubScores.Single(s => s.Name == SubScore.StabilityName).State.ShouldBe("scored");
+        card.HardFails.ShouldNotContain(h => h.StartsWith(ReadinessCalculator.CostBasisName, StringComparison.Ordinal));
+        card.Notes.ShouldContain(n => n.Contains("gross_less_buffer(0.10R)", StringComparison.Ordinal));
+        card.Notes.ShouldNotContain(n => n.Contains("net R", StringComparison.Ordinal));
+        Status(card, 15).ShouldBe("pass");
+    }
+
+    [Fact]
+    public async Task A_larger_buffer_makes_the_effect_negative_and_a_reference_on_another_buffer_is_refused_named()
+    {
+        var f = new ReadinessFixture { Buffer = new CostBufferOptions(0.25) };
+
+        var card = await CardAsync(f);
+
+        Status(card, 15).ShouldBe("fail");
+        card.SubScores.Single(s => s.Name == SubScore.AgreementName).State.ShouldBe("unavailable");
+        card.Notes.ShouldContain(n => n.Contains("reference_basis_mismatch", StringComparison.Ordinal) && n.Contains("gross_less_buffer(0.10R)", StringComparison.Ordinal) && n.Contains("gross_less_buffer(0.25R)", StringComparison.Ordinal));
+        card.Score.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_lab_verdict_whose_cost_stress_did_not_run_on_the_buffer_is_an_unavailable_cost_basis_and_a_hard_fail()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { CostStress = f.Verdict.CostStress! with { CostBasis = null } };
+
+        var card = await CardAsync(f);
+
+        card.HardFails.ShouldContain(ReadinessCalculator.CostBasisName + " (the input is unavailable, which is never a pass)");
+        card.Score.ShouldBe(0);
     }
 
     [Fact]
@@ -831,7 +861,7 @@ public sealed class ScorecardReaderTests
     public async Task The_forward_mean_inside_the_five_percent_band_is_inside_and_far_below_it_is_below()
     {
         var inside = new ReadinessFixture();
-        var below = new ReadinessFixture { DecayResult = Result.Success(ReadinessFixture.DecayView() with { Reference = new DecayReferenceView("available", null, 400, 1.5, 0.5, "net") }) };
+        var below = new ReadinessFixture { DecayResult = Result.Success(ReadinessFixture.DecayView() with { Reference = new DecayReferenceView("available", null, 400, 1.5, 0.5, "gross_less_buffer(0.10R)") }) };
 
         (await CardAsync(inside)).SubScores.Single(s => s.Name == SubScore.AgreementName).Score.ShouldBe(100, "the months are positive in the fixture's series");
         (await CardAsync(below)).SubScores.Single(s => s.Name == SubScore.AgreementName).Score.ShouldBe(0);

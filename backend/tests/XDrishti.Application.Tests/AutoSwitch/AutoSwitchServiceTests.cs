@@ -71,6 +71,7 @@ public sealed class AutoSwitchServiceTests
         row.Snapshot["auto.enabled.before"].ShouldBe("false");
         row.Snapshot["auto.enabled.after"].ShouldBe("true");
         row.Snapshot["service.eod.before"].ShouldBe("paused");
+        row.Snapshot["costs.basis"].ShouldBe("gross_less_buffer(0.10R)");
         (await _h.Store.GetAsync("auto.enabled", Ct))!.Value.ShouldBe("true");
         _h.ServiceActors.ShouldAllBe(a => a == Owner);
     }
@@ -223,13 +224,27 @@ public sealed class AutoSwitchServiceTests
     }
 
     [Fact]
-    public async Task An_unconfirmed_charge_sheet_is_refused_and_named()
+    public async Task An_invalid_cost_buffer_setting_is_refused_and_named()
     {
-        _h.Charges.FindAsync(Arg.Any<CancellationToken>()).Returns((XDrishti.Domain.Reporting.ChargeSheetConfirmation?)null);
+        _h.CostBuffer = new XDrishti.Domain.Confidence.CostBufferOptions(double.NaN);
 
         var result = await _h.Service().TurnOnAsync(new TurnAutoOnCommand(Owner, true), Ct);
 
-        result.Error.Message.ShouldContain("charge sheet");
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Message.ShouldContain("cost basis");
+        result.Error.Message.ShouldContain("Confidence:Costs:BufferR");
+        (await _h.IsOnAsync(Ct)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task A_valid_cost_buffer_passes_the_cost_basis_precondition_with_its_label_and_no_charge_sheet()
+    {
+        var view = await _h.Service().ReadAsync(Ct);
+
+        var item = view.Preconditions.Single(p => p.Id == "cost-basis");
+        item.Status.ShouldBe("pass");
+        item.Detail.ShouldContain("gross_less_buffer(0.10R)");
+        view.Preconditions.ShouldNotContain(p => p.Id == "charge-sheet");
     }
 
     [Fact]
@@ -249,12 +264,12 @@ public sealed class AutoSwitchServiceTests
     public async Task Every_failing_item_is_named_together()
     {
         _h.Scopes.Row = null;
-        _h.Charges.FindAsync(Arg.Any<CancellationToken>()).Returns((XDrishti.Domain.Reporting.ChargeSheetConfirmation?)null);
+        _h.CostBuffer = new XDrishti.Domain.Confidence.CostBufferOptions(0.01);
 
         var result = await _h.Service().TurnOnAsync(new TurnAutoOnCommand(Owner, true), Ct);
 
         result.Error.Message.ShouldContain("scope");
-        result.Error.Message.ShouldContain("charge sheet");
+        result.Error.Message.ShouldContain("cost basis");
     }
 
     [Fact]

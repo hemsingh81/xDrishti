@@ -49,6 +49,8 @@ internal sealed class ConfidenceSettings
 
     public KillSection Kill { get; set; } = new();
 
+    public CostsSection Costs { get; set; } = new();
+
     public RegistrationSection Registration { get; set; } = new();
 
     public HoldOutSection HoldOut { get; set; } = new();
@@ -93,6 +95,9 @@ internal sealed class ConfidenceSettings
 
     /// <summary>The <c>Confidence:Kill</c> subsection as the options of CF-12 part 12b (ADR 0219). The automatic setting is not here: it is stored state that only the owner changes.</summary>
     internal KillOptions ToKillOptions() => new(Kill.StressMultiplier, Kill.DrawdownFactor);
+
+    /// <summary>The <c>Confidence:Costs</c> subsection as the cost buffer of GROSS-01 (ADR 0294): tighten-only (raising is free, lowering is the owner's act).</summary>
+    internal CostBufferOptions ToCostBufferOptions() => new(Costs.BufferR);
 
     /// <summary>Whether the plateau gate is enforced while the block it lives in (<c>Confidence:Nulls</c>) is computed at all: it is not computed with <c>Nulls:Mode</c> Off, so enforcing it then would cap nothing (ADR 0210).</summary>
     internal bool PlateauEnforcedWithoutNulls() => Plateau.Enforce && Nulls.Mode == ConfidenceMode.Off;
@@ -352,6 +357,11 @@ internal sealed class ConfidenceSettings
         public double StressMultiplier { get; set; } = KillOptions.DefaultStressMultiplier;
 
         public double DrawdownFactor { get; set; } = KillOptions.DefaultDrawdownFactor;
+    }
+
+    internal sealed class CostsSection
+    {
+        public double BufferR { get; set; } = CostBufferOptions.DefaultBufferR;
     }
 
     internal sealed class LoopSection

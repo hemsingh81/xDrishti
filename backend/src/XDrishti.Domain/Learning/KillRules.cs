@@ -31,7 +31,8 @@ public static class KillRules
     /// <param name="costR">Charges plus the size of the slippage, in R, of each trade (same length).</param>
     /// <param name="tradesSinceLastFiring">Trades since this rule last fired, or null when it never did.</param>
     /// <param name="stressMultiplier">The multiplier of cost (default 1.5; <c>Confidence:Kill:StressMultiplier</c>, which can only be raised).</param>
-    public static KillRuleVerdict CostStress(IReadOnlyList<double> netR, IReadOnlyList<double> costR, int? tradesSinceLastFiring = null, double stressMultiplier = StressMultiplier)
+    /// <param name="basis">What the R is, printed in the text (GROSS-01: the cost-basis label, such as <c>gross_less_buffer(0.10R)</c>).</param>
+    public static KillRuleVerdict CostStress(IReadOnlyList<double> netR, IReadOnlyList<double> costR, int? tradesSinceLastFiring = null, double stressMultiplier = StressMultiplier, string basis = "net R")
     {
         ArgumentNullException.ThrowIfNull(netR);
         ArgumentNullException.ThrowIfNull(costR);
@@ -63,11 +64,11 @@ public static class KillRules
             c += costR[i];
         }
 
-        return CostStress(net1 / TrailingTrades, c / TrailingTrades, TrailingTrades, tradesSinceLastFiring, stressMultiplier);
+        return CostStress(net1 / TrailingTrades, c / TrailingTrades, TrailingTrades, tradesSinceLastFiring, stressMultiplier, basis);
     }
 
     /// <summary>Rule (a) from the two means: <c>net(1.5) = net1 - 0.5 c</c>, fires when strictly below zero (a value within 1e-12 of zero is zero).</summary>
-    public static KillRuleVerdict CostStress(double net1, double c, int trades, int? tradesSinceLastFiring = null, double stressMultiplier = StressMultiplier)
+    public static KillRuleVerdict CostStress(double net1, double c, int trades, int? tradesSinceLastFiring = null, double stressMultiplier = StressMultiplier, string basis = "net R")
     {
         if (trades < TrailingTrades || !double.IsFinite(net1) || !double.IsFinite(c) || c < 0 || !double.IsFinite(stressMultiplier) || stressMultiplier < 1)
         {
@@ -76,7 +77,7 @@ public static class KillRules
 
         var stressed = net1 - ((stressMultiplier - 1) * c);
         var negative = stressed < -Tie;
-        var text = string.Create(CultureInfo.InvariantCulture, $"net R at 1 times cost {net1:F4}, mean cost {c:F4} R, net R at {stressMultiplier:0.0#} times cost {stressed:F4} on the last {trades} trades");
+        var text = string.Create(CultureInfo.InvariantCulture, $"{basis} at 1 times cost {net1:F4}, mean cost {c:F4} R, {basis} at {stressMultiplier:0.0#} times cost {stressed:F4} on the last {trades} trades");
         if (!negative)
         {
             return new KillRuleVerdict("cost_stress", KillRuleState.Holds, stressed, 0, trades, false, text + ": not below zero");

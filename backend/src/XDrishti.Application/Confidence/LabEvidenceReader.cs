@@ -1,8 +1,8 @@
 using System.Globalization;
 using XDrishti.Application.Abstractions.Messaging;
-using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Lab;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Lab;
 using XDrishti.Domain.Readiness;
 
@@ -12,7 +12,7 @@ namespace XDrishti.Application.Confidence;
 /// <param name="Checklist">Rows 1 to 12 filled where the Lab has the input; the rest default (unavailable).</param>
 /// <param name="Folds">The folds of the verdict (P6-05), or null.</param>
 /// <param name="PositiveFolds">The positive folds, or null.</param>
-/// <param name="CostSheet">The cost-sheet hard-fail term.</param>
+/// <param name="CostSheet">The cost-basis hard-fail term (GROSS-01).</param>
 /// <param name="HoldOutReused">The hold-out hard-fail term.</param>
 /// <param name="Notes">The honesty sentences about what was read.</param>
 /// <param name="LabTiers">The Lab out-of-sample trades by liquidity tier, for the hard fail "evidence only from tier C" (ADR 0224); unavailable with the reason when the verdict has no tier block.</param>
@@ -26,8 +26,7 @@ internal sealed class LabEvidenceReader(
     IQueryHandler<ListLabRunsQuery, Result<IReadOnlyList<LabRunView>>> runs,
     IQueryHandler<GetLabRunQuery, Result<LabRunView>> run,
     IQueryHandler<GetRegistrationQuery, Result<RegistrationView>> registration,
-    IQueryHandler<GetHoldOutQuery, Result<HoldOutView>> holdOut,
-    ICostConfirmationFact confirmation)
+    IQueryHandler<GetHoldOutQuery, Result<HoldOutView>> holdOut)
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -166,12 +165,7 @@ internal sealed class LabEvidenceReader(
 
         notes.Add(string.Create(Inv, $"Lab results are read from the newest finished full run of version {v}. Rows 2, 3 and 6 are on the development out-of-sample trades (pre-hold-out); they are not recomputed with the hold-out trades, because the hold-out's effective n and spread are not stored."));
         notes.Add("Row 3 uses the verdict's own out-of-sample expectancy (the figure of the P5 expectancy gate), and the larger of the factor the gates used and the honest factor of the full trial count; the standard deviation behind row 6 is that expectancy over the per-trade Sharpe of the deflated-Sharpe block.");
-        if (verdict.CostStress is { CostsChecked: false })
-        {
-            notes.Add("The Lab run's costs were not checked against a bill, so its net figures are not vouched for.");
-        }
-
-        var costSheet = await CostSheetAsync(verdict, cancellationToken);
+        var costSheet = CostBasisOf(verdict, notes);
         return new LabEvidence(checklist with { Notes = rowNotes }, evidence.Folds, evidence.PositiveFolds, costSheet, reused, notes, LabTierSet(verdict));
     }
 
@@ -218,15 +212,20 @@ internal sealed class LabEvidenceReader(
         return full.IsSuccess && full.Value.Verdict is { } verdict ? (verdict, string.Empty) : (null, none);
     }
 
-    private async ValueTask<FaultState> CostSheetAsync(LabVerdictView verdict, CancellationToken cancellationToken)
+    /// <summary>
+    /// The cost-basis term (GROSS-01, ADR 0294): clear when the verdict's cost stress ran on gross R less the stated cost buffer (its basis label is set and every row has a figure), unavailable otherwise (no cost stress block, a verdict stored before it, a buffer that was not usable,
+    /// or a run costed with a sheet's charges, which no longer exists): unavailable is never a pass.
+    /// </summary>
+    private static FaultState CostBasisOf(LabVerdictView verdict, List<string> notes)
     {
-        if (verdict.CostStress is not { SheetId: { Length: > 0 } sheet } stress)
+        if (verdict.CostStress is { CostBasis: { } basis } stress && basis.StartsWith(CostBufferOptions.BasisPrefix + "(", StringComparison.Ordinal) && stress.Rows.Count > 0 && stress.Rows.All(r => r.ExpectancyR is not null))
         {
-            return FaultState.Unavailable;
+            notes.Add("The Lab verdict's cost stress ran on " + basis + ": each out-of-sample trade's gross R less the stated cost buffer; nothing is called net.");
+            return FaultState.Clear;
         }
 
-        var confirmedOn = await confirmation.ConfirmedOnAsync(sheet, cancellationToken);
-        return stress.CostsChecked && confirmedOn is not null ? FaultState.Clear : FaultState.Fault;
+        notes.Add("The Lab verdict's cost stress did not run on gross R less the stated cost buffer (no cost stress block, a verdict produced before GROSS-01, or a buffer that was not usable): the cost-basis term is unavailable, which is never a pass; re-run the Lab full test.");
+        return FaultState.Unavailable;
     }
 
     /// <summary>

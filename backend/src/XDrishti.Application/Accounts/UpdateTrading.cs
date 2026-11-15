@@ -82,7 +82,7 @@ internal sealed class UpdateTradingHandler(
         var connection = await connections.FindAsync(account.Id, cancellationToken);
         var result = LiveReadiness.Evaluate(new LiveReadinessFacts(
             account.Trading.Enabled, TradingSettings.IsComplete(spec), spec.CapitalSource == CapitalSource.Fixed && spec.CapitalAmount is not null,
-            connection?.StatusAt(now) ?? ConnectionStatus.NotConnected, source.StepSet, source.Capture, source.Settle, source.PaperPhaseMet, source.ChargeSheetConfirmed, false));
+            connection?.StatusAt(now) ?? ConnectionStatus.NotConnected, source.StepSet, source.Capture, source.Settle, source.PaperPhaseMet, source.CostBasisStated, false));
         var reason = confirmReason?.Trim();
         var failing = new List<ReadinessItem>(result.FailingHard);
         var softOpen = result.FailingSoft;

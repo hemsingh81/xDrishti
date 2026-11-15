@@ -232,9 +232,11 @@ internal sealed class ReadinessFixture
 
     // ---- the real readers over them ----
 
-    public ForwardEdgeReader ForwardEdge => new(Shadow, Ledger, Confirmation);
+    public XDrishti.Domain.Confidence.CostBufferOptions Buffer { get; set; } = new();
 
-    public LabEvidenceReader LabReader => new(Runs, Run, Registration, HoldOut, Confirmation);
+    public ForwardEdgeReader ForwardEdge => new(Shadow, Ledger, Buffer);
+
+    public LabEvidenceReader LabReader => new(Runs, Run, Registration, HoldOut);
 
     public ForwardEvidenceReader ForwardReader => new(ForwardEdge, Decay, Sequential, Kills, async cancellationToken => PaperPhaseVerdict.Met(await Phase.HandleAsync(new EvaluatePaperPhaseCheckQuery(null, null), cancellationToken)), Models, new StrategyCells(Log));
 
@@ -249,7 +251,7 @@ internal sealed class ReadinessFixture
 
             var broken = Substitute.For<IShadowResultReader>();
             broken.ResultsAsync(Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromException<IReadOnlyList<ShadowResultRow>>(failure));
-            return new ForwardEdgeReader(broken, Ledger, Confirmation);
+            return new ForwardEdgeReader(broken, Ledger, Buffer);
         }
     }
 
@@ -269,11 +271,11 @@ internal sealed class ReadinessFixture
 
     // ---- builders ----
 
-    /// <summary>A net, confirmed forward series: one candidate a day, R alternating +0.5 and -0.1 (mean +0.2 R, sd about 0.3), over <paramref name="count"/> sessions.</summary>
+    /// <summary>A gross forward series (GROSS-01): one candidate a day, gross R alternating +0.6 and 0.0, so less the 0.10 R buffer +0.5 and -0.1 (mean +0.2 R, sd about 0.3), over <paramref name="count"/> sessions.</summary>
     public static List<ShadowResultRow> Series(int count) =>
     [
         .. Enumerable.Range(0, count).Select(i => new ShadowResultRow(
-            new DateOnly(2025, 1, 1).AddDays(i), $"{Strategy}|S{i}|BUY|{i}", "g", true, "graded", i % 2 == 0 ? 0.5 : -0.1, "net", "sheet-1", i % 2 == 0 ? 0.6 : 0.0, 1, InSet: true)),
+            new DateOnly(2025, 1, 1).AddDays(i), $"{Strategy}|S{i}|BUY|{i}", "g", true, "graded", i % 2 == 0 ? 0.6 : 0.0, "gross", null, i % 2 == 0 ? 0.6 : 0.0, 1, InSet: true)),
     ];
 
     private IReadOnlyList<LabRunView> RunList() => Verdict is null ? [] : [RunView(null)];
@@ -295,9 +297,9 @@ internal sealed class ReadinessFixture
             0.10),
         new DeflatedSharpeView("ReportOnly", 2, 2, null, null, 0.2, 320, null, null, 0.99, 0.95, string.Empty, string.Empty, string.Empty),
         new CostStressView(
-            "ReportOnly", false, string.Empty, string.Empty, true, "sheet-1",
+            "ReportOnly", false, string.Empty, string.Empty, false, null,
             [new CostStressRowView(1.0, 330, 0.2, 0, ">", "pass", string.Empty), new CostStressRowView(1.5, 330, 0.15, 0.08, ">=", "pass", string.Empty), new CostStressRowView(2.0, 330, 0.1, 0, ">", "pass", string.Empty)],
-            "pass", new CostStressDelayView(1, 100, 90, 0.2, 0.18, 0.9, 0.7, "pass", string.Empty, string.Empty), false, string.Empty, string.Empty, null, new CostStressTiersView(330, 300, 30, 0, 0, 0, 0, string.Empty, string.Empty, string.Empty, 0, 330, 0, 5000)),
+            "pass", new CostStressDelayView(1, 100, 90, 0.2, 0.18, 0.9, 0.7, "pass", string.Empty, string.Empty), false, string.Empty, string.Empty, null, new CostStressTiersView(330, 300, 30, 0, 0, 0, 0, string.Empty, string.Empty, string.Empty, 0, 330, 0, 5000), "gross_less_buffer(0.10R)"),
         null,
         new NullsView(
             "ReportOnly", false, string.Empty, string.Empty,
@@ -310,7 +312,7 @@ internal sealed class ReadinessFixture
 
     /// <summary>A clean decay report: a net reference of 40 trades at +0.1 R, sigma 1, and no CUSUM alarm.</summary>
     public static DecayReportView DecayView(bool alarm = false) => new(
-        Strategy, 1, true, new DecaySettingsView(60, 1.5, -0.05, new string('a', 64), "s", 0.3, true), new DecayReferenceView("available", null, 40, 0.1, 1, "net"),
+        Strategy, 1, true, new DecaySettingsView(60, 1.5, -0.05, new string('a', 64), "s", 0.3, true), new DecayReferenceView("available", null, 40, 0.1, 1, "gross_less_buffer(0.10R)"),
         new DecaySeriesView("basis", null, "ok", 330, 0, 0, false, null, [], new DecayCusumView(alarm, 0, null), [], null), null!, [], [], "line");
 
     public static SequentialStatusView SequentialView(string state, int? firstFailure) => new(

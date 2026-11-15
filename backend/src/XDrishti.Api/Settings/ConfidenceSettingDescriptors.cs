@@ -3,13 +3,14 @@ using System.Reflection;
 using XDrishti.Api.Confidence;
 using XDrishti.Application.LearnedSettings;
 using XDrishti.Application.SettingsCatalog;
+using XDrishti.Domain.Confidence;
 
 namespace XDrishti.Api.Settings;
 
 /// <summary>
 /// One descriptor for every key of the <c>Confidence</c> section (AU-08, ADR 0242). The default is read from a fresh <see cref="ConfidenceSettings"/>, so it cannot drift from the real default. The bounds are the outer
 /// bounds of the existing validation messages (inclusive; the existing validators keep the stricter rules). A key with no declared direction has <c>None</c> and so loosens both ways; the direction is declared only
-/// where the existing validation or an ADR says the key may only be tightened (Readiness, Kill, MlInfluence, Decay, Loop Level and HelpsAt, the CostStress tier, capacity and turnover values; and by plain meaning of the gate Pbo MaxPbo, the largest probability of backtest overfitting a pass tolerates); when a direction is not provably safe it is None. A key is learnable only when it is on <see cref="LearnedAllowList"/> (AU-10).
+/// where the existing validation or an ADR says the key may only be tightened (Readiness, Kill, Costs, MlInfluence, Decay, Loop Level and HelpsAt, the CostStress tier, capacity and turnover values; and by plain meaning of the gate Pbo MaxPbo, the largest probability of backtest overfitting a pass tolerates); when a direction is not provably safe it is None. A key is learnable only when it is on <see cref="LearnedAllowList"/> (AU-10).
 /// </summary>
 internal static class ConfidenceSettingDescriptors
 {
@@ -17,8 +18,8 @@ internal static class ConfidenceSettingDescriptors
     private const SettingSafer Down = SettingSafer.Lower;
     private const SettingSafer NoDirection = SettingSafer.None;
 
-    /// <summary>The sections whose keys the owner may tighten: the readiness bars, the kill rule, the model influence bars, the decay trip and the cost stress values.</summary>
-    private static readonly HashSet<string> AdvancedSections = new(StringComparer.Ordinal) { "Readiness", "Kill", "MlInfluence", "Decay", "CostStress" };
+    /// <summary>The sections whose keys the owner may tighten: the readiness bars, the kill rule, the model influence bars, the decay trip, the cost stress values and the cost buffer.</summary>
+    private static readonly HashSet<string> AdvancedSections = new(StringComparer.Ordinal) { "Readiness", "Kill", "MlInfluence", "Decay", "CostStress", "Costs" };
 
     /// <summary>The descriptors, in the order of the table below.</summary>
     public static IReadOnlyList<SettingDescriptor> All { get; } = Build();
@@ -61,6 +62,7 @@ internal static class ConfidenceSettingDescriptors
         K("Loop:MinDays", NoDirection, 20, 250); K("Loop:Draws", NoDirection, 2000, 20000); K("Loop:Level", Up, 0.90, 0.99); K("Loop:HelpsAt", Up, 0.95, 0.999); K("Loop:MinSlopePer50Rows", NoDirection, 0, 0.1);
         K("Loop:TargetGain", NoDirection, 0.001, 0.1); K("Loop:SlopeLow", NoDirection, 0.8, 1); K("Loop:SlopeHigh", NoDirection, 1, 1.2); K("Loop:SlopeSe", NoDirection, 1, 2);
         K("Kill:StressMultiplier", Up, 1.5, 3); K("Kill:DrawdownFactor", Down, 1, 2);
+        K("Costs:BufferR", Up, CostBufferOptions.MinBufferR, CostBufferOptions.MaxBufferR); // GROSS-01 (ADR 0294): a larger buffer is stricter, so lowering it is the owner's act
         K("Registration:Enforce"); K("Registration:CountInFactor");
         K("HoldOut:Enforce"); K("HoldOut:AutoUnlock"); K("HoldOut:MinMonths", NoDirection, 1, 60); K("HoldOut:SharePercent", NoDirection, 5, 50); K("HoldOut:MinTrades", NoDirection, 5, 1000); K("HoldOut:Retention", NoDirection, 0.1, 1); K("HoldOut:TrainingEmbargoDays", NoDirection, 28, 180); K("HoldOut:BlockMonths", NoDirection, 3, 12); K("HoldOut:AutoRelease");
         K("Readiness:MinNEff", Up, 300, 100000); K("Readiness:MinTradesPerCell", Up, 30, 10000); K("Readiness:ExpectancyR", Up, 0.15, 2); K("Readiness:TStatistic", Up, 2, 10); K("Readiness:MinQuarterShare", Up, 0.70, 1);

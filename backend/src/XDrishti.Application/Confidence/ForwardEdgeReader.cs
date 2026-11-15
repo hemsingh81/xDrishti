@@ -1,6 +1,7 @@
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Shadow;
 using XDrishti.Application.Shadow;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Readiness;
 using XDrishti.Domain.Shadow;
 
@@ -10,7 +11,7 @@ namespace XDrishti.Application.Confidence;
 /// Reads the forward edge series of a strategy for the scorecard through the one shared series rule (<see cref="EdgeSeries"/>, the same that the sequential test and the decay report read), so that the scorecard cannot read a different series. The effective n uses the same
 /// placeholder same-day correlation as CF-08 and CF-09 until CF-01 estimates it. The shadow rows are read once per instance (a scope), however many strategies ask. Read only.
 /// </summary>
-internal sealed class ForwardEdgeReader(IShadowResultReader reader, IPaperLedgerData ledger, ICostConfirmationFact confirmation)
+internal sealed class ForwardEdgeReader(IShadowResultReader reader, IPaperLedgerData ledger, CostBufferOptions buffer)
 {
     private IReadOnlyList<ShadowResultRow>? _rows;
 
@@ -54,14 +55,14 @@ internal sealed class ForwardEdgeReader(IShadowResultReader reader, IPaperLedger
     public async ValueTask<ForwardEdge> ReadAsync(string strategy, CancellationToken cancellationToken)
     {
         var selection = await SelectAsync(strategy, cancellationToken);
-        var costs = await ShadowCostBasis.ReadAsync(selection.Graded, confirmation, cancellationToken);
-        var figures = EdgeSeries.Figures(selection, costs);
+        var figures = EdgeSeries.Figures(selection, buffer);
         var trades = figures.Trades;
-        var basis = EdgeSeries.Basis(costs);
+        var basis = EdgeSeries.Basis(buffer);
+        var label = buffer.Label();
         var nEff = trades.Sum(t => 1.0 / EdgeCount.DesignEffect(t.DayCandidates, EdgeCount.PlaceholderRho));
-        if (costs.Gross || trades.Count < 2)
+        if (trades.Count < 2)
         {
-            return new ForwardEdge(trades.Count, nEff, null, null, null, costs.Gross, basis);
+            return new ForwardEdge(trades.Count, nEff, null, null, null, label, basis);
         }
 
         var rs = trades.Select(t => t.R).ToList();
@@ -69,6 +70,6 @@ internal sealed class ForwardEdgeReader(IShadowResultReader reader, IPaperLedger
         var sd = Math.Sqrt(rs.Sum(r => (r - mean) * (r - mean)) / (rs.Count - 1));
         var months = trades.GroupBy(t => (t.Row.SessionDate.Year, t.Row.SessionDate.Month)).Where(g => g.Count() >= ScoreAnchors.MonthMinTrades).ToList();
         double? share = months.Count == 0 ? null : (double)months.Count(g => g.Average(t => t.R) > 0) / months.Count;
-        return new ForwardEdge(trades.Count, nEff, mean, sd, share, false, basis);
+        return new ForwardEdge(trades.Count, nEff, mean, sd, share, label, basis);
     }
 }

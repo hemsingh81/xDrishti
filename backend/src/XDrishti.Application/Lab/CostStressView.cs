@@ -24,6 +24,7 @@ public sealed record CostStressDelayView(int Minutes, int Signals, int DelayedFi
 /// <param name="Limit">The first-order limit of the formula.</param>
 /// <param name="SheetRatesSha256">The hash of the sheet's rates the run was costed with, so a stored verdict says which numbers were checked.</param>
 /// <param name="Tiers">The liquidity tier and capacity counts of the trades (CF-05 follow-up, ADR 0223); null in a verdict stored before it ("produced before the tier and capacity check; re-run"). Nothing in the verdict reads it.</param>
+/// <param name="CostBasis">The cost basis the rows were judged on: <c>gross_less_buffer(&lt;value&gt;R)</c> for a gross run stressed on the cost buffer (GROSS-01, ADR 0294); null when the trades carried a sheet's charges, or in a verdict stored before it.</param>
 public sealed record CostStressView(
     string Mode,
     bool Enforce,
@@ -38,4 +39,5 @@ public sealed record CostStressView(
     string Formula,
     string Limit,
     string? SheetRatesSha256 = null,
-    CostStressTiersView? Tiers = null);
+    CostStressTiersView? Tiers = null,
+    string? CostBasis = null);

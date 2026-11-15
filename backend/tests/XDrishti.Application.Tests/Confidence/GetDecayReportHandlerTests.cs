@@ -33,6 +33,8 @@ public sealed class GetDecayReportHandlerTests
     private readonly IRunStore _runs = Substitute.For<IRunStore>();
     private readonly IKillProposalReader _proposals = Substitute.For<IKillProposalReader>();
 
+    private CostBufferOptions Buffer { get; } = new();
+
     public GetDecayReportHandlerTests()
     {
         _ledger.EpochAsync(null, Ct).Returns(new EpochRow(1, Start, DateTimeOffset.UnixEpoch, "first", "default", "system"));
@@ -43,7 +45,7 @@ public sealed class GetDecayReportHandlerTests
     }
 
     private ValueTask<Result<DecayReportView>> RunAsync(string? strategy = "ORB", DecayOptions? options = null, KillOptions? kill = null) =>
-        new GetDecayReportHandler(_reader, _ledger, _paper, _costs, new BacktestReferenceReader(_stats, _runs), options ?? new DecayOptions(), new SequentialOptions(), kill ?? new KillOptions(), _proposals).HandleAsync(new GetDecayReportQuery(strategy), Ct);
+        new GetDecayReportHandler(_reader, _ledger, _paper, Buffer, new BacktestReferenceReader(_stats, _runs), options ?? new DecayOptions(), new SequentialOptions(), kill ?? new KillOptions(), _proposals).HandleAsync(new GetDecayReportQuery(strategy), Ct);
 
     private static KillProposalRow Fired(int seriesTrades, long? epoch = 1) =>
         new(9, new NewKillProposal("ORB", epoch, "cost_stress", false, -0.5, 0, 100, "t", ["ORB|15m|BUY|intraday|FIXED_RR|*"], new string('a', 64), seriesTrades), new DateOnly(2026, 11, 3), DateTimeOffset.UnixEpoch, "proposed", null, null, null);
@@ -56,7 +58,7 @@ public sealed class GetDecayReportHandlerTests
 
         var kill = (await RunAsync(kill: new KillOptions(StressMultiplier: 2))).Value.Kill.Single(k => k.Rule == "cost_stress");
 
-        kill.Value!.Value.ShouldBe(-0.5 - 0.12, 1e-9);
+        kill.Value!.Value.ShouldBe(-0.5 - (2 * 0.10), 1e-9); // GROSS-01: gross - m x buffer
         kill.Text.ShouldContain("2.0 times cost");
     }
 
@@ -91,7 +93,7 @@ public sealed class GetDecayReportHandlerTests
     }
 
     /// <summary>A reference of <paramref name="count"/> backtest trades of the strategy ORB before the epoch, alternating +1.12 and -0.88 (mean 0.12, sd about 1).</summary>
-    private void Reference(int count, bool costed = true, bool varied = true)
+    private void Reference(int count, bool costed = false, bool varied = true)
     {
         var trades = Enumerable.Range(0, count).Select(i =>
         {
@@ -107,9 +109,9 @@ public sealed class GetDecayReportHandlerTests
     private static ShadowResultRow Row(int day, string strategy, double net, double? gross, string basis = "net", string status = "graded") =>
         new(Start.AddDays(day), $"{strategy}|SYM{day}|Buy|d{day}", "primary", true, status, net, basis, basis == "net" ? "flat-10" : null, gross, 1, InSet: true);
 
-    /// <summary>One candidate a session for <paramref name="count"/> sessions; net R <paramref name="net"/>, gross R <paramref name="net"/> + 0.12 (charges of 0.12 R).</summary>
-    private void Series(int count, double net, string strategy = "ORB", string basis = "net") =>
-        _reader.ResultsAsync(Ct).Returns([.. Enumerable.Range(0, count).Select(i => Row(i, strategy, net, basis == "net" ? net + 0.12 : net, basis))]);
+    /// <summary>One candidate a session for <paramref name="count"/> sessions, gross R <paramref name="gross"/> (GROSS-01: the series reads it less the 0.10 R buffer).</summary>
+    private void Series(int count, double gross, string strategy = "ORB") =>
+        _reader.ResultsAsync(Ct).Returns([.. Enumerable.Range(0, count).Select(i => Row(i, strategy, gross, gross, "gross"))]);
 
     [Theory]
     [InlineData(null)]
@@ -163,15 +165,18 @@ public sealed class GetDecayReportHandlerTests
     }
 
     [Fact]
-    public async Task A_net_series_against_a_net_reference_is_judged_window_by_window()
+    public async Task A_gross_series_against_a_gross_reference_is_judged_window_by_window_on_gross_less_the_buffer()
     {
         Reference(40);
         Series(130, -0.5);
 
         var view = (await RunAsync()).Value;
 
-        view.Reference.ShouldBe(new DecayReferenceView("available", null, 40, view.Reference.MeanR, view.Reference.Sigma, "net"));
-        view.Reference.MeanR!.Value.ShouldBe(0.12, 1e-9);
+        view.Reference.ShouldBe(new DecayReferenceView("available", null, 40, view.Reference.MeanR, view.Reference.Sigma, "gross_less_buffer(0.10R)"));
+        view.Reference.MeanR!.Value.ShouldBe(0.12 - 0.10, 1e-9);
+        view.Edge.Basis.ShouldStartWith("gross_less_buffer(0.10R)");
+        view.Edge.Basis.ShouldContain("Confidence:Costs:BufferR=0.1");
+        view.Edge.Basis.ShouldNotContain("net");
         view.Edge.State.ShouldBe("alert");
         view.Edge.Trades.ShouldBe(130);
         view.Edge.PendingTrades.ShouldBe(10);
@@ -194,7 +199,8 @@ public sealed class GetDecayReportHandlerTests
         var kill = (await RunAsync()).Value.Kill.ToDictionary(k => k.Rule);
 
         kill["cost_stress"].State.ShouldBe("fires");
-        kill["cost_stress"].Value!.Value.ShouldBe(-0.5 - 0.06, 1e-9);
+        kill["cost_stress"].Value!.Value.ShouldBe(-0.5 - (1.5 * 0.10), 1e-9);
+        kill["cost_stress"].Text.ShouldContain("gross_less_buffer(0.10R) at 1 times cost");
         kill["cost_stress"].Trades.ShouldBe(100);
         kill["decay_twice"].State.ShouldBe("fires");
         kill["failure_boundary"].State.ShouldBe("fires");
@@ -233,29 +239,34 @@ public sealed class GetDecayReportHandlerTests
     }
 
     [Fact]
-    public async Task A_gross_series_is_not_compared_with_a_net_reference_and_has_no_charges_to_stress()
+    public async Task A_costed_reference_is_not_compared_with_the_gross_less_buffer_series_and_the_cost_stress_still_runs()
     {
-        Reference(40);
-        Series(130, -0.5, basis: "gross");
+        Reference(40, costed: true);
+        Series(130, -0.5);
         _costs.ConfirmedOnAsync(Arg.Any<string>(), Ct).Returns(ValueTask.FromResult<DateOnly?>(null));
 
         var view = (await RunAsync()).Value;
 
+        view.Reference.Basis.ShouldBe("net");
         view.Edge.State.ShouldBe("unavailable");
-        view.Edge.Note!.ShouldContain("net of costs but the series is gross");
-        view.Kill.Single(k => k.Rule == "cost_stress").State.ShouldBe("not_evaluated");
+        view.Edge.Note!.ShouldContain("the reference is net of costs but the series is gross_less_buffer(0.10R)");
+        view.Kill.Single(k => k.Rule == "cost_stress").State.ShouldBe("fires");
     }
 
-    [Fact]
-    public async Task A_negative_cost_makes_cost_stress_not_evaluated()
+    [Theory]
+    [InlineData(1.5, 0.15, "holds")]
+    [InlineData(1.5, 0.149, "fires")]
+    [InlineData(3, 0.30, "holds")]
+    [InlineData(3, 0.299, "fires")]
+    public async Task The_cost_stress_fires_when_the_trailing_gross_mean_is_below_the_multiplier_times_the_buffer(double multiplier, double gross, string state)
     {
         Reference(40);
-        _reader.ResultsAsync(Ct).Returns([.. Enumerable.Range(0, 130).Select(i => Row(i, "ORB", -0.5, i == 120 ? -0.51 : -0.38))]);
+        Series(100, gross);
 
-        var kill = (await RunAsync()).Value.Kill.Single(k => k.Rule == "cost_stress");
+        var kill = (await RunAsync(kill: new KillOptions(StressMultiplier: multiplier))).Value.Kill.Single(k => k.Rule == "cost_stress");
 
-        kill.State.ShouldBe("not_evaluated");
-        kill.Text.ShouldContain("negative cost");
+        kill.State.ShouldBe(state);
+        kill.Text.ShouldContain("Confidence:Costs:BufferR=0.1");
     }
 
     [Fact]
@@ -288,15 +299,15 @@ public sealed class GetDecayReportHandlerTests
     {
         Reference(40);
         Series(10, 0.3);
-        var rows = Enumerable.Range(1, 60).Select(i => new PaperCompareRow(i, i, "primary", "measured", "ORB|15m|BUY|intraday|FIXED_RR|*", $"ORB|SYM{i}|Buy|d{i}", T0.AddDays(i), T0.AddDays(i).AddHours(5), -0.6, "net", "flat-10")).ToList();
-        rows.Add(new PaperCompareRow(99, 99, "primary", "measured", "VWAP|15m|BUY|intraday|FIXED_RR|*", "VWAP|SYM|Buy|d", T0, T0.AddMinutes(2000), 9, "net", "flat-10"));
+        var rows = Enumerable.Range(1, 60).Select(i => new PaperCompareRow(i, i, "primary", "measured", "ORB|15m|BUY|intraday|FIXED_RR|*", $"ORB|SYM{i}|Buy|d{i}", T0.AddDays(i), T0.AddDays(i).AddHours(5), -0.6, "gross", null)).ToList();
+        rows.Add(new PaperCompareRow(99, 99, "primary", "measured", "VWAP|15m|BUY|intraday|FIXED_RR|*", "VWAP|SYM|Buy|d", T0, T0.AddMinutes(2000), 9, "gross", null));
         _paper.ReadAsync(1, Ct).Returns(new PaperCompareData(rows, 0, null));
 
         var view = (await RunAsync()).Value;
 
         view.Behavioural.Trades.ShouldBe(60);
         view.Behavioural.State.ShouldBe("alert");
-        view.Behavioural.Basis.ShouldContain("net R as the P10 count stores it");
+        view.Behavioural.Basis.ShouldContain("gross_less_buffer(0.10R)");
         view.Edge.State.ShouldBe("monitoring");
     }
 

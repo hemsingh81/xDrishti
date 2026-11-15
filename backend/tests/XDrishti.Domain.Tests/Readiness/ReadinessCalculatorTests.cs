@@ -74,7 +74,7 @@ public sealed class ReadinessCalculatorTests
     public static TheoryData<string, HardFailInputs> EachTerm => new()
     {
         { ReadinessCalculator.IntegrityName, HardFailInputs.AllClear with { Integrity = FaultState.Fault } },
-        { ReadinessCalculator.CostSheetName, HardFailInputs.AllClear with { CostSheet = FaultState.Fault } },
+        { ReadinessCalculator.CostBasisName, HardFailInputs.AllClear with { CostSheet = FaultState.Fault } },
         { ReadinessCalculator.FailureBoundaryName, HardFailInputs.AllClear with { FailureBoundary = FaultState.Fault } },
         { ReadinessCalculator.HoldOutName, HardFailInputs.AllClear with { HoldOutReused = FaultState.Fault } },
         { ReadinessCalculator.TierName, HardFailInputs.AllClear with { TierCOnly = FaultState.Fault } },
