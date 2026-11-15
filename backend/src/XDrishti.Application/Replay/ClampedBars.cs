@@ -103,6 +103,15 @@ internal sealed class ClampedBars(IHoldOutStore holdOut, HoldOutOptions options,
         return new BarSlice(window.Bars, low, high - low);
     }
 
+    /// <summary>The 1-minute bars of the India date <paramref name="day"/> only, up to and including <paramref name="through"/> (SR-04 tape, ADR 0293): the same clamp (<see cref="ReplayHoldOutException"/> past it) and seam cut as every replay read, never a bar after the day or after <paramref name="through"/>.</summary>
+    public async ValueTask<IReadOnlyList<Bar>> DayMinutesAsync(Guid instrumentId, DateOnly day, DateTimeOffset through, CancellationToken cancellationToken)
+    {
+        await EnsureAsync(day, cancellationToken);
+        var from = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), IndiaOffset);
+        var close = CloseOf(day).AddSeconds(-1);
+        return through < from ? [] : await ReadAsync(instrumentId, from.ToUniversalTime(), (through < close ? through : close).ToUniversalTime(), cancellationToken); // the bar store takes UTC
+    }
+
     private ValueTask<IReadOnlyList<Bar>> ReadAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) =>
         SeamAwareBars.ReadAsync(minutes, seams, instrumentId, from, to, cancellationToken); // bars before the high-water seam are raw backfill and never enter a simulation, learning or planning path (ADR 0270, decision 10)
 

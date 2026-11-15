@@ -70,6 +70,9 @@ internal sealed class SimDaysStore(NpgsqlDataSource dataSource) : ISimDaysStore
     public async ValueTask SetWaitingAsync(Guid id, string? reason, DateTimeOffset now, CancellationToken cancellationToken) =>
         await UpdateAsync("UPDATE research.sim_days_runs SET waiting = @reason, updated_at = @now WHERE id = @id AND waiting IS DISTINCT FROM @reason AND phase IN ('idle', 'settling', 'settled')", id, now, c => c.Parameters.AddWithValue("reason", NpgsqlDbType.Varchar, (object?)Cap(reason, 40) ?? DBNull.Value), cancellationToken);
 
+    public async ValueTask SetHoldOutNoteAsync(Guid id, string? note, DateTimeOffset now, CancellationToken cancellationToken) =>
+        await UpdateAsync("UPDATE research.sim_days_runs SET hold_out_note = @note, updated_at = @now WHERE id = @id AND " + Active, id, now, c => c.Parameters.AddWithValue("note", NpgsqlDbType.Varchar, (object?)Cap(note, 1000) ?? DBNull.Value), cancellationToken);
+
     public ValueTask<bool> SetAutoAsync(Guid id, bool on, DateTimeOffset now, CancellationToken cancellationToken) =>
         UpdateAsync("UPDATE research.sim_days_runs SET auto = @on, updated_at = @now WHERE id = @id AND " + Active, id, now, c => c.Parameters.AddWithValue("on", NpgsqlDbType.Boolean, on), cancellationToken);
 

@@ -4991,6 +4991,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/sim/days/{id}/days/{date}/tape': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One page of a settled day's tape for playback: the stored 1-minute bars of the instruments in play (picked, held or traded that day) and the trade events (entry, exit; the stop is not moved) whose minute lies in [from, to] (date-times on the day, default 09:15 to 15:29 India time), and the live board at to (open positions, entry, stop, last price, running P&L, realised equity), using only bars up to to. Nothing after to and nothing beyond the settled day. 404 sim.not_found, sim.day_not_found; 409 sim.not_settled; 422 sim.invalid. Read only. */
+    get: operations['GetSimDayTape'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/sim/days/{id}/settle': {
     parameters: {
       query?: never;
@@ -23772,6 +23789,42 @@ export interface components {
       finishedAt: null | string;
       estimate: null | components['schemas']['SimAllEstimate'];
     };
+    /**
+     * @description The live board at the clock minute At (SR-04, AC 6), from the bars and the events up to that minute only. Equity is realised, as PaperLedger counts it: the equity at the previous close plus the gross P&amp;L of the exits of the day up to the minute; at the end
+     *     of the day it equals the settled closing equity (AC 5). Unrealised is the sum of the running P&amp;L of the open positions.
+     */
+    SimBoard: {
+      /** Format: date-time */
+      at: string;
+      open: components['schemas']['SimBoardPosition'][];
+      /** Format: double */
+      realised: number;
+      /** Format: double */
+      unrealised: number;
+      /** Format: double */
+      equityOpen: number;
+      /** Format: double */
+      equity: number;
+    };
+    /** @description An open position on the live board at the clock minute: the last price is the close of the instrument's last bar of the day up to the minute (null before its first bar; the running P&amp;L is then 0). */
+    SimBoardPosition: {
+      /** Format: int64 */
+      tradeNo: number;
+      symbol: string;
+      side: string;
+      /** Format: int32 */
+      qty: number;
+      /** Format: date-time */
+      entryAt: string;
+      /** Format: double */
+      entryPrice: number;
+      /** Format: double */
+      stop: number;
+      /** Format: double */
+      lastPrice: null | number;
+      /** Format: double */
+      runningPnl: number;
+    };
     /** @description One day of a simulation (SR-04, AC 7): the picks (the plan made at its close), the blocked with reasons, the fills, the trades that entered or exited on it, the closing equity and the result hash. bool SimDaySnapshotView.Stored is false for the settled cursor day before it is advanced. */
     SimDaySnapshotView: {
       /** Format: uuid */
@@ -23794,7 +23847,30 @@ export interface components {
       hindsight: components['schemas']['ReplayLabelView'][];
       costsLabel: string;
     };
-    /** @description A trade of the simulation book that enters or exits on the day (SR-04): the exit only when it is on or before the day, so a day never shows a later exit. Gross (ADR 0292). */
+    /**
+     * @description One page of a settled day's tape (SR-04 part B, ADR 0293): the stored 1-minute bars of the instruments in play (picked, held or traded that day) and the trade events whose minute lies in [From, To], and the live board at To. Nothing after To is in it.
+     *     Replaying the pages in order, with any paging, gives the settled day's trades and equity.
+     */
+    SimDayTapeView: {
+      /** Format: uuid */
+      runId: string;
+      /** Format: date */
+      session: string;
+      /** Format: date-time */
+      from: string;
+      /** Format: date-time */
+      to: string;
+      /** Format: date-time */
+      marketOpen: string;
+      /** Format: date-time */
+      marketClose: string;
+      symbols: string[];
+      bars: components['schemas']['SimTapeBar'][];
+      events: components['schemas']['SimTapeEvent'][];
+      board: components['schemas']['SimBoard'];
+      costsLabel: string;
+    };
+    /** @description A trade of the simulation book that enters or exits on the day (SR-04): the exit only when it is on or before the day, so a day never shows a later exit. Gross (ADR 0292). The instrument id, exit price and exit reason were added for the tape (part B); a day stored without them reads them as null. */
     SimDayTrade: {
       /** Format: int64 */
       tradeNo: number;
@@ -23820,6 +23896,11 @@ export interface components {
       grossPnl: null | number;
       /** Format: double */
       r: null | number;
+      /** Format: uuid */
+      instrumentId?: null | string;
+      /** Format: double */
+      exitPrice?: null | number;
+      exitReason?: null | string;
     };
     /** @description The body of the auto-run switch. */
     SimDaysAutoBody: {
@@ -23940,6 +24021,41 @@ export interface components {
       items: components['schemas']['SimReportJobView'][];
       /** @description The cursor of the next page; null on the last. */
       nextCursor: null | string;
+    };
+    /** @description One stored 1-minute bar of an instrument in play (SR-04 tape). At is the start of the minute. */
+    SimTapeBar: {
+      symbol: string;
+      /** Format: date-time */
+      at: string;
+      /** Format: double */
+      open: number;
+      /** Format: double */
+      high: number;
+      /** Format: double */
+      low: number;
+      /** Format: double */
+      close: number;
+      /** Format: int64 */
+      volume: number;
+    };
+    /** @description A trade event at its own minute (SR-04 tape): `entry` (price = the fill, stop = the initial stop) or `exit` (price = the exit, with the gross P&amp;L and the reason). The stop is not moved by the replay, so there is no stop-move event. */
+    SimTapeEvent: {
+      /** Format: date-time */
+      at: string;
+      kind: string;
+      /** Format: int64 */
+      tradeNo: number;
+      symbol: string;
+      side: string;
+      /** Format: int32 */
+      qty: number;
+      /** Format: double */
+      price: null | number;
+      /** Format: double */
+      stop: number;
+      /** Format: double */
+      grossPnl: null | number;
+      reason: null | string;
     };
     /** @description The out-of-fold score of the model beside the best baseline (log loss and Brier score: lower is better). */
     SimTrainingScore: {
@@ -38214,6 +38330,59 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetSimDayTape: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path: {
+        id: string;
+        date: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimDayTapeView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };

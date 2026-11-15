@@ -798,6 +798,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.CancelSimDaysCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.CancelSimDaysHandler>();
         services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Sim.GetSimDaysQuery, Result<XDrishti.Application.Replay.Sim.SimDaysView>>, XDrishti.Application.Replay.Sim.GetSimDaysHandler>();
         services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Sim.GetSimDayQuery, Result<XDrishti.Application.Replay.Sim.SimDaySnapshotView>>, XDrishti.Application.Replay.Sim.GetSimDayHandler>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Sim.GetSimDayTapeQuery, Result<XDrishti.Application.Replay.Sim.SimDayTapeView>>, XDrishti.Application.Replay.Sim.GetSimDayTapeHandler>(); // the tape reads bars through the replay facts (hold-out clamp), so it lives with the runner
         services.AddScoped<ICommandHandler<RunHoldOutEpochsCommand, HoldOutEpochsOutcome>, RunHoldOutEpochsHandler>(); // the evening run of the seal steps (HO-01 D10)
         services.AddScoped<ICommandHandler<ReleaseHoldOutCommand, HoldOutBlockView>, ReleaseHoldOutHandler>();
         services.AddScoped<LabPlateau>(); // the plateau gate beside the nulls, read from the stored sweep (CF-07 part C, ADR 0210)

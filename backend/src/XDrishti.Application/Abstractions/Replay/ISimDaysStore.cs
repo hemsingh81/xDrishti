@@ -26,6 +26,9 @@ public interface ISimDaysStore
     /// <summary>Records why the runner waits on the run (a yield rule), or clears it with null.</summary>
     ValueTask SetWaitingAsync(Guid id, string? reason, DateTimeOffset now, CancellationToken cancellationToken);
 
+    /// <summary>Sets the hold-out note of an active run (the start writes what its claim of block 1's look did, after the run is stored).</summary>
+    ValueTask SetHoldOutNoteAsync(Guid id, string? note, DateTimeOffset now, CancellationToken cancellationToken);
+
     /// <summary>Sets the auto flag of an active run; false when it is not active.</summary>
     ValueTask<bool> SetAutoAsync(Guid id, bool on, DateTimeOffset now, CancellationToken cancellationToken);
 

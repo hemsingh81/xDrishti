@@ -26,3 +26,6 @@ public sealed record GetSimDaysQuery(Guid Id) : IQuery<Result<SimDaysView>>;
 
 /// <summary>One stored day of a run, or the settled cursor day before it is advanced.</summary>
 public sealed record GetSimDayQuery(Guid Id, DateOnly Session) : IQuery<Result<SimDaySnapshotView>>;
+
+/// <summary>One page of a settled day's tape: the minutes from <paramref name="From"/> (default 09:15 India time) to <paramref name="To"/> (default 15:29), both on the day.</summary>
+public sealed record GetSimDayTapeQuery(Guid Id, DateOnly Session, DateTimeOffset? From, DateTimeOffset? To) : IQuery<Result<SimDayTapeView>>;

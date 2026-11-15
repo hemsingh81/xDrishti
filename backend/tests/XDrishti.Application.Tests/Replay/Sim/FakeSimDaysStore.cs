@@ -47,6 +47,12 @@ internal sealed class FakeSimDaysStore : ISimDaysStore
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask SetHoldOutNoteAsync(Guid id, string? note, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        Moved(id, r => SimDays.IsActive(r.Phase), r => r with { HoldOutNote = note });
+        return ValueTask.CompletedTask;
+    }
+
     public ValueTask<bool> SetAutoAsync(Guid id, bool on, DateTimeOffset now, CancellationToken cancellationToken) => Move(id, r => SimDays.IsActive(r.Phase), r => r with { Auto = on });
 
     public ValueTask<bool> SettleAsync(Guid id, SimDayPending pending, DateTimeOffset now, CancellationToken cancellationToken) =>
