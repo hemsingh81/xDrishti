@@ -99,7 +99,7 @@ public sealed class PaperSequentialApiTests(ApiFactory factory) : DataTestBase(f
         edge.GetProperty("state").GetString().ShouldBe("monitoring");
         edge.GetProperty("tradesCounted").GetInt32().ShouldBe(6);
         edge.GetProperty("effectiveN").GetDouble().ShouldBe(2.4, 1e-9);
-        edge.GetProperty("sum").GetDouble().ShouldBe(6 * -0.097777778 / 2.5, 1e-6);
+        edge.GetProperty("sum").GetDouble().ShouldBe(6 * -0.106666667 / 2.5, 1e-6); // GROSS-01: a gross loss of 1 R reads -1.1 R less the 0.10 R buffer
         edge.GetProperty("basis").GetString().ShouldNotBeNull().ShouldContain("modelled fills; no queue, no latency");
         view.GetProperty("rho").GetDouble().ShouldBe(0.3);
         view.GetProperty("rhoIsPlaceholder").GetBoolean().ShouldBeTrue();
