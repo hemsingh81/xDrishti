@@ -100,7 +100,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             }
         }
 
-        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "expression_legs", "expression_runs", "expression_trades", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "ml_holdout_scores", "ml_influence_checks", "ml_monitor_checks", "ml_switch_settings", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "replay_runs", "replay_sessions", "replay_sweeps", "replay_trades", "rollback_proposals", "sim_all_chunks", "sim_all_jobs", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "sim_training_runs", "trade_features", "trade_features_ext", "training_sets", "training_sim_cell_stats", "universe_settings_changes"]);
+        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "expression_legs", "expression_runs", "expression_trades", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "ml_holdout_scores", "ml_influence_checks", "ml_monitor_checks", "ml_switch_settings", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "replay_runs", "replay_sessions", "replay_sweeps", "replay_trades", "rollback_proposals", "sim_all_chunks", "sim_all_jobs", "sim_comparisons", "sim_days_runs", "sim_days_snapshots", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "sim_training_runs", "trade_features", "trade_features_ext", "training_sets", "training_sim_cell_stats", "universe_settings_changes"]);
         foreach (var name in names)
         {
             // a rollback proposal is inserted column by column (never as an already-decided row), so the role holds no table-level INSERT on it (RollbackGrantsTests covers its columns)
@@ -140,6 +140,26 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             ("replay_runs", "state", true), ("replay_runs", "cursor_session", true), ("replay_runs", "result_hash", true), ("replay_runs", "finished_at", true), ("replay_runs", "fail_reason", true), ("replay_runs", "recorded", true), ("replay_runs", "versions", false),
             ("replay_runs", "input_hash", false), ("replay_runs", "params", false), ("replay_runs", "settings_snapshot", false), ("replay_runs", "scope_hash", false), ("replay_runs", "range_to", false),
             ("replay_runs", "arm", false), ("replay_runs", "sweep_id", false), ("replay_sweeps", "starts", false), ("replay_sweeps", "params", false), ("replay_sessions", "record", false), ("replay_sessions", "equity", false), ("replay_trades", "net_pnl", false), ("replay_trades", "exit_at", false),
+        })
+        {
+            await using var check = new NpgsqlCommand("SELECT has_column_privilege('xd_app', @t, @c, 'UPDATE')", connection);
+            check.Parameters.AddWithValue("t", "research." + table);
+            check.Parameters.AddWithValue("c", column);
+            ((bool)(await check.ExecuteScalarAsync(Ct))!).ShouldBe(expected, $"UPDATE of {table}.{column}");
+        }
+    }
+
+    [Fact]
+    public async Task The_simulation_tables_let_the_runtime_role_update_only_the_moving_columns_of_a_run_and_nothing_of_a_day()
+    {
+        await using var connection = new NpgsqlConnection(_owner);
+        await connection.OpenAsync(Ct);
+
+        foreach (var (table, column, expected) in new[]
+        {
+            ("sim_days_runs", "phase", true), ("sim_days_runs", "cursor_session", true), ("sim_days_runs", "auto", true), ("sim_days_runs", "range_end", true), ("sim_days_runs", "pending_record", true), ("sim_days_runs", "fail_reason", true),
+            ("sim_days_runs", "params", false), ("sim_days_runs", "input_hash", false), ("sim_days_runs", "settings_snapshot", false), ("sim_days_runs", "versions", false), ("sim_days_runs", "capital", false), ("sim_days_runs", "range_start", false),
+            ("sim_days_snapshots", "record", false), ("sim_days_snapshots", "equity_close", false), ("sim_days_snapshots", "result_hash", false),
         })
         {
             await using var check = new NpgsqlCommand("SELECT has_column_privilege('xd_app', @t, @c, 'UPDATE')", connection);
@@ -253,7 +273,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             (await SqlStateAsync(_app, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
 
-        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(43); // the three SR-03 tables were dropped (ADR 0292)
+        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(45); // the three SR-03 tables were dropped (ADR 0292); SR-04 added sim_days_runs and sim_days_snapshots (ADR 0293)
     }
 
     [Fact]

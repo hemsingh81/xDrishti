@@ -4940,6 +4940,142 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/sim/days': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start a day-by-day simulation: body start, end (default the last complete stored session; clamped to the day before hold-out block 1 and its embargo unless block 1's strategy look is stored, which the start takes automatically when free and says so in holdOutNote), scope {basketIds, instrumentIds} (required), capital (default Sim:DefaultCapital), riskProfileId (default the seeded standard profile), mode (learning or frozen, default learning). Gross costs. 201 with the id. 422 sim.invalid (start after end, before the first stored bar plus the warm-up, empty scope, capital <= 0); 409 sim.busy (a simulation is active). */
+    post: operations['StartSimDays'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sim/days/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The status of a simulation: cursor day, phase (idle, settling, settled, complete, cancelled, error), auto, equity, days done of total, the hold-out note, the hindsight labels and the cost basis. Read only. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid. */
+    get: operations['GetSimDays'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sim/days/{id}/days/{date}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One day (yyyy-MM-dd): the picks, blocked with reasons, fills, the trades entering or exiting that day, the closing equity and result hash; stored false for the settled cursor day before it is advanced. 404 sim.day_not_found. Read only. */
+    get: operations['GetSimDay'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sim/days/{id}/settle': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Settle the cursor day (Instant): the runner moves the phase settling to settled. 202 with the status. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid. */
+    post: operations['SettleSimDay'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sim/days/{id}/advance': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Store the settled day (immutable) and move the cursor to the next trading session, or complete the run at its end. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid. */
+    post: operations['AdvanceSimDay'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sim/days/{id}/auto': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Auto-run on or off (body on): on settles and advances every day to the end; off stops after the current day. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid. */
+    post: operations['SetSimDaysAuto'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sim/days/{id}/continue': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Extend a complete simulation to the newest complete stored session; the stored days are not recomputed. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid. */
+    post: operations['ContinueSimDays'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sim/days/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancel a simulation; the stored days stay. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid. */
+    post: operations['CancelSimDays'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/replay/runs': {
     parameters: {
       query?: never;
@@ -23636,6 +23772,114 @@ export interface components {
       finishedAt: null | string;
       estimate: null | components['schemas']['SimAllEstimate'];
     };
+    /** @description One day of a simulation (SR-04, AC 7): the picks (the plan made at its close), the blocked with reasons, the fills, the trades that entered or exited on it, the closing equity and the result hash. bool SimDaySnapshotView.Stored is false for the settled cursor day before it is advanced. */
+    SimDaySnapshotView: {
+      /** Format: uuid */
+      runId: string;
+      /** Format: date */
+      session: string;
+      stored: boolean;
+      picks: components['schemas']['ReplayCandidateView'][];
+      blocked: components['schemas']['ReplayBlockedView'][];
+      fills: components['schemas']['ReplayFillView'][];
+      trades: components['schemas']['SimDayTrade'][];
+      /** Format: double */
+      equityClose: number;
+      /** Format: double */
+      drawdownPct: null | number;
+      /** Format: int32 */
+      openPositions: number;
+      notes: string[];
+      resultHash: string;
+      hindsight: components['schemas']['ReplayLabelView'][];
+      costsLabel: string;
+    };
+    /** @description A trade of the simulation book that enters or exits on the day (SR-04): the exit only when it is on or before the day, so a day never shows a later exit. Gross (ADR 0292). */
+    SimDayTrade: {
+      /** Format: int64 */
+      tradeNo: number;
+      symbol: string;
+      side: string;
+      cellKey: string;
+      /** Format: int32 */
+      qty: number;
+      /** Format: date */
+      entrySession: string;
+      /** Format: date-time */
+      entryAt: string;
+      /** Format: double */
+      entryPrice: number;
+      /** Format: double */
+      stopPrice: number;
+      swing: boolean;
+      /** Format: date */
+      exitSession: null | string;
+      /** Format: date-time */
+      exitAt: null | string;
+      /** Format: double */
+      grossPnl: null | number;
+      /** Format: double */
+      r: null | number;
+    };
+    /** @description The body of the auto-run switch. */
+    SimDaysAutoBody: {
+      on: boolean;
+    };
+    /** @description The body of a day-by-day simulation start (SR-04). Defaults: end the last complete stored session (clamped before hold-out block 1 unless its strategy look is stored), capital `Sim:DefaultCapital`, the seeded standard profile, mode learning. Costs are gross (ADR 0292). */
+    SimDaysStartBody: {
+      /** Format: date */
+      start: string;
+      /** Format: date */
+      end: null | string;
+      scope: null | components['schemas']['ReplayScopeBody'];
+      /** Format: double */
+      capital: null | number;
+      /** Format: uuid */
+      riskProfileId: null | string;
+      mode: null | string;
+    };
+    /** @description The answer of a start. */
+    SimDaysStarted: {
+      /** Format: uuid */
+      id: string;
+    };
+    /** @description The status of a day-by-day simulation (SR-04): the cursor day, the phase, the equity and how many days are done of the total, with the hindsight labels, the cost basis, the hold-out note and why the runner waits (`market_hours`, `low_disk`, `data_job`, `backfill`, `sim_all`), or null. */
+    SimDaysView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: date */
+      start: string;
+      /** Format: date */
+      end: string;
+      /** Format: date */
+      requestedEnd: string;
+      /** Format: date */
+      cursor: string;
+      phase: string;
+      auto: boolean;
+      mode: string;
+      /** Format: double */
+      capital: number;
+      /** Format: double */
+      equity: number;
+      /** Format: double */
+      settledEquity: null | number;
+      /** Format: int32 */
+      daysDone: number;
+      /** Format: int32 */
+      daysTotal: number;
+      holdOutNote: null | string;
+      waiting: null | string;
+      failReason: null | string;
+      hindsight: components['schemas']['ReplayLabelView'][];
+      costsLabel: string;
+      /** Format: int32 */
+      speedSecondsPerMinute: number;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
     /** @description One job a training report can read: what it covers and how far it has got. A training simulation, not evidence. */
     SimReportJobView: {
       /**
@@ -37865,6 +38109,315 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  StartSimDays: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SimDaysStartBody'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimDaysStarted'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetSimDays: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimDaysView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetSimDay: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        date: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimDaySnapshotView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SettleSimDay: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimDaysView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  AdvanceSimDay: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimDaysView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SetSimDaysAuto: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SimDaysAutoBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimDaysView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ContinueSimDays: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimDaysView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  CancelSimDays: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimDaysView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

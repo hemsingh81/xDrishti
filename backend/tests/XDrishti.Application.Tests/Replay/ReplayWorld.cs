@@ -90,6 +90,9 @@ internal sealed class ReplayWorld
 
     public DateOnly HoldOutStart { get; set; } = new(2027, 3, 1);
 
+    /// <summary>The last session of the block in force; null is <see cref="Start"/>.</summary>
+    public DateOnly? HoldOutEnd { get; set; }
+
     public int EmbargoDays { get; set; } = 30;
 
     public FillConstraints Fill { get; set; } = new(MaxPairCorrelation: 1.0, MaxPerSector: 10, MaxIntraday: 10, MaxSwing: 10, MaxNetLongRiskPct: 50, MaxNetShortRiskPct: 50, MaxPerTradeRiskPct: 2.0);
@@ -157,7 +160,7 @@ internal sealed class ReplayWorld
             holdOut.ListBlocksAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<StoredBlock>>([new StoredBlock(block, new StoredRelease(released.Start, DateTimeOffset.UnixEpoch, "owner", "owner:x", hash, true, released.End.AddDays(1)))]));
         }
 
-        holdOut.CurrentAsync(Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult<HoldOutBlock?>(NoHoldOut ? null : new HoldOutBlock(HoldOutStart, Start.AddYears(-3), Start, 6, "h", DateTimeOffset.UnixEpoch)));
+        holdOut.CurrentAsync(Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult<HoldOutBlock?>(NoHoldOut ? null : new HoldOutBlock(HoldOutStart, Start.AddYears(-3), HoldOutEnd ?? Start, 6, "h", DateTimeOffset.UnixEpoch)));
 
         var baskets = Substitute.For<IBasketQueries>();
         Baskets = baskets;

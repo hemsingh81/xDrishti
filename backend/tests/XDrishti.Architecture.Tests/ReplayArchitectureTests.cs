@@ -163,9 +163,9 @@ public sealed partial class ReplayArchitectureTests
 
         written.ShouldBe(allowed);
         Regex.IsMatch(store, @"DELETE\s+FROM|TRUNCATE", RegexOptions.IgnoreCase).ShouldBeFalse("the replay tables are never deleted from in this slice");
-        foreach (var file in Directory.GetFiles(Path.Combine(Src(), "XDrishti.Infrastructure", "Replay"), "*.cs", SearchOption.AllDirectories).Where(f => !f.EndsWith("ReplayStore.cs", StringComparison.Ordinal)))
+        foreach (var file in Directory.GetFiles(Path.Combine(Src(), "XDrishti.Infrastructure", "Replay"), "*.cs", SearchOption.AllDirectories).Where(f => !f.EndsWith("ReplayStore.cs", StringComparison.Ordinal) && !f.EndsWith("SimDaysStore.cs", StringComparison.Ordinal)))
         {
-            SqlWrite().IsMatch(File.ReadAllText(file)).ShouldBeFalse(file + " writes SQL: only ReplayStore does");
+            SqlWrite().IsMatch(File.ReadAllText(file)).ShouldBeFalse(file + " writes SQL: only ReplayStore (and SimDaysStore, its own two tables) does");
         }
 
         var namers = Directory.EnumerateFiles(Src(), "*.cs", SearchOption.AllDirectories)
@@ -180,6 +180,54 @@ public sealed partial class ReplayArchitectureTests
         SqlWrite().IsMatch("UPDATE research.replay_runs SET").ShouldBeTrue();
         SqlWrite().IsMatch("SELECT 1 FROM research.replay_runs").ShouldBeFalse("a read is not a write");
         SqlWrite().IsMatch("SELECT id FROM research.replay_runs FOR UPDATE SKIP LOCKED").ShouldBeFalse("a row lock is not a write");
+    }
+
+    // the store, the ledger port, and holdOut: SimDaysHoldOut.ClaimAsync, block 1's look through the HO-01b claim of the seal service (ADR 0293)
+    private static readonly string[] SimWriteReceivers = ["store", "ledger", "holdOut"];
+
+    private static readonly string[] SimResolvedAllowed = ["ISimDaysStore", "ReplayDriver", "IReplayFacts", "ICommandHandler"];
+
+    private static readonly string[] SimConstructorAllowed = ["IServiceScopeFactory", "SimDaysOptions", "SystemReplayOptions", "TimeProvider", "ILogger`1", "ReplayDriver", "IReplayFacts", "ReplayInputHasher", "IReplayInputs", "SimDaysHoldOut", "IRiskProfileStore", "ISimDaysStore", "ITestLedger", "ITradingCalendar"];
+
+    [Fact]
+    public void The_day_by_day_simulation_writes_only_its_two_tables_through_its_store_and_the_trial_ledger()
+    {
+        // SR-04 AC 12 (ADR 0293): no write reaches planning, paper, shadow, cell statistics, model or settings; there is no push. The hold-out look it takes goes through SimDaysHoldOut, the HO-01b claim of the seal service (Lab), never a store of its own.
+        var store = File.ReadAllText(Path.Combine(Src(), "XDrishti.Infrastructure", "Replay", "SimDaysStore.cs"));
+        SqlWrite().Matches(store).Select(m => m.Groups["table"].Value.ToLowerInvariant()).Distinct().Order(StringComparer.Ordinal).ToList().ShouldBe(["research.sim_days_runs", "research.sim_days_snapshots"]);
+        Regex.IsMatch(store, @"DELETE\s+FROM|TRUNCATE", RegexOptions.IgnoreCase).ShouldBeFalse();
+
+        var files = Directory.GetFiles(Path.Combine(Src(), "XDrishti.Application", "Replay", "Sim"), "*.cs");
+        files.Length.ShouldBeGreaterThan(10, "the scan sees the simulation files");
+        foreach (var file in files)
+        {
+            var text = File.ReadAllText(file);
+            text.ShouldNotContain("XDrishti.Execution", customMessage: file);
+            Banned().IsMatch(text).ShouldBeFalse(file);
+            foreach (Match write in ReceiverOfWrite().Matches(text))
+            {
+                SimWriteReceivers.ShouldContain(write.Groups["receiver"].Value, $"{Path.GetFileName(file)}: {write.Value} writes through something other than the simulation store, the ledger port or the hold-out claim (SR-04, AC 12)");
+            }
+
+            foreach (Match m in ResolvedType().Matches(text))
+            {
+                SimResolvedAllowed.ShouldContain(m.Groups["t"].Value, $"{Path.GetFileName(file)} resolves {m.Value}");
+            }
+        }
+
+        foreach (var type in Application.GetTypes().Where(t => t.Namespace == "XDrishti.Application.Replay.Sim" && (t.Name.EndsWith("Runner", StringComparison.Ordinal) || t.Name.EndsWith("Handler", StringComparison.Ordinal))))
+        {
+            foreach (var parameter in type.GetConstructors(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SelectMany(c => c.GetParameters()))
+            {
+                SimConstructorAllowed.ShouldContain(parameter.ParameterType.Name, $"{type.Name} takes {parameter.ParameterType.Name}");
+            }
+        }
+
+        // only the simulation widens the hold-out clamp
+        var wideners = Directory.EnumerateFiles(Path.Combine(Src(), "XDrishti.Application"), "*.cs", SearchOption.AllDirectories)
+            .Where(f => !RepositoryFiles.IsBuildOutput(f) && File.ReadAllText(f).Contains(".ReadInsideHoldOut(", StringComparison.Ordinal))
+            .Select(Path.GetFileName).Order(StringComparer.Ordinal).ToList();
+        wideners.ShouldBe(["SimDayBook.cs", "StartSimDaysHandler.cs"]);
     }
 
     [Fact]

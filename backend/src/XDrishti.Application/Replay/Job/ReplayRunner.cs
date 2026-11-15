@@ -1,14 +1,11 @@
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Replay;
 using XDrishti.Application.Abstractions.Research;
-using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Platform.Services;
 using XDrishti.Domain.Replay;
-using XDrishti.Domain.Research.SimAll;
 
 namespace XDrishti.Application.Replay.Job;
 
@@ -41,13 +38,7 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
     /// <summary>The wait after a failure of the store doubles from the poll interval up to this, so a database outage of some minutes does not fail a run for good.</summary>
     private static readonly TimeSpan MaxBackoff = TimeSpan.FromMinutes(5);
 
-    /// <summary>No run starts a session within this time of the market window opening (the session is short, the margin is as for the simulate-everything chunk).</summary>
-    private static readonly TimeSpan WindowMargin = TimeSpan.FromMinutes(30);
-
-    private static readonly TimeSpan BackfillEvery = TimeSpan.FromMinutes(1);
-
-    private DateTimeOffset? _backfillCheckedAt;
-    private bool _backfillIncomplete;
+    private readonly ReplayYieldRules _yield = new(options, time);
     private string? _lastYield;
     private volatile ActiveRun? _active;
     private bool _recovered;
@@ -346,51 +337,8 @@ public sealed class ReplayRunner(IServiceScopeFactory scopes, SystemReplayOption
             exit is null ? null : t.ExitSession, exit?.ExitAt, exit?.GrossPnl, exit?.Charges, exit?.NetPnl, exit?.ChargeSheetId, exit?.RSim);
     }
 
-    /// <summary>Why the job should wait now, or null. The rules of <c>SimAllRunner.YieldAsync</c>, and a simulate-everything chunk in flight. Cheap checks first; the backfill is asked once a minute.</summary>
-    private async Task<string?> YieldAsync(IServiceProvider services, bool includeBackfill, CancellationToken cancellationToken)
-    {
-        var now = time.GetUtcNow();
-        if (services.GetRequiredService<IFreeDiskProbe>().FreeBytes() is not { } free || free < options.MinFreeBytes)
-        {
-            return SimAllPause.LowDisk;
-        }
-
-        if (!options.RunInMarketHours)
-        {
-            var calendar = await services.GetRequiredService<ITradingCalendar>().GetAsync(cancellationToken);
-            if (SimAllPause.InMarketHours(calendar, now) || (SimAllPause.NextWindowStart(calendar, now) is { } next && next - now < WindowMargin))
-            {
-                return SimAllPause.MarketHours;
-            }
-        }
-
-        var gate = services.GetRequiredService<ISimAllBackfillGate>();
-        if (await gate.DataJobRunningAsync(cancellationToken))
-        {
-            return SimAllPause.DataJob; // a bar-history job or a recovery pass
-        }
-
-        if (await services.GetRequiredService<ISimAllStore>().GetActiveAsync(cancellationToken) is { State: SimAllStates.Running })
-        {
-            return SimAllRunning;
-        }
-
-        if (includeBackfill)
-        {
-            if (_backfillCheckedAt is not { } checkedAt || now - checkedAt >= BackfillEvery)
-            {
-                _backfillIncomplete = await gate.IncompleteReasonAsync(cancellationToken) is not null;
-                _backfillCheckedAt = now;
-            }
-
-            if (_backfillIncomplete)
-            {
-                return SimAllPause.Backfill;
-            }
-        }
-
-        return null;
-    }
+    /// <summary>Why the job should wait now, or null (<see cref="ReplayYieldRules"/>).</summary>
+    private ValueTask<string?> YieldAsync(IServiceProvider services, bool includeBackfill, CancellationToken cancellationToken) => _yield.ReasonAsync(services, includeBackfill, cancellationToken);
 
     private void NoteYield(Guid? runId, string reason)
     {

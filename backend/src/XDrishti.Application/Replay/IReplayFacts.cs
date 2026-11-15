@@ -23,6 +23,9 @@ public interface IReplayFacts
     /// <summary>The close of each day bar of an instrument (the benchmark index of the equity read) from <paramref name="from"/> to <paramref name="to"/> inclusive, through the same hold-out clamp as every other read of the replay (<see cref="ReplayHoldOutException"/> past it).</summary>
     ValueTask<IReadOnlyList<(DateOnly Session, double Close)>> DayClosesAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken);
 
+    /// <summary>SR-04 (ADR 0293): the run may read inside the hold-out block in force up to <paramref name="through"/> (block 1's strategy look is stored); its sessions there carry the <c>seen_holdout</c> label. Call before <c>PrepareAsync</c>. Only the day-by-day simulation calls this. Returns whether the clamp was widened (a facts source without a clamp of its own does not, and the caller stays before the cut).</summary>
+    bool ReadInsideHoldOut(DateOnly through) => false;
+
     /// <summary>
     /// Tells the facts of one run the last session it will replay (so the bars of each instrument are read once for the whole run) and, when the run resumes after a restart, the settings snapshot and the strategy versions that were stored with it (so neither is re-read from today's settings and today's active versions). With a version map a strategy that is not in it has no version. With <paramref name="learningFixed"/> learning mode recomputes from <paramref name="learningSources"/> (null: the sources of the frozen rows) and never asks for today's newest snapshot.
     /// The default does nothing: a facts source that keeps no window and has no stored snapshot needs neither.

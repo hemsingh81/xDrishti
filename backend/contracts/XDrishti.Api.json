@@ -17224,6 +17224,420 @@
         }
       }
     },
+    "/api/sim/days": {
+      "post": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "Start a day-by-day simulation: body start, end (default the last complete stored session; clamped to the day before hold-out block 1 and its embargo unless block 1's strategy look is stored, which the start takes automatically when free and says so in holdOutNote), scope {basketIds, instrumentIds} (required), capital (default Sim:DefaultCapital), riskProfileId (default the seeded standard profile), mode (learning or frozen, default learning). Gross costs. 201 with the id. 422 sim.invalid (start after end, before the first stored bar plus the warm-up, empty scope, capital <= 0); 409 sim.busy (a simulation is active).",
+        "operationId": "StartSimDays",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimDaysStartBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimDaysStarted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sim/days/{id}": {
+      "get": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "The status of a simulation: cursor day, phase (idle, settling, settled, complete, cancelled, error), auto, equity, days done of total, the hold-out note, the hindsight labels and the cost basis. Read only. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid.",
+        "operationId": "GetSimDays",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimDaysView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sim/days/{id}/days/{date}": {
+      "get": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "One day (yyyy-MM-dd): the picks, blocked with reasons, fills, the trades entering or exiting that day, the closing equity and result hash; stored false for the settled cursor day before it is advanced. 404 sim.day_not_found. Read only.",
+        "operationId": "GetSimDay",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimDaySnapshotView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sim/days/{id}/settle": {
+      "post": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "Settle the cursor day (Instant): the runner moves the phase settling to settled. 202 with the status. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid.",
+        "operationId": "SettleSimDay",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimDaysView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sim/days/{id}/advance": {
+      "post": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "Store the settled day (immutable) and move the cursor to the next trading session, or complete the run at its end. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid.",
+        "operationId": "AdvanceSimDay",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimDaysView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sim/days/{id}/auto": {
+      "post": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "Auto-run on or off (body on): on settles and advances every day to the end; off stops after the current day. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid.",
+        "operationId": "SetSimDaysAuto",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimDaysAutoBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimDaysView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sim/days/{id}/continue": {
+      "post": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "Extend a complete simulation to the newest complete stored session; the stored days are not recomputed. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid.",
+        "operationId": "ContinueSimDays",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimDaysView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sim/days/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "Cancel a simulation; the stored days stay. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid.",
+        "operationId": "CancelSimDays",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimDaysView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/replay/runs": {
       "post": {
         "tags": [
@@ -70329,6 +70743,382 @@
         },
         "description": "Progress of the job, read by the report view while it runs (AU-14, AU-15)."
       },
+      "SimDaySnapshotView": {
+        "required": [
+          "runId",
+          "session",
+          "stored",
+          "picks",
+          "blocked",
+          "fills",
+          "trades",
+          "equityClose",
+          "drawdownPct",
+          "openPositions",
+          "notes",
+          "resultHash",
+          "hindsight",
+          "costsLabel"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "session": {
+            "type": "string",
+            "format": "date"
+          },
+          "stored": {
+            "type": "boolean"
+          },
+          "picks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayCandidateView"
+            }
+          },
+          "blocked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayBlockedView"
+            }
+          },
+          "fills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayFillView"
+            }
+          },
+          "trades": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimDayTrade"
+            }
+          },
+          "equityClose": {
+            "type": "number",
+            "format": "double"
+          },
+          "drawdownPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "openPositions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "resultHash": {
+            "type": "string"
+          },
+          "hindsight": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayLabelView"
+            }
+          },
+          "costsLabel": {
+            "type": "string"
+          }
+        },
+        "description": "One day of a simulation (SR-04, AC 7): the picks (the plan made at its close), the blocked with reasons, the fills, the trades that entered or exited on it, the closing equity and the result hash. bool SimDaySnapshotView.Stored is false for the settled cursor day before it is advanced."
+      },
+      "SimDayTrade": {
+        "required": [
+          "tradeNo",
+          "symbol",
+          "side",
+          "cellKey",
+          "qty",
+          "entrySession",
+          "entryAt",
+          "entryPrice",
+          "stopPrice",
+          "swing",
+          "exitSession",
+          "exitAt",
+          "grossPnl",
+          "r"
+        ],
+        "type": "object",
+        "properties": {
+          "tradeNo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "cellKey": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "entrySession": {
+            "type": "string",
+            "format": "date"
+          },
+          "entryAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entryPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "stopPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "swing": {
+            "type": "boolean"
+          },
+          "exitSession": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "exitAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "grossPnl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "r": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "A trade of the simulation book that enters or exits on the day (SR-04): the exit only when it is on or before the day, so a day never shows a later exit. Gross (ADR 0292)."
+      },
+      "SimDaysAutoBody": {
+        "required": [
+          "on"
+        ],
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          }
+        },
+        "description": "The body of the auto-run switch."
+      },
+      "SimDaysStartBody": {
+        "required": [
+          "start",
+          "end",
+          "scope",
+          "capital",
+          "riskProfileId",
+          "mode"
+        ],
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date"
+          },
+          "end": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "scope": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReplayScopeBody"
+              }
+            ]
+          },
+          "capital": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "riskProfileId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "mode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The body of a day-by-day simulation start (SR-04). Defaults: end the last complete stored session (clamped before hold-out block 1 unless its strategy look is stored), capital `Sim:DefaultCapital`, the seeded standard profile, mode learning. Costs are gross (ADR 0292)."
+      },
+      "SimDaysStarted": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "description": "The answer of a start."
+      },
+      "SimDaysView": {
+        "required": [
+          "id",
+          "start",
+          "end",
+          "requestedEnd",
+          "cursor",
+          "phase",
+          "auto",
+          "mode",
+          "capital",
+          "equity",
+          "settledEquity",
+          "daysDone",
+          "daysTotal",
+          "holdOutNote",
+          "waiting",
+          "failReason",
+          "hindsight",
+          "costsLabel",
+          "speedSecondsPerMinute",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "start": {
+            "type": "string",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "format": "date"
+          },
+          "requestedEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "cursor": {
+            "type": "string",
+            "format": "date"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "auto": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "capital": {
+            "type": "number",
+            "format": "double"
+          },
+          "equity": {
+            "type": "number",
+            "format": "double"
+          },
+          "settledEquity": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "daysDone": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "daysTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "holdOutNote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "waiting": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "failReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hindsight": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayLabelView"
+            }
+          },
+          "costsLabel": {
+            "type": "string"
+          },
+          "speedSecondsPerMinute": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "The status of a day-by-day simulation (SR-04): the cursor day, the phase, the equity and how many days are done of the total, with the hindsight labels, the cost basis, the hold-out note and why the runner waits (`market_hours`, `low_disk`, `data_job`, `backfill`, `sim_all`), or null."
+      },
       "SimReportJobView": {
         "required": [
           "id",
@@ -75644,6 +76434,9 @@
     },
     {
       "name": "Reports"
+    },
+    {
+      "name": "Simulation"
     },
     {
       "name": "Replay"

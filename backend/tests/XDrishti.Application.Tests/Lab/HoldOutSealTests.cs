@@ -195,6 +195,92 @@ public sealed class HoldOutSealTests
         await _runs.DidNotReceive().InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>());
     }
 
+    // ---- SR-04 (ADR 0293): the day-by-day simulation takes block 1's look automatically
+
+    private static readonly FakeTimeProvider Later = new(new DateTimeOffset(2026, 11, 4, 6, 0, 0, TimeSpan.Zero));
+
+    private SimDaysHoldOut SimHoldOut(HoldOutOptions? options = null)
+    {
+        _store.Releases.Clear();
+        _store.Blocks.RemoveAll(b => b.Start == Two); // block 1 in force and sealed (its last session closed on 2026-10-30)
+        var o = options ?? new HoldOutOptions();
+        _runs.ListAsync(Arg.Any<string?>(), Arg.Any<LabRunState?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns((IReadOnlyList<LabRun>)[]);
+        return new SimDaysHoldOut(Epochs(Later), _store, Step(o, Later), _runs, new LabHoldOutGuard(_store, _bars, o, Later), o, new FixedCalendar(), Later);
+    }
+
+    [Fact]
+    public async Task A_simulation_into_block_one_claims_its_strategy_look_as_auto_and_is_clamped_until_the_look_is_stored()
+    {
+        Run("ORB", 3, new DateOnly(2026, 4, 1));
+        var holdOut = SimHoldOut();
+
+        var decided = await holdOut.ResolveAsync(new DateOnly(2026, 10, 30), Ct);
+        await _runs.DidNotReceive().InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>()); // the decision claims nothing
+        var answer = await holdOut.ClaimAsync(decided, Ct);
+
+        decided.Claim!.Start.ShouldBe(One);
+        answer.End.ShouldBe(HoldOutOptions.TrainingCut(One, new HoldOutOptions().TrainingEmbargoDays));
+        answer.ReadThrough.ShouldBeNull();
+        answer.Note!.ShouldContain("claimed automatically");
+        answer.Note!.ShouldContain(new HoldOutOptions().SnapshotHash());
+        await _runs.Received(1).InsertOrGetAsync(Arg.Is<NewLabRun>(n => n.Labels.Any(l => l.Contains(SimDaysHoldOut.Actor, StringComparison.Ordinal))), Arg.Any<CancellationToken>());
+        HoldOutJob.ModeOf(SimDaysHoldOut.Actor).ShouldBe(HoldOutUnlocker.AutoMode, "recorded as auto, never as an owner approval");
+    }
+
+    [Fact]
+    public async Task Once_block_one_strategy_look_is_stored_the_simulation_reads_inside_the_block()
+    {
+        var holdOut = SimHoldOut();
+        FreshStrategyLook(One);
+
+        var answer = await holdOut.ResolveAsync(new DateOnly(2026, 10, 30), Ct);
+
+        (answer.End, answer.ReadThrough, answer.Claim).ShouldBe((new DateOnly(2026, 10, 30), new DateOnly(2026, 10, 30), null));
+        answer.Note!.ShouldContain("mode owner, actor owner:x");
+        await _runs.DidNotReceive().InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task With_the_auto_option_off_or_no_candidate_the_end_is_clamped_and_nothing_is_claimed()
+    {
+        Run("ORB", 3, new DateOnly(2026, 4, 1));
+        var off = await SimHoldOut(new HoldOutOptions(AutoUnlock: false)).ResolveAsync(new DateOnly(2026, 10, 30), Ct);
+        _listed.Clear();
+        var holdOut = SimHoldOut();
+        var none = await holdOut.ClaimAsync(await holdOut.ResolveAsync(new DateOnly(2026, 10, 30), Ct), Ct);
+
+        off.Note!.ShouldContain("AutoUnlock is off");
+        none.Note!.ShouldContain("unavailable");
+        (off.ReadThrough, none.ReadThrough).ShouldBe((null, null));
+        await _runs.DidNotReceive().InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task While_a_hold_out_look_is_queued_the_simulation_claims_nothing_again()
+    {
+        Run("ORB", 3, new DateOnly(2026, 4, 1));
+        var holdOut = SimHoldOut();
+        _runs.ListAsync(null, LabRunState.Queued, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(_ => (IReadOnlyList<LabRun>)[.. _jobs.Values]);
+        await holdOut.ClaimAsync(await holdOut.ResolveAsync(new DateOnly(2026, 10, 30), Ct), Ct);
+
+        var again = await holdOut.ResolveAsync(new DateOnly(2026, 10, 30), Ct);
+
+        again.Claim.ShouldBeNull();
+        again.Note!.ShouldContain("queued or running");
+        await _runs.Received(1).InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_range_before_the_cut_reads_nothing_of_the_hold_out()
+    {
+        Run("ORB", 3, new DateOnly(2026, 4, 1));
+
+        var answer = await SimHoldOut().ResolveAsync(new DateOnly(2026, 2, 2), Ct);
+
+        answer.ShouldBe(new SimHoldOutAnswer(new DateOnly(2026, 2, 2), null, null));
+        await _runs.DidNotReceive().InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task A_filling_block_and_a_used_slot_and_a_run_that_does_not_pass_claim_nothing()
     {

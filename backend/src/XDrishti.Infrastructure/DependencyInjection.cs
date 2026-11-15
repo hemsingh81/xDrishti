@@ -393,6 +393,7 @@ public static class DependencyInjection
         services.AddScoped<XDrishti.Infrastructure.Replay.ReplayStore>(); // the system replay's own insert-only tables: runs, sessions and trades, one store for the write and the read side (SR-01 part B, ADR 0272)
         services.AddScoped<XDrishti.Application.Abstractions.Replay.IReplayStore>(sp => sp.GetRequiredService<XDrishti.Infrastructure.Replay.ReplayStore>());
         services.AddScoped<XDrishti.Application.Abstractions.Replay.IReplayReads>(sp => sp.GetRequiredService<XDrishti.Infrastructure.Replay.ReplayStore>());
+        services.AddScoped<XDrishti.Application.Abstractions.Replay.ISimDaysStore, XDrishti.Infrastructure.Replay.SimDaysStore>(); // the day-by-day simulation's own tables (SR-04, ADR 0293)
         services.AddScoped<XDrishti.Application.Abstractions.Replay.IReplayCandidates, XDrishti.Infrastructure.Replay.ReplayCandidateSource>(); // the conditional tickets of a replayed session from the as-of facts (SR-01)
         services.AddScoped<IPlanContextSource, StoredPlanContextSource>(); // accounts, holdings, sectors and correlations as of the close (P7-09, ADR 0092); read only
         services.AddScoped<ISuggestionStore, SuggestionStore>(); // the append-only suggestion inbox (P7-09, ADR 0092)

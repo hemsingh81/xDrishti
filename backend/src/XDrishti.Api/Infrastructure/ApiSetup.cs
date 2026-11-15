@@ -155,6 +155,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, PaperPhaseCheckEndpoints>(); // the paper phase check (P10-06): one GET, computed on read
         services.AddSingleton<IEndpointModule, TicketAlertsEndpoints>(); // price-crossing alerts and prompts on the plan screen (P7-20); preferences only, no order
         services.AddSingleton<IEndpointModule, ReportsEndpoints>();
+        services.AddSingleton<IEndpointModule, SimDaysEndpoints>(); // the day-by-day simulation (SR-04 part A, ADR 0293): start, settle, advance, auto, continue, cancel, read; research only, no order
         services.AddSingleton<IEndpointModule, ReplayEndpoints>(); // the system replay (SR-01 part C, ADR 0272): start, read while running, cancel; research only, no order
         services.AddSingleton<IEndpointModule, BasketBenchmarkEndpoints>(); // the owner's basket benchmark (BK-06c)
         services.AddSingleton<IEndpointModule, MarketStrengthEndpoints>(); // the stored relative-strength rows (BK-09): one GET, read only
@@ -305,6 +306,9 @@ internal static class ApiSetup
         services.AddHostedService<SimAllService>();
         services.AddReplayRunner(); // the system replay job (SR-01 part B, ADR 0272): its own hosted loop, never beside a simulate-everything chunk
         services.AddHostedService<XDrishti.Api.Lab.ReplayService>();
+        services.AddOptions<XDrishti.Application.Replay.Sim.SimDaysOptions>().BindConfiguration(XDrishti.Application.Replay.Sim.SimDaysOptions.Section).ValidateDataAnnotations().ValidateOnStart(); // the day-by-day simulation's defaults (SR-04)
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<XDrishti.Application.Replay.Sim.SimDaysOptions>>().Value));
+        services.AddHostedService<XDrishti.Api.Lab.SimDaysService>();
     }
 
     /// <summary>

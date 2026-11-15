@@ -784,8 +784,20 @@ public static class DependencyInjection
         services.AddScoped<HoldOutUnlocker>(); // the one look at the hold-out, by the owner or by the auto option (CF-06)
         services.AddScoped<ICommandHandler<RegisterStrategyCommand, RegistrationView>, RegisterStrategyHandler>();
         services.AddScoped<ICommandHandler<UnlockHoldOutCommand, LabRunView>, UnlockHoldOutHandler>();
-        services.AddScoped<IHoldOutSealStep, StrategyAutoLookStep>(); // seal step 20: the auto strategy look, never block 1 (HO-01 D10)
+        services.AddScoped<StrategyAutoLookStep>();
+        services.AddScoped<IHoldOutSealStep>(sp => sp.GetRequiredService<StrategyAutoLookStep>()); // seal step 20: the auto strategy look, never block 1 (HO-01 D10); its claim also takes block 1's look for SR-04 (ADR 0293)
         services.AddScoped<IHoldOutSealStep, HoldOutAutoReleaseStep>(); // seal step 90: the auto release (HO-01 D4)
+        // the day-by-day simulation (SR-04 part A, ADR 0293): a stored cursor over the SR-01 replay; research tables only, no order
+        services.TryAddSingleton(new XDrishti.Application.Replay.Sim.SimDaysOptions()); // the host replaces it with its configuration (section Sim)
+        services.AddScoped<SimDaysHoldOut>(); // the hold-out rule: inside block 1 only once its strategy look is stored, taken automatically when free
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.StartSimDaysCommand, Guid>, XDrishti.Application.Replay.Sim.StartSimDaysHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.SettleSimDayCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.SettleSimDayHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.AdvanceSimDayCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.AdvanceSimDayHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.SetSimAutoCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.SetSimAutoHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.ContinueSimDaysCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.ContinueSimDaysHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.Replay.Sim.CancelSimDaysCommand, XDrishti.Application.Replay.Sim.SimDaysView>, XDrishti.Application.Replay.Sim.CancelSimDaysHandler>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Sim.GetSimDaysQuery, Result<XDrishti.Application.Replay.Sim.SimDaysView>>, XDrishti.Application.Replay.Sim.GetSimDaysHandler>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.Replay.Sim.GetSimDayQuery, Result<XDrishti.Application.Replay.Sim.SimDaySnapshotView>>, XDrishti.Application.Replay.Sim.GetSimDayHandler>();
         services.AddScoped<ICommandHandler<RunHoldOutEpochsCommand, HoldOutEpochsOutcome>, RunHoldOutEpochsHandler>(); // the evening run of the seal steps (HO-01 D10)
         services.AddScoped<ICommandHandler<ReleaseHoldOutCommand, HoldOutBlockView>, ReleaseHoldOutHandler>();
         services.AddScoped<LabPlateau>(); // the plateau gate beside the nulls, read from the stored sweep (CF-07 part C, ADR 0210)
@@ -817,6 +829,7 @@ public static class DependencyInjection
     public static IServiceCollection AddReplayRunner(this IServiceCollection services)
     {
         services.AddSingleton<XDrishti.Application.Replay.Job.ReplayRunner>();
+        services.AddSingleton<XDrishti.Application.Replay.Sim.SimDaysRunner>(); // the day-by-day simulation's runner (SR-04, ADR 0293), the same job pattern
         return services;
     }
 
