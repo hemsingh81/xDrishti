@@ -2,3 +2,4 @@
 export { SimulationReportPage } from './components/SimulationReportPageLazy';
 export { SystemReplayPage } from './components/SystemReplayPageLazy';
 export { ReplayTradeChartPage } from './components/ReplayTradeChartPageLazy';
+export { SimDaysPage } from './components/SimDaysPageLazy';

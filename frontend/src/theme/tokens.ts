@@ -276,6 +276,7 @@ export const navHue: Record<string, IconHueName> = {
   '/reports': 'reports',
   '/reports/simulation': 'reports',
   '/simulation/replay': 'reports',
+  '/simulation/days': 'reports',
   '/lab': 'lab',
   '/assistant': 'suggestions',
   '/accounts': 'accounts',
