@@ -201,6 +201,55 @@ internal sealed class SimDaysStore(NpgsqlDataSource dataSource) : ISimDaysStore
             reader.IsDBNull(0) ? null : reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetDecimal(2), reader.GetString(3));
     }
 
+    public async ValueTask<IReadOnlyList<SimDaysListRow>> ListAsync(int offset, int take, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("""
+            SELECT r.id, r.phase, r.auto, r.mode,
+                   coalesce(jsonb_array_length(r.params->'scope'->'basketIds'), 0), coalesce(jsonb_array_length(r.params->'scope'->'instrumentIds'), 0),
+                   r.range_start, r.range_end, r.cursor_session, r.capital,
+                   (SELECT s.equity_close FROM research.sim_days_snapshots s WHERE s.run_id = r.id ORDER BY s.session DESC LIMIT 1),
+                   (SELECT count(*)::int FROM research.sim_days_snapshots s WHERE s.run_id = r.id),
+                   r.created_at
+            FROM research.sim_days_runs r
+            ORDER BY r.created_at DESC, r.id DESC
+            OFFSET @offset LIMIT @take
+            """);
+        command.Parameters.AddWithValue("offset", NpgsqlDbType.Integer, offset);
+        command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, take);
+        var rows = new List<SimDaysListRow>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new SimDaysListRow(
+                reader.GetGuid(0), reader.GetString(1), reader.GetBoolean(2), reader.GetString(3), reader.GetInt32(4), reader.GetInt32(5), reader.GetFieldValue<DateOnly>(6), reader.GetFieldValue<DateOnly>(7), reader.GetFieldValue<DateOnly>(8),
+                reader.GetDecimal(9), reader.IsDBNull(10) ? null : reader.GetDecimal(10), reader.GetInt32(11), reader.GetFieldValue<DateTimeOffset>(12)));
+        }
+
+        return rows;
+    }
+
+    public async ValueTask<IReadOnlyList<SimDayListRow>> ListDaysAsync(Guid id, bool descending, int offset, int take, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("""
+            SELECT session, equity_close, coalesce(jsonb_array_length(trades), 0), coalesce(jsonb_array_length(picks), 0),
+                   EXISTS (SELECT 1 FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(record->'labels') = 'array' THEN record->'labels' ELSE '[]'::jsonb END) l WHERE l LIKE 'seen\_holdout:%')
+            FROM research.sim_days_snapshots
+            WHERE run_id = @id
+            ORDER BY session
+            """ + (descending ? " DESC" : string.Empty) + " OFFSET @offset LIMIT @take");
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id);
+        command.Parameters.AddWithValue("offset", NpgsqlDbType.Integer, offset);
+        command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, take);
+        var rows = new List<SimDayListRow>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new SimDayListRow(reader.GetFieldValue<DateOnly>(0), reader.GetDecimal(1), reader.GetInt32(2), reader.GetInt32(3), reader.GetBoolean(4)));
+        }
+
+        return rows;
+    }
+
     private async ValueTask<List<SimDaySnapshotRow>> SnapshotRowsAsync(string where, Guid id, DateOnly? session, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand("SELECT session, record::text, picks::text, blocked::text, trades::text, equity_close, result_hash, end_in_force FROM research.sim_days_snapshots " + where);

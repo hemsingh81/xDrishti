@@ -17,3 +17,9 @@ public sealed record SimDaySnapshotRow(DateOnly Session, string RecordJson, stri
 
 /// <summary>What the tape of one day reads (SR-04 part B), and nothing more of the run: the stored day's record and trades (null when the day is not stored), the closing equity of the stored day before it (null on the first day) and the trades still open coming into the day (their latest stored state, a JSON array).</summary>
 public sealed record SimTapeDay(string? RecordJson, string? TradesJson, decimal? EquityOpen, string HeldJson);
+
+/// <summary>One simulation in the list (SR-04): the header columns and the scope's counts, never the stored texts. <paramref name="LastEquity"/> is the closing equity of the newest stored day, null before the first.</summary>
+public sealed record SimDaysListRow(Guid Id, string Phase, bool Auto, string Mode, int Baskets, int Instruments, DateOnly Start, DateOnly End, DateOnly Cursor, decimal Capital, decimal? LastEquity, int DaysDone, DateTimeOffset CreatedAt);
+
+/// <summary>One stored day in a run's list of days (SR-04): a projection, never the record text. <paramref name="SeenHoldOut"/>: the day's labels carry a <c>seen_holdout:</c> label.</summary>
+public sealed record SimDayListRow(DateOnly Session, decimal EquityClose, int Trades, int Picks, bool SeenHoldOut);

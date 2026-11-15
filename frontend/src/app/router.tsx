@@ -118,6 +118,10 @@ export const routes: RouteObject[] = [
             lazy: async () => ({ Component: (await import('@/features/simulation')).SystemReplayPage }),
           },
           {
+            path: 'simulation/days',
+            lazy: async () => ({ Component: (await import('@/features/simulation')).SimDaysPage }),
+          },
+          {
             path: 'simulation/replay/:runId/trades/:tradeNo',
             lazy: async () => ({ Component: (await import('@/features/simulation')).ReplayTradeChartPage }),
           },

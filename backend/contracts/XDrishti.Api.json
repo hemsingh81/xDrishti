@@ -17273,6 +17273,145 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "The simulations, newest first, a page at a time (limit 1 to 100, default 20; cursor from the previous page): id, phase, active (the one run in idle, settling or settled), auto, mode, scope (basket and stock counts), start, end, cursor, capital, equity (the newest stored day's close, the capital before the first), days done, created. Read only. 422 sim.invalid.",
+        "operationId": "ListSimDays",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimDaysListView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sim/days/settings": {
+      "get": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "The simulation's defaults: defaultCapital (rupees, Sim:DefaultCapital), speedSecondsPerMinute (playback at 1X) and autoContinue. Read only.",
+        "operationId": "GetSimDaysSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimDaysSettingsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sim/days/{id}/days": {
+      "get": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "The run's stored days, a page at a time (limit 1 to 100, default 20; cursor from the previous page; sort asc (default, oldest first) or desc): session, closing equity, trades, picks and seenHoldOut. Never the record. 404 sim.not_found; 422 sim.invalid. Read only.",
+        "operationId": "ListSimDayDays",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimDayListView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/sim/days/{id}": {
@@ -17280,7 +17419,7 @@
         "tags": [
           "Simulation"
         ],
-        "summary": "The status of a simulation: cursor day, phase (idle, settling, settled, complete, cancelled, error), auto, equity, days done of total, the hold-out note, the hindsight labels and the cost basis. Read only. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid.",
+        "summary": "The status of a simulation: cursor day, phase (idle, settling, settled, complete, cancelled, error), auto, equity, days done of total, the hold-out note, the hindsight labels, the cost basis and hasNewSessions (a complete run that Continue would extend). Read only. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid.",
         "operationId": "GetSimDays",
         "parameters": [
           {
@@ -70924,6 +71063,60 @@
         },
         "description": "An open position on the live board at the clock minute: the last price is the close of the instrument's last bar of the day up to the minute (null before its first bar; the running P&amp;L is then 0)."
       },
+      "SimDayListItemView": {
+        "required": [
+          "session",
+          "equityClose",
+          "trades",
+          "picks",
+          "seenHoldOut"
+        ],
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "string",
+            "format": "date"
+          },
+          "equityClose": {
+            "type": "number",
+            "format": "double"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "picks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "seenHoldOut": {
+            "type": "boolean"
+          }
+        },
+        "description": "One stored day: the closing equity, the trades entered or exited on it, the picks and whether it rests on a released hold-out block (`seen_holdout`)."
+      },
+      "SimDayListView": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimDayListItemView"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A page of a run's stored days (SR-04); string? SimDayListView.NextCursor is null on the last page."
+      },
       "SimDaySnapshotView": {
         "required": [
           "runId",
@@ -71199,6 +71392,136 @@
         },
         "description": "The body of the auto-run switch."
       },
+      "SimDaysListItemView": {
+        "required": [
+          "id",
+          "phase",
+          "active",
+          "auto",
+          "mode",
+          "scope",
+          "start",
+          "end",
+          "cursor",
+          "capital",
+          "equity",
+          "daysDone",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "auto": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/SimDaysScopeView"
+          },
+          "start": {
+            "type": "string",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "format": "date"
+          },
+          "cursor": {
+            "type": "string",
+            "format": "date"
+          },
+          "capital": {
+            "type": "number",
+            "format": "double"
+          },
+          "equity": {
+            "type": "number",
+            "format": "double"
+          },
+          "daysDone": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "One simulation in the list: bool SimDaysListItemView.Active marks the one active run (idle, settling or settled); decimal SimDaysListItemView.Equity is the closing equity of the newest stored day, the capital before the first."
+      },
+      "SimDaysListView": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimDaysListItemView"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A page of simulations (SR-04), newest first; string? SimDaysListView.NextCursor is null on the last page."
+      },
+      "SimDaysScopeView": {
+        "required": [
+          "baskets",
+          "instruments"
+        ],
+        "type": "object",
+        "properties": {
+          "baskets": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "instruments": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The scope of a simulation as counts: the baskets and the stocks it was started with."
+      },
+      "SimDaysSettingsView": {
+        "required": [
+          "defaultCapital",
+          "speedSecondsPerMinute",
+          "autoContinue"
+        ],
+        "type": "object",
+        "properties": {
+          "defaultCapital": {
+            "type": "number",
+            "format": "double"
+          },
+          "speedSecondsPerMinute": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "autoContinue": {
+            "type": "boolean"
+          }
+        },
+        "description": "The simulation's defaults (section `Sim`): the starting capital in rupees, the playback seconds per market minute at 1X and whether a complete run extends by itself."
+      },
       "SimDaysStartBody": {
         "required": [
           "start",
@@ -71383,9 +71706,13 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "hasNewSessions": {
+            "type": "boolean",
+            "default": false
           }
         },
-        "description": "The status of a day-by-day simulation (SR-04): the cursor day, the phase, the equity and how many days are done of the total, with the hindsight labels, the cost basis, the hold-out note and why the runner waits (`market_hours`, `low_disk`, `data_job`, `backfill`, `sim_all`), or null."
+        "description": "The status of a day-by-day simulation (SR-04): the cursor day, the phase, the equity and how many days are done of the total, with the hindsight labels, the cost basis, the hold-out note and why the runner waits (`market_hours`, `low_disk`, `data_job`, `backfill`, `sim_all`), or null. bool SimDaysView.HasNewSessions: the run is complete and Continue would extend it (a newer complete session is stored and the hold-out lets it be read); computed by the status read only, false on the answers of the commands."
       },
       "SimReportJobView": {
         "required": [

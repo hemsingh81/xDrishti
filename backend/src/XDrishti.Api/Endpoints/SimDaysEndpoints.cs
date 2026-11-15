@@ -24,9 +24,24 @@ internal sealed class SimDaysEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group.MapGet("", ListAsync)
+            .WithName("ListSimDays")
+            .WithSummary("The simulations, newest first, a page at a time (limit 1 to 100, default 20; cursor from the previous page): id, phase, active (the one run in idle, settling or settled), auto, mode, scope (basket and stock counts), start, end, cursor, capital, equity (the newest stored day's close, the capital before the first), days done, created. Read only. 422 sim.invalid.")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapGet("/settings", SettingsAsync)
+            .WithName("GetSimDaysSettings")
+            .WithSummary("The simulation's defaults: defaultCapital (rupees, Sim:DefaultCapital), speedSecondsPerMinute (playback at 1X) and autoContinue. Read only.");
+
+        group.MapGet("/{id:guid}/days", DaysAsync)
+            .WithName("ListSimDayDays")
+            .WithSummary("The run's stored days, a page at a time (limit 1 to 100, default 20; cursor from the previous page; sort asc (default, oldest first) or desc): session, closing equity, trades, picks and seenHoldOut. Never the record. 404 sim.not_found; 422 sim.invalid. Read only.")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
         group.MapGet("/{id:guid}", GetAsync)
             .WithName("GetSimDays")
-            .WithSummary("The status of a simulation: cursor day, phase (idle, settling, settled, complete, cancelled, error), auto, equity, days done of total, the hold-out note, the hindsight labels and the cost basis. Read only." + Codes)
+            .WithSummary("The status of a simulation: cursor day, phase (idle, settling, settled, complete, cancelled, error), auto, equity, days done of total, the hold-out note, the hindsight labels, the cost basis and hasNewSessions (a complete run that Continue would extend). Read only." + Codes)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapGet("/{id:guid}/days/{date}", DayAsync)
@@ -82,6 +97,15 @@ internal sealed class SimDaysEndpoints : IEndpointModule
         var result = await handler.HandleAsync(new StartSimDaysCommand(body.Start, body.End, body.Scope?.BasketIds, body.Scope?.InstrumentIds, body.Capital, body.RiskProfileId, body.Mode), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Created("/api/sim/days/" + result.Value.ToString("D"), new SimDaysStarted(result.Value));
     }
+
+    private static async Task<Results<Ok<SimDaysListView>, ProblemHttpResult>> ListAsync(string? limit, string? cursor, HttpContext http, IQueryHandler<ListSimDaysQuery, Result<SimDaysListView>> handler, CancellationToken cancellationToken) =>
+        Read(http, await handler.HandleAsync(new ListSimDaysQuery(limit, cursor), cancellationToken));
+
+    private static async Task<Ok<SimDaysSettingsView>> SettingsAsync(IQueryHandler<GetSimDaysSettingsQuery, SimDaysSettingsView> handler, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await handler.HandleAsync(new GetSimDaysSettingsQuery(), cancellationToken));
+
+    private static async Task<Results<Ok<SimDayListView>, ProblemHttpResult>> DaysAsync(Guid id, string? limit, string? cursor, string? sort, HttpContext http, IQueryHandler<ListSimDayDaysQuery, Result<SimDayListView>> handler, CancellationToken cancellationToken) =>
+        Read(http, await handler.HandleAsync(new ListSimDayDaysQuery(id, limit, cursor, sort), cancellationToken));
 
     private static async Task<Results<Ok<SimDaysView>, ProblemHttpResult>> GetAsync(Guid id, HttpContext http, IQueryHandler<GetSimDaysQuery, Result<SimDaysView>> handler, CancellationToken cancellationToken) =>
         Read(http, await handler.HandleAsync(new GetSimDaysQuery(id), cancellationToken));

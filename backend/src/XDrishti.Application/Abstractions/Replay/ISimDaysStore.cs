@@ -54,4 +54,10 @@ public interface ISimDaysStore
     ValueTask<SimTapeDay> TapeDayAsync(Guid id, DateOnly session, CancellationToken cancellationToken);
 
     ValueTask<SimDaySnapshotRow?> SnapshotAsync(Guid id, DateOnly session, CancellationToken cancellationToken);
+
+    /// <summary>Up to <paramref name="take"/> runs from <paramref name="offset"/>, newest first (created, then id).</summary>
+    ValueTask<IReadOnlyList<SimDaysListRow>> ListAsync(int offset, int take, CancellationToken cancellationToken);
+
+    /// <summary>Up to <paramref name="take"/> stored days of a run from <paramref name="offset"/>, in session order (newest first when <paramref name="descending"/>); a projection of narrow columns.</summary>
+    ValueTask<IReadOnlyList<SimDayListRow>> ListDaysAsync(Guid id, bool descending, int offset, int take, CancellationToken cancellationToken);
 }

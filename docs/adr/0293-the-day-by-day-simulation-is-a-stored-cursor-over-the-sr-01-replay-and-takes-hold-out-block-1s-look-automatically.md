@@ -21,3 +21,6 @@ The owner wants an XDhan-like simulation: one trading day at a time, learning on
 - The hold-out block 1 look is taken by the first simulation that reaches it, if a strategy version qualifies; until then simulations stop at 2026-04-09 and say so.
 - A Continue leaves a one-day gap of new entries at the old end (the price of never recomputing stored days).
 - The risk limits are the seeded Standard profile (or one named at start), as SR-01; reading the paper account's own profile is open.
+
+## Part C (2026-11-15)
+The Day-by-day screen (`/simulation/days`) plays a stored day on a clock from the tape, mirroring `SimTape.BoardAt` in `simBoard.ts`. List endpoints `GET /api/sim/days`, `GET /api/sim/days/{id}/days` and `GET /api/sim/days/settings` are read-only projections. `hasNewSessions` on a complete run's status is true when newer complete sessions can be read, **or** when block 1's strategy look is still free: Continue is how that look is taken (it answers 409 `sim.nothing_new` with the note while the look runs, and extends the run once the look is stored). The status itself never claims the look.

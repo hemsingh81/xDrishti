@@ -2,7 +2,7 @@ using XDrishti.Application.Replay.Reads;
 
 namespace XDrishti.Application.Replay.Sim;
 
-/// <summary>The status of a day-by-day simulation (SR-04): the cursor day, the phase, the equity and how many days are done of the total, with the hindsight labels, the cost basis, the hold-out note and why the runner waits (<c>market_hours</c>, <c>low_disk</c>, <c>data_job</c>, <c>backfill</c>, <c>sim_all</c>), or null.</summary>
+/// <summary>The status of a day-by-day simulation (SR-04): the cursor day, the phase, the equity and how many days are done of the total, with the hindsight labels, the cost basis, the hold-out note and why the runner waits (<c>market_hours</c>, <c>low_disk</c>, <c>data_job</c>, <c>backfill</c>, <c>sim_all</c>), or null. <see cref="HasNewSessions"/>: the run is complete and Continue would extend it (a newer complete session is stored and the hold-out lets it be read); computed by the status read only, false on the answers of the commands.</summary>
 public sealed record SimDaysView(
     Guid Id,
     DateOnly Start,
@@ -24,4 +24,5 @@ public sealed record SimDaysView(
     string CostsLabel,
     int SpeedSecondsPerMinute,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool HasNewSessions = false);
