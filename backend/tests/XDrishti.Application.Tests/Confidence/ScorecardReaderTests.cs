@@ -650,11 +650,50 @@ public sealed class ScorecardReaderTests
     [Fact]
     public async Task Row_10_passes_a_quarter_with_a_mean_of_exactly_minus_0_05()
     {
-        var f = WithRobustness(r => r with { ByQuarter = [Q(2025, 1, 0.1), Q(2025, 2, -0.05)] });
+        var f = WithRobustness(r => r with { ByQuarter = [Q(2025, 1, 0.1), Q(2025, 2, 0.05)] }); // gross 0.05 less the 0.10 buffer is exactly -0.05
 
         var card = await CardAsync(f);
 
         Status(card, 10).ShouldBe("pass");
+    }
+
+    [Fact]
+    public async Task A_quarter_whose_gross_mean_clears_the_floor_but_not_once_less_the_buffer_does_not_count()
+    {
+        // GROSS-01: gross 0.04 R is above the -0.05 floor, gross less the 0.10 buffer (-0.06) is not
+        var f = WithRobustness(r => r with { ByQuarter = [Q(2025, 1, 0.3), Q(2025, 2, 0.04)] });
+
+        var card = await CardAsync(f);
+
+        Status(card, 10).ShouldBe("fail");
+        card.Rows.Single(r => r.Number == 10).Value.ShouldContain("quarters 50 %");
+    }
+
+    [Fact]
+    public async Task The_year_concentration_is_read_on_each_years_total_less_the_buffer_per_trade()
+    {
+        // gross totals 30 and 20 over 100 trades each: 60 % gross, (30 - 10) / ((30 - 10) + (20 - 10)) = 67 % less the buffer, above the 0.60 limit
+        var f = WithRobustness(r => r with { ByYear = [new YearView(2024, 100, 0.3, 30, 1.3, true), new YearView(2025, 100, 0.2, 20, 1.3, true)] });
+
+        var card = await CardAsync(f);
+
+        Status(card, 10).ShouldBe("fail");
+    }
+
+    [Fact]
+    public async Task New_verdicts_count_the_positive_folds_on_each_folds_mean_less_the_buffer_and_old_ones_keep_the_stored_count()
+    {
+        var fresh = new ReadinessFixture();
+        fresh.Verdict = fresh.Verdict! with { Evidence = fresh.Verdict.Evidence with { Folds = 3, PositiveFolds = 3, FoldMeansR = [0.3, 0.08, 0.2] } };
+        var old = new ReadinessFixture();
+        old.Verdict = old.Verdict! with { Evidence = old.Verdict.Evidence with { Folds = 3, PositiveFolds = 3, FoldMeansR = null } };
+
+        var freshLab = await fresh.LabReader.ReadAsync(ReadinessFixture.Strategy, 1, TestContext.Current.CancellationToken);
+        var oldLab = await old.LabReader.ReadAsync(ReadinessFixture.Strategy, 1, TestContext.Current.CancellationToken);
+
+        freshLab.PositiveFolds.ShouldBe(2); // 0.08 - 0.10 is not positive
+        oldLab.PositiveFolds.ShouldBe(3);
+        oldLab.Notes.ShouldContain(n => n.Contains("produced before the per-fold means were kept", StringComparison.Ordinal));
     }
 
     [Fact]

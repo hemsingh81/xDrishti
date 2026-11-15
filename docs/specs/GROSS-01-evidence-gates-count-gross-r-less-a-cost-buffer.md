@@ -16,7 +16,7 @@ With costs gross forever, five evidence gates could never pass. They now judge *
 - Gate 5, live-readiness soft item `charge_sheet_confirmed` (`LiveReadinessSource.cs:47-55`, `LiveReadiness.cs:60,75`): always failing, needs a typed reason.
 
 ## The cost buffer (researched default)
-- Setting `Confidence:Costs:BufferR`, **default 0.10 R per round trip**, range 0.05–0.50, **tighten-only** (it can be raised freely; lowering it is an owner act, password-protected like the other Confidence settings).
+- Setting `Confidence:Costs:BufferR`, **default 0.10 R per round trip**, range 0.05–0.50, **tighten-only**, declared safer higher. *Corrected at build (coordinator, 2026-11-15):* it is not on the learned allow-list, so the app has no path to change it; changing it is an owner act through host configuration only (appsettings or environment, validated at start, an out-of-range value stops the host).
 - Why 0.10 R: an NSE intraday equity round trip at Dhan costs about 0.04–0.06 % of turnover (brokerage capped at ₹20 an order, STT 0.025 % on the sell, exchange about 0.003 %, SEBI fee, stamp duty 0.003 % on the buy, GST on brokerage and exchange fees), plus slippage. With the strategies' stops at about 0.5–1 % of price, that is about 0.05–0.12 R. 0.10 R sits at the top of that range, so the gates stay on the safe side. Swing trades (with delivery STT at 0.1 % each side) cost more per round trip but have wider stops; the same buffer is used, with a note in the ADR.
 - Every figure built this way carries the basis label `gross_less_buffer(0.10R)` with the setting snapshot; nothing is ever labelled net.
 
@@ -39,7 +39,7 @@ With costs gross forever, five evidence gates could never pass. They now judge *
 5. The Lab cost-basis row is Clear with the stress run, Unavailable without it; Unavailable is a hard fail.
 6. Auto can be turned on when every other precondition passes and the buffer setting is valid; an unreadable setting refuses it, named.
 7. Live readiness's soft item passes with a valid setting and fails (needing a typed reason) when unreadable.
-8. Raising the buffer needs no password; lowering it is refused without the owner's step-up (settings catalog and API tests).
+8. *(Corrected at build.)* The catalog declares the buffer Advanced and safer higher; an approved learned change to it is never laid over the configuration (not on the allow-list), so the gates keep the configured value; a configured value out of range stops the host (settings catalog and configuration tests).
 9. Every figure and report shows the basis `gross_less_buffer(<value>R)`; no figure is labelled net.
 10. `ExecutionBoundaryArchitectureTests` stays green; no new order path.
 

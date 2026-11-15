@@ -126,6 +126,20 @@ public sealed class LearnedConfigTests(ApiFactory factory)
     }
 
     [Fact]
+    public void An_approved_cost_buffer_change_is_never_laid_over_the_configuration_and_the_gates_still_read_the_tenth()
+    {
+        // GROSS-01 (ADR 0294): the buffer is not on the allow-list; changing it is an owner act through host configuration only
+        LearnedAllowList.Keys.ShouldNotContain("Confidence:Costs:BufferR");
+
+        var lowered = Overlay([new("Confidence:Costs:BufferR", "0.05", "owner:me@x.test")]);
+        var raised = Overlay([new("Confidence:Costs:BufferR", "0.2", "auto")]);
+
+        lowered.Costs.BufferR.ShouldBe(0.10);
+        raised.Costs.BufferR.ShouldBe(0.10);
+        factory.Services.GetRequiredService<XDrishti.Domain.Confidence.CostBufferOptions>().BufferR.ShouldBe(0.10);
+    }
+
+    [Fact]
     public void The_configuration_binds_the_learned_guardrails_with_their_defaults()
     {
         var options = factory.Services.GetRequiredService<LearnedSettingsOptions>();

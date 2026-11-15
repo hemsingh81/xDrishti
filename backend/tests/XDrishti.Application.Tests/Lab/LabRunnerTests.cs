@@ -351,7 +351,9 @@ public sealed class LabRunnerTests
         verdicts[0].Evidence.Dependence.ShouldBeNull();
         verdicts[1].Outcome.ShouldBe(verdicts[0].Outcome);
         verdicts[1].Gates.ShouldBe(verdicts[0].Gates);
-        (verdicts[1].Evidence with { Dependence = null }).ShouldBe(verdicts[0].Evidence);
+        (verdicts[1].Evidence with { Dependence = null, FoldMeansR = null }).ShouldBe(verdicts[0].Evidence with { FoldMeansR = null }); // the fold means are a list (compared below)
+        verdicts[1].Evidence.FoldMeansR!.ShouldBe(verdicts[0].Evidence.FoldMeansR!);
+        verdicts[0].Evidence.FoldMeansR!.Count.ShouldBe(verdicts[0].Evidence.Folds); // GROSS-01: a new verdict stores one mean per fold
         verdicts[1].Evidence.Dependence.ShouldNotBeNull();
         verdicts[1].Evidence.Dependence!.Mode.ShouldBe("ReportOnly");
         verdicts[1].Evidence.Dependence!.Settings.ShouldBe(new ConfidenceOptions().KeyText());

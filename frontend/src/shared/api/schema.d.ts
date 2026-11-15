@@ -12724,7 +12724,10 @@ export interface components {
       /** @description What the state means and what happens next, in words. */
       note: string;
     };
-    /** @description The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words. */
+    /**
+     * @description The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words. `FoldMeansR` (GROSS-01, ADR 0294) is the mean R of each pooled fold window in order, so a reader can count the
+     *     positive folds less the cost buffer; null in a verdict stored before it. Additive: nothing that keys or hashes a run reads it.
+     */
     EvidenceView: {
       /** Format: int32 */
       oosTrades: number;
@@ -12742,6 +12745,7 @@ export interface components {
       calibrationErrorPp: number;
       method: string;
       dependence?: null | components['schemas']['DependenceView'];
+      foldMeansR?: null | number[];
     };
     /** @description How many tickets were left out of the report for one reason. */
     ExclusionCountView: {

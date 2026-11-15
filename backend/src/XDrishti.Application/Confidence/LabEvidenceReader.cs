@@ -82,8 +82,10 @@ internal sealed class LabEvidenceReader(
         double? yearShare = null;
         if (years is { Count: > 0 })
         {
-            var total = years.Sum(y => y.TotalR);
-            yearShare = total > 0 ? years.Max(y => y.TotalR) / total : 1.0;
+            // GROSS-01: each year's total R less the buffer on each of its trades
+            var net = years.Select(y => y.TotalR - (buffer.BufferR * y.Trades)).ToList();
+            var total = net.Sum();
+            yearShare = total > 0 ? net.Max() / total : 1.0;
         }
 
         var quarters = verdict.Robustness?.ByQuarter;
@@ -114,7 +116,7 @@ internal sealed class LabEvidenceReader(
             ObservedMaxDrawdownR = mc?.ObservedMaxDrawdownR,
             McDrawdownP95 = p95,
             McDrawdownP90 = mc?.DrawdownP90,
-            QuarterShare = quarters is { Count: > 0 } ? QuarterBreakdown.Share([.. quarters.Select(q => q.MeanR)], EdgeChecklist.QuarterFloorR) : null,
+            QuarterShare = quarters is { Count: > 0 } ? QuarterBreakdown.Share([.. quarters.Select(q => buffer.Apply(q.MeanR))], EdgeChecklist.QuarterFloorR) : null,
             MaxInstrumentShare = verdict.Robustness?.MaxInstrumentShare,
             BenchmarkBeaten = verdict.Benchmark is { } benchmark ? BenchmarkComparison.Beats(benchmark.StrategySharpe, benchmark.HoldSharpe) : null,
         };
@@ -167,10 +169,22 @@ internal sealed class LabEvidenceReader(
         }
 
         notes.Add(string.Create(Inv, $"Lab results are read from the newest finished full run of version {v}. Rows 2, 3 and 6 are on the development out-of-sample trades (pre-hold-out); they are not recomputed with the hold-out trades, because the hold-out's effective n and spread are not stored."));
-        notes.Add("Rows 3 and 6 read the verdict's out-of-sample expectancy on " + buffer.Label() + " (its gross expectancy less the cost buffer; setting " + buffer.KeyText() + "). The fold counts of the stability sub-score are the verdict's stored gross counts: the per-fold expectancies are not stored, so they cannot be taken less the buffer.");
+        notes.Add("Rows 3 and 6 read the verdict's out-of-sample expectancy on " + buffer.Label() + " (its gross expectancy less the cost buffer; setting " + buffer.KeyText() + "). " + (evidence.FoldMeansR is { } means && means.Count == evidence.Folds ? "The positive folds of the stability sub-score are counted on each fold's mean R less the buffer." : "The positive folds of the stability sub-score are the verdict's stored gross count: this verdict was produced before the per-fold means were kept (re-run the Lab full test)."));
         notes.Add("Row 3 uses the verdict's own out-of-sample expectancy (the figure of the P5 expectancy gate), and the larger of the factor the gates used and the honest factor of the full trial count; the standard deviation behind row 6 is that expectancy over the per-trade Sharpe of the deflated-Sharpe block.");
         var costSheet = CostBasisOf(verdict, notes);
-        return new LabEvidence(checklist with { Notes = rowNotes }, evidence.Folds, evidence.PositiveFolds, costSheet, reused, notes, LabTierSet(verdict));
+        return new LabEvidence(checklist with { Notes = rowNotes }, evidence.Folds, PositiveFoldsOf(evidence), costSheet, reused, notes, LabTierSet(verdict));
+    }
+
+    /// <summary>The positive folds on gross_less_buffer: each stored fold mean less the buffer above zero (GROSS-01).</summary>
+    private int PositiveFoldsOf(EvidenceView evidence)
+    {
+        if (evidence.FoldMeansR is { } means && means.Count == evidence.Folds)
+        {
+            return means.Count(m => buffer.Apply(m) > 0);
+        }
+
+        // shortcut: a verdict stored before GROSS-01 kept only the gross count of positive folds, so it is used as it is (the card note says so); a re-run of the Lab full test stores the fold means
+        return evidence.PositiveFolds;
     }
 
     /// <summary>The name of the Lab set beside the hard fail.</summary>
