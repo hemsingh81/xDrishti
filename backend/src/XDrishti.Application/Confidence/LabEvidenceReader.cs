@@ -169,18 +169,19 @@ internal sealed class LabEvidenceReader(
         }
 
         notes.Add(string.Create(Inv, $"Lab results are read from the newest finished full run of version {v}. Rows 2, 3 and 6 are on the development out-of-sample trades (pre-hold-out); they are not recomputed with the hold-out trades, because the hold-out's effective n and spread are not stored."));
-        notes.Add("Rows 3 and 6 read the verdict's out-of-sample expectancy on " + buffer.Label() + " (its gross expectancy less the cost buffer; setting " + buffer.KeyText() + "). " + (evidence.FoldMeansR is { } means && means.Count == evidence.Folds ? "The positive folds of the stability sub-score are counted on each fold's mean R less the buffer." : "The positive folds of the stability sub-score are the verdict's stored gross count: this verdict was produced before the per-fold means were kept (re-run the Lab full test)."));
+        notes.Add("Rows 3 and 6 read the verdict's out-of-sample expectancy on " + buffer.Label() + " (its gross expectancy less the cost buffer; setting " + buffer.KeyText() + "). " + (evidence.FoldMeansR is { } means && means.Count == evidence.Folds ? "The positive folds of the stability sub-score are counted on each fold's mean R less the buffer." : evidence.FoldMeansR is not null ? "The stored fold means do not match the fold count, so the positive folds are unavailable (stability reads unavailable)." : "The positive folds of the stability sub-score are the verdict's stored gross count: this verdict was produced before the per-fold means were kept (re-run the Lab full test)."));
         notes.Add("Row 3 uses the verdict's own out-of-sample expectancy (the figure of the P5 expectancy gate), and the larger of the factor the gates used and the honest factor of the full trial count; the standard deviation behind row 6 is that expectancy over the per-trade Sharpe of the deflated-Sharpe block.");
         var costSheet = CostBasisOf(verdict, notes);
         return new LabEvidence(checklist with { Notes = rowNotes }, evidence.Folds, PositiveFoldsOf(evidence), costSheet, reused, notes, LabTierSet(verdict));
     }
 
     /// <summary>The positive folds on gross_less_buffer: each stored fold mean less the buffer above zero (GROSS-01).</summary>
-    private int PositiveFoldsOf(EvidenceView evidence)
+    private int? PositiveFoldsOf(EvidenceView evidence)
     {
-        if (evidence.FoldMeansR is { } means && means.Count == evidence.Folds)
+        if (evidence.FoldMeansR is { } means)
         {
-            return means.Count(m => buffer.Apply(m) > 0);
+            // a list that does not match the fold count is never read as the looser gross count: fail closed
+            return means.Count == evidence.Folds ? means.Count(m => buffer.Apply(m) > 0) : null;
         }
 
         // shortcut: a verdict stored before GROSS-01 kept only the gross count of positive folds, so it is used as it is (the card note says so); a re-run of the Lab full test stores the fold means

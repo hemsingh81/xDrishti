@@ -697,6 +697,18 @@ public sealed class ScorecardReaderTests
     }
 
     [Fact]
+    public async Task Fold_means_that_do_not_match_the_fold_count_make_the_positive_folds_unavailable()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { Evidence = f.Verdict.Evidence with { Folds = 3, PositiveFolds = 3, FoldMeansR = [0.3, 0.2] } };
+
+        var lab = await f.LabReader.ReadAsync(ReadinessFixture.Strategy, 1, TestContext.Current.CancellationToken);
+
+        lab.PositiveFolds.ShouldBeNull();
+        lab.Notes.ShouldContain(n => n.Contains("do not match the fold count", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Row_10_fails_with_one_instrument_over_its_limit()
     {
         var f = WithRobustness(r => r with { MaxInstrumentShare = 0.4 });

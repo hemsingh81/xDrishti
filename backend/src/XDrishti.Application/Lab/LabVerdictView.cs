@@ -3,7 +3,7 @@ using XDrishti.Application.Confidence;
 namespace XDrishti.Application.Lab;
 
 /// <summary>
-/// The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words. <c>FoldMeansR</c> (GROSS-01, ADR 0294) is the mean R of each pooled fold window in order, so a reader can count the
+/// The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words. <c>FoldMeansR</c> (GROSS-01, ADR 0294; a list, so record equality compares it by reference — compare its items, never two views with ==) is the mean R of each pooled fold window in order, so a reader can count the
 /// positive folds less the cost buffer; null in a verdict stored before it. Additive: nothing that keys or hashes a run reads it.
 /// </summary>
 public sealed record EvidenceView(int OosTrades, double? ExpectancyR, double? ProfitFactor, int Folds, int PositiveFolds, double? MaxDrawdownR, double CalibrationErrorPp, string Method, DependenceView? Dependence = null, IReadOnlyList<double>? FoldMeansR = null);
