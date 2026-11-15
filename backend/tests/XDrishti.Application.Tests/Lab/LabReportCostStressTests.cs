@@ -47,6 +47,20 @@ public sealed class LabReportCostStressTests
     }
 
     [Fact]
+    public void A_stress_on_gross_less_the_buffer_prints_its_basis_and_no_text_says_net()
+    {
+        var block = Block(false, midStatus: "fail") with { CostBasis = "gross_less_buffer(0.10R)", Formula = LabCostStress.BufferFormula };
+
+        var r = LabReportBuilder.Build(Run(), Verdict(block), 6);
+
+        r.Warnings.ShouldNotContain(w => w.Code == "costs_not_checked");
+        r.Warnings.ShouldContain(w => w.Text.Contains("gross_less_buffer(0.10R) expectancy", StringComparison.Ordinal));
+        r.Warnings.ShouldNotContain(w => w.Text.Contains("net", StringComparison.Ordinal));
+        r.HonestLimits.ShouldContain(LabCostStress.BufferFormula);
+        r.HonestLimits.ShouldNotContain(CostStress.Formula);
+    }
+
+    [Fact]
     public void Tier_C_trades_and_capacity_breaches_are_counted_in_a_report_only_warning_and_clean_tiers_add_none()
     {
         var dirty = Block(true) with { Tiers = new CostStressTiersView(400, 300, 70, 30, 0, 12, 0, "s", "h", "b") };

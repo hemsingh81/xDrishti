@@ -106,7 +106,7 @@ public sealed class LabRunnerTests
         _variantStats.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
         _variantStats.AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>()).Returns(ci => ci.Arg<IReadOnlyList<VariantStatsRow>>().Count);
         return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, new ConfidenceOptions()), new LabRobustness(_simulation, LabSettings.Default, null, options), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance,
-            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, new LabCostStress(options), tiers: tiers);
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, new LabCostStress(options, new CostBufferOptions()), tiers: tiers);
     }
 
     private LabRunner Runner(ConfidenceOptions? confidence = null) => new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, confidence), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance, new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats);
@@ -351,7 +351,9 @@ public sealed class LabRunnerTests
         verdicts[0].Evidence.Dependence.ShouldBeNull();
         verdicts[1].Outcome.ShouldBe(verdicts[0].Outcome);
         verdicts[1].Gates.ShouldBe(verdicts[0].Gates);
-        (verdicts[1].Evidence with { Dependence = null }).ShouldBe(verdicts[0].Evidence);
+        (verdicts[1].Evidence with { Dependence = null, FoldMeansR = null }).ShouldBe(verdicts[0].Evidence with { FoldMeansR = null }); // the fold means are a list (compared below)
+        verdicts[1].Evidence.FoldMeansR!.ShouldBe(verdicts[0].Evidence.FoldMeansR!);
+        verdicts[0].Evidence.FoldMeansR!.Count.ShouldBe(verdicts[0].Evidence.Folds); // GROSS-01: a new verdict stores one mean per fold
         verdicts[1].Evidence.Dependence.ShouldNotBeNull();
         verdicts[1].Evidence.Dependence!.Mode.ShouldBe("ReportOnly");
         verdicts[1].Evidence.Dependence!.Settings.ShouldBe(new ConfidenceOptions().KeyText());

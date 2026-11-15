@@ -1,4 +1,5 @@
 using XDrishti.Application.Abstractions.Shadow;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Shadow;
 
@@ -53,6 +54,30 @@ internal static class EdgeSeries
             .Select(x => new EdgeFigure(x.Row, x.R!.Value, selection.CandidatesBySession[x.Row.SessionDate]))
             .ToList();
         return new EdgeFigures(ordered, figures.Count - ordered.Count);
+    }
+
+    /// <summary>
+    /// The graded trades on the basis of GROSS-01 (ADR 0294): each trade's gross R (<see cref="ShadowCostBasis.GrossOf"/>) less the cost buffer. A trade without a finite gross figure is left out and counted; the rest are ordered as <see cref="Figures(EdgeSelection, ShadowCostView)"/> orders them.
+    /// Shared by the scorecard, the sequential test and the decay report so that they read one series.
+    /// </summary>
+    public static EdgeFigures Figures(EdgeSelection selection, CostBufferOptions buffer)
+    {
+        ArgumentNullException.ThrowIfNull(selection);
+        ArgumentNullException.ThrowIfNull(buffer);
+        var figures = selection.Graded.Select(r => (Row: r, R: ShadowCostBasis.GrossOf(r) is { } g ? buffer.Apply(g) : (double?)null)).ToList();
+        var ordered = figures
+            .Where(x => x.R is { } v && double.IsFinite(v))
+            .OrderBy(x => x.Row.SessionDate).ThenBy(x => x.Row.TradeKey, StringComparer.Ordinal)
+            .Select(x => new EdgeFigure(x.Row, x.R!.Value, selection.CandidatesBySession[x.Row.SessionDate]))
+            .ToList();
+        return new EdgeFigures(ordered, figures.Count - ordered.Count);
+    }
+
+    /// <summary>What the R of the edge series is on the basis of GROSS-01, in words, led by its label and ending with the setting snapshot.</summary>
+    public static string Basis(CostBufferOptions buffer)
+    {
+        ArgumentNullException.ThrowIfNull(buffer);
+        return buffer.Label() + ": gross R (before charges) less a cost buffer of " + buffer.BufferR.ToString("0.00##", System.Globalization.CultureInfo.InvariantCulture) + " R per trade, " + ShadowWording.ModelledFills + "; setting " + buffer.KeyText();
     }
 
     /// <summary>What the R of the edge series is, in words (gross or net, whose fills, and the cost sheet's state).</summary>

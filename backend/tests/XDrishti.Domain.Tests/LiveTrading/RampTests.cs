@@ -97,9 +97,23 @@ public sealed class RampTests
     [Fact]
     public void A_soft_item_that_could_not_be_read_is_never_a_pass()
     {
-        var r = LiveReadiness.Evaluate(Ready() with { PaperPhaseMet = null, ChargeSheetConfirmed = false, OrderBookCaptureOn = false });
+        var r = LiveReadiness.Evaluate(Ready() with { PaperPhaseMet = null, CostBasisStated = null, OrderBookCaptureOn = false });
 
         r.FailingHard.ShouldBeEmpty();
-        r.FailingSoft.Select(i => i.Code).ShouldBe([LiveReadiness.PaperPhase, LiveReadiness.ChargeSheet, LiveReadiness.OrderBook]);
+        r.FailingSoft.Select(i => i.Code).ShouldBe([LiveReadiness.PaperPhase, LiveReadiness.CostBasis, LiveReadiness.OrderBook]);
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    [InlineData(null, false)]
+    public void The_cost_basis_item_passes_only_with_a_valid_buffer_setting_and_is_soft(bool? stated, bool passes)
+    {
+        var r = LiveReadiness.Evaluate(Ready() with { CostBasisStated = stated });
+
+        var item = r.Items.Single(i => i.Code == LiveReadiness.CostBasis);
+        (item.Code, item.Hard, item.Passed).ShouldBe(("cost_basis_stated", false, passes));
+        r.FailingHard.ShouldBeEmpty();
+        r.Items.ShouldNotContain(i => i.Code == "charge_sheet_confirmed");
     }
 }

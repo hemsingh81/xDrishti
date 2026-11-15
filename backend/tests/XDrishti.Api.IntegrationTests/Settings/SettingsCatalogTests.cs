@@ -124,6 +124,7 @@ public sealed partial class SettingsCatalogTests(ApiFactory factory)
         ["Confidence:Loop:HelpsAt"] = SettingSafer.Higher,
         ["Confidence:Kill:StressMultiplier"] = SettingSafer.Higher,
         ["Confidence:Kill:DrawdownFactor"] = SettingSafer.Lower,
+        ["Confidence:Costs:BufferR"] = SettingSafer.Higher,
         ["Confidence:Readiness:MinNEff"] = SettingSafer.Higher,
         ["Confidence:Readiness:MinTradesPerCell"] = SettingSafer.Higher,
         ["Confidence:Readiness:ExpectancyR"] = SettingSafer.Higher,
@@ -149,6 +150,26 @@ public sealed partial class SettingsCatalogTests(ApiFactory factory)
         var actual = ConfidenceSettingDescriptors.All.Concat(SettingsRegistry.All).Where(d => d.Safer != SettingSafer.None).ToDictionary(d => d.Key, d => d.Safer, StringComparer.Ordinal);
 
         actual.OrderBy(x => x.Key).ShouldBe(Declared.OrderBy(x => x.Key));
+    }
+
+    [Fact]
+    public void The_cost_buffer_is_an_advanced_tighten_only_key_raising_is_free_and_lowering_needs_the_owner()
+    {
+        var d = ConfidenceSettingDescriptors.All.Single(x => x.Key == "Confidence:Costs:BufferR");
+
+        (d.Tier, d.Safer, d.Default, d.Min, d.Max, d.Learnable).ShouldBe((SettingTier.Advanced, SettingSafer.Higher, "0.1", 0.05m, 0.5m, false));
+        d.IsLoosening(0.10m, 0.20m).ShouldBeFalse(); // raising: no password
+        d.IsLoosening(0.10m, 0.05m).ShouldBeTrue(); // lowering: the owner's fresh password
+    }
+
+    [Fact]
+    public void A_cost_buffer_out_of_range_stops_the_host()
+    {
+        Should.Throw<Exception>(() =>
+        {
+            using var host = factory.WithWebHostBuilder(b => b.UseSetting("Confidence:Costs:BufferR", "0.01"));
+            host.CreateClient();
+        });
     }
 
     [Theory]
@@ -228,6 +249,7 @@ public sealed partial class SettingsCatalogTests(ApiFactory factory)
         response.ShouldNotBeNull();
         response.Items.Count(i => i.Tier == "Essential").ShouldBe(4);
         response.Items.ShouldContain(i => i.Key == "Confidence:Kill:StressMultiplier" && i.Safer == "higher" && i.Source == "default" && i.Range!.Max == 3);
+        response.Items.ShouldContain(i => i.Key == "Confidence:Costs:BufferR" && i.Safer == "higher" && i.Tier == "Advanced" && i.Range!.Min == 0.05m && i.Range.Max == 0.5m);
         response.Items.Where(i => SecretLooking().IsMatch(i.Key)).ShouldBeEmpty();
         response.Items.Where(i => i.Source is "stored" or "section").ShouldAllBe(i => i.Value == null);
     }

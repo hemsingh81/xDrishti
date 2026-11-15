@@ -160,7 +160,7 @@ internal sealed class LabFullTest(
             verdict.Outcome.ToString().ToUpperInvariant(),
             verdict.VariantCount,
             verdict.AdjustmentFactor,
-            EvidenceOf(pool.Evidence, verdict.Dependence),
+            EvidenceOf(pool.Evidence, verdict.Dependence) with { FoldMeansR = [.. pool.Windows.Where(w => w.Trades > 0).Select(w => w.TotalR / w.Trades)] },
             [.. verdict.Gates.Select(g => new GateView(g.Name, g.Required, g.Adjusted, Finite(g.Actual), g.Passed, g.Reason))],
             limits,
             cellList,

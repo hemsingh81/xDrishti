@@ -123,3 +123,5 @@ The local LLM can turn these into the weekly review text; numbers always come fr
 | Dividend tracking in XIRR | Dividends from ledger as cash flows |
 | Volatility-scaled position sizing | Size so each trade risks the same rupees after slippage, capped by liquidity (capacity) |
 
+
+**Auto on gross costs (GROSS-01, [ADR 0294](../adr/0294-evidence-gates-count-gross-r-less-a-stated-cost-buffer.md)).** The Auto-on precondition `cost-basis` replaces `charge-sheet`: it passes when the cost buffer setting `Confidence:Costs:BufferR` is valid and fails, named, when it is not; the ON snapshot records the basis and the setting. Auto still only suggests and places no order.

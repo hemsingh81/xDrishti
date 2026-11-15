@@ -8,10 +8,13 @@ namespace XDrishti.Application.Lab;
 /// The cost stress gates of CF-05 (ADR 0206) for a Lab verdict: the stored out-of-sample trades restated at the stress multipliers, the delay test's signals judged, and, only when the owner has turned <c>Enforce</c> on, the outcome capped at MARGINAL by a miss.
 /// With <c>Enforce</c> off (the default) the outcome, the gates, the limits and the run key are exactly what they were; the figure is added beside them. Pure over its inputs.
 /// </summary>
-internal sealed class LabCostStress(CostStressOptions options)
+internal sealed class LabCostStress(CostStressOptions options, CostBufferOptions buffer)
 {
-    /// <summary>Printed when the trades carry no charges (a gross run): there is nothing to stress.</summary>
-    public const string Gross = "unavailable: the trades carry no charges from a stored sheet (a gross run)";
+    /// <summary>Printed when the trades carry no charges (a gross run) and the cost buffer is not usable: there is nothing to stress.</summary>
+    public const string Gross = "unavailable: the trades carry no charges from a stored sheet (a gross run) and the cost buffer setting is not usable";
+
+    /// <summary>Printed with the figure of a gross run stressed on the cost buffer.</summary>
+    public const string BufferFormula = "stressed R = gross R - m x buffer for each stored out-of-sample trade, then averaged (GROSS-01: costs are gross, the stated cost buffer per round trip stands for charges and slippage)";
 
     private const string ExpectancyGate = "expectancy_R";
 
@@ -39,11 +42,19 @@ internal sealed class LabCostStress(CostStressOptions options)
 
         var gate = verdict.Gates.FirstOrDefault(g => string.Equals(g.Name, ExpectancyGate, StringComparison.Ordinal));
         var gross = oosTrades.Any(t => t.RExact is null);
-        IReadOnlyList<StressTrade> trades = gross ? [] : [.. oosTrades.Select(t => new StressTrade(t.RExact!.Value, t.R))];
-        var result = CostStress.Evaluate(trades, options, gate?.Adjusted ?? 0, gate?.Passed ?? false, costsChecked);
-        var rows = result.Points.Select(p => new CostStressRowView(p.Multiplier, gross ? oosTrades.Count : p.Trades, p.ExpectancyR, p.Threshold, p.Comparison, Word(p.Status), gross ? Gross : p.Reason)).ToList();
+
+        // GROSS-01 (ADR 0294): a gross run is stressed on gross R less the cost buffer: each trade's cost is the buffer, so its R at multiplier m is gross - m x buffer. The buffer is the stated cost (there is no bill to check), so the rows are judged;
+        // an unusable buffer leaves them unavailable, never a pass.
+        // shortcut: the buffer is a start-validated singleton (the host refuses an out-of-range value), so an invalid buffer cannot occur in a running host; the arm is kept fail closed for a host that skips the validation
+        var buffered = gross && buffer.IsValid;
+        IReadOnlyList<StressTrade> trades = buffered ? [.. oosTrades.Select(t => new StressTrade(t.R, buffer.Apply(t.R)))] : gross ? [] : [.. oosTrades.Select(t => new StressTrade(t.RExact!.Value, t.R))];
+        // the 1x row of a buffered run is judged on its own figure (gross - 1 x buffer) against the gate's adjusted threshold, not on the gross gate's verdict
+        var oneXPassed = buffered ? CostStress.Mean(trades, 1) is { } oneX && oneX >= (gate?.Adjusted ?? double.PositiveInfinity) : gate?.Passed ?? false;
+        var result = CostStress.Evaluate(trades, options, gate?.Adjusted ?? 0, oneXPassed, buffered || costsChecked, buffered ? buffer.Label() : "net");
+        var unavailable = gross && !buffered;
+        var rows = result.Points.Select(p => new CostStressRowView(p.Multiplier, unavailable ? oosTrades.Count : p.Trades, p.ExpectancyR, p.Threshold, p.Comparison, Word(p.Status), unavailable ? Gross : p.Reason)).ToList();
         var delayView = delay is null ? null : DelayOf(delay, costsChecked);
-        var tradable = gross ? StressStatus.Unavailable : result.Tradable;
+        var tradable = unavailable ? StressStatus.Unavailable : result.Tradable;
         var misses = new List<string>();
         for (var i = 1; i < result.Points.Count; i++)
         {
@@ -60,7 +71,7 @@ internal sealed class LabCostStress(CostStressOptions options)
 
         var cap = options.Enforce && misses.Count > 0 && string.Equals(verdict.Outcome, "PASS", StringComparison.Ordinal);
         var view = new CostStressView(
-            options.Mode.ToString(), options.Enforce, options.KeyText(), options.SnapshotHash(), costsChecked, sheetId, rows, Word(tradable), delayView, cap, CostStress.Formula, CostStress.FirstOrderLimit, ratesSha256, tiers);
+            options.Mode.ToString(), options.Enforce, options.KeyText(), options.SnapshotHash(), costsChecked, sheetId, rows, Word(tradable), delayView, cap, buffered ? BufferFormula : CostStress.Formula, CostStress.FirstOrderLimit, ratesSha256, tiers, buffered ? buffer.Label() : null);
         return cap
             ? verdict with { Outcome = "MARGINAL", Limits = [.. verdict.Limits, "capped at MARGINAL by the cost stress gates (enforced): " + string.Join(", ", misses)], CostStress = view }
             : verdict with { CostStress = view };

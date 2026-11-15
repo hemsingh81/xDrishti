@@ -19,7 +19,7 @@ public enum LiveServiceState
 /// <param name="Capture">The <c>live-capture</c> service.</param>
 /// <param name="Settle">The <c>live-settle</c> service.</param>
 /// <param name="PaperPhaseMet">The P10 paper phase check says MET; null when it could not be read.</param>
-/// <param name="ChargeSheetConfirmed">The owner confirmed the charge sheet; null when it could not be read.</param>
+/// <param name="CostBasisStated">The cost basis is stated: the cost buffer setting is readable and valid (GROSS-01, ADR 0294); null when it could not be read.</param>
 /// <param name="OrderBookCaptureOn">The order book is captured (nothing reads it before P11-01 and the owner's switch).</param>
 public sealed record LiveReadinessFacts(
     bool RoleOn,
@@ -30,7 +30,7 @@ public sealed record LiveReadinessFacts(
     LiveServiceState Capture,
     LiveServiceState Settle,
     bool? PaperPhaseMet,
-    bool? ChargeSheetConfirmed,
+    bool? CostBasisStated,
     bool OrderBookCaptureOn);
 
 /// <summary>One line of the readiness: a hard item refuses the switch, a soft item needs the owner's typed reason.</summary>
@@ -46,7 +46,7 @@ public sealed record LiveReadinessResult(IReadOnlyList<ReadinessItem> Items)
 
 /// <summary>
 /// The live-ready gate of an account's mode change (spec P11-04 criterion 3, ADR 0148), pure. Hard items: the Trading role complete with a fixed capital, the Dhan connection <c>connected</c>, a ramp step, and the <c>live-capture</c> and
-/// <c>live-settle</c> services registered and enabled. Soft items (the P10 phase check not MET, the charge sheet not confirmed, the order book not captured) pass only with a typed reason. Switching back to paper is not judged here.
+/// <c>live-settle</c> services registered and enabled. Soft items (the P10 phase check not MET, the cost basis not stated, the order book not captured) pass only with a typed reason. Switching back to paper is not judged here.
 /// </summary>
 public static class LiveReadiness
 {
@@ -57,7 +57,7 @@ public static class LiveReadiness
     public const string LiveCapture = "live_capture";
     public const string LiveSettle = "live_settle";
     public const string PaperPhase = "paper_phase_met";
-    public const string ChargeSheet = "charge_sheet_confirmed";
+    public const string CostBasis = "cost_basis_stated";
     public const string OrderBook = "order_book_capture";
 
     public static LiveReadinessResult Evaluate(LiveReadinessFacts f)
@@ -72,7 +72,7 @@ public static class LiveReadiness
             Service(LiveCapture, "live-capture", f.Capture),
             Service(LiveSettle, "live-settle", f.Settle),
             new(PaperPhase, false, f.PaperPhaseMet == true, f.PaperPhaseMet switch { true => "the paper phase check is MET", false => "the paper phase check is not MET", _ => "the paper phase check could not be read" }),
-            new(ChargeSheet, false, f.ChargeSheetConfirmed == true, f.ChargeSheetConfirmed switch { true => "the charge sheet is confirmed", false => "the charge sheet is not confirmed", _ => "the charge sheet could not be read" }),
+            new(CostBasis, false, f.CostBasisStated == true, f.CostBasisStated switch { true => "the cost basis is stated (gross R less the cost buffer)", false => "the cost buffer setting is not valid", _ => "the cost buffer setting could not be read" }),
             new(OrderBook, false, f.OrderBookCaptureOn, f.OrderBookCaptureOn ? "the order book is captured" : "the order book is not captured, so every order-dependent figure is unavailable"),
         ]);
     }

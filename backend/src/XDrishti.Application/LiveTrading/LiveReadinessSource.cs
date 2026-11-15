@@ -1,22 +1,22 @@
 using XDrishti.Application.Abstractions.LiveTrading;
 using XDrishti.Application.Abstractions.Messaging;
-using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Paper;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.LiveTrading;
 
 namespace XDrishti.Application.LiveTrading;
 
 /// <summary>
-/// The facts of the live-ready gate from outside the account (spec P11-04). Reads only. A service that is not registered (live-capture and live-settle until P11-01) is NotRegistered, which is not a pass; a phase check or charge sheet that cannot be read
+/// The facts of the live-ready gate from outside the account (spec P11-04). Reads only. A service that is not registered (live-capture and live-settle until P11-01) is NotRegistered, which is not a pass; a phase check or cost buffer setting that cannot be read
 /// is null, which is not a pass either.
 /// </summary>
 internal sealed class LiveReadinessSource(
     IRampStore ramp,
     ServiceSettingsReader services,
     IQueryHandler<EvaluatePaperPhaseCheckQuery, Result<PaperPhaseCheckView>> phase,
-    IChargeSheetConfirmationSource chargeSheet) : ILiveReadinessSource
+    CostBufferOptions costBuffer) : ILiveReadinessSource
 {
     public const string CaptureId = "live-capture";
     public const string SettleId = "live-settle";
@@ -25,7 +25,7 @@ internal sealed class LiveReadinessSource(
     {
         var step = await ramp.CurrentAsync(accountId, cancellationToken);
         var all = await services.ReadAllAsync(cancellationToken);
-        return new LiveSourceFacts(step is not null, State(all, CaptureId), State(all, SettleId), await PhaseMetAsync(cancellationToken), await ChargeSheetAsync(cancellationToken));
+        return new LiveSourceFacts(step is not null, State(all, CaptureId), State(all, SettleId), await PhaseMetAsync(cancellationToken), CostBasisStated());
     }
 
     private static LiveServiceState State(IReadOnlyList<EffectiveService> all, string id) =>
@@ -44,15 +44,7 @@ internal sealed class LiveReadinessSource(
         }
     }
 
-    private async ValueTask<bool?> ChargeSheetAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await chargeSheet.FindAsync(cancellationToken) is not null;
-        }
-        catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
-        {
-            return null;
-        }
-    }
+    /// <summary>GROSS-01: the cost basis is stated when the cost buffer setting is valid; an invalid one is not a pass.</summary>
+    // shortcut: the buffer is a start-validated singleton, so false cannot occur in a running host; kept fail closed
+    private bool? CostBasisStated() => costBuffer.IsValid;
 }

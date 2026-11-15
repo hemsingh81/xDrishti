@@ -42,7 +42,7 @@ public sealed class AutoSwitchArchitectureTests
     {
         Received(typeof(AutoSwitchService)).ShouldBe(
         [
-            "IAutoSwitch", "IEssentialSettingStore", "IServiceScheduleReader", "ServiceRegistry", "ICommandHandler`2", "ICommandHandler`2", "IAutoScopeStore", "IDataAccountStatus", "IChargeSheetConfirmationSource", "IAutoSwitchLog", "IPlanStore", "TimeProvider", "ILogger`1", "IPlanBuilderSettings",
+            "IAutoSwitch", "IEssentialSettingStore", "IServiceScheduleReader", "ServiceRegistry", "ICommandHandler`2", "ICommandHandler`2", "IAutoScopeStore", "IDataAccountStatus", "CostBufferOptions", "IAutoSwitchLog", "IPlanStore", "TimeProvider", "ILogger`1", "IPlanBuilderSettings",
         ]);
         Received(typeof(SwitchedPlanBuilder)).ShouldBe(["IAutoSwitch", "SelectionPlanBuilder", "NullPlanBuilder"]);
     }

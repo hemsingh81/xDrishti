@@ -7,6 +7,7 @@ using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Paper;
 using XDrishti.Application.Shadow;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Readiness;
 using XDrishti.Domain.Research;
@@ -649,11 +650,62 @@ public sealed class ScorecardReaderTests
     [Fact]
     public async Task Row_10_passes_a_quarter_with_a_mean_of_exactly_minus_0_05()
     {
-        var f = WithRobustness(r => r with { ByQuarter = [Q(2025, 1, 0.1), Q(2025, 2, -0.05)] });
+        var f = WithRobustness(r => r with { ByQuarter = [Q(2025, 1, 0.1), Q(2025, 2, 0.05)] }); // gross 0.05 less the 0.10 buffer is exactly -0.05
 
         var card = await CardAsync(f);
 
         Status(card, 10).ShouldBe("pass");
+    }
+
+    [Fact]
+    public async Task A_quarter_whose_gross_mean_clears_the_floor_but_not_once_less_the_buffer_does_not_count()
+    {
+        // GROSS-01: gross 0.04 R is above the -0.05 floor, gross less the 0.10 buffer (-0.06) is not
+        var f = WithRobustness(r => r with { ByQuarter = [Q(2025, 1, 0.3), Q(2025, 2, 0.04)] });
+
+        var card = await CardAsync(f);
+
+        Status(card, 10).ShouldBe("fail");
+        card.Rows.Single(r => r.Number == 10).Value.ShouldContain("quarters 50 %");
+    }
+
+    [Fact]
+    public async Task The_year_concentration_is_read_on_each_years_total_less_the_buffer_per_trade()
+    {
+        // gross totals 30 and 20 over 100 trades each: 60 % gross, (30 - 10) / ((30 - 10) + (20 - 10)) = 67 % less the buffer, above the 0.60 limit
+        var f = WithRobustness(r => r with { ByYear = [new YearView(2024, 100, 0.3, 30, 1.3, true), new YearView(2025, 100, 0.2, 20, 1.3, true)] });
+
+        var card = await CardAsync(f);
+
+        Status(card, 10).ShouldBe("fail");
+    }
+
+    [Fact]
+    public async Task New_verdicts_count_the_positive_folds_on_each_folds_mean_less_the_buffer_and_old_ones_keep_the_stored_count()
+    {
+        var fresh = new ReadinessFixture();
+        fresh.Verdict = fresh.Verdict! with { Evidence = fresh.Verdict.Evidence with { Folds = 3, PositiveFolds = 3, FoldMeansR = [0.3, 0.08, 0.2] } };
+        var old = new ReadinessFixture();
+        old.Verdict = old.Verdict! with { Evidence = old.Verdict.Evidence with { Folds = 3, PositiveFolds = 3, FoldMeansR = null } };
+
+        var freshLab = await fresh.LabReader.ReadAsync(ReadinessFixture.Strategy, 1, TestContext.Current.CancellationToken);
+        var oldLab = await old.LabReader.ReadAsync(ReadinessFixture.Strategy, 1, TestContext.Current.CancellationToken);
+
+        freshLab.PositiveFolds.ShouldBe(2); // 0.08 - 0.10 is not positive
+        oldLab.PositiveFolds.ShouldBe(3);
+        oldLab.Notes.ShouldContain(n => n.Contains("produced before the per-fold means were kept", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Fold_means_that_do_not_match_the_fold_count_make_the_positive_folds_unavailable()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { Evidence = f.Verdict.Evidence with { Folds = 3, PositiveFolds = 3, FoldMeansR = [0.3, 0.2] } };
+
+        var lab = await f.LabReader.ReadAsync(ReadinessFixture.Strategy, 1, TestContext.Current.CancellationToken);
+
+        lab.PositiveFolds.ShouldBeNull();
+        lab.Notes.ShouldContain(n => n.Contains("do not match the fold count", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -754,16 +806,49 @@ public sealed class ScorecardReaderTests
     }
 
     [Fact]
-    public async Task A_forward_series_gross_of_charges_is_not_offered_as_net()
+    public async Task A_gross_forward_series_is_judged_on_gross_r_less_the_buffer_and_labelled_so()
     {
+        // GROSS-01: no charge sheet is confirmed (gross forever); gross mean 0.30 R less the 0.10 R buffer is 0.20 R
         var f = new ReadinessFixture { Confirmed = false };
 
         var card = await CardAsync(f);
 
-        card.SubScores.Single(s => s.Name == SubScore.EffectName).State.ShouldBe("unavailable");
-        card.HardFails.ShouldContain(ReadinessCalculator.CostSheetName);
-        card.Notes.ShouldContain(n => n.Contains("gross of charges", StringComparison.Ordinal));
-        Status(card, 15).ShouldBe("unavailable");
+        card.SubScores.Single(s => s.Name == SubScore.EffectName).State.ShouldBe("scored");
+        card.SubScores.Single(s => s.Name == SubScore.AgreementName).State.ShouldBe("scored");
+        card.SubScores.Single(s => s.Name == SubScore.StabilityName).State.ShouldBe("scored");
+        card.HardFails.ShouldNotContain(h => h.StartsWith(ReadinessCalculator.CostBasisName, StringComparison.Ordinal));
+        card.Notes.ShouldContain(n => n.Contains("gross_less_buffer(0.10R)", StringComparison.Ordinal));
+        card.Notes.ShouldNotContain(n => n.Contains("net R", StringComparison.Ordinal));
+        Status(card, 15).ShouldBe("pass");
+        card.Rows.Single(r => r.Number == 3).Value.ShouldStartWith("0.2 R"); // the verdict's gross 0.30 R less the buffer
+        card.Notes.ShouldContain(n => n.Contains("Rows 3 and 6 read the verdict's out-of-sample expectancy on gross_less_buffer(0.10R)", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_larger_buffer_makes_the_effect_negative_and_a_reference_on_another_buffer_is_refused_named()
+    {
+        // gross 0.30 R less 0.35 R: the forward mean and the Lab expectancy are both -0.05 R
+        var f = new ReadinessFixture { Buffer = new CostBufferOptions(0.35) };
+
+        var card = await CardAsync(f);
+
+        card.SubScores.Single(s => s.Name == SubScore.EffectName).Score.ShouldBe(0);
+        Status(card, 3).ShouldBe("fail");
+        card.SubScores.Single(s => s.Name == SubScore.AgreementName).State.ShouldBe("unavailable");
+        card.Notes.ShouldContain(n => n.Contains("reference_basis_mismatch", StringComparison.Ordinal) && n.Contains("gross_less_buffer(0.10R)", StringComparison.Ordinal) && n.Contains("gross_less_buffer(0.35R)", StringComparison.Ordinal));
+        card.Score.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_lab_verdict_whose_cost_stress_did_not_run_on_the_buffer_is_an_unavailable_cost_basis_and_a_hard_fail()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { CostStress = f.Verdict.CostStress! with { CostBasis = null } };
+
+        var card = await CardAsync(f);
+
+        card.HardFails.ShouldContain(ReadinessCalculator.CostBasisName + " (the input is unavailable, which is never a pass)");
+        card.Score.ShouldBe(0);
     }
 
     [Fact]
@@ -831,7 +916,7 @@ public sealed class ScorecardReaderTests
     public async Task The_forward_mean_inside_the_five_percent_band_is_inside_and_far_below_it_is_below()
     {
         var inside = new ReadinessFixture();
-        var below = new ReadinessFixture { DecayResult = Result.Success(ReadinessFixture.DecayView() with { Reference = new DecayReferenceView("available", null, 400, 1.5, 0.5, "net") }) };
+        var below = new ReadinessFixture { DecayResult = Result.Success(ReadinessFixture.DecayView() with { Reference = new DecayReferenceView("available", null, 400, 1.5, 0.5, "gross_less_buffer(0.10R)") }) };
 
         (await CardAsync(inside)).SubScores.Single(s => s.Name == SubScore.AgreementName).Score.ShouldBe(100, "the months are positive in the fixture's series");
         (await CardAsync(below)).SubScores.Single(s => s.Name == SubScore.AgreementName).Score.ShouldBe(0);

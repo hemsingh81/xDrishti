@@ -21,7 +21,7 @@ internal sealed class GetDecayReportHandler(
     IShadowResultReader reader,
     IPaperLedgerData ledger,
     IBacktestPaperData paperData,
-    ICostConfirmationFact confirmation,
+    CostBufferOptions buffer,
     BacktestReferenceReader references,
     DecayOptions options,
     SequentialOptions sequential,
@@ -81,19 +81,21 @@ internal sealed class GetDecayReportHandler(
             return Reference.None("the strategy's backtest cells are not all costed the same way, so there is no single reference basis");
         }
 
+        // GROSS-01: a gross backtest is read on the same basis as the series, each trade's gross R less the cost buffer; a costed (net) one keeps its own basis and is never compared with it
+        var gross = !costed[0];
         var observations = new List<DriftObservation>();
         foreach (var cell in cells.OrderBy(c => c.SheetId, StringComparer.Ordinal))
         {
             foreach (var r in cell.Results)
             {
-                observations.Add(new DriftObservation("r" + observations.Count.ToString(CultureInfo.InvariantCulture), observations.Count, r));
+                observations.Add(new DriftObservation("r" + observations.Count.ToString(CultureInfo.InvariantCulture), observations.Count, gross ? buffer.Apply(r) : r));
             }
         }
 
         var band = RollingBandDetector.MakeBand(observations, Drift);
         return band.IsFailure
             ? Reference.None(band.Error.Message)
-            : Reference.Of(band.Value, costed[0] ? "net" : "gross");
+            : Reference.Of(band.Value, gross ? buffer.Label() : "net");
     }
 
     private async ValueTask<EdgeRead> EdgeAsync(long? epochId, string prefix, Reference reference, double rho, CancellationToken cancellationToken)
@@ -101,12 +103,11 @@ internal sealed class GetDecayReportHandler(
         // shortcut: every shadow row of every epoch is read and filtered in memory; filter by edge_epoch (and trade key) in SQL when the record grows.
         var rows = await reader.ResultsAsync(cancellationToken);
         var selection = EdgeSeries.Select(rows, epochId, prefix);
-        var costs = await ShadowCostBasis.ReadAsync(selection.Graded, confirmation, cancellationToken);
-        var figures = EdgeSeries.Figures(selection, costs);
+        var figures = EdgeSeries.Figures(selection, buffer);
         var ordered = figures.Trades;
         var noFigure = figures.NoFigure;
         var trades = ordered.Select(x => new DecayTrade(x.Row.TradeKey, EdgeSeries.SessionInstant(x.Row.SessionDate), x.Row.SessionDate, x.R, x.DayCandidates)).ToList();
-        var basis = EdgeSeries.Basis(costs);
+        var basis = EdgeSeries.Basis(buffer);
         var notes = new List<string>();
         if (selection.ScopedCount == 0)
         {
@@ -127,9 +128,11 @@ internal sealed class GetDecayReportHandler(
             notes.Add(string.Create(CultureInfo.InvariantCulture, $"{noFigure} graded trade(s) have no figure on this basis and are left out of the series; they still count among the day's candidates for the design effect."));
         }
 
-        var view = Series(basis, notes, trades, costs.Gross ? "gross" : "net", reference, rho, out var decay);
-        var costRows = costs.Gross ? null : ordered.Where(x => x.Row.RGross is not null).Select(x => (Net: x.Row.RSim!.Value, Cost: x.Row.RGross!.Value - x.Row.RSim!.Value)).ToList();
-        return new EdgeRead(selection.ScopedCount > 0, view, decay, trades, ordered.Select(x => x.R).ToList(), costs.Gross, costRows is { } c && c.Count == ordered.Count ? c : null);
+        var view = Series(basis, notes, trades, buffer.Label(), reference, rho, out var decay);
+
+        // GROSS-01: each trade's R is its gross R less the buffer and its cost is the buffer, so the cost stress reads gross - m x buffer
+        var costRows = ordered.Select(x => (Net: x.R, Cost: buffer.BufferR)).ToList();
+        return new EdgeRead(selection.ScopedCount > 0, view, decay, trades, ordered.Select(x => x.R).ToList(), costRows);
     }
 
     private async ValueTask<DecaySeriesView> BehaviouralAsync(long? epochId, string prefix, Reference reference, double rho, CancellationToken cancellationToken)
@@ -142,17 +145,19 @@ internal sealed class GetDecayReportHandler(
 
         var data = await paperData.ReadAsync(id, cancellationToken);
         var counted = BehaviouralSeries.Select(data, prefix);
-        var trades = counted.Select(t => new DecayTrade(string.Create(CultureInfo.InvariantCulture, $"ticket-{t.Trade.TicketId:D12}"), t.Trade.ExitAt.ToUnixTimeSeconds(), t.ExitDay, t.Trade.R, t.DayCandidates)).ToList();
         var allNet = counted.All(t => t.Trade.RBasis == "net");
         var allGross = counted.All(t => t.Trade.RBasis == "gross");
+
+        // GROSS-01: a gross series is read as gross R less the buffer, the basis of the reference; net or mixed keeps its own basis and is not compared
+        var trades = counted.Select(t => new DecayTrade(string.Create(CultureInfo.InvariantCulture, $"ticket-{t.Trade.TicketId:D12}"), t.Trade.ExitAt.ToUnixTimeSeconds(), t.ExitDay, allGross ? buffer.Apply(t.Trade.R) : t.Trade.R, t.DayCandidates)).ToList();
         var notes = new List<string>();
         if (counted.Count == 0)
         {
             notes.Add("No counted paper trade of this strategy in the epoch yet.");
         }
 
-        var basis = Label + "; " + (counted.Count == 0 ? "none counted yet" : allNet ? "net R as the P10 count stores it" : allGross ? "gross R (before charges)" : "net and gross R mixed");
-        return Series(basis, notes, trades, allNet ? "net" : allGross ? "gross" : "mixed", reference, rho, out _);
+        var basis = Label + "; " + (counted.Count == 0 ? "none counted yet" : allNet ? "net R as the P10 count stores it" : allGross ? EdgeSeries.Basis(buffer) : "net and gross R mixed");
+        return Series(basis, notes, trades, allNet ? "net" : allGross ? buffer.Label() : "mixed", reference, rho, out _);
     }
 
     private DecaySeriesView Series(string basis, List<string> notes, List<DecayTrade> trades, string seriesBasis, Reference reference, double rho, out DecayReport? report)
@@ -201,17 +206,9 @@ internal sealed class GetDecayReportHandler(
         var lastFired = await proposals.LatestAsync(strategy, "cost_stress", epochId, cancellationToken);
         int? sinceFired = lastFired is null ? null : Math.Max(0, edge.R.Count - lastFired.Proposal.SeriesTrades);
 
-        // (a) cost stress needs the net R and the cost of each trade; a gross series has no charges in it, so there is nothing to stress
-        if (edge.Gross || edge.Costs is null)
-        {
-            verdicts.Add(KillRules.NotEvaluated("cost_stress", edge.R.Count, "cost stress not evaluated: the series is gross of charges, or a trade has no gross figure to take the charges from"));
-        }
-        else
-        {
-            // shortcut: c is the charges in R (gross R minus net R); the slippage of the modelled fill is inside both and is not recorded apart, so c is understated and the stress is lighter than CF-05's.
-            var verdict = KillRules.CostStress([.. edge.Costs.Select(x => x.Net)], [.. edge.Costs.Select(x => x.Cost)], sinceFired, kill.StressMultiplier);
-            verdicts.Add(verdict with { Text = verdict.Text + " (charges only: the slippage inside the modelled fill is not recorded apart)" });
-        }
+        // (a) cost stress on the basis of GROSS-01: net = gross R - buffer, cost = buffer, so it fires when the trailing gross mean - multiplier x buffer is below zero
+        var verdict = KillRules.CostStress([.. edge.Costs.Select(x => x.Net)], [.. edge.Costs.Select(x => x.Cost)], sinceFired, kill.StressMultiplier, buffer.Label());
+        verdicts.Add(verdict with { Text = verdict.Text + "; setting " + buffer.KeyText() });
 
         // (b) drawdown needs the 95th percentile of the matched drawdown at the series' own n
         // shortcut: BacktestBand.Compute does give DrawdownP95 at the paper set's own n, but it matches draws by the cell of each trade and a shadow row records no cell (only the trade key strategy|symbol|side|date), so it cannot be asked for the edge series.
@@ -274,5 +271,5 @@ internal sealed class GetDecayReportHandler(
         public static Reference Of(ExpectancyBand band, string basis) => new(band, new DecayReferenceView("available", null, band.ReferenceTrades, band.Mean, band.Sd, basis));
     }
 
-    private sealed record EdgeRead(bool HasSeries, DecaySeriesView View, DecayReport? Decay, List<DecayTrade> Trades, List<double> R, bool Gross, List<(double Net, double Cost)>? Costs);
+    private sealed record EdgeRead(bool HasSeries, DecaySeriesView View, DecayReport? Decay, List<DecayTrade> Trades, List<double> R, List<(double Net, double Cost)> Costs);
 }

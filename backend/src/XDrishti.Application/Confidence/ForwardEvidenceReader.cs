@@ -31,11 +31,6 @@ internal sealed class ForwardEvidenceReader(
         var report = await decay.HandleAsync(new GetDecayReportQuery(strategy), cancellationToken);
         var failure = await sequential.HandleAsync(new GetSequentialStatusQuery(GetSequentialStatusQuery.StrategyScope, strategy), cancellationToken);
         notes.Add(string.Create(Inv, $"The forward series is the graded shadow edge candidates of the current paper epoch ({forward.Trades} trades, effective n {forward.NEff:0.#}); {forward.Basis}. The same-day correlation is the placeholder 0.3 until CF-01 estimates it."));
-        if (forward.Gross)
-        {
-            notes.Add("The forward series is gross of charges (the cost sheet is not confirmed), so its mean, spread and months are not offered as net: the effect, agreement and paper-confirm rows are unavailable.");
-        }
-
         var (model, ece) = await CalibrationAsync(cancellationToken);
         var score = new ScoreInputs
         {
@@ -54,13 +49,19 @@ internal sealed class ForwardEvidenceReader(
 
     /// <summary>
     /// Where the forward mean sits against the 5th percentile of the point-in-time backtest reference of P10-04: <c>mu_ref - 1.645 x sigma x sqrt(1/n_eff + 1/N_ref)</c>. The reference is the decay report's (the strategy's backtest trades before the epoch started); it is read only when it
-    /// is on the same net basis as the series.
+    /// is on the same basis as the series, buffer included (GROSS-01): a reference on another basis or another buffer is refused, named.
     /// </summary>
     private static BandPosition? BandOf(Result<DecayReportView> report, ForwardEdge forward, List<string> notes)
     {
-        if (report.IsFailure || report.Value.Reference is not { State: "available", MeanR: { } mu, Sigma: { } sigma, Trades: { } n, Basis: "net" })
+        if (report.IsFailure || report.Value.Reference is not { State: "available", MeanR: { } mu, Sigma: { } sigma, Trades: { } n, Basis: { } referenceBasis })
         {
-            notes.Add("Backtest agreement: no net point-in-time backtest reference of this strategy is available, so the forward mean is not compared with a band.");
+            notes.Add("Backtest agreement: no point-in-time backtest reference of this strategy is available, so the forward mean is not compared with a band.");
+            return null;
+        }
+
+        if (!string.Equals(referenceBasis, forward.CostBasis, StringComparison.Ordinal))
+        {
+            notes.Add($"Backtest agreement: the reference is on the basis {referenceBasis} but the forward series is on {forward.CostBasis}; a different basis or buffer is not compared (reference_basis_mismatch).");
             return null;
         }
 

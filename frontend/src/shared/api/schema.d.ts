@@ -10287,6 +10287,8 @@ export interface components {
       /** @description The hash of the sheet's rates the run was costed with, so a stored verdict says which numbers were checked. */
       sheetRatesSha256?: null | string;
       tiers?: null | components['schemas']['CostStressTiersView'];
+      /** @description The cost basis the rows were judged on: `gross_less_buffer(&lt;value&gt;R)` for a gross run stressed on the cost buffer (GROSS-01, ADR 0294); null when the trades carried a sheet's charges, or in a verdict stored before it. */
+      costBasis?: null | string;
     };
     /** @description What undoing a cost batch did: its entries are voided (nothing is deleted). Undoing a batch again is a no-op (`AlreadyUndone`, `Voided` 0). */
     CostUndoResult: {
@@ -12722,7 +12724,10 @@ export interface components {
       /** @description What the state means and what happens next, in words. */
       note: string;
     };
-    /** @description The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words. */
+    /**
+     * @description The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words. `FoldMeansR` (GROSS-01, ADR 0294) is the mean R of each pooled fold window in order, so a reader can count the
+     *     positive folds less the cost buffer; null in a verdict stored before it. Additive: nothing that keys or hashes a run reads it.
+     */
     EvidenceView: {
       /** Format: int32 */
       oosTrades: number;
@@ -12740,6 +12745,7 @@ export interface components {
       calibrationErrorPp: number;
       method: string;
       dependence?: null | components['schemas']['DependenceView'];
+      foldMeansR?: null | number[];
     };
     /** @description How many tickets were left out of the report for one reason. */
     ExclusionCountView: {

@@ -33953,6 +33953,13 @@
                 "$ref": "#/components/schemas/CostStressTiersView"
               }
             ]
+          },
+          "costBasis": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The cost basis the rows were judged on: `gross_less_buffer(&lt;value&gt;R)` for a gross run stressed on the cost buffer (GROSS-01, ADR 0294); null when the trades carried a sheet's charges, or in a verdict stored before it."
           }
         },
         "description": "The cost stress and the delay test of a Lab verdict (CF-05, ADR 0206), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a miss caps the outcome at MARGINAL and never raises it. Every settings figure used is in\nstring CostStressView.Settings and its hash in string CostStressView.SettingsHash. string CostStressView.Tradable is the worst of the three multipliers. bool CostStressView.CostsChecked is false until `cost-sheet check` has recorded a bill check, and the rows are then unavailable."
@@ -40501,9 +40508,19 @@
                 "$ref": "#/components/schemas/DependenceView"
               }
             ]
+          },
+          "foldMeansR": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "number",
+              "format": "double"
+            }
           }
         },
-        "description": "The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words."
+        "description": "The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words. `FoldMeansR` (GROSS-01, ADR 0294) is the mean R of each pooled fold window in order, so a reader can count the\npositive folds less the cost buffer; null in a verdict stored before it. Additive: nothing that keys or hashes a run reads it."
       },
       "ExclusionCountView": {
         "required": [
