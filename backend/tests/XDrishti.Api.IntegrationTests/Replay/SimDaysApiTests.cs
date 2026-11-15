@@ -95,6 +95,11 @@ public sealed class SimDaysApiTests(ApiFactory factory) : DataTestBase(factory)
 
         (await anonymous.GetAsync(new Uri($"/api/sim/days/{id}", UriKind.Relative), Ct)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         (await anonymous.GetAsync(new Uri($"/api/sim/days/{id}/days/2026-10-05", UriKind.Relative), Ct)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        foreach (var read in new[] { "/api/sim/days", "/api/sim/days/settings", $"/api/sim/days/{id}/days" })
+        {
+            (await anonymous.GetAsync(new Uri(read, UriKind.Relative), Ct)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized, read);
+        }
+
         (await anonymous.PostAsJsonAsync(new Uri("/api/sim/days", UriKind.Relative), new { start = "2026-10-05" }, Ct)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         foreach (var action in new[] { "settle", "advance", "continue", "cancel" })
         {
@@ -181,10 +186,52 @@ public sealed class SimDaysApiTests(ApiFactory factory) : DataTestBase(factory)
 
         (notComplete.Status, Code(notComplete.Body)).ShouldBe((HttpStatusCode.Conflict, "sim.not_complete"));
         (status.GetProperty("phase").GetString(), status.GetProperty("daysDone").GetInt32(), status.GetProperty("daysTotal").GetInt32()).ShouldBe(("complete", 2, 2));
+        status.GetProperty("hasNewSessions").GetBoolean().ShouldBeFalse("no newer session is stored");
         (auto.Status, Code(auto.Body)).ShouldBe((HttpStatusCode.Conflict, "sim.final"), "auto-run applies to an active run");
         cancelled.Body.GetProperty("phase").GetString().ShouldBe("cancelled");
         (twice.Status, Code(twice.Body)).ShouldBe((HttpStatusCode.Conflict, "sim.final"));
         (missing.Status, Code(missing.Body)).ShouldBe((HttpStatusCode.NotFound, "sim.not_found"));
+    }
+
+    [Fact]
+    public async Task The_lists_page_the_runs_newest_first_and_a_runs_days_as_a_projection_and_the_settings_answer_the_defaults()
+    {
+        var older = New() with { CreatedAt = T0.AddDays(-1) };
+        (await WithStoreAsync(s => s.InsertAsync(older, Ct).AsTask())).ShouldBeTrue();
+        (await WithStoreAsync(s => s.CancelAsync(older.Id, T0, Ct).AsTask())).ShouldBeTrue();
+        var id = await StoredAsync();
+        await WithStoreAsync(async s =>
+        {
+            foreach (var day in new[] { D1, D2 })
+            {
+                (await s.MovePhaseAsync(id, "idle", "settling", T0, Ct)).ShouldBeTrue();
+                (await s.SettleAsync(id, Pending(day), T0, Ct)).ShouldBeTrue();
+                (await PostAsync($"/api/sim/days/{id}/advance")).Status.ShouldBe(HttpStatusCode.OK);
+            }
+
+            return 0;
+        });
+
+        var page1 = await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/sim/days?limit=1", UriKind.Relative), Ct);
+        var page2 = await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/sim/days?limit=1&cursor=" + page1.GetProperty("nextCursor").GetString(), UriKind.Relative), Ct);
+        var days = await Client.GetFromJsonAsync<JsonElement>(new Uri($"/api/sim/days/{id}/days?sort=desc", UriKind.Relative), Ct);
+        var settings = await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/sim/days/settings", UriKind.Relative), Ct);
+        using var missing = await Client.GetAsync(new Uri($"/api/sim/days/{Guid.NewGuid()}/days", UriKind.Relative), Ct);
+        using var bad = await Client.GetAsync(new Uri("/api/sim/days?limit=0", UriKind.Relative), Ct);
+
+        var first = page1.GetProperty("items")[0];
+        (first.GetProperty("id").GetGuid(), first.GetProperty("phase").GetString(), first.GetProperty("active").GetBoolean()).ShouldBe((id, "complete", false));
+        (first.GetProperty("equity").GetDecimal(), first.GetProperty("daysDone").GetInt32(), first.GetProperty("scope").GetProperty("baskets").GetInt32(), first.GetProperty("scope").GetProperty("instruments").GetInt32()).ShouldBe((1_000_500m, 2, 1, 0));
+        var second = page2.GetProperty("items")[0];
+        (second.GetProperty("id").GetGuid(), second.GetProperty("phase").GetString(), second.GetProperty("equity").GetDecimal()).ShouldBe((older.Id, "cancelled", 1_000_000m));
+        page2.GetProperty("nextCursor").ValueKind.ShouldBe(JsonValueKind.Null);
+        days.GetProperty("items").GetArrayLength().ShouldBe(2);
+        var newest = days.GetProperty("items")[0];
+        (newest.GetProperty("session").GetString(), newest.GetProperty("equityClose").GetDecimal(), newest.GetProperty("trades").GetInt32(), newest.GetProperty("picks").GetInt32(), newest.GetProperty("seenHoldOut").GetBoolean()).ShouldBe(("2026-10-06", 1_000_500m, 0, 1, false));
+        newest.TryGetProperty("record", out _).ShouldBeFalse("a projection, never the record");
+        (settings.GetProperty("defaultCapital").GetDecimal(), settings.GetProperty("speedSecondsPerMinute").GetInt32()).ShouldBe((1_000_000m, 10));
+        (missing.StatusCode, Code(await missing.Content.ReadFromJsonAsync<JsonElement>(Ct))).ShouldBe((HttpStatusCode.NotFound, "sim.not_found"));
+        (bad.StatusCode, Code(await bad.Content.ReadFromJsonAsync<JsonElement>(Ct))).ShouldBe((HttpStatusCode.UnprocessableEntity, "sim.invalid"));
     }
 
     [Fact]

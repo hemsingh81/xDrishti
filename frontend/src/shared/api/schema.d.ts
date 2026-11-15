@@ -4947,10 +4947,45 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    /** The simulations, newest first, a page at a time (limit 1 to 100, default 20; cursor from the previous page): id, phase, active (the one run in idle, settling or settled), auto, mode, scope (basket and stock counts), start, end, cursor, capital, equity (the newest stored day's close, the capital before the first), days done, created. Read only. 422 sim.invalid. */
+    get: operations['ListSimDays'];
     put?: never;
     /** Start a day-by-day simulation: body start, end (default the last complete stored session; clamped to the day before hold-out block 1 and its embargo unless block 1's strategy look is stored, which the start takes automatically when free and says so in holdOutNote), scope {basketIds, instrumentIds} (required), capital (default Sim:DefaultCapital), riskProfileId (default the seeded standard profile), mode (learning or frozen, default learning). Gross costs. 201 with the id. 422 sim.invalid (start after end, before the first stored bar plus the warm-up, empty scope, capital <= 0); 409 sim.busy (a simulation is active). */
     post: operations['StartSimDays'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sim/days/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The simulation's defaults: defaultCapital (rupees, Sim:DefaultCapital), speedSecondsPerMinute (playback at 1X) and autoContinue. Read only. */
+    get: operations['GetSimDaysSettings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sim/days/{id}/days': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The run's stored days, a page at a time (limit 1 to 100, default 20; cursor from the previous page; sort asc (default, oldest first) or desc): session, closing equity, trades, picks and seenHoldOut. Never the record. 404 sim.not_found; 422 sim.invalid. Read only. */
+    get: operations['ListSimDayDays'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -4964,7 +4999,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The status of a simulation: cursor day, phase (idle, settling, settled, complete, cancelled, error), auto, equity, days done of total, the hold-out note, the hindsight labels and the cost basis. Read only. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid. */
+    /** The status of a simulation: cursor day, phase (idle, settling, settled, complete, cancelled, error), auto, equity, days done of total, the hold-out note, the hindsight labels, the cost basis and hasNewSessions (a complete run that Continue would extend). Read only. 404 sim.not_found; 409 sim.busy, sim.not_settled, sim.not_complete, sim.nothing_new, sim.final; 422 sim.invalid. */
     get: operations['GetSimDays'];
     put?: never;
     post?: never;
@@ -23825,6 +23860,23 @@ export interface components {
       /** Format: double */
       runningPnl: number;
     };
+    /** @description One stored day: the closing equity, the trades entered or exited on it, the picks and whether it rests on a released hold-out block (`seen_holdout`). */
+    SimDayListItemView: {
+      /** Format: date */
+      session: string;
+      /** Format: double */
+      equityClose: number;
+      /** Format: int32 */
+      trades: number;
+      /** Format: int32 */
+      picks: number;
+      seenHoldOut: boolean;
+    };
+    /** @description A page of a run's stored days (SR-04); string? SimDayListView.NextCursor is null on the last page. */
+    SimDayListView: {
+      items: components['schemas']['SimDayListItemView'][];
+      nextCursor: null | string;
+    };
     /** @description One day of a simulation (SR-04, AC 7): the picks (the plan made at its close), the blocked with reasons, the fills, the trades that entered or exited on it, the closing equity and the result hash. bool SimDaySnapshotView.Stored is false for the settled cursor day before it is advanced. */
     SimDaySnapshotView: {
       /** Format: uuid */
@@ -23906,6 +23958,50 @@ export interface components {
     SimDaysAutoBody: {
       on: boolean;
     };
+    /** @description One simulation in the list: bool SimDaysListItemView.Active marks the one active run (idle, settling or settled); decimal SimDaysListItemView.Equity is the closing equity of the newest stored day, the capital before the first. */
+    SimDaysListItemView: {
+      /** Format: uuid */
+      id: string;
+      phase: string;
+      active: boolean;
+      auto: boolean;
+      mode: string;
+      scope: components['schemas']['SimDaysScopeView'];
+      /** Format: date */
+      start: string;
+      /** Format: date */
+      end: string;
+      /** Format: date */
+      cursor: string;
+      /** Format: double */
+      capital: number;
+      /** Format: double */
+      equity: number;
+      /** Format: int32 */
+      daysDone: number;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @description A page of simulations (SR-04), newest first; string? SimDaysListView.NextCursor is null on the last page. */
+    SimDaysListView: {
+      items: components['schemas']['SimDaysListItemView'][];
+      nextCursor: null | string;
+    };
+    /** @description The scope of a simulation as counts: the baskets and the stocks it was started with. */
+    SimDaysScopeView: {
+      /** Format: int32 */
+      baskets: number;
+      /** Format: int32 */
+      instruments: number;
+    };
+    /** @description The simulation's defaults (section `Sim`): the starting capital in rupees, the playback seconds per market minute at 1X and whether a complete run extends by itself. */
+    SimDaysSettingsView: {
+      /** Format: double */
+      defaultCapital: number;
+      /** Format: int32 */
+      speedSecondsPerMinute: number;
+      autoContinue: boolean;
+    };
     /** @description The body of a day-by-day simulation start (SR-04). Defaults: end the last complete stored session (clamped before hold-out block 1 unless its strategy look is stored), capital `Sim:DefaultCapital`, the seeded standard profile, mode learning. Costs are gross (ADR 0292). */
     SimDaysStartBody: {
       /** Format: date */
@@ -23924,7 +24020,7 @@ export interface components {
       /** Format: uuid */
       id: string;
     };
-    /** @description The status of a day-by-day simulation (SR-04): the cursor day, the phase, the equity and how many days are done of the total, with the hindsight labels, the cost basis, the hold-out note and why the runner waits (`market_hours`, `low_disk`, `data_job`, `backfill`, `sim_all`), or null. */
+    /** @description The status of a day-by-day simulation (SR-04): the cursor day, the phase, the equity and how many days are done of the total, with the hindsight labels, the cost basis, the hold-out note and why the runner waits (`market_hours`, `low_disk`, `data_job`, `backfill`, `sim_all`), or null. bool SimDaysView.HasNewSessions: the run is complete and Continue would extend it (a newer complete session is stored and the hold-out lets it be read); computed by the status read only, false on the answers of the commands. */
     SimDaysView: {
       /** Format: uuid */
       id: string;
@@ -23960,6 +24056,8 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+      /** @default false */
+      hasNewSessions: boolean;
     };
     /** @description One job a training report can read: what it covers and how far it has got. A training simulation, not evidence. */
     SimReportJobView: {
@@ -38234,6 +38332,38 @@ export interface operations {
       };
     };
   };
+  ListSimDays: {
+    parameters: {
+      query?: {
+        limit?: string;
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimDaysListView'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
   StartSimDays: {
     parameters: {
       query?: never;
@@ -38258,6 +38388,70 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetSimDaysSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimDaysSettingsView'];
+        };
+      };
+    };
+  };
+  ListSimDayDays: {
+    parameters: {
+      query?: {
+        limit?: string;
+        cursor?: string;
+        sort?: string;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimDayListView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

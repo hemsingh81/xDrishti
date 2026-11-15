@@ -246,7 +246,7 @@ public sealed class SimDaysRunnerTests
 
         await AutoToTheEnd(rig, id);
 
-        var view = await new GetSimDaysHandler(rig.Store, rig.Calendar, rig.Options).HandleAsync(new GetSimDaysQuery(id), Ct);
+        var view = await new GetSimDaysHandler(rig.Store, rig.Calendar, null!, rig.Options) /* the hold-out is read for a complete run only */.HandleAsync(new GetSimDaysQuery(id), Ct);
         (view.Value.Phase, view.Value.Waiting).ShouldBe((SimDays.Settling, "market_hours"));
         rig.Store.Row(id).Manual.ShouldBeFalse();
     }

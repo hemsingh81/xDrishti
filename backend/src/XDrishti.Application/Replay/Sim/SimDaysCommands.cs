@@ -29,3 +29,12 @@ public sealed record GetSimDayQuery(Guid Id, DateOnly Session) : IQuery<Result<S
 
 /// <summary>One page of a settled day's tape: the minutes from <paramref name="From"/> (default 09:15 India time) to <paramref name="To"/> (default 15:29), both on the day.</summary>
 public sealed record GetSimDayTapeQuery(Guid Id, DateOnly Session, DateTimeOffset? From, DateTimeOffset? To) : IQuery<Result<SimDayTapeView>>;
+
+/// <summary>The simulations, newest first, a page at a time: <paramref name="Limit"/> 1 to 100 (default 20), <paramref name="Cursor"/> from the previous page.</summary>
+public sealed record ListSimDaysQuery(string? Limit, string? Cursor) : IQuery<Result<SimDaysListView>>;
+
+/// <summary>The stored days of one run, a page at a time; <paramref name="Sort"/> <c>asc</c> (default, oldest first) or <c>desc</c>.</summary>
+public sealed record ListSimDayDaysQuery(Guid Id, string? Limit, string? Cursor, string? Sort) : IQuery<Result<SimDayListView>>;
+
+/// <summary>The defaults the start form and the playback read (Sim:DefaultCapital, Sim:DefaultSpeedSecondsPerMinute, Sim:AutoContinue).</summary>
+public sealed record GetSimDaysSettingsQuery : IQuery<SimDaysSettingsView>;

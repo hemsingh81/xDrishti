@@ -43,9 +43,16 @@ internal static class SimDaysSupport
 
     public static IReadOnlyList<ReplayLabelView> Labels(SimDaysRunRow row) => ReplayReadSupport.Labels(ReplayJson.Read<ReplayParams>(row.ParamsJson));
 
-    public static SimDaysView View(SimDaysRunRow row, TradingCalendar calendar, SimDaysOptions options) => new(
+    public static SimDaysView View(SimDaysRunRow row, TradingCalendar calendar, SimDaysOptions options, bool hasNewSessions = false) => new(
         row.Id, row.Start, row.End, row.RequestedEnd, row.Cursor, row.Phase, row.Auto, row.Mode, row.Capital, row.LastEquity ?? row.Capital, row.Pending?.EquityClose, row.DaysDone, Count(calendar, row.Start, row.End),
-        row.HoldOutNote, row.Waiting, row.FailReason, Labels(row), CostsLabel, options.DefaultSpeedSecondsPerMinute, row.CreatedAt, row.UpdatedAt);
+        row.HoldOutNote, row.Waiting, row.FailReason, Labels(row), CostsLabel, options.DefaultSpeedSecondsPerMinute, row.CreatedAt, row.UpdatedAt, hasNewSessions);
+
+    /// <summary>Whether Continue would extend <paramref name="row"/> (SR-04, AC 10): it is complete, a complete session after its end is stored (<paramref name="lastComplete"/>) and the hold-out answer for it lets the cursor step past the end. Mirrors <see cref="ContinueSimDaysHandler"/>.</summary>
+    public static bool HasNewSessions(SimDaysRunRow row, DateOnly? lastComplete, DateOnly? allowedEnd, TradingCalendar calendar)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        return row.Phase == SimDays.Complete && lastComplete > row.End && allowedEnd is { } end && end > row.End && Next(calendar, row.Cursor, end) is not null;
+    }
 
     public static SimDaySnapshotView Snapshot(SimDaysRunRow row, DateOnly session, bool stored, string recordJson, string tradesJson, string hash)
     {

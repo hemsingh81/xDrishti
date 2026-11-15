@@ -94,6 +94,22 @@ internal sealed class FakeSimDaysStore : ISimDaysStore
 
     public ValueTask<SimDaySnapshotRow?> SnapshotAsync(Guid id, DateOnly session, CancellationToken cancellationToken) => ValueTask.FromResult(Days.GetValueOrDefault(id)?.FirstOrDefault(d => d.Session == session));
 
+    public ValueTask<IReadOnlyList<SimDaysListRow>> ListAsync(int offset, int take, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<SimDaysListRow>>([.. _runs.Values.Select(With).OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id).Skip(offset).Take(take).Select(r =>
+        {
+            var scope = ReplayJson.Read<XDrishti.Domain.Replay.ReplayParams>(r.ParamsJson)?.Scope;
+            return new SimDaysListRow(r.Id, r.Phase, r.Auto, r.Mode, scope?.BasketIds.Count ?? 0, scope?.InstrumentIds.Count ?? 0, r.Start, r.End, r.Cursor, r.Capital, r.LastEquity, r.DaysDone, r.CreatedAt);
+        })]);
+
+    public ValueTask<IReadOnlyList<SimDayListRow>> ListDaysAsync(Guid id, bool descending, int offset, int take, CancellationToken cancellationToken)
+    {
+        var days = Days.GetValueOrDefault(id) ?? [];
+        var ordered = descending ? days.OrderByDescending(d => d.Session) : days.OrderBy(d => d.Session);
+        return ValueTask.FromResult<IReadOnlyList<SimDayListRow>>([.. ordered.Skip(offset).Take(take).Select(d => new SimDayListRow(
+            d.Session, d.EquityClose, (ReplayJson.Read<List<SimDayTrade>>(d.TradesJson) ?? []).Count, (ReplayJson.Read<List<object>>(d.PicksJson) ?? []).Count,
+            (ReplayJson.Read<XDrishti.Domain.Replay.ReplaySessionRecord>(d.RecordJson)?.Labels ?? []).Any(l => l.StartsWith(XDrishti.Domain.Lab.SeenHoldOut.Prefix, StringComparison.Ordinal))))]);
+    }
+
     private SimDaysRunRow With(SimDaysRunRow r) => r with { DaysDone = Days[r.Id].Count, LastEquity = Days[r.Id].Count == 0 ? null : Days[r.Id].MaxBy(d => d.Session)!.EquityClose };
 
     private ValueTask<bool> Move(Guid id, Func<SimDaysRunRow, bool> when, Func<SimDaysRunRow, SimDaysRunRow> to) => ValueTask.FromResult(Moved(id, when, to));
