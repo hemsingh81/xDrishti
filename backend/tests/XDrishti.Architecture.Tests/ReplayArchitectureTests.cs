@@ -227,7 +227,7 @@ public sealed partial class ReplayArchitectureTests
         var wideners = Directory.EnumerateFiles(Path.Combine(Src(), "XDrishti.Application"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && File.ReadAllText(f).Contains(".ReadInsideHoldOut(", StringComparison.Ordinal))
             .Select(Path.GetFileName).Order(StringComparer.Ordinal).ToList();
-        wideners.ShouldBe(["SimDayBook.cs", "StartSimDaysHandler.cs"]);
+        wideners.ShouldBe(["GetSimDayTapeHandler.cs", "SimDayBook.cs", "StartSimDaysHandler.cs"]); // the tape reads a settled day of a run whose read-through is stored, as settling it did
     }
 
     [Fact]

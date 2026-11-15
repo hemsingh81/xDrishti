@@ -60,7 +60,7 @@ public sealed class StartSimDaysHandlerTests
 
     private SimDaysHoldOut? _simHoldOut;
 
-    private StartSimDaysHandler Handler(HoldOutOptions? holdOutOptions = null)
+    private StartSimDaysHandler Handler(HoldOutOptions? holdOutOptions = null, XDrishti.Application.Abstractions.Replay.ISimDaysStore? store = null)
     {
         var o = holdOutOptions ?? new HoldOutOptions(TrainingEmbargoDays: _rig.World.EmbargoDays);
         var rig = ReplayRig.Create(_rig.World);
@@ -76,7 +76,7 @@ public sealed class StartSimDaysHandlerTests
         var simHoldOut = _simHoldOut = new SimDaysHoldOut(epochs, _holdOut, step, _runs, guard, o, calendar, _rig.Time);
         var profiles = Substitute.For<IRiskProfileStore>();
         profiles.ListAsync(Arg.Any<CancellationToken>()).Returns((IReadOnlyList<Domain.Accounts.RiskProfile>)[]);
-        return new StartSimDaysHandler(rig.Driver, rig.Facts, new ReplayInputHasher(rig.Facts, rig.Facts), rig.Facts, simHoldOut, profiles, new SystemReplayOptions(), _rig.Options, _rig.Store, _ledger, _rig.Time, NullLogger<StartSimDaysHandler>.Instance);
+        return new StartSimDaysHandler(rig.Driver, rig.Facts, new ReplayInputHasher(rig.Facts, rig.Facts), rig.Facts, simHoldOut, profiles, new SystemReplayOptions(), _rig.Options, store ?? _rig.Store, _ledger, _rig.Time, NullLogger<StartSimDaysHandler>.Instance);
     }
 
     private static StartSimDaysCommand Command(DateOnly start, DateOnly? end = null, decimal? capital = null, bool emptyScope = false) =>
@@ -137,6 +137,44 @@ public sealed class StartSimDaysHandlerTests
         refused.Error.Message.ShouldContain("look is free", customMessage: "the decision found the look to claim, and the refusal came first");
         await _runs.DidNotReceive().InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>());
         await _runs.DidNotReceive().ListSucceededFullTestsAsync(Arg.Any<CancellationToken>());
+    }
+
+    private void BlockOneSealedFromOctoberEighth()
+    {
+        _rig.World.HoldOutStart = new DateOnly(2026, 10, 8);
+        _rig.World.EmbargoDays = 0;
+        _holdOut.Blocks.Clear();
+        _holdOut.Blocks.Add(new HoldOutBlock(_rig.World.HoldOutStart, new DateOnly(2024, 1, 1), new DateOnly(2026, 10, 30), 6, new string('h', 64), DateTimeOffset.UnixEpoch)); // sealed, its look free
+    }
+
+    [Fact]
+    public async Task A_start_that_loses_the_one_active_run_race_is_sim_busy_and_claims_nothing()
+    {
+        BlockOneSealedFromOctoberEighth();
+        var racing = Substitute.For<XDrishti.Application.Abstractions.Replay.ISimDaysStore>();
+        racing.ActiveAsync(Arg.Any<CancellationToken>()).Returns((XDrishti.Application.Abstractions.Replay.SimDaysRunRow?)null); // the check saw none
+        racing.InsertAsync(Arg.Any<XDrishti.Application.Abstractions.Replay.NewSimDaysRun>(), Arg.Any<CancellationToken>()).Returns(false); // the other start stored first
+
+        var lost = await Handler(store: racing).HandleAsync(Command(ReplayWorld.Start, new DateOnly(2026, 10, 30)), Ct);
+
+        lost.Error.Code.ShouldBe(SimDays.BusyCode);
+        await _runs.DidNotReceive().ListSucceededFullTestsAsync(Arg.Any<CancellationToken>());
+        await _runs.DidNotReceive().InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>());
+        _ledger.Rows.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_start_that_reaches_block_one_claims_the_look_after_it_is_stored_and_writes_the_claims_note_on_the_run()
+    {
+        BlockOneSealedFromOctoberEighth();
+
+        var started = await Handler().HandleAsync(Command(ReplayWorld.Start, new DateOnly(2026, 10, 30)), Ct);
+
+        started.IsSuccess.ShouldBeTrue(started.IsFailure ? started.Error.Message : string.Empty);
+        await _runs.Received().ListSucceededFullTestsAsync(Arg.Any<CancellationToken>());
+        var note = _rig.Store.Row(started.Value).HoldOutNote;
+        note.ShouldNotBeNull();
+        note.ShouldNotContain("look is free", customMessage: "the stored note says what the claim did");
     }
 
     [Fact]

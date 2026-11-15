@@ -7,6 +7,7 @@ using XDrishti.Api.IntegrationTests.Data;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Application.Abstractions.Replay;
 using XDrishti.Application.Replay;
+using XDrishti.Application.Replay.Sim;
 using XDrishti.Domain.Replay;
 
 namespace XDrishti.Api.IntegrationTests.Replay;
@@ -27,6 +28,28 @@ public sealed class SimDaysApiTests(ApiFactory factory) : DataTestBase(factory)
         await base.InitializeAsync();
         await using var connection = await OpenAsync();
         await ExecuteAsync(connection, "DELETE FROM research.sim_days_snapshots; DELETE FROM research.sim_days_runs;");
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        Factory.ReplayStart.Gate = null;
+        await using (var connection = await OpenAsync())
+        {
+            // leave nothing behind for the next class: a fixed hold-out block feeds the bell notices (holdout_stalled), a run or day feeds the simulation reads
+            await ExecuteAsync(connection, "DELETE FROM research.sim_days_snapshots; DELETE FROM research.sim_days_runs;" + (_blockFixed ? " DELETE FROM lab.holdout_unlocks; DELETE FROM lab.holdout_releases; DELETE FROM lab.holdout_blocks;" : string.Empty));
+        }
+
+        await base.DisposeAsync();
+    }
+
+    /// <summary>Fixes a hold-out block far after the test days, so the replay's clamp lets them be read.</summary>
+    private bool _blockFixed;
+
+    private async Task BlockAfterTheTestDaysAsync()
+    {
+        _blockFixed = true;
+        await using var connection = await OpenAsync();
+        await ExecuteAsync(connection, "DELETE FROM lab.holdout_unlocks; DELETE FROM lab.holdout_releases; DELETE FROM lab.holdout_blocks; INSERT INTO lab.holdout_blocks (start_date, history_first, history_last, length_months, setting_hash, created_at) VALUES ('2031-01-01', '2026-03-02', '2031-06-30', 12, repeat('a', 64), now())");
     }
 
     private static NewSimDaysRun New()
@@ -182,12 +205,12 @@ public sealed class SimDaysApiTests(ApiFactory factory) : DataTestBase(factory)
         (await Should.ThrowAsync<PostgresException>(() => reopen.ExecuteNonQueryAsync(Ct))).SqlState.ShouldBe(PostgresErrorCodes.CheckViolation, "the trigger keeps a cancelled run final");
     }
 
-    /// <summary>The row count of every table of the planning, paper, trading, selection, settings and confidence schemas and of every research table but the simulation's own.</summary>
+    /// <summary>The row count of every table of the planning, paper (with shadow), trading, selection, settings, confidence, lab, portfolio, accounts and readiness schemas and of every research table (cell statistics, models) but the simulation's own.</summary>
     private async Task<Dictionary<string, long>> CountsAsync()
     {
         await using var connection = await OpenAsync();
         var tables = new List<string>();
-        await using (var list = new NpgsqlCommand("SELECT schemaname || '.' || tablename FROM pg_tables WHERE schemaname IN ('workflow', 'paper', 'trading', 'selection', 'config', 'confidence', 'research') AND tablename NOT LIKE 'sim_days_%' ORDER BY 1", connection))
+        await using (var list = new NpgsqlCommand("SELECT schemaname || '.' || tablename FROM pg_tables WHERE schemaname IN ('workflow', 'paper', 'trading', 'selection', 'config', 'confidence', 'research', 'lab', 'portfolio', 'accounts', 'readiness') AND tablename NOT LIKE 'sim_days_%' ORDER BY 1", connection))
         await using (var reader = await list.ExecuteReaderAsync(Ct))
         {
             while (await reader.ReadAsync(Ct))
@@ -209,10 +232,25 @@ public sealed class SimDaysApiTests(ApiFactory factory) : DataTestBase(factory)
     [Fact]
     public async Task A_settled_and_advanced_day_writes_no_planning_paper_shadow_statistics_model_or_settings_row()
     {
+        await BlockAfterTheTestDaysAsync();
+        Factory.ReplayStart.Gate = new CompleteBackfill();
         var id = await StoredAsync();
         var before = await CountsAsync();
         before.Keys.ShouldContain("research.cell_stats");
+        before.Keys.ShouldContain("research.model_versions");
+        before.Keys.ShouldContain("paper.shadow_entries");
 
+        (await PostAsync($"/api/sim/days/{id}/settle")).Status.ShouldBe(HttpStatusCode.Accepted);
+        // The real runner and engine take the manual settle (it runs in market hours too). Here it can only fail: the integration doubles cannot step a session (StubReplayFacts throws
+        // on MarketAsync and SizingAsync) and seeding a whole tradable market is out of reach, so this proves a failed tick writes nothing. A successful settle is covered by
+        // SimDaysRunnerTests (the real engine over fakes, writing only through ISimDaysStore) and ReplayArchitectureTests (no write outside the two tables, statically).
+        await Factory.Services.GetRequiredService<SimDaysRunner>().TickAsync(Ct);
+        var ticked = await WithStoreAsync(s => s.GetAsync(id, Ct).AsTask());
+        ticked!.Phase.ShouldBe(SimDays.Failed, "the real runner took the settle and ran the real engine, which cannot prepare the test's empty basket: " + ticked.FailReason + ticked.Waiting);
+        var after = await CountsAsync();
+        after.ShouldBe(before, "the runner's tick wrote nothing outside the simulation's own tables");
+        (await WithStoreAsync(s => s.CancelAsync(id, T0, Ct).AsTask())).ShouldBeFalse("an error run is final");
+        id = await StoredAsync(); // a second run walks the rest of the routes over a settled day, as the runner leaves it
         (await PostAsync($"/api/sim/days/{id}/settle")).Status.ShouldBe(HttpStatusCode.Accepted);
         (await WithStoreAsync(s => s.SettleAsync(id, Pending(D1), T0, Ct).AsTask())).ShouldBeTrue();
         (await PostAsync($"/api/sim/days/{id}/advance")).Status.ShouldBe(HttpStatusCode.OK);
@@ -220,5 +258,102 @@ public sealed class SimDaysApiTests(ApiFactory factory) : DataTestBase(factory)
         (await PostAsync($"/api/sim/days/{id}/cancel")).Status.ShouldBe(HttpStatusCode.OK);
 
         (await CountsAsync()).ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task The_tape_of_a_settled_day_pages_its_bars_and_events_by_minute_and_refuses_an_unknown_run_or_an_unsettled_day()
+    {
+        await BlockAfterTheTestDaysAsync();
+        var instrument = await SeedAsync("TAPEA");
+        await using (var connection = await OpenAsync())
+        {
+            foreach (var (time, close) in new[] { ("09:15", 100.0), ("09:16", 101.0), ("09:17", 102.0), ("10:00", 99.0) })
+            {
+                var at = new DateTimeOffset(D1.ToDateTime(TimeOnly.Parse(time, System.Globalization.CultureInfo.InvariantCulture)), TimeSpan.FromMinutes(330));
+                await ExecuteAsync(connection, "INSERT INTO market.bars_1m (instrument_id, ts, open, high, low, close, volume, source) VALUES (@id, @ts, @c, @c, @c, @c, 100, 'csv')", ("id", instrument), ("ts", at.ToUniversalTime()), ("c", close));
+            }
+        }
+
+        var id = await StoredAsync();
+        var open = new DateTimeOffset(D1.ToDateTime(new TimeOnly(9, 15)), TimeSpan.FromMinutes(330));
+        var trade = new SimDayTrade(1, "TAPEA", "BUY", "S1|1D|BUY|swing|FIXED_RR|*", 10, D1, open, 100m, 98m, true, null, null, null, null, instrument);
+        var pending = Pending(D1) with { TradesJson = ReplayJson.Canonical(new[] { trade }) };
+        var unsettled = await GetAsync($"/api/sim/days/{id}/days/2026-10-05/tape");
+        (await PostAsync($"/api/sim/days/{id}/settle")).Status.ShouldBe(HttpStatusCode.Accepted);
+        (await WithStoreAsync(s => s.SettleAsync(id, pending, T0, Ct).AsTask())).ShouldBeTrue();
+
+        var page = await GetAsync($"/api/sim/days/{id}/days/2026-10-05/tape?from={Uri.EscapeDataString("2026-10-05T09:15:00+05:30")}&to={Uri.EscapeDataString("2026-10-05T09:16:00+05:30")}");
+        var unknown = await GetAsync($"/api/sim/days/{Guid.NewGuid()}/days/2026-10-05/tape");
+        var never = await GetAsync($"/api/sim/days/{id}/days/2026-10-20/tape");
+        var off = await GetAsync($"/api/sim/days/{id}/days/2026-10-05/tape?from={Uri.EscapeDataString("2026-10-05T10:00:00+05:30")}&to={Uri.EscapeDataString("2026-10-05T09:16:00+05:30")}");
+
+        (unsettled.Status, Code(unsettled.Body)).ShouldBe((HttpStatusCode.Conflict, SimDays.NotSettledCode));
+        page.Status.ShouldBe(HttpStatusCode.OK, page.Body.ToString());
+        page.Body.GetProperty("bars").GetArrayLength().ShouldBe(2, "no bar after to");
+        page.Body.GetProperty("events").EnumerateArray().Select(e => e.GetProperty("kind").GetString()).ShouldBe([SimTape.EntryKind]);
+        var position = page.Body.GetProperty("board").GetProperty("open").EnumerateArray().Single();
+        (position.GetProperty("lastPrice").GetDecimal(), position.GetProperty("runningPnl").GetDecimal()).ShouldBe((101m, 10m));
+        (unknown.Status, Code(unknown.Body)).ShouldBe((HttpStatusCode.NotFound, SimDays.NotFoundCode));
+        (never.Status, Code(never.Body)).ShouldBe((HttpStatusCode.NotFound, "sim.day_not_found"));
+        (off.Status, Code(off.Body)).ShouldBe((HttpStatusCode.UnprocessableEntity, SimDays.InvalidCode));
+    }
+
+    [Fact]
+    public async Task A_one_minute_page_of_fifty_held_instruments_reads_only_the_day_and_answers_fast()
+    {
+        await BlockAfterTheTestDaysAsync();
+        var instruments = new List<Guid>();
+        for (var i = 0; i < 50; i++)
+        {
+            instruments.Add(await SeedAsync($"TAPEP{i:00}"));
+        }
+
+        await using (var connection = await OpenAsync())
+        {
+            // a full session (375 minutes) of D2 for every instrument, and one bar of D1
+            await ExecuteAsync(
+                connection,
+                "INSERT INTO market.bars_1m (instrument_id, ts, open, high, low, close, volume, source) SELECT i, @d2 + m * interval '1 minute', 100 + m * 0.01, 100 + m * 0.01, 100 + m * 0.01, 100 + m * 0.01, 100, 'csv' FROM unnest(@ids) i CROSS JOIN generate_series(0, 374) m UNION ALL SELECT i, @d1, 100, 100, 100, 100, 100, 'csv' FROM unnest(@ids) i",
+                ("ids", instruments.ToArray()), ("d2", new DateTimeOffset(D2.ToDateTime(new TimeOnly(9, 15)), TimeSpan.FromMinutes(330)).ToUniversalTime()), ("d1", new DateTimeOffset(D1.ToDateTime(new TimeOnly(9, 15)), TimeSpan.FromMinutes(330)).ToUniversalTime()));
+        }
+
+        var id = await StoredAsync();
+        var entry = new DateTimeOffset(D1.ToDateTime(new TimeOnly(9, 15)), TimeSpan.FromMinutes(330));
+        var held = instruments.Select((g, i) => new SimDayTrade(i + 1, $"TAPEP{i:00}", "BUY", "S1|1D|BUY|swing|FIXED_RR|*", 1, D1, entry, 100m, 95m, true, null, null, null, null, g)).ToArray();
+        (await PostAsync($"/api/sim/days/{id}/settle")).Status.ShouldBe(HttpStatusCode.Accepted);
+        (await WithStoreAsync(s => s.SettleAsync(id, Pending(D1) with { TradesJson = ReplayJson.Canonical(held) }, T0, Ct).AsTask())).ShouldBeTrue();
+        (await PostAsync($"/api/sim/days/{id}/advance")).Status.ShouldBe(HttpStatusCode.OK);
+        (await PostAsync($"/api/sim/days/{id}/settle")).Status.ShouldBe(HttpStatusCode.Accepted);
+        (await WithStoreAsync(s => s.SettleAsync(id, Pending(D2), T0, Ct).AsTask())).ShouldBeTrue();
+        var minute = Uri.EscapeDataString("2026-10-06T12:00:00+05:30");
+        var path = $"/api/sim/days/{id}/days/2026-10-06/tape?from={minute}&to={minute}";
+        (await GetAsync(path)).Status.ShouldBe(HttpStatusCode.OK); // warm the route once
+
+        var best = long.MaxValue; // best of three samples, so a busy gate machine does not flake the check (target < 200 ms, measured 16-21 ms)
+        (HttpStatusCode Status, JsonElement Body) page = default;
+        for (var sample = 0; sample < 3; sample++)
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var got = await GetAsync(path);
+            clock.Stop();
+            best = Math.Min(best, clock.ElapsedMilliseconds);
+            page = got;
+        }
+
+        TestContext.Current.SendDiagnosticMessage($"SR-04 tape: one-minute page of 50 instruments in {best} ms (best of 3)");
+        page.Status.ShouldBe(HttpStatusCode.OK, page.Body.ToString());
+        page.Body.GetProperty("symbols").GetArrayLength().ShouldBe(50, "the trades held into the day are in play");
+        page.Body.GetProperty("bars").GetArrayLength().ShouldBe(50, "one minute: one bar each");
+        var board = page.Body.GetProperty("board");
+        board.GetProperty("open").GetArrayLength().ShouldBe(50);
+        board.GetProperty("equityOpen").GetDecimal().ShouldBe(1_000_500m, "the close of the stored day before");
+        best.ShouldBeLessThan(200, "spec SR-04 non-functional: a one-minute page in < 200 ms");
+    }
+
+    private async Task<(HttpStatusCode Status, JsonElement Body)> GetAsync(string path)
+    {
+        using var response = await Client.GetAsync(new Uri(path, UriKind.Relative), Ct);
+        var text = await response.Content.ReadAsStringAsync(Ct);
+        return (response.StatusCode, text.Length == 0 ? default : JsonDocument.Parse(text).RootElement.Clone());
     }
 }

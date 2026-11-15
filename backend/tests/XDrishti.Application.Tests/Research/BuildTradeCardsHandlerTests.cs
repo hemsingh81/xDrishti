@@ -545,6 +545,17 @@ public sealed class BuildTradeCardsHandlerTests
     /// <summary>A store that remembers each list it returned with a weak reference and, at the start of the next read, collects garbage and notes whether the earlier lists are still alive.</summary>
     private sealed class TrackingStore(FakeBarStore inner) : IBarStore
     {
+        public async ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>>> ReadManyAsync(IReadOnlyCollection<Guid> instrumentIds, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+        {
+            var all = new Dictionary<Guid, IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>>();
+            foreach (var id in instrumentIds)
+            {
+                all[id] = await ReadAsync(id, from, to, cancellationToken);
+            }
+
+            return all;
+        }
+
         private readonly List<WeakReference> _lists = [];
 
         public int Reads => _lists.Count;

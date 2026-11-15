@@ -70,6 +70,9 @@ internal sealed class SimDaysStore(NpgsqlDataSource dataSource) : ISimDaysStore
     public async ValueTask SetWaitingAsync(Guid id, string? reason, DateTimeOffset now, CancellationToken cancellationToken) =>
         await UpdateAsync("UPDATE research.sim_days_runs SET waiting = @reason, updated_at = @now WHERE id = @id AND waiting IS DISTINCT FROM @reason AND phase IN ('idle', 'settling', 'settled')", id, now, c => c.Parameters.AddWithValue("reason", NpgsqlDbType.Varchar, (object?)Cap(reason, 40) ?? DBNull.Value), cancellationToken);
 
+    public async ValueTask SetHoldOutNoteAsync(Guid id, string? note, DateTimeOffset now, CancellationToken cancellationToken) =>
+        await UpdateAsync("UPDATE research.sim_days_runs SET hold_out_note = @note, updated_at = @now WHERE id = @id AND " + Active, id, now, c => c.Parameters.AddWithValue("note", NpgsqlDbType.Varchar, (object?)Cap(note, 1000) ?? DBNull.Value), cancellationToken);
+
     public ValueTask<bool> SetAutoAsync(Guid id, bool on, DateTimeOffset now, CancellationToken cancellationToken) =>
         UpdateAsync("UPDATE research.sim_days_runs SET auto = @on, updated_at = @now WHERE id = @id AND " + Active, id, now, c => c.Parameters.AddWithValue("on", NpgsqlDbType.Boolean, on), cancellationToken);
 
@@ -173,6 +176,30 @@ internal sealed class SimDaysStore(NpgsqlDataSource dataSource) : ISimDaysStore
 
     public async ValueTask<SimDaySnapshotRow?> SnapshotAsync(Guid id, DateOnly session, CancellationToken cancellationToken) =>
         (await SnapshotRowsAsync("WHERE run_id = @id AND session = @session", id, session, cancellationToken)).FirstOrDefault();
+
+    public async ValueTask<SimTapeDay> TapeDayAsync(Guid id, DateOnly session, CancellationToken cancellationToken)
+    {
+        // a trade still open coming into the day: stored before it with no exit, and no earlier stored day has its exit (a trade is stored on its entry day and again on its exit day)
+        await using var command = dataSource.CreateCommand("""
+            SELECT
+                (SELECT record::text FROM research.sim_days_snapshots WHERE run_id = @id AND session = @session),
+                (SELECT trades::text FROM research.sim_days_snapshots WHERE run_id = @id AND session = @session),
+                (SELECT equity_close FROM research.sim_days_snapshots WHERE run_id = @id AND session < @session ORDER BY session DESC LIMIT 1),
+                (SELECT coalesce(jsonb_agg(t.value ORDER BY (t.value->>'tradeNo')::bigint), '[]'::jsonb)::text
+                 FROM research.sim_days_snapshots s CROSS JOIN LATERAL jsonb_array_elements(s.trades) t
+                 WHERE s.run_id = @id AND s.session < @session AND t.value->>'exitSession' IS NULL
+                   -- shortcut: the NOT EXISTS unpacks every earlier snapshot per candidate trade (trades x days); measured 16-21 ms for 50 trades; rewrite as one GROUP BY over the earlier snapshots when runs exceed about a year
+                   AND NOT EXISTS (
+                       SELECT 1 FROM research.sim_days_snapshots s2 CROSS JOIN LATERAL jsonb_array_elements(s2.trades) t2
+                       WHERE s2.run_id = @id AND s2.session < @session AND t2.value->>'tradeNo' = t.value->>'tradeNo' AND t2.value->>'exitSession' IS NOT NULL))
+            """);
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id);
+        command.Parameters.AddWithValue("session", NpgsqlDbType.Date, session);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        await reader.ReadAsync(cancellationToken);
+        return new SimTapeDay(
+            reader.IsDBNull(0) ? null : reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetDecimal(2), reader.GetString(3));
+    }
 
     private async ValueTask<List<SimDaySnapshotRow>> SnapshotRowsAsync(string where, Guid id, DateOnly? session, CancellationToken cancellationToken)
     {

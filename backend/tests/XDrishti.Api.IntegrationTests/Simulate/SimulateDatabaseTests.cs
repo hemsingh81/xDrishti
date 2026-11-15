@@ -51,6 +51,17 @@ public sealed partial class SimulateDatabaseTests(ApiFactory factory) : DataTest
     /// <summary>A bar store and bar queries that record every call and answer nothing: a refusal must not reach them.</summary>
     internal sealed class NoReads : IBarStore, IBarQueries
     {
+        public async ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>>> ReadManyAsync(IReadOnlyCollection<Guid> instrumentIds, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+        {
+            var all = new Dictionary<Guid, IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>>();
+            foreach (var id in instrumentIds)
+            {
+                all[id] = await ReadAsync(id, from, to, cancellationToken);
+            }
+
+            return all;
+        }
+
         public List<string> Calls { get; } = [];
 
         public ValueTask<IBarMergeSession> BeginMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken) => Record<IBarMergeSession>(nameof(BeginMergeAsync));

@@ -241,6 +241,17 @@ public sealed class ModelHoldOutPassDatabaseTests(ApiFactory factory) : DataTest
 
     private sealed class RecordingBars(IBarStore inner) : IBarStore
     {
+        public async ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>>> ReadManyAsync(IReadOnlyCollection<Guid> instrumentIds, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+        {
+            var all = new Dictionary<Guid, IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>>();
+            foreach (var id in instrumentIds)
+            {
+                all[id] = await ReadAsync(id, from, to, cancellationToken);
+            }
+
+            return all;
+        }
+
         public List<DateTimeOffset> Reads { get; } = [];
 
         public ValueTask<IBarMergeSession> BeginMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken) => inner.BeginMergeAsync(instrumentId, source, cancellationToken);

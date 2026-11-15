@@ -57,6 +57,8 @@ internal sealed class StubReplayFacts : IReplayFacts, IReplayInputs
 
     public ValueTask<IReadOnlyList<Bar>> MinuteBarsAsync(Guid instrumentId, DateOnly cut, CancellationToken cancellationToken) => throw new NotSupportedException("a start reads no bars");
 
+    public ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<Bar>>> DayMinuteBarsAsync(IReadOnlyCollection<Guid> instrumentIds, DateOnly day, DateTimeOffset through, CancellationToken cancellationToken) => throw new NotSupportedException("a start reads no bars");
+
     public ValueTask<ReplayMarket> MarketAsync(DateOnly cut, DateOnly forDate, IReadOnlyList<ContextInstrument> instruments, IReadOnlyList<ContextInstrument> ranked, CancellationToken cancellationToken) => throw new NotSupportedException("a start steps no session");
 
     public ValueTask<SizingInputs> SizingAsync(DateOnly cut, DateOnly forDate, IReadOnlyList<ContextInstrument> instruments, CancellationToken cancellationToken) => throw new NotSupportedException("a start steps no session");

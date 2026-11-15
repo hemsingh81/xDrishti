@@ -35,9 +35,9 @@ internal sealed class SimDayBook(ReplayDriver driver, ReplayPrepared prepared)
             return Result.Failure<SimDayBook>(Error.Validation("sim.unreadable", "The stored parameters, settings snapshot or strategy versions cannot be read."));
         }
 
-        if (row.ReadThrough is { } through)
+        if (row.ReadThrough is { } through && !facts.ReadInsideHoldOut(through))
         {
-            facts.ReadInsideHoldOut(through);
+            return Result.Failure<SimDayBook>(Error.Conflict("sim.holdout", $"The run reads inside the hold-out block up to {through:yyyy-MM-dd}, but the replay cannot read there: the day cannot be settled."));
         }
 
         var versions = stored.ToDictionary(p => p.Key, p => (IReadOnlyList<StoredVersion>)p.Value, StringComparer.Ordinal);
@@ -64,7 +64,7 @@ internal sealed class SimDayBook(ReplayDriver driver, ReplayPrepared prepared)
             .Select(t =>
             {
                 var exit = t.Exit is { } e && t.ExitSession <= day ? e : null;
-                return new SimDayTrade(t.Id, t.Item.Symbol, t.Item.Side, t.Item.Evidence.CellKey, t.Qty, t.EntrySession, t.EntryAt, t.EntryPrice, t.StopPrice, t.Swing, exit is null ? null : t.ExitSession, exit?.ExitAt, exit?.GrossPnl, exit?.RSim);
+                return new SimDayTrade(t.Id, t.Item.Symbol, t.Item.Side, t.Item.Evidence.CellKey, t.Qty, t.EntrySession, t.EntryAt, t.EntryPrice, t.StopPrice, t.Swing, exit is null ? null : t.ExitSession, exit?.ExitAt, exit?.GrossPnl, exit?.RSim, t.InstrumentId, exit?.ExitPrice, exit?.ExitReason);
             })
             .ToList();
         return Result.Success(new SimDayOutcome(record, text, ReplayJson.Sha256(text), ReplayJson.Canonical(trades), record.Equity));

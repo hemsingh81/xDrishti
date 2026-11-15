@@ -53,6 +53,9 @@ public interface IReplayFacts
     /// <summary>The 1-minute bars of the instrument up to and including the close of <paramref name="cut"/>, about 400 calendar days.</summary>
     ValueTask<IReadOnlyList<Bar>> MinuteBarsAsync(Guid instrumentId, DateOnly cut, CancellationToken cancellationToken);
 
+    /// <summary>The 1-minute bars of the India date <paramref name="day"/> of each of <paramref name="instrumentIds"/> up to and including <paramref name="through"/>, in one read through the same hold-out clamp (SR-04 tape).</summary>
+    ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<Bar>>> DayMinuteBarsAsync(IReadOnlyCollection<Guid> instrumentIds, DateOnly day, DateTimeOffset through, CancellationToken cancellationToken);
+
     /// <summary>The market gate, the correlations of the ranked instruments and the instrument facts of <paramref name="instruments"/>, as of the close of <paramref name="cut"/> for the plan of <paramref name="forDate"/>.</summary>
     ValueTask<ReplayMarket> MarketAsync(DateOnly cut, DateOnly forDate, IReadOnlyList<ContextInstrument> instruments, IReadOnlyList<ContextInstrument> ranked, CancellationToken cancellationToken);
 

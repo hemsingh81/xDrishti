@@ -17368,6 +17368,93 @@
         }
       }
     },
+    "/api/sim/days/{id}/days/{date}/tape": {
+      "get": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "One page of a settled day's tape for playback: the stored 1-minute bars of the instruments in play (picked, held or traded that day) and the trade events (entry, exit; the stop is not moved) whose minute lies in [from, to] (date-times on the day, default 09:15 to 15:29 India time), and the live board at to (open positions, entry, stop, last price, running P&L, realised equity), using only bars up to to. Nothing after to and nothing beyond the settled day. 404 sim.not_found, sim.day_not_found; 409 sim.not_settled; 422 sim.invalid. Read only.",
+        "operationId": "GetSimDayTape",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimDayTapeView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sim/days/{id}/settle": {
       "post": {
         "tags": [
@@ -70743,6 +70830,100 @@
         },
         "description": "Progress of the job, read by the report view while it runs (AU-14, AU-15)."
       },
+      "SimBoard": {
+        "required": [
+          "at",
+          "open",
+          "realised",
+          "unrealised",
+          "equityOpen",
+          "equity"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "open": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimBoardPosition"
+            }
+          },
+          "realised": {
+            "type": "number",
+            "format": "double"
+          },
+          "unrealised": {
+            "type": "number",
+            "format": "double"
+          },
+          "equityOpen": {
+            "type": "number",
+            "format": "double"
+          },
+          "equity": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "The live board at the clock minute At (SR-04, AC 6), from the bars and the events up to that minute only. Equity is realised, as PaperLedger counts it: the equity at the previous close plus the gross P&amp;L of the exits of the day up to the minute; at the end\nof the day it equals the settled closing equity (AC 5). Unrealised is the sum of the running P&amp;L of the open positions."
+      },
+      "SimBoardPosition": {
+        "required": [
+          "tradeNo",
+          "symbol",
+          "side",
+          "qty",
+          "entryAt",
+          "entryPrice",
+          "stop",
+          "lastPrice",
+          "runningPnl"
+        ],
+        "type": "object",
+        "properties": {
+          "tradeNo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "entryAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entryPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "stop": {
+            "type": "number",
+            "format": "double"
+          },
+          "lastPrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "runningPnl": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "An open position on the live board at the clock minute: the last price is the close of the instrument's last bar of the day up to the minute (null before its first bar; the running P&amp;L is then 0)."
+      },
       "SimDaySnapshotView": {
         "required": [
           "runId",
@@ -70833,6 +71014,73 @@
         },
         "description": "One day of a simulation (SR-04, AC 7): the picks (the plan made at its close), the blocked with reasons, the fills, the trades that entered or exited on it, the closing equity and the result hash. bool SimDaySnapshotView.Stored is false for the settled cursor day before it is advanced."
       },
+      "SimDayTapeView": {
+        "required": [
+          "runId",
+          "session",
+          "from",
+          "to",
+          "marketOpen",
+          "marketClose",
+          "symbols",
+          "bars",
+          "events",
+          "board",
+          "costsLabel"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "session": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "marketOpen": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "marketClose": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bars": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimTapeBar"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimTapeEvent"
+            }
+          },
+          "board": {
+            "$ref": "#/components/schemas/SimBoard"
+          },
+          "costsLabel": {
+            "type": "string"
+          }
+        },
+        "description": "One page of a settled day's tape (SR-04 part B, ADR 0293): the stored 1-minute bars of the instruments in play (picked, held or traded that day) and the trade events whose minute lies in [From, To], and the live board at To. Nothing after To is in it.\nReplaying the pages in order, with any paging, gives the settled day's trades and equity."
+      },
       "SimDayTrade": {
         "required": [
           "tradeNo",
@@ -70915,9 +71163,29 @@
               "number"
             ],
             "format": "double"
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "exitPrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "exitReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "A trade of the simulation book that enters or exits on the day (SR-04): the exit only when it is on or before the day, so a day never shows a later exit. Gross (ADR 0292)."
+        "description": "A trade of the simulation book that enters or exits on the day (SR-04): the exit only when it is on or before the day, so a day never shows a later exit. Gross (ADR 0292). The instrument id, exit price and exit reason were added for the tape (part B); a day stored without them reads them as null."
       },
       "SimDaysAutoBody": {
         "required": [
@@ -71222,6 +71490,111 @@
           }
         },
         "description": "A page of jobs."
+      },
+      "SimTapeBar": {
+        "required": [
+          "symbol",
+          "at",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "open": {
+            "type": "number",
+            "format": "double"
+          },
+          "high": {
+            "type": "number",
+            "format": "double"
+          },
+          "low": {
+            "type": "number",
+            "format": "double"
+          },
+          "close": {
+            "type": "number",
+            "format": "double"
+          },
+          "volume": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "description": "One stored 1-minute bar of an instrument in play (SR-04 tape). At is the start of the minute."
+      },
+      "SimTapeEvent": {
+        "required": [
+          "at",
+          "kind",
+          "tradeNo",
+          "symbol",
+          "side",
+          "qty",
+          "price",
+          "stop",
+          "grossPnl",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "tradeNo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "price": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "stop": {
+            "type": "number",
+            "format": "double"
+          },
+          "grossPnl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A trade event at its own minute (SR-04 tape): `entry` (price = the fill, stop = the initial stop) or `exit` (price = the exit, with the gross P&amp;L and the reason). The stop is not moved by the replay, so there is no stop-move event."
       },
       "SimTrainingScore": {
         "required": [

@@ -14,3 +14,6 @@ public sealed record SimDayPending(DateOnly Session, string RecordJson, string T
 
 /// <summary>One stored, immutable day of a simulation.</summary>
 public sealed record SimDaySnapshotRow(DateOnly Session, string RecordJson, string PicksJson, string BlockedJson, string TradesJson, decimal EquityClose, string ResultHash, DateOnly EndInForce);
+
+/// <summary>What the tape of one day reads (SR-04 part B), and nothing more of the run: the stored day's record and trades (null when the day is not stored), the closing equity of the stored day before it (null on the first day) and the trades still open coming into the day (their latest stored state, a JSON array).</summary>
+public sealed record SimTapeDay(string? RecordJson, string? TradesJson, decimal? EquityOpen, string HeldJson);

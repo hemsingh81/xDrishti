@@ -297,6 +297,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(XDrishti.Api.Endpoints.SimDaysStarted))]
 [JsonSerializable(typeof(XDrishti.Application.Replay.Sim.SimDaysView))]
 [JsonSerializable(typeof(XDrishti.Application.Replay.Sim.SimDaySnapshotView))]
+[JsonSerializable(typeof(XDrishti.Application.Replay.Sim.SimDayTapeView))]
 [JsonSerializable(typeof(XDrishti.Api.Endpoints.ReplayStartBody))]
 [JsonSerializable(typeof(XDrishti.Api.Endpoints.ReplayCancelView))]
 [JsonSerializable(typeof(XDrishti.Application.Replay.Job.StartedReplay))]

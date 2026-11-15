@@ -31,6 +31,9 @@ public interface IBarStore
 
     /// <summary>The stored bars of the instrument from <paramref name="from"/> up to and including <paramref name="to"/>, oldest first.</summary>
     ValueTask<IReadOnlyList<Bar>> ReadAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken);
+
+    /// <summary>The stored bars of each of <paramref name="instrumentIds"/> from <paramref name="from"/> up to and including <paramref name="to"/>, oldest first, in one read (SR-04 tape); an instrument without bars has an empty list. Like <see cref="ReadAsync"/>, read through <c>SeamAwareBars</c> outside the raw readers.</summary>
+    ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<Bar>>> ReadManyAsync(IReadOnlyCollection<Guid> instrumentIds, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken);
 }
 
 /// <summary>One merge in progress; see <see cref="IBarStore.BeginMergeAsync"/>.</summary>

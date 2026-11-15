@@ -48,6 +48,22 @@ public interface IBackfillSeams
 {
     ValueTask<DateTimeOffset?> SeamOfAsync(Guid instrumentId, CancellationToken cancellationToken);
 
+    /// <summary>The high-water seam of each of <paramref name="instrumentIds"/> that has one, in one read (SR-04 tape). The default asks <see cref="SeamOfAsync"/> one by one.</summary>
+    async ValueTask<IReadOnlyDictionary<Guid, DateTimeOffset>> SeamsOfAsync(IReadOnlyCollection<Guid> instrumentIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(instrumentIds);
+        var all = new Dictionary<Guid, DateTimeOffset>();
+        foreach (var id in instrumentIds.Distinct())
+        {
+            if (await SeamOfAsync(id, cancellationToken) is { } seam)
+            {
+                all[id] = seam;
+            }
+        }
+
+        return all;
+    }
+
     /// <summary><c>Data:History:Replay:AdmitVerified</c>. The policy of what the switch does lives in <c>PreSeamAdmission</c>; the port only says it. The default is off: a port that does not implement it admits nothing.</summary>
     bool AdmitVerified => false;
 
